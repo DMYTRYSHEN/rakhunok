@@ -1,5 +1,7 @@
 # Core to Corex Migration Plan
 
+The detailed dashboard behavior, UX, Tailwind, and acceptance specification is maintained in [DASHBOARD_AUDIT.md](DASHBOARD_AUDIT.md).
+
 ## Objective
 
 Rebuild the working product from `D:\svetle\core` in `D:\svetle\corex` using the latest stable Svelte 5, SvelteKit, TypeScript, Vite, Tailwind CSS, Vitest, and Playwright versions available when scaffolding begins.

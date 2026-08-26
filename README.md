@@ -17,6 +17,26 @@ npm run dev
 
 The development server prints its local URL. Use `npm run build` to generate the static application in `build/` and `npm run preview` to inspect that build.
 
+Dashboard invoice and onboarding requests use the same-origin `/api` path. During local development, run the existing Worker in a second terminal so Vite can proxy those requests to port `8787`:
+
+```powershell
+npm run dev:worker
+```
+
+Keep Worker secrets in its ignored local secret file or Wrangler secret storage. Never place service-role keys or telemetry tokens in a tracked Wrangler configuration.
+
+### Invoice database scenarios
+
+`npm run test:invoice-db` provisions or updates one dedicated Auth user and merchant, then verifies fixed, itemized, delivery, and table invoices against the real Worker and database. Every created invoice is cancelled through the Worker and deleted during cleanup; the marked test merchant remains available for repeat runs.
+
+The runner refuses to write unless `ALLOW_TEST_DATABASE_WRITES=1`, the declared project ref matches `TEST_SUPABASE_URL`, and the merchant email or name contains `test`, `staging`, or `qa`. Configure the `TEST_*` values from `.env.example` in the current terminal without committing credentials, start the Worker with `npm run dev:worker`, and then run:
+
+```powershell
+npm run test:invoice-db
+```
+
+Set `TEST_KEEP_ORDERS=1` only when retained test records are deliberately required for manual inspection.
+
 ## Validation
 
 Run the complete local gate before opening a pull request:
@@ -38,6 +58,7 @@ src/
 └─ routes/            # Thin SvelteKit route composition
 docs/
 ├─ BASELINE.md        # Legacy behavior inventory
+├─ DASHBOARD_AUDIT.md # Dashboard behavior, UX, and Tailwind specification
 ├─ ROUTES.md          # Preserved URL contracts
 ├─ API_CONTRACT.md    # Existing backend boundary
 └─ MIGRATION_PLAN.md  # Sequenced migration roadmap

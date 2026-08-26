@@ -5,7 +5,7 @@
 
 <section class="hero">
 	<div class="hero-grid container">
-		<div use:reveal>
+		<div>
 			<p class="eyebrow"><i></i> Оплата з банківського рахунку</p>
 			<h1>Оплата одразу <span>на ваш рахунок.</span></h1>
 			<p class="hero-copy">

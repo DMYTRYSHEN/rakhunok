@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import LandingPage from '$lib/features/landing/LandingPage.svelte';
 	import { getAuthRedirectUrl } from '$lib/features/landing/utils/auth-redirect';
+	import '$lib/features/landing/landing.css';
 
 	onMount(() => {
 		const redirectUrl = getAuthRedirectUrl(

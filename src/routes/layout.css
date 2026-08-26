@@ -1,2 +1,50 @@
 @import 'tailwindcss';
-@import '../lib/features/landing/landing.css';
+
+html[data-theme='dark'],
+html[data-theme='dark'] body {
+	background-color: #17191a;
+}
+
+html[data-theme='dark'] .dashboard-root {
+	color-scheme: dark;
+	background: #17191a;
+	color: #f4f4f5;
+}
+
+html[data-theme='dark'] .dashboard-root :is(.bg-white, .bg-white\/95) {
+	background-color: #222526;
+}
+
+html[data-theme='dark'] .dashboard-root :is(.bg-zinc-50, .bg-\[\#f6f7f8\]) {
+	background-color: #17191a;
+}
+
+html[data-theme='dark'] .dashboard-root .bg-zinc-100 {
+	background-color: #303334;
+}
+
+html[data-theme='dark'] .dashboard-root .bg-zinc-200 {
+	background-color: #45494b;
+}
+
+html[data-theme='dark'] .dashboard-root :is(.border-zinc-100, .border-zinc-200, .border-zinc-300) {
+	border-color: #3f3f46;
+}
+
+html[data-theme='dark'] .dashboard-root :is(.text-zinc-950, .text-zinc-900, .text-zinc-700, .text-zinc-600) {
+	color: #f4f4f5;
+}
+
+html[data-theme='dark'] .dashboard-root :is(.text-zinc-500, .text-zinc-400) {
+	color: #b4b4bd;
+}
+
+html[data-theme='dark'] .dashboard-root :is(button, a, [role='button']):focus-visible {
+	outline-color: #93c5fd;
+}
+
+html[data-theme='dark'] .dashboard-root :is(input, select, textarea) {
+	background-color: #272a2b;
+	border-color: #52525b;
+	color: #f4f4f5;
+}
