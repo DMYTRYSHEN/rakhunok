@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
+	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Check from '@lucide/svelte/icons/check';
 	import Copy from '@lucide/svelte/icons/copy';
@@ -52,6 +53,7 @@
 	let entities = $state<BusinessEntity[]>([]);
 	let terminals = $state<Terminal[]>([]);
 	let selectedTerminalId = $state('');
+	let qrSwipeStartX = $state<number | null>(null);
 	let orders = $state<OrderSummary[]>([]);
 	let historyPeriod = $state<HistoryPeriod>('today');
 	let selectedOrder = $state<OrderSummary | null>(null);
@@ -81,6 +83,7 @@
 	const amountCharacters = $derived(formattedDisplay.split(''));
 	const previousCharacters = $derived(previousDisplay.padStart(formattedDisplay.length, ' ').slice(-formattedDisplay.length).split(''));
 	const selectedTerminal = $derived(terminals.find((terminal) => terminal.id === selectedTerminalId));
+	const selectedTerminalIndex = $derived(terminals.findIndex((terminal) => terminal.id === selectedTerminalId));
 	const scenarioIndex = $derived(scenario === 'fixed' ? 0 : scenario === 'table' ? 1 : 2);
 	const canPreview = $derived(
 		scenario === 'open' || (amount > 0 && (scenario !== 'table' || Boolean(selectedTerminal)))
@@ -274,6 +277,21 @@
 		} finally {
 			historyLoading = false;
 		}
+	}
+
+	function selectQrTerminal(index: number) {
+		const terminal = terminals[index];
+		if (!terminal || terminal.id === selectedTerminalId) return;
+		selectedTerminalId = terminal.id;
+		haptic('selection');
+	}
+
+	function finishQrSwipe(event: PointerEvent) {
+		if (qrSwipeStartX === null) return;
+		const distance = event.clientX - qrSwipeStartX;
+		qrSwipeStartX = null;
+		if (Math.abs(distance) < 40) return;
+		selectQrTerminal(selectedTerminalIndex + (distance < 0 ? 1 : -1));
 	}
 
 	function historyThreshold(period: HistoryPeriod) {
@@ -684,9 +702,31 @@
 			<div class="creation-status"><span></span> Новий рахунок</div>
 			<p class="eyebrow">Перевірка перед створенням</p>
 			<h2 id="preview-title">{scenario === 'open' ? 'Вільна сума' : formatAmount(String(amount))} {#if scenario !== 'open'}<small>₴</small>{/if}</h2>
-			{#if scenario === 'table' && selectedTerminal}<p class="terminal-summary">{selectedTerminal.name} · {selectedTerminal.code}</p>{/if}
 			{#if scenario === 'table' && selectedTerminal}
-				<PaymentQr value={`${window.location.origin}/pos/${encodeURIComponent(selectedTerminal.code)}`} label="QR столу (багаторазовий)" />
+				<div
+					class="qr-carousel"
+					class:multiple={terminals.length > 1}
+					role="group"
+					aria-label="QR-коди терміналів"
+					onpointerdown={(event) => (qrSwipeStartX = event.clientX)}
+					onpointerup={finishQrSwipe}
+					onpointercancel={() => (qrSwipeStartX = null)}
+				>
+					<div class="qr-carousel-heading">
+						<button type="button" aria-label="Попередній QR-код" disabled={selectedTerminalIndex <= 0} onclick={() => selectQrTerminal(selectedTerminalIndex - 1)}><ChevronLeft size={18} /></button>
+						<p class="terminal-summary"><strong>{selectedTerminal.name}</strong><span>{selectedTerminal.code}</span></p>
+						<button type="button" aria-label="Наступний QR-код" disabled={selectedTerminalIndex >= terminals.length - 1} onclick={() => selectQrTerminal(selectedTerminalIndex + 1)}><ChevronRight size={18} /></button>
+					</div>
+					<PaymentQr value={`${window.location.origin}/pos/${encodeURIComponent(selectedTerminal.code)}`} label="QR столу (багаторазовий)" />
+					{#if terminals.length > 1}
+						<div class="qr-pagination" aria-label={`QR-код ${selectedTerminalIndex + 1} з ${terminals.length}`}>
+							{#each terminals as terminal, index}
+								<button class:active={terminal.id === selectedTerminalId} type="button" aria-label={`Показати QR ${terminal.name}`} onclick={() => selectQrTerminal(index)}></button>
+							{/each}
+							<span>{selectedTerminalIndex + 1} / {terminals.length}</span>
+						</div>
+					{/if}
+				</div>
 			{:else}
 				<div class="creation-mark" aria-hidden="true"><svg viewBox="0 0 208 221"><path d="M108.9 29.2c31.7 0 52.6 20.2 52.6 47.8 0 21.2-12.1 38.8-33.1 46.3l40.9 68.1c-25.3 0-48.6-13.3-61-34.7l-13.7-23.7c-12.1 0-21.9 9.6-21.9 21.3v37.1c-19.4 0-35.2-15.3-35.2-34.3v-20c0-18.9 15.8-34.3 35.2-34.3h28.8c15.8 0 24.7-8.3 24.7-22.4 0-13.1-7.5-19.7-22.4-19.7H72.7c-19.4 0-35.2-14.1-35.2-31.5h71.4Z" /></svg></div>
 			{/if}
