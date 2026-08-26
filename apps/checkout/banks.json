@@ -1,0 +1,482 @@
+[
+  {
+    "id": "alliance",
+    "code": "ALLI",
+    "name": "Alliance Bank (Альянс)",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/39/28/e2/3928e2e6-1f69-235d-bb14-0b8b703ab54e/Placeholder.mill/200x200bb-75.webp",
+    "color": "#1ed4fd",
+    "checked": true
+  },
+  {
+    "id": "altbank",
+    "code": "ALTB",
+    "name": "Altbank Private",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/6b/f1/a2/6bf1a2b4-3a6f-c3c7-7beb-73d4e9ffe884/AppIcon-0-0-1x_U007emarketing-0-6-0-0-85-220.png/200x200ia-75.webp",
+    "color": "#233b69",
+    "checked": false
+  },
+  {
+    "id": "asvi",
+    "code": "ASVI",
+    "name": "amobank (ASVIO BANK)",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/f9/70/ea/f970eab9-348c-f0f9-a54a-b0d50cf7e835/Placeholder.mill/200x200bb-75.webp",
+    "color": "#1e2938",
+    "checked": false
+  },
+  {
+    "id": "lviv",
+    "code": "LVIV",
+    "name": "Bank Lviv Online",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/cf/24/47/cf244747-62ff-6fd4-9352-b09e6e929998/Placeholder.mill/200x200bb-75.webp",
+    "color": "#2267c6",
+    "checked": false
+  },
+  {
+    "id": "bisbank",
+    "code": "BINV",
+    "name": "BIS24 (БІЗБАНК)",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/07/e8/2e/07e82efe-55a5-cd91-e59e-e422b599f7d8/Placeholder.mill/200x200bb-75.webp",
+    "color": "#e1af41",
+    "checked": false
+  },
+  {
+    "id": "capibank",
+    "code": "UCAP",
+    "name": "CAPIbank (Укр. Капітал)",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/24/5f/f3/245ff3b3-236b-21da-fcf1-90b30636e838/AppIcon-0-0-1x_U007ephone-0-1-0-85-220.png/512x512bb.jpg",
+    "color": "#2352cb",
+    "checked": false
+  },
+  {
+    "id": "cominbank",
+    "code": "CMIG",
+    "name": "ComInBank (Комінбанк)",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/ab/79/4a/ab794ad1-d3b6-5094-932d-534233407b33/Placeholder.mill/200x200bb-75.webp",
+    "color": "#5786c3",
+    "checked": false
+  },
+  {
+    "id": "oschad_corplight",
+    "code": "SABC",
+    "name": "CorpLight Oschadbank",
+    "active": false,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/2d/43/bd/2d43bd12-db44-5ed9-a381-771e6a7c72a1/Placeholder.mill/200x200bb-75.webp",
+    "color": "#01654c",
+    "checked": true
+  },
+  {
+    "id": "crystal",
+    "code": "CRYS",
+    "name": "CrystalBank",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/60/14/ec/6014ec5d-9f72-9953-c6ae-e9dd82d24465/Placeholder.mill/200x200bb-75.webp",
+    "color": "#555555",
+    "checked": false
+  },
+  {
+    "id": "izibank",
+    "code": "TASB",
+    "name": "izibank (Tascombank)",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/fa/dd/6d/fadd6db5-56ff-c4ba-fd98-cc48f34b4997/Placeholder.mill/200x200bb-75.webp",
+    "color": "#FF6B00",
+    "checked": true
+  },
+  {
+    "id": "kredo",
+    "code": "WUCU",
+    "name": "KredoBank (Кредобанк)",
+    "active": false,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/83/34/dc/8334dcfd-7b65-78a3-2053-7b73e588e91e/Placeholder.mill/200x200bb-75.webp",
+    "color": "#005CA9",
+    "checked": true
+  },
+  {
+    "id": "mono",
+    "code": "MONO",
+    "name": "monobank",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/a7/06/5a/a7065ad9-93f8-5705-4b1a-81ade2916c05/Placeholder.mill/200x200bb-75.webp",
+    "color": "#000000",
+    "checked": true
+  },
+  {
+    "id": "NovaPay",
+    "code": "NOVA",
+    "name": "NovaPay",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/80/be/f7/80bef75a-fca9-ec80-98b8-dad73437089c/Placeholder.mill/200x200bb-75.webp",
+    "color": "#680dd2",
+    "checked": true
+  },
+  {
+    "id": "idea",
+    "code": "IDEU",
+    "name": "OBank (Ідея Банк)",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/6d/7d/5f/6d7d5f6d-54f7-4473-5433-4d8623cc48bf/Placeholder.mill/200x200bb-75.webp",
+    "color": "#503690",
+    "checked": false
+  },
+  {
+    "id": "pinb",
+    "code": "PINB",
+    "name": "PINBANK",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/23/1f/38/231f38ec-c451-96ae-e820-bd1215bacde7/Placeholder.mill/200x200bb-75.webp",
+    "color": "#492578",
+    "checked": false
+  },
+  {
+    "id": "pb",
+    "code": "PBAN",
+    "name": "Privat24 – mobile bank Приват24(PrivatBank)",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/57/f8/e0/57f8e0bf-783f-766a-b52b-ba630accaef1/Placeholder.mill/200x200bb-75.webp",
+    "color": "#78BE20",
+    "checked": true
+  },
+  {
+    "id": "sensebank",
+    "code": "SENS",
+    "name": "Sense Bank",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/06/da/1c/06da1ccf-fdb3-ae36-cf00-e258e76e2284/Placeholder.mill/200x200bb-75.webp",
+    "color": "#2622fe",
+    "checked": true
+  },
+  {
+    "id": "skyb",
+    "code": "SKYB",
+    "name": "SkyBank",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/b0/38/7a/b0387ade-726a-b679-094f-43575052f03d/Placeholder.mill/200x200bb-75.webp",
+    "color": "#3ea9e2",
+    "checked": false
+  },
+  {
+    "id": "ukrsib-online",
+    "code": "KHAB",
+    "name": "UKRSIB online / business",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/6e/16/bd/6e16bdb8-591b-8244-706e-c4b6868c9d09/Placeholder.mill/200x200bb-75.webp",
+    "color": "#018357",
+    "checked": true
+  },
+  {
+    "id": "vostok",
+    "code": "VSTB",
+    "name": "VST bank (Банк Восток)",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/9e/fb/0f/9efb0fb7-d747-dbb3-53be-dbb4ebba503e/Placeholder.mill/200x200bb-75.webp",
+    "color": "#fb5404",
+    "checked": false
+  },
+  {
+    "id": "winbank",
+    "code": "PIRB",
+    "name": "Winbank Ukraine (Піреус)",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/10/63/63/1063638d-570a-10e5-dfe9-3e97c9baf74e/AppIcon-0-0-1x_U007ephone-0-1-0-sRGB-85-220.png/512x512bb.jpg",
+    "color": "#F7941D",
+    "checked": false
+  },
+  {
+    "id": "abank24",
+    "code": "ABUA",
+    "name": "А-Банк (ABank)",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/3a/76/1e/3a761e68-39dc-51ad-f189-e9d89227442c/Placeholder.mill/200x200bb-75.webp",
+    "color": "#03d350",
+    "checked": true
+  },
+  {
+    "id": "apsb",
+    "code": "APSB",
+    "name": "Агропросперіс Банк",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/ab/9e/3b/ab9e3bc5-3963-a9a1-2715-35ccf1f71ed9/Placeholder.mill/200x200bb-75.webp",
+    "color": "#e0e0e0",
+    "checked": false
+  },
+  {
+    "id": "accordbank",
+    "code": "ACBR",
+    "name": "Акордбанк (Accordbank)",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/f8/ab/04/f8ab0426-212a-5f08-271b-ca37938e43c1/Placeholder.mill/200x200bb-75.webp",
+    "color": "#df2b2c",
+    "checked": true
+  },
+  {
+    "id": "bank34",
+    "code": "B34U",
+    "name": "Банк 3/4",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/c7/05/b7/c705b7aa-01e7-8d68-7ab6-07e852564514/Placeholder.mill/200x200bb-75.webp",
+    "color": "#607D8B",
+    "checked": false
+  },
+  {
+    "id": "bvr",
+    "code": "BVRU",
+    "name": "Банк Власний Рахунок",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/55/0a/cd/550acd91-aae2-cd09-0f04-29f817bde0f2/Placeholder.mill/200x200bb-75.webp",
+    "color": "#0833b5",
+    "checked": false
+  },
+  {
+    "id": "grant",
+    "code": "GRNT",
+    "name": "Банк Грант",
+    "active": false,
+    "routing_mode": "scheme",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/72/39/22/723922e3-f193-630a-10e2-4906398e05fe/Placeholder.mill/200x200bb-75.webp",
+    "color": "#41bde0",
+    "checked": false
+  },
+  {
+    "id": "kdba",
+    "code": "KDBA",
+    "name": "БАНК КД (Кліринговий Дім)",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/9e/2a/c3/9e2ac395-01d9-46a1-0c58-234e9f3ee88a/Placeholder.mill/200x200bb-75.webp",
+    "color": "#c3f542",
+    "checked": false
+  },
+  {
+    "id": "creditdnepr",
+    "code": "CRDE",
+    "name": "Банк Кредит Дніпро",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/c5/29/03/c5290377-b794-f55b-a501-05ce2c986487/Placeholder.mill/200x200bb-75.webp",
+    "color": "#0066CC",
+    "checked": true
+  },
+  {
+    "id": "pivdenny",
+    "code": "PIVD",
+    "name": "Банк Південний",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/41/83/90/41839039-82fd-1dcc-83e2-7b9bd3d0dc70/Placeholder.mill/200x200bb-75.webp",
+    "color": "#00539F",
+    "checked": true
+  },
+  {
+    "id": "globus",
+    "code": "GLBU",
+    "name": "Глобус Банк",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/cf/31/7d/cf317d36-9ed8-4918-e96f-c6e0622f8fb6/Placeholder.mill/200x200bb-75.webp",
+    "color": "#383838",
+    "checked": true
+  },
+  {
+    "id": "industrialbank",
+    "code": "IBBK",
+    "name": "Індустріалбанк",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/77/9d/75/779d75ec-ce67-d107-5de0-a35e8ea0c84c/Placeholder.mill/200x200bb-75.webp",
+    "color": "#3069bd",
+    "checked": false
+  },
+  {
+    "id": "creditagricole",
+    "code": "AGBU",
+    "name": "Креді Аґріколь (Credit Agricole)",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/85/14/03/8514039f-6272-a984-1706-ab46a834c113/Placeholder.mill/200x200bb-75.webp",
+    "color": "#29a4d1",
+    "checked": true
+  },
+  {
+    "id": "mib",
+    "code": "IIBU",
+    "name": "МІБ (Міжнар. Інвест. Банк)",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/31/e4/0f/31e40f2a-c73c-1bb8-14e8-af0ed2ade52a/Placeholder.mill/200x200bb-75.webp",
+    "color": "#037d5f",
+    "checked": false
+  },
+  {
+    "id": "mtb",
+    "code": "MTBA",
+    "name": "МТБ Банк",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/c6/75/f0/c675f033-ec60-fe2c-45f7-e9615bd91437/Placeholder.mill/200x200bb-75.webp",
+    "color": "#0072CE",
+    "checked": true
+  },
+  {
+    "id": "otpbank",
+    "code": "OTPV",
+    "name": "ОТП Банк (OTP Bank)",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/86/0f/b0/860fb09e-039b-cf89-3b07-0124ec97c092/Placeholder.mill/200x200bb-75.webp",
+    "color": "#52AE30",
+    "checked": true
+  },
+  {
+    "id": "oschad",
+    "code": "SABR",
+    "name": "Ощадбанк",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/fb/bd/c8/fbbdc880-5b61-b1a9-f33c-ace61c38be11/Placeholder.mill/200x200bb-75.webp",
+    "color": "#28cfc6",
+    "checked": false
+  },
+  {
+    "id": "pltv",
+    "code": "PLTV",
+    "name": "Полтава-Банк онлайн",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/4e/b1/bf/4eb1bfa6-b66b-90e9-fd4e-c57006c62e43/AppIcon-0-0-1x_U007emarketing-0-6-0-85-220.png/200x200ia-75.webp",
+    "color": "#e41f26",
+    "checked": false
+  },
+  {
+    "id": "pravex",
+    "code": "PRAV",
+    "name": "ПРАВЕКС БАНК (Pravex)",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/d6/e0/a3/d6e0a3cf-abd2-de79-20a0-225239da6336/Placeholder.mill/200x200bb-75.webp",
+    "color": "#FFD700",
+    "checked": true
+  },
+  {
+    "id": "1955925f-93fc-448d-b969-f61a7818f11f",
+    "code": "PBUS",
+    "name": "Приват24 для бізнесу",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/31/94/f6/3194f6f5-1868-425b-ac5f-6bad596d5ad8/Placeholder.mill/200x200bb-75.webp",
+    "color": "#2c6dff",
+    "checked": true
+  },
+  {
+    "id": "pcbu",
+    "code": "PCBU",
+    "name": "ПроКредит Банк",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/7a/f3/1f/7af31fc8-d021-6b53-512e-1cbe04664cd0/AppIcon-Prod-0-0-1x_U007emarketing-0-11-0-85-220.png/512x512bb.jpg",
+    "color": "#555555",
+    "checked": false
+  },
+  {
+    "id": "pumb",
+    "code": "FUIB",
+    "name": "ПУМБ (FUIB)",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/02/0a/09/020a099e-1a78-877b-6394-0919c2b247c4/Placeholder.mill/200x200bb-75.webp",
+    "color": "#EE3124",
+    "checked": true
+  },
+  {
+    "id": "rada",
+    "code": "RDBK",
+    "name": "РАДАБАНК",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/d3/7e/4f/d37e4fb3-9e66-9348-8e1d-0b9b98ca79a4/Placeholder.mill/200x200bb-75.webp",
+    "color": "#174d8d",
+    "checked": true
+  },
+  {
+    "id": "myraif",
+    "code": "AVAL",
+    "name": "Райффайзен Банк (MyRaif)",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/2f/8f/ce/2f8fced9-fdee-7c58-2346-88d943faa770/Placeholder.mill/200x200bb-75.webp",
+    "color": "#FFE600",
+    "checked": true
+  },
+  {
+    "id": "task",
+    "code": "TASK",
+    "name": "ТАСКОМБАНК TAS2U",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/f3/46/92/f34692a6-97b4-64fc-f764-86cfdbac26e6/Placeholder.mill/200x200bb-75.webp",
+    "color": "#2935c0",
+    "checked": false
+  },
+  {
+    "id": "ukrgasbank",
+    "code": "UGAS",
+    "name": "Укргазбанк",
+    "active": true,
+    "routing_mode": "scheme",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/7c/d2/c1/7cd2c1a0-4e29-8f4a-6762-ab97e99b1b97/Placeholder.mill/200x200bb-75.webp",
+    "color": "#00A651",
+    "checked": true
+  },
+  {
+    "id": "exim",
+    "code": "EXIM",
+    "name": "Укрексімбанк Enter EXIM",
+    "active": true,
+    "routing_mode": "redirect",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/fb/cc/e8/fbcce884-198d-bfd0-2f7e-65cdfa7136b5/AppIcon-1x_U007emarketing-0-11-0-0-0-0-85-220-0.png/200x200ia-75.webp",
+    "color": "#085292",
+    "checked": false
+  },
+  {
+    "id": "unex",
+    "code": "UNEX",
+    "name": "Юнекс Банк (Unex Bank)",
+    "active": true,
+    "routing_mode": "universal_link",
+    "logo": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/f3/03/71/f30371be-cc35-68d1-adab-12bad8b4eac7/Placeholder.mill/200x200bb-75.webp",
+    "color": "#ff0100",
+    "checked": true
+  }
+]

@@ -1,0 +1,2430 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Rahunok — App Clip Checkout</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+:root {
+    --sheet-bg: rgba(28, 28, 30, 0.65);
+    --sheet-border: rgba(255, 255, 255, 0.15);
+    --sheet-blur: blur(60px) saturate(210%);
+    --sub-view-bg: rgba(28, 28, 30, 0.98);
+    --text-primary: #ffffff;
+    --text-secondary: rgba(235, 235, 245, 0.6);
+    --text-tertiary: rgba(235, 235, 245, 0.3);
+
+    --card-border: rgba(255, 255, 255, 0.2);
+    --card-shadow: 0 10px 20px rgba(0, 0, 0, 0.45);
+    --card-bg: rgba(255, 255, 255, 0.08);
+
+    --accent: #30d158;
+    --warn: #ff453a;
+
+    --order-bg: #0d0e13;
+    --order-surface: #16181f;
+    --order-surface-2: #1d2029;
+    --order-text: #f5f6f8;
+    --order-text-dim: rgba(245, 246, 248, 0.45);
+    --order-divider: rgba(255, 255, 255, 0.06);
+    --order-cta: #ffffff;
+    --order-cta-text: #0d0e13;
+
+    --btn-bg: #ffffff;
+    --btn-text: #000000;
+
+    --as-bg: rgba(40, 40, 44, 0.92);
+    --as-divider: rgba(255, 255, 255, 0.08);
+    --as-action: #0a84ff;
+
+    --font-stack: 'Manrope', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --ease-apple: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.15);
+}
+
+body.light-mode {
+    --sheet-bg: #ffffff;
+    --sheet-border: transparent;
+    --sheet-blur: none;
+    --sub-view-bg: #ffffff;
+    --text-primary: #000000;
+    --text-secondary: #8a8a8e;
+    --text-tertiary: #c7c7cc;
+
+    --card-border: rgba(0, 0, 0, 0.1);
+    --card-shadow: 0 8px 18px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
+    --card-bg: rgba(0, 0, 0, 0.04);
+
+    --warn: #ff3b30;
+
+    --order-bg: #f2f3f7;
+    --order-surface: #ffffff;
+    --order-surface-2: #f2f3f7;
+    --order-text: #16181f;
+    --order-text-dim: rgba(22, 24, 31, 0.45);
+    --order-divider: rgba(0, 0, 0, 0.06);
+    --order-cta: #16181f;
+    --order-cta-text: #ffffff;
+
+    --btn-bg: #000000;
+    --btn-text: #ffffff;
+
+    --as-bg: rgba(250, 250, 252, 0.94);
+    --as-divider: rgba(0, 0, 0, 0.08);
+    --as-action: #007aff;
+}
+
+* {
+    margin: 0; padding: 0; box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none; -webkit-user-select: none;
+    font-family: var(--font-stack);
+}
+input { user-select: text; -webkit-user-select: text; }
+
+body {
+    background-color: var(--order-bg);
+    color: var(--text-primary);
+    height: 100dvh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    overflow: hidden;
+    transition: background-color 0.5s var(--ease-apple);
+}
+
+/* Odometer */
+.anim-amount { display: inline-flex; align-items: baseline; font-feature-settings: "tnum" 1; }
+.d-shaft { display: inline-block; height: 1em; overflow: hidden; line-height: 1; }
+.d-col { display: flex; flex-direction: column; transition: transform 0.6s var(--ease-spring); will-change: transform; }
+.d-col span { height: 1em; line-height: 1; display: block; }
+.anim-amount > span:not(.d-shaft) { line-height: 1; }
+
+.theme-toggle {
+    position: fixed;
+    top: env(safe-area-inset-top, 14px);
+    right: 14px;
+    z-index: 1000;
+    width: 36px; height: 36px; border-radius: 18px;
+    background: rgba(100, 100, 100, 0.25);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: none; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s var(--ease-apple);
+}
+body.light-mode .theme-toggle { background: rgba(255,255,255,0.75); color: #333; }
+.theme-toggle:active { transform: scale(0.9); }
+.theme-toggle .icon-sun { display: none; }
+body.light-mode .theme-toggle .icon-sun { display: block; }
+body.light-mode .theme-toggle .icon-moon { display: none; }
+
+.clip-root {
+    position: absolute; inset: 0;
+    display: flex; justify-content: center;
+    background: var(--order-bg);
+    transition: background 0.5s var(--ease-apple);
+}
+.screen { position: absolute; inset: 0; display: none; justify-content: center; }
+.screen.active { display: flex; }
+.checkout-state { align-items: center; padding: 24px; text-align: center; }
+.checkout-state-card { display: grid; width: min(100%, 320px); justify-items: center; gap: 12px; }
+.checkout-state-mark { display: grid; width: 54px; height: 54px; place-items: center; border-radius: 18px; background: #fff; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16); }
+.checkout-state-mark img { width: 38px; height: 40px; object-fit: contain; }
+.checkout-state h1 { color: var(--order-text); font-size: 20px; letter-spacing: 0; }
+.checkout-state p { max-width: 270px; color: var(--order-text-dim); font-size: 13px; line-height: 1.5; }
+.checkout-state-loader { width: 22px; height: 22px; border: 2px solid var(--order-divider); border-top-color: var(--order-text); border-radius: 50%; animation: stateSpin 700ms linear infinite; }
+.checkout-state.error .checkout-state-loader { display: none; }
+@keyframes stateSpin { to { transform: rotate(360deg); } }
+.screen-content {
+    width: 100%; max-width: 420px;
+    padding: calc(env(safe-area-inset-top, 20px) + 20px) 20px calc(env(safe-area-inset-bottom, 20px) + 12px);
+    display: flex; flex-direction: column;
+    transform-origin: center top;
+    transition: transform 0.55s var(--ease-apple), filter 0.55s var(--ease-apple);
+}
+body.sheet-open .screen.active .screen-content {
+    transform: scale(0.94) translateY(-6px);
+    filter: brightness(0.55) saturate(0.9);
+    pointer-events: none;
+}
+body.light-mode.sheet-open .screen.active .screen-content { filter: brightness(0.8) saturate(0.95); }
+
+.order-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 22px;
+}
+.order-nav-btn {
+    width: 34px; height: 34px; border-radius: 17px;
+    background: var(--order-surface);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--order-text);
+    border: none; cursor: pointer;
+    transition: transform 0.2s var(--ease-apple), background 0.4s;
+}
+.order-nav-btn:active { transform: scale(0.9); }
+.order-merchant { display: flex; align-items: center; gap: 10px; }
+.merchant-avatar {
+    width: 34px; height: 34px; border-radius: 17px;
+    background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+.merchant-avatar img { width: 25px; height: 27px; object-fit: contain; }
+.order-merchant-name { font-size: 16px; font-weight: 700; color: var(--order-text); letter-spacing: -0.005em; }
+
+.order-hero { text-align: center; margin-bottom: 22px; }
+.order-hero-label { font-size: 13px; font-weight: 500; color: var(--order-text-dim); margin-bottom: 8px; }
+.order-hero-amount {
+    font-size: 52px; font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--order-text);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    display: inline-flex;
+}
+.order-hero-old {
+    display: block; margin-top: 8px;
+    font-size: 14px; font-weight: 500;
+    color: var(--order-text-dim);
+    text-decoration: line-through;
+    font-variant-numeric: tabular-nums;
+    opacity: 0; transform: translateY(-4px);
+    transition: all 0.4s var(--ease-apple);
+}
+.order-hero-old.visible { opacity: 1; transform: translateY(0); }
+
+.pay-status {
+    display: inline-flex; align-items: center; gap: 7px;
+    margin-top: 12px;
+    padding: 6px 13px;
+    background: var(--order-surface);
+    border-radius: 15px;
+    font-size: 12.5px; font-weight: 600;
+    color: var(--order-text);
+    transition: all 0.4s var(--ease-apple);
+}
+.pay-status .st-dot { width: 7px; height: 7px; border-radius: 4px; background: #ffb300; transition: background 0.4s; }
+.pay-status.paid .st-dot { background: var(--accent); }
+.pay-status.paid { color: var(--accent); }
+.pay-status.preparing .st-dot { background: #ff9f0a; animation: dotPulse 1.4s ease-in-out infinite; }
+@keyframes dotPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+.waiting-wrap {
+    min-height: calc(100% - 54px);
+    padding: 34px 0 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+.table-badge {
+    min-height: 32px;
+    padding: 6px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--order-surface);
+    border: 0.5px solid var(--order-divider);
+    border-radius: 16px;
+    color: var(--order-text);
+    font-size: 12px;
+    font-weight: 700;
+}
+.table-badge svg { color: var(--order-text-dim); }
+.waiting-indicator {
+    width: 78px;
+    height: 78px;
+    margin: 34px 0 24px;
+    position: relative;
+    display: grid;
+    place-items: center;
+    border-radius: 24px;
+    background: var(--order-surface);
+    border: 0.5px solid var(--order-divider);
+    color: var(--order-text);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
+}
+.waiting-indicator::before {
+    content: '';
+    position: absolute;
+    inset: -7px;
+    border: 2px solid transparent;
+    border-top-color: rgba(128, 128, 128, 0.7);
+    border-right-color: rgba(128, 128, 128, 0.22);
+    border-radius: 30px;
+    animation: stateSpin 1.25s linear infinite;
+}
+.waiting-title {
+    max-width: 320px;
+    color: var(--order-text);
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1.2;
+}
+.waiting-sub {
+    max-width: 330px;
+    margin-top: 9px;
+    color: var(--order-text-dim);
+    font-size: 14px;
+    line-height: 1.55;
+}
+.waiting-status {
+    width: 100%;
+    margin-top: 30px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    min-height: 52px;
+    background: var(--order-surface);
+    border: 0.5px solid var(--order-divider);
+    border-radius: 16px;
+    text-align: left;
+}
+.waiting-status-dot {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 8px;
+    border-radius: 50%;
+    background: #ff9f0a;
+    animation: dotPulse 1.4s ease-in-out infinite;
+}
+.waiting-status-copy { flex: 1; min-width: 0; }
+.waiting-status-label { color: var(--order-text); font-size: 13px; font-weight: 700; }
+.waiting-status-detail { margin-top: 2px; color: var(--order-text-dim); font-size: 11px; font-weight: 500; }
+.waiting-status svg { color: var(--order-text-dim); flex: 0 0 auto; }
+
+.order-card {
+    background: var(--order-surface);
+    border-radius: 18px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: background 0.4s;
+}
+.summary-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 16px; font-size: 14px;
+}
+.summary-row + .summary-row { border-top: 0.5px solid var(--order-divider); }
+.summary-label { color: var(--order-text-dim); font-weight: 500; }
+.summary-value { color: var(--order-text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.summary-value.discount { color: var(--accent); }
+.summary-value.dim { color: var(--order-text-dim); font-weight: 500; }
+.summary-row.total .summary-label { color: var(--order-text); font-weight: 600; font-size: 15px; }
+.summary-row.total .summary-value { font-size: 16px; font-weight: 800; }
+.discount-row { display: none; }
+.discount-row.visible { display: flex; }
+
+.promo-card {
+    background: var(--order-surface);
+    border-radius: 18px;
+    padding: 6px;
+    display: flex; gap: 6px;
+    margin-bottom: 20px;
+    transition: background 0.4s;
+}
+.promo-input {
+    flex: 1; background: transparent; border: none; outline: none;
+    padding: 10px 12px; font-size: 14px; font-weight: 500;
+    color: var(--order-text);
+    letter-spacing: 0.02em; text-transform: uppercase; min-width: 0;
+}
+.promo-input::placeholder { color: var(--order-text-dim); text-transform: none; }
+.promo-apply {
+    background: var(--order-surface-2); color: var(--order-text);
+    border: none; border-radius: 13px; padding: 0 16px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: all 0.25s var(--ease-apple); white-space: nowrap;
+}
+.promo-apply:active { transform: scale(0.95); }
+.promo-apply.applied { background: rgba(48, 209, 88, 0.15); color: var(--accent); pointer-events: none; }
+
+.order-cta {
+    width: 100%; height: 54px;
+    background: var(--order-cta); color: var(--order-cta-text);
+    border: none; border-radius: 27px;
+    font-size: 15px; font-weight: 700; letter-spacing: -0.005em;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all 0.3s var(--ease-spring);
+    margin-top: auto;
+}
+.order-cta:active { transform: scale(0.97); }
+.order-cta:disabled { background: var(--order-surface); color: var(--order-text-dim); pointer-events: none; }
+
+.wizard-progress { display: flex; gap: 6px; margin-bottom: 22px; transition: opacity 0.3s; }
+.wp-seg { flex: 1; height: 4px; border-radius: 2px; background: var(--order-surface-2); overflow: hidden; position: relative; }
+.wp-seg::after {
+    content: ''; position: absolute; inset: 0;
+    background: var(--order-text); border-radius: 2px;
+    transform: translateX(-101%); transition: transform 0.5s var(--ease-apple);
+}
+.wp-seg.done::after { transform: translateX(0); }
+
+.wizard-step { display: none; flex-direction: column; flex: 1; }
+.wizard-step.active { display: flex; }
+.wiz-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--order-text); margin-bottom: 4px; }
+.wiz-sub { font-size: 13px; color: var(--order-text-dim); margin-bottom: 20px; line-height: 1.4; }
+
+.form-field { margin-bottom: 12px; }
+.form-label { display: block; font-size: 12px; font-weight: 500; color: var(--order-text-dim); margin-bottom: 6px; padding-left: 2px; }
+.wiz-input {
+    width: 100%; background: var(--order-surface);
+    border: 1px solid transparent; border-radius: 14px;
+    padding: 14px 15px; color: var(--order-text);
+    font-size: 16px; outline: none; transition: border-color 0.25s;
+}
+.wiz-input:focus { border-color: rgba(128,128,128,0.4); }
+.wiz-input::placeholder { color: var(--order-text-dim); }
+
+.method-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.method-row {
+    width: 100%; background: var(--order-surface);
+    border: 1.5px solid transparent; border-radius: 15px;
+    padding: 13px 14px; display: flex; align-items: center; gap: 12px;
+    cursor: pointer; color: var(--order-text);
+    transition: border-color 0.25s var(--ease-apple), transform 0.2s var(--ease-apple); text-align: left;
+}
+.method-row:active { transform: scale(0.98); }
+.method-row.selected { border-color: var(--order-text); }
+.method-radio {
+    width: 20px; height: 20px; border-radius: 10px;
+    border: 1.5px solid var(--order-text-dim);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.25s;
+}
+.method-row.selected .method-radio { border-color: var(--order-text); background: var(--order-text); }
+.method-row.selected .method-radio::after { content: ''; width: 7px; height: 7px; border-radius: 4px; background: var(--order-bg); }
+.method-text { flex: 1; min-width: 0; }
+.method-name { font-size: 14px; font-weight: 600; }
+.method-eta { font-size: 11.5px; color: var(--order-text-dim); margin-top: 1px; }
+.method-price { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+.amount-entry { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 8px; }
+.entry-hint { font-size: 13px; font-weight: 500; color: var(--order-text-dim); margin-bottom: 12px; }
+.entry-amount {
+    font-size: 58px; font-weight: 800; letter-spacing: -0.03em;
+    color: var(--order-text); font-variant-numeric: tabular-nums;
+    line-height: 1; transition: color 0.2s;
+}
+.entry-amount.empty { color: var(--order-text-dim); }
+.entry-amount .cur { font-size: 34px; font-weight: 600; margin-left: 5px; }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+.key {
+    height: 56px; background: transparent; border: none; border-radius: 16px;
+    color: var(--order-text); font-size: 24px; font-weight: 600;
+    font-variant-numeric: tabular-nums; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s var(--ease-apple), transform 0.15s var(--ease-apple);
+}
+.key:active { background: var(--order-surface); transform: scale(0.94); }
+
+.waiting-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.table-badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 14px; background: var(--order-surface);
+    border-radius: 16px; font-size: 13px; font-weight: 600;
+    color: var(--order-text); margin-bottom: 28px;
+}
+.waiting-pulse {
+    width: 68px; height: 68px; border-radius: 34px; background: var(--order-surface);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 22px; position: relative;
+}
+.waiting-pulse::before {
+    content: ''; position: absolute; inset: 0; border-radius: 34px;
+    border: 1.5px solid rgba(128,128,128,0.4); animation: pulseRing 2s var(--ease-apple) infinite;
+}
+@keyframes pulseRing { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.55); opacity: 0; } }
+.waiting-pulse svg { color: var(--order-text); }
+.waiting-title { font-size: 20px; font-weight: 700; color: var(--order-text); letter-spacing: -0.015em; margin-bottom: 6px; }
+.waiting-sub { font-size: 13px; color: var(--order-text-dim); max-width: 240px; line-height: 1.45; }
+.skeleton-card {
+    width: 100%; background: var(--order-surface); border-radius: 18px;
+    padding: 16px; margin-top: 32px; display: flex; flex-direction: column; gap: 12px;
+}
+.skel-line {
+    height: 12px; border-radius: 6px;
+    background: linear-gradient(90deg, var(--order-surface-2) 25%, rgba(128,128,128,0.15) 50%, var(--order-surface-2) 75%);
+    background-size: 200% 100%; animation: shimmer 1.6s linear infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+.skel-line.w60 { width: 60%; }
+.skel-line.w40 { width: 40%; }
+.skel-line.w80 { width: 80%; }
+
+.status-screen {
+    position: fixed; inset: 0; z-index: 500; background: var(--order-bg);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.45s var(--ease-apple), background 0.5s;
+}
+.status-screen.active { opacity: 1; pointer-events: auto; }
+.status-content {
+    width: 100%; max-width: 420px; padding: 20px;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    height: 100dvh; justify-content: center; padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 12px);
+    overflow-y: auto;
+}
+.status-icon {
+    width: 84px; height: 84px; border-radius: 42px;
+    display: flex; align-items: center; justify-content: center; margin-bottom: 22px;
+    position: relative; flex-shrink: 0;
+}
+.status-icon .status-spinner {
+    width: 84px; height: 84px; border: 3px solid var(--order-surface-2);
+    border-top-color: var(--order-text); border-radius: 50%;
+    animation: spin 1s linear infinite; position: absolute;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+.status-icon.success { background: var(--accent); animation: popIn 0.5s var(--ease-spring); }
+.status-icon.success .status-spinner { display: none; }
+@keyframes popIn { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+.status-check {
+    width: 38px; height: 38px; stroke: #fff; stroke-width: 3;
+    stroke-linecap: round; stroke-linejoin: round; fill: none;
+    stroke-dasharray: 48; stroke-dashoffset: 48;
+}
+.status-icon.success .status-check { animation: drawCheck 0.45s var(--ease-apple) forwards; animation-delay: 0.15s; }
+@keyframes drawCheck { to { stroke-dashoffset: 0; } }
+.status-title { font-size: 22px; font-weight: 700; color: var(--order-text); letter-spacing: -0.015em; margin-bottom: 6px; }
+.status-amount {
+    font-size: 44px; font-weight: 800; letter-spacing: -0.025em;
+    color: var(--order-text); font-variant-numeric: tabular-nums; margin-bottom: 20px; display: inline-flex;
+}
+.status-details { width: 100%; background: var(--order-surface); border-radius: 18px; overflow: hidden; margin-bottom: 12px; }
+.status-details .summary-row { padding: 12px 16px; }
+
+.wallet-btn {
+    width: 100%; height: 50px; background: #000000; color: #ffffff;
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 25px;
+    font-size: 14px; font-weight: 600; cursor: pointer; display: none;
+    align-items: center; justify-content: center; gap: 9px; margin-bottom: 10px;
+    transition: transform 0.25s var(--ease-spring);
+}
+body.light-mode .wallet-btn { border-color: transparent; }
+.wallet-btn.visible { display: flex; }
+.wallet-btn:active { transform: scale(0.97); }
+.wallet-icon {
+    width: 24px; height: 18px; border-radius: 3.5px;
+    background: linear-gradient(180deg, #4cd964 0%, #4cd964 24%, #ffcc00 24%, #ffcc00 48%, #ff9500 48%, #ff9500 72%, #007aff 72%);
+    position: relative; overflow: hidden; flex-shrink: 0;
+}
+.wallet-icon::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 42%; background: #f2f2f7; border-radius: 3.5px 3.5px 3px 3px; }
+
+.app-banner {
+    width: 100%; background: var(--order-surface); border-radius: 18px;
+    padding: 13px 14px; display: none; align-items: center; gap: 12px;
+    margin-bottom: 12px; text-align: left; border: none; cursor: pointer;
+    color: var(--order-text); transition: transform 0.2s var(--ease-apple);
+}
+.app-banner.visible { display: flex; }
+.app-banner:active { transform: scale(0.98); }
+.app-banner-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: linear-gradient(135deg, #30d158, #0e8a34);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-weight: 800; font-size: 17px; color: #fff;
+}
+.app-banner-text { flex: 1; min-width: 0; }
+.app-banner-title { font-size: 14px; font-weight: 600; }
+.app-banner-sub { font-size: 11.5px; color: var(--order-text-dim); margin-top: 2px; }
+.app-banner-get { background: rgba(128,128,128,0.18); color: var(--order-text); border-radius: 14px; padding: 6px 13px; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+
+.status-done {
+    width: 100%; height: 52px; background: var(--order-cta); color: var(--order-cta-text);
+    border: none; border-radius: 26px; font-size: 15px; font-weight: 600; cursor: pointer;
+    transition: transform 0.25s var(--ease-spring); opacity: 0; pointer-events: none;
+}
+.status-done.visible { opacity: 1; pointer-events: auto; }
+.status-done:active { transform: scale(0.97); }
+
+.dim-layer {
+    position: absolute; inset: 0; z-index: 1; background: rgba(0, 0, 0, 0.35);
+    opacity: 0; pointer-events: none; transition: opacity 0.55s var(--ease-apple);
+}
+body.sheet-open .dim-layer { opacity: 1; }
+body.light-mode .dim-layer { background: rgba(0, 0, 0, 0.18); }
+
+.action-sheet-overlay {
+    position: fixed; inset: 0; z-index: 2000; background: rgba(0, 0, 0, 0.4);
+    opacity: 0; pointer-events: none; transition: opacity 0.35s var(--ease-apple);
+    display: flex; align-items: flex-end; justify-content: center;
+}
+.action-sheet-overlay.active { opacity: 1; pointer-events: auto; }
+.action-sheet {
+    width: 100%; max-width: 420px; padding: 0 10px calc(env(safe-area-inset-bottom, 10px) + 10px);
+    transform: translateY(30px); transition: transform 0.4s var(--ease-spring);
+}
+.action-sheet-overlay.active .action-sheet { transform: translateY(0); }
+.as-group {
+    background: var(--as-bg); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+    border-radius: 16px; overflow: hidden; margin-bottom: 8px;
+}
+.as-title { padding: 12px 16px; text-align: center; font-size: 12px; font-weight: 500; color: var(--text-secondary); border-bottom: 0.5px solid var(--as-divider); }
+.as-action {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 16px; background: transparent; border: none;
+    border-bottom: 0.5px solid var(--as-divider); font-size: 17px; font-weight: 400;
+    color: var(--as-action); cursor: pointer; text-decoration: none;
+}
+.as-action:last-child { border-bottom: none; }
+.as-action:active { background: rgba(120,120,128,0.15); }
+.as-cancel { font-weight: 600; border-radius: 16px; background: var(--as-bg); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); }
+
+.toast {
+    position: fixed; bottom: calc(env(safe-area-inset-bottom, 20px) + 24px); left: 50%;
+    transform: translateX(-50%) translateY(20px); z-index: 3000;
+    background: rgba(40, 40, 44, 0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    color: #fff; padding: 10px 18px; border-radius: 20px; font-size: 13px; font-weight: 500;
+    opacity: 0; pointer-events: none; transition: all 0.35s var(--ease-apple); white-space: nowrap;
+}
+.toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.device-frame {
+    position: relative; z-index: 10; width: 100%; max-width: 420px; height: 100dvh;
+    display: flex; flex-direction: column; justify-content: flex-end; pointer-events: none;
+}
+.payment-sheet {
+    pointer-events: auto; background: var(--sheet-bg); backdrop-filter: var(--sheet-blur);
+    -webkit-backdrop-filter: var(--sheet-blur); border-top: 0.5px solid var(--sheet-border);
+    border-radius: 38px 38px 0 0; padding: 16px 0 0 0; display: flex; flex-direction: column;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.35); position: relative;
+    padding-bottom: max(env(safe-area-inset-bottom, 20px), 20px);
+    transform: translateY(105%); transition: transform 0.55s var(--ease-apple), background 0.5s var(--ease-apple);
+}
+body.sheet-open .payment-sheet { transform: translateY(0); }
+
+.sheet-header { display: flex; justify-content: space-between; align-items: center; position: relative; padding: 0 20px; margin-bottom: 14px; }
+.header-btn {
+    width: 28px; height: 28px; border-radius: 14px; background: rgba(120, 120, 128, 0.16);
+    border: none; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.2s var(--ease-apple); z-index: 10;
+}
+body.light-mode .header-btn { background: rgba(0, 0, 0, 0.06); }
+.header-btn:active { transform: scale(0.9); opacity: 0.7; }
+.logo-area { position: absolute; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px; white-space: nowrap; }
+.recipient-name { font-size: 15px; font-weight: 700; letter-spacing: -0.005em; color: var(--text-primary); }
+.security-badge { font-size: 10px; font-weight: 500; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
+
+.info-group { text-align: center; padding: 0 20px; margin-bottom: 12px; }
+.amount { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-primary); font-variant-numeric: tabular-nums; line-height: 1.1; display: inline-flex; }
+.hero-meta-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; }
+.fee-badge {
+    display: inline-flex; align-items: center; padding: 4px 10px; background: rgba(120, 120, 128, 0.16);
+    border-radius: 12px; font-size: 11px; font-weight: 500; color: var(--text-secondary); transition: all 0.3s var(--ease-apple);
+}
+body.light-mode .fee-badge { background: rgba(0, 0, 0, 0.05); }
+.fee-badge.has-fee { color: #ff9f0a; background: rgba(255, 159, 10, 0.14); }
+.search-trigger {
+    background: rgba(120, 120, 128, 0.16); color: var(--text-secondary); border: none; border-radius: 12px;
+    padding: 4px 10px; font-size: 11px; font-weight: 500; display: flex; align-items: center; gap: 5px;
+    cursor: pointer; transition: all 0.2s var(--ease-apple);
+}
+body.light-mode .search-trigger { background: rgba(0,0,0,0.05); color: #555; }
+.search-trigger:active { transform: scale(0.95); }
+
+.carousel-container { width: 100%; height: 112px; position: relative; margin-bottom: 14px; }
+.carousel-track {
+    display: flex; width: 100%; height: 100%; overflow-x: auto; scroll-snap-type: x mandatory;
+    padding: 0 calc(50% - 80px); align-items: center; gap: 10px;
+    -ms-overflow-style: none; scrollbar-width: none; overscroll-behavior-x: contain;
+}
+.carousel-track::-webkit-scrollbar { display: none; }
+.card-wrapper { flex: 0 0 160px; height: 98px; scroll-snap-align: center; display: flex; justify-content: center; align-items: center; perspective: 900px; }
+
+.bank-card {
+    width: 100%; height: 100%;
+    background: var(--v2-bg, linear-gradient(135deg, #1c1c1e, #2c2c2e));
+    border: 0.5px solid var(--card-border); border-radius: 11px; box-shadow: var(--card-shadow);
+    padding: 12px; display: flex; flex-direction: column; justify-content: space-between;
+    color: #ffffff; will-change: transform, opacity; position: relative; overflow: hidden;
+    cursor: pointer;
+}
+.bank-card.disabled {
+    opacity: 0.55 !important;
+    filter: grayscale(0.5);
+}
+.card-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; position: relative; z-index: 2; }
+.card-header-left { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
+.bank-logo-small {
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.bank-logo-small img, .bank-logo-small svg { max-width: 20px; max-height: 20px; object-fit: contain; }
+
+.bank-name {
+    font-size: 13px; font-weight: 700; letter-spacing: -0.005em;
+    max-width: 95px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    line-height: 1.2;
+}
+.bank-logo { font-weight: 700; font-size: 10px; opacity: 0.95; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.bank-logo img, .bank-logo svg { height: 18px; max-width: 32px; object-fit: contain; }
+
+.card-bottom { display: flex; justify-content: space-between; align-items: flex-end; position: relative; z-index: 2; }
+.iban { font-family: "SF Mono", monospace; font-size: 10px; letter-spacing: 0.05em; opacity: 0.85; }
+.network-logo { width: 24px; height: 15px; background: rgba(255,255,255,0.2); border-radius: 3px; flex-shrink: 0; }
+
+.card-bg-logo {
+    position: absolute;
+    right: -14px;
+    bottom: -16px;
+    width: 105px;
+    height: 105px;
+    pointer-events: none;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: rotate(-10deg) scale(1.25);
+    mix-blend-mode: overlay;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+.card-bg-logo img, .card-bg-logo svg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.delivery-rows { display: none; flex-direction: column; gap: 8px; padding: 0 20px; margin-bottom: 12px; }
+.delivery-rows.visible { display: flex; }
+.d-row {
+    width: 100%; background: var(--card-bg); border: 0.5px solid var(--card-border);
+    border-radius: 14px; padding: 11px 13px; display: flex; align-items: center; gap: 11px;
+    cursor: pointer; transition: transform 0.2s var(--ease-apple); text-align: left; color: var(--text-primary);
+}
+.d-row:active { transform: scale(0.98); }
+.d-row-icon { width: 30px; height: 30px; border-radius: 15px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; }
+.d-row-icon.person { background: #0a84ff; }
+.d-row-icon.np { background: #da2a34; }
+.d-row-text { flex: 1; min-width: 0; }
+.d-row-title { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+.d-row-value { font-size: 13px; font-weight: 600; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.d-row-chevron { color: var(--text-tertiary); flex-shrink: 0; }
+
+.sub-view {
+    position: absolute; top: 52px; left: 0; right: 0; bottom: 0;
+    background: var(--sub-view-bg); z-index: 20; padding: 0 20px 20px;
+    transform: translateY(20px); opacity: 0; pointer-events: none; transition: all 0.4s var(--ease-spring);
+    display: flex; flex-direction: column; overflow-y: auto; border-radius: 38px 38px 0 0;
+}
+body.light-mode .sub-view { background: var(--sheet-bg); }
+.sub-view.active { transform: translateY(0); opacity: 1; pointer-events: auto; }
+.view-title { font-size: 19px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.015em; }
+
+.info-list { background: var(--card-bg); border: 0.5px solid var(--card-border); border-radius: 16px; overflow: hidden; }
+.info-row { padding: 12px 14px; display: flex; justify-content: space-between; border-bottom: 0.5px solid var(--card-border); font-size: 13px; }
+.info-row:last-child { border-bottom: none; }
+.info-label { color: var(--text-secondary); }
+.info-value { font-weight: 500; text-align: right; word-break: break-all; margin-left: 16px; }
+
+.search-input-wrapper { position: relative; margin-bottom: 14px; flex-shrink: 0; }
+.search-input-wrapper svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); }
+.bank-search-input {
+    width: 100%; background: rgba(120, 120, 128, 0.16); border: none; border-radius: 10px;
+    padding: 9px 10px 9px 34px; color: var(--text-primary); font-size: 15px; outline: none;
+}
+body.light-mode .bank-search-input { background: rgba(0,0,0,0.05); color: #000; }
+.bank-search-input::placeholder { color: var(--text-secondary); }
+
+.bank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-bottom: 10px; }
+.grid-card {
+    aspect-ratio: 1.62; border-radius: 11px; padding: 11px 12px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    color: #fff; cursor: pointer; position: relative; border: 2px solid transparent;
+    transition: transform 0.2s var(--ease-apple), border-color 0.25s var(--ease-apple); overflow: hidden;
+    width: 100%; height: auto; max-height: 110px;
+}
+.grid-card.disabled { opacity: 0.5; filter: grayscale(0.6); }
+.grid-card:active { transform: scale(0.96); }
+.grid-card.selected { border-color: var(--text-primary); }
+.grid-card-name {
+    font-size: 13px; font-weight: 700;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 100px; position: relative; z-index: 2;
+}
+.grid-card-code {
+    font-family: "SF Mono", monospace; font-size: 10px; opacity: 0.85;
+    letter-spacing: 0.04em; position: relative; z-index: 2;
+}
+.grid-bg-logo {
+    position: absolute; right: -15px; bottom: -18px; width: 95px; height: 95px;
+    pointer-events: none; z-index: 1; transform: rotate(-10deg) scale(1.2);
+    mix-blend-mode: overlay;
+}
+.grid-bg-logo img, .grid-bg-logo svg { width: 100%; height: 100%; object-fit: contain; }
+.grid-check {
+    position: relative; top: 0; right: 0; width: 20px; height: 20px; border-radius: 10px;
+    background: rgba(255,255,255,0.95); color: #000; display: none; align-items: center; justify-content: center;
+    z-index: 3; flex-shrink: 0;
+}
+.grid-card.selected .grid-check { display: flex; }
+
+.action-area { padding: 0 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.pay-btn {
+    width: 100%; height: 50px; background: var(--btn-bg); color: var(--btn-text);
+    border: none; border-radius: 25px; font-size: 13px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all 0.4s var(--ease-spring); position: relative; overflow: hidden;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+}
+.pay-btn:active { transform: scale(0.96); }
+.pay-btn.processing { width: 50px; color: transparent; pointer-events: none; }
+.spinner {
+    position: absolute; width: 22px; height: 22px; border: 3px solid rgba(128,128,128,0.15);
+    border-top-color: var(--btn-text); border-radius: 50%; opacity: 0;
+    transition: opacity 0.3s; animation: spin 1s linear infinite;
+}
+.pay-btn.processing .spinner { opacity: 1; }
+.recaptcha-notice {
+    max-width: 300px;
+    color: var(--text-tertiary);
+    font-size: 9px;
+    font-weight: 500;
+    line-height: 1.35;
+    text-align: center;
+}
+.recaptcha-notice a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.grecaptcha-badge { visibility: hidden !important; }
+
+.carousel-skel { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; gap: 10px; overflow: hidden; }
+.carousel-skel.visible { display: flex; }
+.skel-bankcard {
+    flex: 0 0 160px; height: 98px; border-radius: 11px;
+    background: linear-gradient(90deg, rgba(128,128,128,0.14) 25%, rgba(128,128,128,0.28) 50%, rgba(128,128,128,0.14) 75%);
+    background-size: 200% 100%; animation: shimmer 1.5s linear infinite;
+}
+.skel-bankcard.side { transform: scale(0.87); opacity: 0.55; }
+.grid-skel { display: none; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid-skel.visible { display: grid; }
+.skel-tile {
+    aspect-ratio: 1.62; border-radius: 11px;
+    background: linear-gradient(90deg, rgba(128,128,128,0.14) 25%, rgba(128,128,128,0.28) 50%, rgba(128,128,128,0.14) 75%);
+    background-size: 200% 100%; animation: shimmer 1.5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+@media (max-height: 740px) {
+    .order-hero-amount { font-size: 42px; }
+    .entry-amount { font-size: 46px; }
+    .key { height: 48px; }
+    .carousel-container { height: 104px; }
+    .card-wrapper { height: 92px; }
+}
+    </style>
+
+    <!-- Supabase JS SDK -->
+</head>
+<body>
+
+    <div class="clip-root">
+        <div class="screen checkout-state active" id="screenState" aria-live="polite">
+            <div class="checkout-state-card">
+                <div class="checkout-state-mark" aria-hidden="true"><img src="/checkout/logo.svg" alt=""></div>
+                <div class="checkout-state-loader" aria-hidden="true"></div>
+                <h1 id="checkoutStateTitle">Відкриваємо рахунок</h1>
+                <p id="checkoutStateMessage">Перевіряємо актуальну суму та реквізити.</p>
+            </div>
+        </div>
+        <!-- Scenario 1 & 3 Order View (Fixed Order & Restaurant Table) -->
+        <div class="screen" id="screenOrder">
+            <div class="screen-content">
+                <nav class="order-nav">
+                    <button class="order-nav-btn back-btn" aria-label="Назад">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <div class="order-merchant">
+                        <div class="merchant-avatar" id="merchAv1"><img src="/checkout/logo.svg" alt=""></div>
+                        <span class="order-merchant-name" id="merchName1">Мерчант</span>
+                    </div>
+                    <button class="order-nav-btn more-btn" aria-label="Дії">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+                    </button>
+                </nav>
+
+                <section class="order-hero">
+                    <div class="order-hero-label" id="orderLabel">Замовлення №4092-A</div>
+                    <div class="order-hero-amount" id="heroAmount"></div>
+                    <div>
+                        <div class="pay-status" id="payStatus">
+                            <span class="st-dot"></span>
+                            <span id="payStatusText">Очікує на оплату</span>
+                        </div>
+                    </div>
+                    <!-- Live Table TTL Countdown Timer Bar -->
+                    <div id="tableTtlWrap" style="display:none; max-width:220px; margin:10px auto 0; background:rgba(255,255,255,0.06); border:1px solid var(--card-border); border-radius:20px; padding:4px 12px; align-items:center; gap:8px;">
+                        <span style="font-size:11.5px; font-weight:700; color:var(--accent); font-family:monospace;" id="tableTtlTimer">00:30</span>
+                        <div style="flex:1; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+                            <div id="tableTtlBar" style="width:100%; height:100%; background:var(--accent); transition:width 1s linear;"></div>
+                        </div>
+                        <span style="font-size:10px; color:var(--order-text-dim); text-transform:uppercase;">TTL</span>
+                    </div>
+                </section>
+
+                <div class="order-card" id="orderCard">
+                    <div class="summary-row">
+                        <span class="summary-label">Замовлення</span>
+                        <span class="summary-value" id="rowBase">0,00 ₴</span>
+                    </div>
+                    <div class="summary-row discount-row" id="discountRow">
+                        <span class="summary-label">Знижка за промокодом</span>
+                        <span class="summary-value discount" id="discountVal">−0,00 ₴</span>
+                    </div>
+                    <div class="summary-row total">
+                        <span class="summary-label">До сплати</span>
+                        <span class="summary-value" id="summaryTotal">0,00 ₴</span>
+                    </div>
+                </div>
+
+                <div class="promo-card" id="promoCard">
+                    <input type="text" class="promo-input" id="promoInput" placeholder="Промокод" autocomplete="off" spellcheck="false">
+                    <button class="promo-apply" id="promoApply">Застосувати</button>
+                </div>
+
+                <button class="order-cta" id="goToPayBtn1">
+                    <span id="cta1Text">Перейти до оплати</span>
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Scenario 4: Delivery Flow Screen -->
+        <div class="screen" id="screenDelivery">
+            <div class="screen-content">
+                <nav class="order-nav">
+                    <button class="order-nav-btn" id="wizBackBtn" aria-label="Назад">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <div class="order-merchant">
+                        <div class="merchant-avatar" id="wizAv"><img src="/checkout/logo.svg" alt=""></div>
+                        <span class="order-merchant-name" id="wizName">Крамниця «Файно»</span>
+                    </div>
+                    <button class="order-nav-btn more-btn" aria-label="Дії">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+                    </button>
+                </nav>
+
+                <div class="wizard-progress" id="wizProgress" style="opacity: 0;">
+                    <div class="wp-seg" data-step="recipient"></div>
+                    <div class="wp-seg" data-step="np"></div>
+                </div>
+
+                <!-- Step 0: Overview -->
+                <div class="wizard-step active" data-step="overview">
+                    <section class="order-hero">
+                        <div class="order-hero-label" id="wizOrderLabel">Замовлення з доставкою</div>
+                        <div class="order-hero-amount" id="wizHeroAmount"></div>
+                        <div>
+                            <div class="pay-status" id="wizPayStatus">
+                                <span class="st-dot"></span>
+                                <span id="wizPayStatusText">Очікує на оплату</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="order-card" id="wizCard">
+                        <div class="summary-row">
+                            <span class="summary-label">Замовлення</span>
+                            <span class="summary-value" id="wizRowBase">0,00 ₴</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Доставка · Нова пошта</span>
+                            <span class="summary-value dim" id="wizRowDelivery">за тарифом</span>
+                        </div>
+                        <div class="summary-row total">
+                            <span class="summary-label">До сплати</span>
+                            <span class="summary-value" id="wizRowTotal">0,00 ₴</span>
+                        </div>
+                    </div>
+
+                    <button class="order-cta" id="wizStartBtn">
+                        <span id="wizStartText">Оформити доставку</span>
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+                </div>
+
+                <!-- Step 1: Recipient -->
+                <div class="wizard-step" data-step="recipient">
+                    <h2 class="wiz-title">Отримувач</h2>
+                    <p class="wiz-sub">Кому Нова пошта передасть замовлення</p>
+                    <div class="form-field">
+                        <label class="form-label" for="fName">Ім'я та прізвище</label>
+                        <input type="text" class="wiz-input" id="fName" placeholder="Тарас Шевченко" autocomplete="name">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="fPhone">Номер телефону</label>
+                        <input type="tel" class="wiz-input" id="fPhone" placeholder="+380 __ ___ __ __" autocomplete="tel" inputmode="tel">
+                    </div>
+                    <button class="order-cta" id="wizNext1" disabled>Далі</button>
+                </div>
+
+                <!-- Step 2: Nova Poshta options -->
+                <div class="wizard-step" data-step="np">
+                    <h2 class="wiz-title">Доставка Новою поштою</h2>
+                    <p class="wiz-sub">Оберіть спосіб та адресу отримання</p>
+
+                    <div class="method-list" id="methodList">
+                        <button class="method-row selected" data-method="branch">
+                            <span class="method-radio"></span>
+                            <span class="method-text">
+                                <span class="method-name">У відділення</span>
+                                <span class="method-eta" style="display:block;">1–2 дні</span>
+                            </span>
+                            <span class="method-price">70,00 ₴</span>
+                        </button>
+                        <button class="method-row" data-method="locker">
+                            <span class="method-radio"></span>
+                            <span class="method-text">
+                                <span class="method-name">У поштомат</span>
+                                <span class="method-eta" style="display:block;">1–2 дні</span>
+                            </span>
+                            <span class="method-price">65,00 ₴</span>
+                        </button>
+                        <button class="method-row" data-method="courier">
+                            <span class="method-radio"></span>
+                            <span class="method-text">
+                                <span class="method-name">Кур'єром за адресою</span>
+                                <span class="method-eta" style="display:block;">1–3 дні</span>
+                            </span>
+                            <span class="method-price">120,00 ₴</span>
+                        </button>
+                    </div>
+
+                    <div class="form-field">
+                        <label class="form-label" for="fCity">Місто</label>
+                        <input type="text" class="wiz-input" id="fCity" placeholder="Київ" autocomplete="address-level2">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="fBranch" id="fBranchLabel">Відділення</label>
+                        <input type="text" class="wiz-input" id="fBranch" placeholder="Відділення №1">
+                    </div>
+                    <button class="order-cta" id="wizNext2" disabled>
+                        Перейти до оплати
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scenario 2: Custom Amount Keypad View -->
+        <div class="screen" id="screenAmount">
+            <div class="screen-content">
+                <nav class="order-nav">
+                    <button class="order-nav-btn back-btn" aria-label="Назад">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <div class="order-merchant">
+                        <div class="merchant-avatar" id="c2Av"><img src="/checkout/logo.svg" alt=""></div>
+                        <span class="order-merchant-name" id="c2Name">Кав'ярня «Крапка»</span>
+                    </div>
+                    <button class="order-nav-btn more-btn" aria-label="Дії">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+                    </button>
+                </nav>
+
+                <div class="amount-entry">
+                    <div class="entry-hint">Введіть суму до сплати</div>
+                    <div class="entry-amount empty" id="entryAmount"></div>
+                </div>
+
+                <div class="keypad" id="keypad">
+                    <button class="key" data-k="1">1</button>
+                    <button class="key" data-k="2">2</button>
+                    <button class="key" data-k="3">3</button>
+                    <button class="key" data-k="4">4</button>
+                    <button class="key" data-k="5">5</button>
+                    <button class="key" data-k="6">6</button>
+                    <button class="key" data-k="7">7</button>
+                    <button class="key" data-k="8">8</button>
+                    <button class="key" data-k="9">9</button>
+                    <button class="key" data-k=",">,</button>
+                    <button class="key" data-k="0">0</button>
+                    <button class="key" data-k="del" aria-label="Стерти">
+                        <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
+                    </button>
+                </div>
+
+                <button class="order-cta" id="goToPayBtn2" disabled>Перейти до оплати</button>
+            </div>
+        </div>
+
+        <!-- Scenario 3 Waiting: Restaurant Table Bill in Preparation -->
+        <div class="screen" id="screenWaiting">
+            <div class="screen-content">
+                <nav class="order-nav">
+                    <button class="order-nav-btn back-btn" aria-label="Назад">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <div class="order-merchant">
+                        <div class="merchant-avatar" id="waitAv"><img src="/checkout/logo.svg" alt=""></div>
+                        <span class="order-merchant-name" id="waitName">Бістро «Смак»</span>
+                    </div>
+                    <button class="order-nav-btn more-btn" aria-label="Дії">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+                    </button>
+                </nav>
+
+                <div class="waiting-wrap">
+                    <div class="table-badge" id="waitTableBadge">
+                        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"></rect></svg>
+                        <span id="waitTableNum">Столик 30</span>
+                    </div>
+
+                    <div class="waiting-indicator" role="status" aria-label="Рахунок формується">
+                        <svg viewBox="0 0 24 24" width="31" height="31" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"></path>
+                            <path d="M9 8h6M9 12h6"></path>
+                        </svg>
+                    </div>
+
+                    <div class="waiting-title">Готуємо рахунок</div>
+                    <div class="waiting-sub">
+                        Сума з'явиться автоматично, щойно заклад додасть замовлення до столика.
+                    </div>
+
+                    <div class="waiting-status">
+                        <span class="waiting-status-dot" aria-hidden="true"></span>
+                        <div class="waiting-status-copy">
+                            <div class="waiting-status-label">Каса формує чек</div>
+                            <div class="waiting-status-detail">Статус оновлюється автоматично</div>
+                        </div>
+                        <svg viewBox="0 0 24 24" width="17" height="17" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dim-layer"></div>
+
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" id="themeToggle" aria-label="Перемкнути тему">
+        <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+    </button>
+
+    <!-- Payment Sheet (Apple Pay / App Clip Style) -->
+    <div class="device-frame">
+        <main class="payment-sheet">
+            <header class="sheet-header">
+                <button class="header-btn" id="closeBtn" aria-label="Закрити">
+                    <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+                <div class="logo-area">
+                    <div class="recipient-name" id="sheetMerchant">Мерчант</div>
+                    <div class="security-badge">
+                        <svg viewBox="0 0 24 24" width="9" height="9" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        Захищено Rahunok · NBU 003
+                    </div>
+                </div>
+                <button class="header-btn" id="infoBtn" aria-label="Деталі платежу">
+                    <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                </button>
+            </header>
+
+            <section class="info-group">
+                <div class="amount" id="sheetAmount"></div>
+                <div class="hero-meta-row">
+                    <div class="fee-badge" id="feeBadge">Без комісії</div>
+                    <button class="search-trigger" id="openSearchBtn">
+                        <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>
+                        Усі банки
+                    </button>
+                </div>
+            </section>
+
+            <!-- 3D Bank Carousel -->
+            <section class="carousel-container">
+                <div class="carousel-track" id="track"></div>
+                <div class="carousel-skel" id="carouselSkel">
+                    <div class="skel-bankcard side"></div>
+                    <div class="skel-bankcard"></div>
+                    <div class="skel-bankcard side"></div>
+                </div>
+            </section>
+
+            <!-- Delivery details row inside sheet -->
+            <section class="delivery-rows" id="deliveryRows">
+                <button class="d-row" id="recipientRow">
+                    <div class="d-row-icon person">
+                        <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    </div>
+                    <div class="d-row-text">
+                        <div class="d-row-title">Отримувач</div>
+                        <div class="d-row-value" id="recipientValue"></div>
+                    </div>
+                    <svg class="d-row-chevron" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+                <button class="d-row" id="deliveryRow">
+                    <div class="d-row-icon np">
+                        <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                    </div>
+                    <div class="d-row-text">
+                        <div class="d-row-title" id="deliveryRowTitle">Доставка · Нова пошта</div>
+                        <div class="d-row-value" id="deliveryValue"></div>
+                    </div>
+                    <svg class="d-row-chevron" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+            </section>
+
+            <!-- Pay Button -->
+            <section class="action-area">
+                <button class="pay-btn" id="payBtn">
+                    <span class="btn-text" id="payBtnText">Ви підтвердите платіж у застосунку банку</span>
+                    <div class="spinner"></div>
+                </button>
+                <p class="recaptcha-notice">
+                    Цей сайт захищено reCAPTCHA. Застосовуються
+                    <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Політика конфіденційності</a> та
+                    <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer">Умови використання</a> Google.
+                </p>
+            </section>
+
+            <!-- Info View -->
+            <div class="sub-view" id="infoView">
+                <h3 class="view-title">Деталі платежу</h3>
+                <div class="info-list">
+                    <div class="info-row"><span class="info-label">Отримувач</span><span class="info-value" id="infoMerchant">ТОВ «Рахунок»</span></div>
+                    <div class="info-row"><span class="info-label">IBAN</span><span class="info-value" id="infoIban">UA673005280000026500504354077</span></div>
+                    <div class="info-row"><span class="info-label">ЄДРПОУ</span><span class="info-value" id="infoTaxId">37193071</span></div>
+                    <div class="info-row"><span class="info-label">Призначення</span><span class="info-value" id="infoRef">Замовлення</span></div>
+                </div>
+            </div>
+
+            <!-- Search View -->
+            <div class="sub-view" id="searchView">
+                <h3 class="view-title">Оберіть банк</h3>
+                <div class="search-input-wrapper">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="bankSearchInput" placeholder="Знайти банк..." class="bank-search-input">
+                </div>
+                <div class="grid-skel" id="gridSkel">
+                    <div class="skel-tile"></div><div class="skel-tile"></div>
+                    <div class="skel-tile"></div><div class="skel-tile"></div>
+                </div>
+                <div class="bank-grid" id="bankGrid"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Status & Success Overlay -->
+    <div class="status-screen" id="statusScreen">
+        <div class="status-content">
+            <div class="status-icon" id="statusIcon">
+                <div class="status-spinner"></div>
+                <svg class="status-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <div class="status-title" id="statusTitle">Очікуємо підтвердження банку…</div>
+            <div class="status-amount" id="statusAmount"></div>
+            <div class="status-details" id="statusDetails" style="display:none;">
+                <div class="summary-row"><span class="summary-label">Банк</span><span class="summary-value" id="statusBank">Monobank</span></div>
+                <div class="summary-row" id="statusFeeRow" style="display:none;"><span class="summary-label">Комісія 0,5%</span><span class="summary-value" id="statusFee"></span></div>
+                <div class="summary-row" id="statusDeliveryRow" style="display:none;"><span class="summary-label">Доставка НП</span><span class="summary-value" id="statusDelivery"></span></div>
+                <div class="summary-row"><span class="summary-label">Отримувач</span><span class="summary-value" id="statusMerchant">Мерчант</span></div>
+                <div class="summary-row"><span class="summary-label">Призначення</span><span class="summary-value" id="statusRef">Замовлення</span></div>
+            </div>
+            <button class="wallet-btn" id="walletBtn">
+                <span class="wallet-icon"></span>
+                Додати в Apple Wallet
+            </button>
+            <button class="app-banner" id="appBanner">
+                <div class="app-banner-icon">₴</div>
+                <div class="app-banner-text">
+                    <div class="app-banner-title">Rahunok</div>
+                    <div class="app-banner-sub">Чеки, історія платежів і кешбек — у повному застосунку</div>
+                </div>
+                <div class="app-banner-get">ОТРИМАТИ</div>
+            </button>
+            <button class="status-done" id="statusDone">Готово</button>
+        </div>
+    </div>
+
+    <!-- Action Sheet Overlay -->
+    <div class="action-sheet-overlay" id="actionSheetOverlay">
+        <div class="action-sheet">
+            <div class="as-group">
+                <div class="as-title" id="asTitle">Замовлення</div>
+                <a class="as-action" href="tel:+380800300000" id="asCallBtn">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    Зателефонувати продавцю
+                </a>
+                <button class="as-action" id="shareOrderBtn">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                    Поділитися замовленням
+                </button>
+            </div>
+            <button class="as-action as-cancel" id="asCancelBtn">Скасувати</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- Production App Logic matching rahunok_app_clip_checkout.html -->
+    <script type="module">
+        import { fetchCheckoutOrder } from '/checkout/js/checkout-api.js';
+        import { resolveScenario } from '/checkout/js/scenarios.js';
+
+        function detectOS() {
+        const ua = navigator.userAgent || '';
+        if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) return 'ios';
+        if (/android/i.test(ua)) return 'android';
+        return 'desktop';
+    }
+    const clientOS = detectOS();
+
+    (async function() {
+        const SUPABASE_URL = "https://mwaeazabpvbxqfrceogr.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13YWVhemFicHZieHFmcmNlb2dyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyOTc5MjIsImV4cCI6MjA5OTg3MzkyMn0.9omKvLBG6QXHTT9mtZzcBXPWDY5VOMRh2Sygdk4UPvo";
+        
+        let supabase = null;
+        async function loadSupabaseClient() {
+            if (window.supabase) return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            try {
+                const sdk = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+                return sdk.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            } catch (error) {
+                console.warn('Supabase SDK load error:', error);
+                return null;
+            }
+        }
+
+        const body = document.body;
+        const vib = (p) => { if (navigator.vibrate) navigator.vibrate(p); };
+        const round2 = (n) => Math.round(n * 100) / 100;
+        const numStr = (n) => n.toFixed(2).replace('.', ',');
+
+        // Theme Toggle
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            body.classList.toggle('light-mode');
+            vib(8);
+        });
+
+        // Digits Odometer
+        function setAnimatedAmount(el, str, suffix, suffixClass) {
+            if (!el) return;
+            const key = str + '|' + (suffix || '');
+            if (el._key === key) return;
+            const prev = el._str || '';
+            el._key = key;
+            el._str = str;
+            el.classList.add('anim-amount');
+            el.innerHTML = '';
+
+            [...str].forEach((ch, i) => {
+                if (/\d/.test(ch)) {
+                    const shaft = document.createElement('span');
+                    shaft.className = 'd-shaft';
+                    const col = document.createElement('span');
+                    col.className = 'd-col';
+                    for (let d = 0; d <= 9; d++) {
+                        const s = document.createElement('span');
+                        s.textContent = d;
+                        col.appendChild(s);
+                    }
+                    shaft.appendChild(col);
+                    el.appendChild(shaft);
+
+                    const prevCh = prev[i];
+                    const startDigit = /\d/.test(prevCh || '') ? parseInt(prevCh) : 0;
+                    const target = parseInt(ch);
+                    col.style.transition = 'none';
+                    col.style.transform = `translateY(${-startDigit}em)`;
+
+                    if (startDigit !== target) {
+                        requestAnimationFrame(() =>
+                            requestAnimationFrame(() => {
+                                col.style.transition = '';
+                                col.style.transform = `translateY(${-target}em)`;
+                            })
+                        );
+                    }
+                } else {
+                    const s = document.createElement('span');
+                    s.textContent = ch === ' ' ? '\u00A0' : ch;
+                    el.appendChild(s);
+                }
+            });
+
+            if (suffix) {
+                const s = document.createElement('span');
+                if (suffixClass) s.className = suffixClass;
+                s.textContent = suffix;
+                el.appendChild(s);
+            }
+        }
+
+        // Screens management
+        const screens = {
+            state: document.getElementById('screenState'),
+            order: document.getElementById('screenOrder'),
+            delivery: document.getElementById('screenDelivery'),
+            amount: document.getElementById('screenAmount'),
+            waiting: document.getElementById('screenWaiting')
+        };
+        function showScreen(name) {
+            Object.values(screens).forEach(s => s.classList.remove('active'));
+            if (screens[name]) screens[name].classList.add('active');
+        }
+        function showCheckoutError(title, message) {
+            screens.state.classList.add('error');
+            document.getElementById('checkoutStateTitle').textContent = title;
+            document.getElementById('checkoutStateMessage').textContent = message;
+            showScreen('state');
+        }
+
+        // Status chips
+        function setChip(chipEl, textEl, state) {
+            if (!chipEl || !textEl) return;
+            chipEl.classList.remove('paid', 'preparing');
+            if (state === 'paid') { chipEl.classList.add('paid'); textEl.textContent = 'Оплачено'; }
+            else if (state === 'preparing') { chipEl.classList.add('preparing'); textEl.textContent = 'Готується'; }
+            else textEl.textContent = 'Очікує на оплату';
+        }
+        const setPayStatus = (s) => setChip(document.getElementById('payStatus'), document.getElementById('payStatusText'), s);
+        const setWizStatus = (s) => setChip(document.getElementById('wizPayStatus'), document.getElementById('wizPayStatusText'), s);
+
+        // Extract Order ID from Query, Pathname, Hash or Last Created in LocalStorage
+        const params = new URLSearchParams(window.location.search);
+        const forcedSc = (params.get('sc') || params.get('scenario') || params.get('type') || '').toLowerCase();
+        
+        let orderId = params.get('id') || params.get('order_id');
+        if (!orderId) {
+            // Check Pathname e.g. /pay/a90b0c or /checkout/a90b0c or full UUID
+            const pathMatch = window.location.pathname.match(/\/(?:pay|checkout|o|t|tag|pos)\/([a-zA-Z0-9-]{3,36})/i);
+            if (pathMatch) orderId = pathMatch[1];
+        }
+        if (!orderId && window.location.hash) {
+            // Check Hash e.g. #a90b0c or #/pay/a90b0c
+            const hashMatch = window.location.hash.match(/([a-zA-Z0-9-]{3,36})/i);
+            if (hashMatch) orderId = hashMatch[1];
+        }
+        if (!orderId && !forcedSc) {
+            // Fallback to last created invoice in current browser session
+            orderId = localStorage.getItem('rahunok_last_order_id') || '';
+        } else if (!orderId) {
+            orderId = 'demo-1';
+        }
+
+        let activeTerminal = null;
+        let currentOrder = window.__INITIAL_ORDER__ || null;
+        let checkoutLoadReason = null;
+        if (window.__INITIAL_TERMINAL__) activeTerminal = window.__INITIAL_TERMINAL__;
+        if (currentOrder?._terminal) activeTerminal = currentOrder._terminal;
+        const ttlSeconds = parseInt(params.get('ttl')) || 30;
+
+        function isOrderFresh(order) {
+            if (!order) return false;
+            if (activeTerminal && (order.order_number === activeTerminal.code || order.id === 'term-' + activeTerminal.code)) return true;
+            const timeVal = order.created_at || order.createdAt;
+            if (!timeVal) return false;
+            const createdAt = typeof timeVal === 'number' ? timeVal : new Date(timeVal).getTime();
+            if (isNaN(createdAt)) return false;
+            const diff = (Date.now() - createdAt) / 1000;
+            return diff < ttlSeconds;
+        }
+
+        function getOrderRemainingTTL(order) {
+            if (!order) return 0;
+            const timeVal = order.created_at || order.createdAt;
+            if (!timeVal) return 0;
+            const createdAt = typeof timeVal === 'number' ? timeVal : new Date(timeVal).getTime();
+            if (isNaN(createdAt)) return 0;
+            const diff = (Date.now() - createdAt) / 1000;
+            return Math.max(0, Math.floor(ttlSeconds - diff));
+        }
+
+        let tableCountdownInterval = null;
+                function startTableCountdown(order, terminal) {
+            if (tableCountdownInterval) clearInterval(tableCountdownInterval);
+            const wrap = document.getElementById('tableTtlWrap');
+            const timerEl = document.getElementById('tableTtlTimer');
+            const barEl = document.getElementById('tableTtlBar');
+            if (!wrap || !timerEl || !barEl) return;
+            
+
+
+            // Only show countdown for manual table orders that are not paid/cancelled
+            if (order.status !== 'pending' && order.status !== 'preparing' && order.status !== 'new') {
+                wrap.style.display = 'none';
+                return;
+            }
+
+            wrap.style.display = 'inline-flex';
+
+            function tick() {
+                const remaining = getOrderRemainingTTL(order);
+                if (remaining <= 0) {
+                    clearInterval(tableCountdownInterval);
+                    wrap.style.display = 'none';
+                    currentOrder = {
+                        ...order,
+                        status: 'preparing',
+                        title: 'Рахунок скасовано',
+                        total_amount: 0,
+                        base_amount: 0
+                    };
+                    vib(10);
+                    showScreen('waiting');
+                    return;
+                }
+                const secStr = remaining < 10 ? '0' + remaining : String(remaining);
+                timerEl.textContent = '00:' + secStr;
+                const pct = (remaining / ttlSeconds) * 100;
+                barEl.style.width = Math.max(0, Math.min(100, pct)) + '%';
+            }
+
+            tick();
+            tableCountdownInterval = setInterval(tick, 1000);
+        }
+
+        if (!currentOrder && !forcedSc && orderId) {
+            const result = await fetchCheckoutOrder(orderId);
+            currentOrder = result.order;
+            checkoutLoadReason = result.reason;
+            if (currentOrder?._terminal) activeTerminal = currentOrder._terminal;
+        }
+
+        // Offline-only cache fallback. A definitive 404 must never show stale money.
+        if (!currentOrder && !forcedSc && checkoutLoadReason === 'offline') {
+            if (activeTerminal) {
+                const rawTableStored = localStorage.getItem('rahunok_term_' + activeTerminal.code);
+                if (rawTableStored) {
+                    try {
+                        const parsed = JSON.parse(rawTableStored);
+                        if (parsed && Number(parsed.total_amount) > 0 && isOrderFresh(parsed)) {
+                            currentOrder = parsed;
+                        } else {
+                            localStorage.removeItem('rahunok_term_' + activeTerminal.code);
+                        }
+                    } catch(e) {}
+                }
+            }
+            if (!currentOrder) {
+                const rawStored = localStorage.getItem('rahunok_order_' + orderId) ||
+                                  localStorage.getItem('rahunok_order_' + (orderId.slice ? orderId.slice(0, 6) : orderId)) ||
+                                  localStorage.getItem('rahunok_last_order');
+                if (rawStored) {
+                    try { currentOrder = JSON.parse(rawStored); } catch(e) {}
+                }
+            }
+        }
+
+        // Dynamic Table Initializer (Starts in preparing state with 0 amount)
+        if (!currentOrder && !forcedSc && activeTerminal) {
+            currentOrder = {
+                id: 'term-' + activeTerminal.code,
+                order_number: activeTerminal.name,
+                title: `${activeTerminal.name} · Рахунок готується`,
+                type: 'table',
+                table_number: activeTerminal.name,
+                status: 'preparing',
+                total_amount: 0,
+                base_amount: 0,
+                merchant: { display_name: 'POS Термінал', business_name: 'Очікування касира', tax_id: '', iban: '' }
+            };
+        }
+
+        // Explicit scenario presets are development/demo fixtures only.
+        if (forcedSc === '2' || forcedSc === 'open_amount' || forcedSc === 'amount') {
+            currentOrder = {
+                id: 'demo-sc2',
+                order_number: 'Каса',
+                title: 'Оплата на касі',
+                type: 'open_amount',
+                total_amount: 0,
+                base_amount: 0,
+                merchant: { display_name: "Кав'ярня «Крапка»", business_name: "ФОП Ковальчук В.М.", tax_id: '3124567890', iban: 'UA673005280000026500504354077' }
+            };
+        } else if (forcedSc === '3' || forcedSc === 'table') {
+            currentOrder = {
+                id: 'demo-sc3',
+                order_number: 'Рахунок №118',
+                title: 'Столик 12 · Рахунок №118',
+                type: 'table',
+                table_number: 12,
+                status: 'preparing',
+                total_amount: 386.0,
+                base_amount: 386.0,
+                merchant: { display_name: 'Бістро «Смак»', business_name: 'ТОВ «СМАК РЕСТО»', tax_id: '39281746', iban: 'UA673005280000026500504354077' }
+            };
+        } else if (forcedSc === '4' || forcedSc === 'delivery') {
+            currentOrder = {
+                id: 'demo-sc4',
+                order_number: '№7731',
+                title: 'Замовлення №7731 · Нова пошта',
+                type: 'delivery',
+                total_amount: 940.0,
+                base_amount: 940.0,
+                merchant: { display_name: 'Крамниця «Файно»', business_name: 'ФОП Мельник І.П.', tax_id: '2987654321', iban: 'UA673005280000026500504354077' }
+            };
+        }
+
+        const isExplicitDemo = orderId === 'demo-1' || orderId.startsWith('demo-');
+        if (!currentOrder && isExplicitDemo) {
+            const localOrders = JSON.parse(localStorage.getItem('rahunok_orders') || '[]');
+            currentOrder = localOrders.find(o => o.id === orderId) || {
+                id: orderId,
+                order_number: '№4092-A',
+                title: 'Замовлення №4092-A',
+                type: 'fixed',
+                total_amount: 44.0,
+                base_amount: 44.0,
+                merchant: {
+                    display_name: 'Rozetka',
+                    business_name: 'ТОВ «РОЗЕТКА.УА»',
+                    tax_id: '37193071',
+                    iban: 'UA673005280000026500504354077'
+                }
+            };
+        }
+
+        if (!currentOrder) {
+            const isOffline = checkoutLoadReason === 'offline';
+            showCheckoutError(
+                isOffline ? 'Немає з’єднання' : 'Рахунок не знайдено',
+                isOffline
+                    ? 'Перевірте інтернет-з’єднання та відкрийте рахунок ще раз.'
+                    : 'Посилання недійсне або термін дії рахунку завершився. Перевірте посилання у продавця.'
+            );
+            return;
+        }
+
+        const merchantData = currentOrder.merchant || {};
+        const merchantName = merchantData.display_name || merchantData.business_name || 'Мерчант';
+        let total = Number(currentOrder.total_amount || 0);
+        let baseAmount = Number(currentOrder.base_amount || total);
+        const scenario = resolveScenario(
+            currentOrder,
+            activeTerminal ? 'table' : forcedSc,
+            window.__CHECKOUT_SCENARIOS__ || {}
+        );
+        const orderScenario = scenario.type;
+
+        // Bind Scenario UI
+        document.getElementById('merchName1').textContent = merchantName;
+        document.getElementById('sheetMerchant').textContent = merchantName;
+        document.getElementById('asTitle').textContent = `${merchantName} · ${currentOrder.order_number}`;
+        document.getElementById('infoMerchant').textContent = merchantData.business_name || merchantName;
+        document.getElementById('infoIban').textContent = merchantData.iban || 'Не вказано';
+        document.getElementById('infoTaxId').textContent = merchantData.tax_id || 'Не вказано';
+        document.getElementById('infoRef').textContent = currentOrder.title || currentOrder.order_number;
+
+        // Emit checkout_opened
+        if (typeof emitCheckoutEvent === 'function') {
+            emitCheckoutEvent('checkout_opened', {
+                metadata: {
+                    total_amount: currentOrder.total_amount,
+                    title: currentOrder.title,
+                    table_number: currentOrder.table_number || null,
+                    url: window.location.href
+                }
+            });
+        }
+
+        // Live Realtime Multi-Channel Listener for Restaurant Tables
+        function startTableLiveListener(terminal) {
+            async function onTableReady(newOrder) {
+                if (!newOrder || !(Number(newOrder.total_amount) > 0) || !isOrderFresh(newOrder)) return;
+                console.log('⚡ Table bill received in realtime:', newOrder);
+                vib([30, 50, 30]);
+                currentOrder = newOrder;
+                total = Number(newOrder.total_amount);
+                baseAmount = Number(newOrder.base_amount || total);
+                
+                document.getElementById('orderLabel').textContent = newOrder.title || newOrder.order_number || terminal.name;
+                document.getElementById('rowBase').textContent = numStr(baseAmount) + ' ₴';
+                document.getElementById('summaryTotal').textContent = numStr(total) + ' ₴';
+                setAnimatedAmount(document.getElementById('heroAmount'), numStr(total) + ' ₴');
+                setPayStatus('pending');
+                showScreen('order');
+                startTableCountdown(newOrder, terminal);
+            }
+
+            // 1. Native High-Speed Browser BroadcastChannel (0ms latency cross-tab)
+            if ('BroadcastChannel' in window) {
+                try {
+                    const bc = new BroadcastChannel('rahunok_bus');
+                    bc.onmessage = (ev) => {
+                        const data = ev.data;
+                        if (data && (data.order_number === terminal.code || data.id === 'term-' + terminal.code)) {
+                            onTableReady(data);
+                        }
+                    };
+                } catch(e) {}
+            }
+
+            // 2. Supabase Realtime loads in the background after the waiting UI is visible.
+            loadSupabaseClient().then((client) => {
+                supabase = client;
+                if (!supabase) return;
+                try {
+                    const sbChannel = supabase.channel('table_room_' + terminal.code, { config: { broadcast: { self: true } } });
+                    
+                    // Supabase Broadcast event
+                    sbChannel.on('broadcast', { event: 'table_bill' }, (payload) => {
+                        if (payload && payload.payload) {
+                            onTableReady(payload.payload);
+                        }
+                    });
+
+                    // Postgres CDC table changes
+                    sbChannel.on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+                        const row = payload.new;
+                        if (row && (row.order_number === terminal.code || row.id === 'term-' + terminal.code)) {
+                            onTableReady(row);
+                        }
+                    });
+
+                    sbChannel.subscribe();
+                } catch(e) {
+                    console.warn('Supabase realtime init error:', e);
+                }
+            });
+
+            // 3. Window Storage Event (Cross-window localStorage)
+            window.addEventListener('storage', (e) => {
+                if (e.key === 'rahunok_term_' + terminal.code || e.key === 'rahunok_last_order') {
+                    try {
+                        const parsed = JSON.parse(e.newValue);
+                        if (parsed && (parsed.order_number === terminal.code || parsed.id === 'term-' + terminal.code)) {
+                            onTableReady(parsed);
+                        }
+                    } catch(err) {}
+                }
+            });
+
+            // 4. Safe Polling Interval (every 800ms)
+            const pollTimer = setInterval(async () => {
+                if (currentOrder && currentOrder.status !== 'preparing' && Number(currentOrder.total_amount) > 0 && isOrderFresh(currentOrder)) {
+                    return;
+                }
+
+                // Check LocalStorage directly
+                const stored = localStorage.getItem('rahunok_term_' + terminal.code);
+                if (stored) {
+                    try {
+                        const parsed = JSON.parse(stored);
+                        if (parsed && Number(parsed.total_amount) > 0 && isOrderFresh(parsed)) {
+                            onTableReady(parsed);
+                            return;
+                        }
+                    } catch(e) {}
+                }
+
+                // Check Supabase REST API without mismatched types
+                if (supabase) {
+                    try {
+                        const { data } = await supabase.from('orders')
+                            .select('*, merchant:merchants(*)')
+                            .eq('order_number', terminal.code)
+                            .neq('status', 'paid')
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                            .maybeSingle();
+
+                        if (data && Number(data.total_amount) > 0 && isOrderFresh(data)) {
+                            onTableReady(data);
+                            return;
+                        }
+                    } catch(e) {}
+                }
+            }, 800);
+        }
+
+        // Render based on the declarative scenario registry.
+        if (scenario.screen === 'amount') {
+            document.getElementById('c2Name').textContent = merchantName;
+            showScreen('amount');
+        } else if (scenario.screen === 'delivery') {
+            document.getElementById('wizName').textContent = merchantName;
+            document.getElementById('wizOrderLabel').textContent = currentOrder.order_number;
+            document.getElementById('wizRowBase').textContent = numStr(baseAmount) + ' ₴';
+            document.getElementById('wizRowTotal').textContent = numStr(total) + ' ₴';
+            setAnimatedAmount(document.getElementById('wizHeroAmount'), numStr(total) + ' ₴');
+            showScreen('delivery');
+        } else if (orderScenario === 'table') {
+            document.getElementById('waitName').textContent = merchantName;
+            document.getElementById('waitTableNum').textContent = activeTerminal ? activeTerminal.name : (currentOrder.title || 'Термінал');
+            if (activeTerminal) startTableLiveListener(activeTerminal);
+
+            if (currentOrder.status !== 'preparing' && Number(currentOrder.total_amount) > 0 && isOrderFresh(currentOrder)) {
+                document.getElementById('orderLabel').textContent = currentOrder.title || currentOrder.order_number || (activeTerminal ? activeTerminal.name : 'Термінал');
+                document.getElementById('rowBase').textContent = numStr(baseAmount) + ' ₴';
+                document.getElementById('summaryTotal').textContent = numStr(total) + ' ₴';
+                setAnimatedAmount(document.getElementById('heroAmount'), numStr(total) + ' ₴');
+                showScreen('order');
+                startTableCountdown(currentOrder, activeTerminal);
+            } else {
+                showScreen('waiting');
+            }
+        } else {
+            document.getElementById('orderLabel').textContent = currentOrder.order_number;
+            document.getElementById('rowBase').textContent = numStr(baseAmount) + ' ₴';
+            document.getElementById('summaryTotal').textContent = numStr(total) + ' ₴';
+            setAnimatedAmount(document.getElementById('heroAmount'), numStr(total) + ' ₴');
+            showScreen('order');
+        }
+
+        // ==========================================
+        // Delivery Wizard Logic
+        // ==========================================
+        const deliveryState = { name: '', phone: '', city: '', branch: '', method: 'branch' };
+        const methodInfo = {
+            branch:  { label: 'У відділення', short: 'Відділення', price: 70.00, addrLabel: 'Відділення', addrPh: 'Відділення №1' },
+            locker:  { label: 'У поштомат', short: 'Поштомат', price: 65.00, addrLabel: 'Поштомат', addrPh: 'Поштомат №5231' },
+            courier: { label: "Кур'єром за адресою", short: "Кур'єр", price: 120.00, addrLabel: 'Адреса', addrPh: 'вул. Хрещатик, 1, кв. 5' }
+        };
+        let wizardReachedSheet = false;
+
+        function goToWizStep(step) {
+            document.querySelectorAll('#screenDelivery .wizard-step').forEach(s =>
+                s.classList.toggle('active', s.dataset.step === step));
+            const segs = document.querySelectorAll('#wizProgress .wp-seg');
+            segs.forEach(seg => {
+                const st = seg.dataset.step;
+                const done = (step === 'recipient' && st === 'recipient') || (step === 'np');
+                seg.classList.toggle('done', done);
+            });
+            document.getElementById('wizProgress').style.opacity = step === 'overview' ? '0' : '1';
+        }
+
+        document.getElementById('wizStartBtn').addEventListener('click', () => {
+            if (wizardReachedSheet && fName.value.trim().length >= 3 && fPhone.value.trim().length >= 10) {
+                openSheet();
+            } else {
+                goToWizStep('recipient');
+            }
+            vib(8);
+        });
+
+        const fName = document.getElementById('fName');
+        const fPhone = document.getElementById('fPhone');
+        const fCity = document.getElementById('fCity');
+        const fBranch = document.getElementById('fBranch');
+        const wizNext1 = document.getElementById('wizNext1');
+        const wizNext2 = document.getElementById('wizNext2');
+
+        const recipientValid = () => fName.value.trim().length >= 3 && fPhone.value.replace(/\D/g, '').length >= 10;
+        const npValid = () => fCity.value.trim().length >= 2 && fBranch.value.trim().length >= 1;
+
+        [fName, fPhone].forEach(i => i.addEventListener('input', () => wizNext1.disabled = !recipientValid()));
+        [fCity, fBranch].forEach(i => i.addEventListener('input', () => wizNext2.disabled = !npValid()));
+
+        wizNext1.addEventListener('click', () => {
+            deliveryState.name = fName.value.trim();
+            deliveryState.phone = fPhone.value.trim();
+            goToWizStep('np');
+            vib(8);
+            setTimeout(() => fCity.focus(), 300);
+        });
+
+        document.getElementById('methodList').addEventListener('click', (e) => {
+            const row = e.target.closest('.method-row');
+            if (!row) return;
+            document.querySelectorAll('.method-row').forEach(r => r.classList.remove('selected'));
+            row.classList.add('selected');
+            deliveryState.method = row.dataset.method;
+            const m = methodInfo[deliveryState.method];
+            document.getElementById('fBranchLabel').textContent = m.addrLabel;
+            fBranch.placeholder = m.addrPh;
+            vib(6);
+        });
+
+        wizNext2.addEventListener('click', () => {
+            deliveryState.city = fCity.value.trim();
+            deliveryState.branch = fBranch.value.trim();
+            wizardReachedSheet = true;
+            const m = methodInfo[deliveryState.method];
+            total = round2(baseAmount + m.price);
+            
+            document.getElementById('recipientValue').textContent = `${deliveryState.name} · ${deliveryState.phone}`;
+            document.getElementById('deliveryRowTitle').textContent = `Нова пошта · ${m.short} · ${numStr(m.price)} ₴`;
+            document.getElementById('deliveryValue').textContent = `${deliveryState.city}, ${deliveryState.branch}`;
+            document.getElementById('deliveryRows').classList.add('visible');
+
+            openSheet();
+            vib(10);
+        });
+
+        document.getElementById('wizBackBtn').addEventListener('click', () => {
+            const active = document.querySelector('#screenDelivery .wizard-step.active')?.dataset.step;
+            if (active === 'np') goToWizStep('recipient');
+            else if (active === 'recipient') goToWizStep('overview');
+            else if (window.history.length > 1) history.back();
+        });
+
+        // ==========================================
+        // Keypad Custom Amount Logic
+        // ==========================================
+        let entryValue = '';
+        const entryAmount = document.getElementById('entryAmount');
+        const goToPayBtn2 = document.getElementById('goToPayBtn2');
+
+        function renderEntry() {
+            const display = entryValue === '' ? '0' : entryValue;
+            setAnimatedAmount(entryAmount, display, '₴', 'cur');
+            const val = parseFloat(entryValue.replace(',', '.')) || 0;
+            entryAmount.classList.toggle('empty', val <= 0);
+            goToPayBtn2.disabled = val <= 0;
+        }
+
+        document.getElementById('keypad').addEventListener('click', (e) => {
+            const key = e.target.closest('.key');
+            if (!key) return;
+            const k = key.dataset.k;
+            vib(6);
+            if (k === 'del') entryValue = entryValue.slice(0, -1);
+            else if (k === ',') { if (entryValue !== '' && !entryValue.includes(',')) entryValue += ','; }
+            else {
+                const [, dec] = entryValue.split(',');
+                if (dec !== undefined && dec.length >= 2) return;
+                if (entryValue.replace(',', '').length >= 7) return;
+                if (entryValue === '0' && k !== ',') entryValue = k;
+                else entryValue += k;
+            }
+            renderEntry();
+        });
+
+        goToPayBtn2.addEventListener('click', () => {
+            total = parseFloat(entryValue.replace(',', '.')) || 0;
+            openSheet();
+        });
+
+        // ==========================================
+        // Promo Code Logic
+        // ==========================================
+        let promoApplied = false;
+        const promoInput = document.getElementById('promoInput');
+        const promoApply = document.getElementById('promoApply');
+
+        promoApply.addEventListener('click', () => {
+            if (promoApplied) return;
+            const code = promoInput.value.trim().toUpperCase();
+            if (!code) { promoInput.focus(); showToast('Введіть промокод'); return; }
+
+            promoApplied = true;
+            const discount = 4.00;
+            total = Math.max(0, round2(total - discount));
+            document.getElementById('discountVal').textContent = `−${numStr(discount)} ₴`;
+            document.getElementById('discountRow').classList.add('visible');
+            document.getElementById('summaryTotal').textContent = numStr(total) + ' ₴';
+            setAnimatedAmount(document.getElementById('heroAmount'), numStr(total) + ' ₴');
+            setAnimatedAmount(document.getElementById('sheetAmount'), numStr(total) + ' ₴');
+            promoApply.textContent = 'Застосовано';
+            promoApply.classList.add('applied');
+            promoInput.disabled = true;
+            vib([15, 40, 15]);
+            showToast(`Знижку ${numStr(discount)} ₴ застосовано`);
+        });
+
+        // ==========================================
+        // Bank Carousel & Dynamic bank-api Integration
+        // ==========================================
+        let banksData = [
+            { name: "Monobank", code: "MONO", id: "mono", logo: "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/a7/06/5a/a7065ad9-93f8-5705-4b1a-81ade2916c05/Placeholder.mill/200x200bb-75.webp", bg: "linear-gradient(135deg, #000000, #2c2c2e)", active: true },
+            { name: "Приват24", code: "PBAN", id: "pb", logo: "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/57/f8/e0/57f8e0bf-783f-766a-b52b-ba630accaef1/Placeholder.mill/200x200bb-75.webp", bg: "linear-gradient(135deg, #2e7d32, #1b5e20)", feePct: 0.5, active: true },
+            { name: "Sense Bank", code: "SENS", id: "sensebank", logo: "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/06/da/1c/06da1ccf-fdb3-ae36-cf00-e258e76e2284/Placeholder.mill/200x200bb-75.webp", bg: "linear-gradient(135deg, #0d3264, #1a4f94)", active: true },
+            { name: "Абанк", code: "ABUA", id: "abank24", logo: "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/3a/76/1e/3a761e68-39dc-51ad-f189-e9d89227442c/Placeholder.mill/200x200bb-75.webp", bg: "linear-gradient(135deg, #9e9d24, #827717)", active: true },
+            { name: "ПУМБ", code: "FUIB", id: "pumb", logo: "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/02/0a/09/020a099e-1a78-877b-6394-0919c2b247c4/Placeholder.mill/200x200bb-75.webp", bg: "linear-gradient(135deg, #e53935, #b71c1c)", active: true },
+            { name: "Райффайзен Банк", code: "AVAL", id: "myraif", logo: "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/2f/8f/ce/2f8fced9-fdee-7c58-2346-88d943faa770/Placeholder.mill/200x200bb-75.webp", bg: "linear-gradient(135deg, #fbc02d, #f57f17)", active: true },
+            { name: "NovaPay", code: "NOVA", id: "NovaPay", logo: "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/80/be/f7/80bef75a-fca9-ec80-98b8-dad73437089c/Placeholder.mill/200x200bb-75.webp", bg: "linear-gradient(135deg, #f44336, #c62828)", active: true },
+            { name: "izibank", code: "TASB", id: "izibank", logo: "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/fa/dd/6d/fadd6db5-56ff-c4ba-fd98-cc48f34b4997/Placeholder.mill/200x200bb-75.webp", bg: "linear-gradient(135deg, #ff9800, #e65100)", active: true },
+            { name: "Глобус Банк", code: "GLBU", id: "globus", logo: "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/cf/31/7d/cf317d36-9ed8-4918-e96f-c6e0622f8fb6/Placeholder.mill/200x200bb-75.webp", bg: "linear-gradient(135deg, #0288d1, #01579b)", active: true }
+        ];
+
+        let currentIndex = 0;
+        let wrappers = [], cards = [];
+        let trackWidth = 0;
+        let paymentResourcesPromise = null;
+        const track = document.getElementById('track');
+        const grid = document.getElementById('bankGrid');
+        const feeBadge = document.getElementById('feeBadge');
+
+        const currentFee = () => {
+            if (!banksData[currentIndex]) return 0;
+            return banksData[currentIndex].feePct ? round2(total * banksData[currentIndex].feePct / 100) : 0;
+        };
+        const payTotal = () => round2(total + currentFee());
+
+        function updateFee() {
+            const fee = currentFee();
+            if (fee > 0) {
+                feeBadge.textContent = `Комісія 0,5% · +${numStr(fee)} ₴`;
+                feeBadge.classList.add('has-fee');
+            } else {
+                feeBadge.textContent = 'Без комісії';
+                feeBadge.classList.remove('has-fee');
+            }
+            setAnimatedAmount(document.getElementById('sheetAmount'), numStr(payTotal()) + ' ₴');
+        }
+
+        function initBanksUI(hydrated = false) {
+            if (!hydrated) {
+                const apiBase = (window.location.hostname === 'localhost' && window.location.port !== '8787') ? 'http://localhost:8787' : '';
+                const bundledCatalogUrl = '/checkout/banks.json';
+                fetch(bundledCatalogUrl)
+                    .then(response => response.ok ? response.json() : Promise.reject())
+                    .then(list => {
+                        if (Array.isArray(list) && list.length > 0) {
+                            banksData = list.filter(bank => bank.active !== false);
+                            initBanksUI(true);
+                        }
+                    })
+                    .catch(() => {});
+                Promise.all([
+                    fetch(apiBase + '/api/v1/banks'),
+                    fetch(apiBase + '/api/v1/logos')
+                ]).then(async ([listRes, logosRes]) => {
+                    if (listRes.ok) {
+                        const list = await listRes.json();
+                        if (list && list.length > 0) {
+                            banksData = list.filter(b => b.active !== false);
+                        }
+                    }
+                    if (logosRes.ok) {
+                        const logosMap = await logosRes.json();
+                        banksData.forEach(b => {
+                            const logoData = logosMap[b.code.toUpperCase()];
+                            if (logoData) {
+                                b.color = logoData.color;
+                                b.logo = logoData.logo;
+                            }
+                        });
+                    }
+                    initBanksUI(true);
+                }).catch(() => {});
+            }
+
+            track.innerHTML = '';
+            grid.innerHTML = '';
+
+            function renderBankLogo(target, bank, fallbackText = '') {
+                target.textContent = fallbackText;
+                if (!bank.logo) return;
+
+                let logoUrl;
+                try {
+                    logoUrl = new URL(bank.logo, window.location.origin);
+                    if (!['http:', 'https:', 'data:'].includes(logoUrl.protocol)) return;
+                } catch {
+                    return;
+                }
+
+                const image = document.createElement('img');
+                image.src = logoUrl.href;
+                image.alt = '';
+                image.loading = 'eager';
+                image.decoding = 'async';
+                image.addEventListener('load', () => target.replaceChildren(image), { once: true });
+            }
+
+            banksData.forEach((bank, index) => {
+                const isInactive = bank.active === false;
+
+                // Carousel Card
+                const wrapper = document.createElement('div');
+                wrapper.className = 'card-wrapper';
+                wrapper.dataset.index = index;
+                wrapper.innerHTML = `
+                    <div class="bank-card ${isInactive ? 'disabled' : ''}" id="bcard-${index}" style="--v2-bg: ${bank.bg || 'linear-gradient(135deg, #1c1c1e, #2c2c2e)'};">
+                        <div class="card-top">
+                            <div class="card-header-left">
+                                <div class="bank-logo-small" id="bcard-logo-${index}"></div>
+                                <div class="bank-name" id="bcard-name-${index}">${bank.name}</div>
+                            </div>
+                            <div class="bank-logo">${bank.code}</div>
+                        </div>
+                        <div class="card-bottom">
+                            <div class="iban">A2A · NBU 003</div>
+                            <div class="network-logo"></div>
+                        </div>
+                        <div class="card-bg-logo" id="bcard-bg-logo-${index}">${bank.code}</div>
+                    </div>
+                `;
+                wrapper.querySelector('.bank-card').addEventListener('click', () => {
+                    if (index !== currentIndex) selectBank(index, false);
+                });
+                track.appendChild(wrapper);
+                renderBankLogo(wrapper.querySelector(`#bcard-logo-${index}`), bank);
+                renderBankLogo(wrapper.querySelector(`#bcard-bg-logo-${index}`), bank, bank.code);
+
+                // Grid Tile
+                const tile = document.createElement('div');
+                tile.className = `grid-card ${index === 0 ? 'selected' : ''}`;
+                tile.id = `gtile-${index}`;
+                tile.style.background = bank.bg || 'linear-gradient(135deg, #1c1c1e, #2c2c2e)';
+                tile.dataset.index = index;
+                tile.innerHTML = `
+                    <div class="card-top">
+                        <div class="card-header-left">
+                            <div class="bank-logo-small" id="gtile-logo-${index}"></div>
+                            <div class="grid-card-name" id="gtile-name-${index}">${bank.name}</div>
+                        </div>
+                        <div class="grid-check">
+                            <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </div>
+                    </div>
+                    <div class="grid-card-code" id="gtile-code-${index}">
+                        ${bank.code} · Open Banking
+                    </div>
+                    <div class="grid-bg-logo" id="gtile-bg-logo-${index}">${bank.code}</div>
+                `;
+                tile.addEventListener('click', () => {
+                    selectBank(index, true);
+                });
+                grid.appendChild(tile);
+                renderBankLogo(tile.querySelector(`#gtile-logo-${index}`), bank);
+                renderBankLogo(tile.querySelector(`#gtile-bg-logo-${index}`), bank, bank.code);
+            });
+
+            wrappers = document.querySelectorAll('.card-wrapper');
+            cards = document.querySelectorAll('.bank-card');
+            trackWidth = track.getBoundingClientRect().width;
+            updateCards();
+        }
+
+        function updateCards() {
+            if (!trackWidth || wrappers.length === 0) return;
+            const trackCenter = track.scrollLeft + (trackWidth / 2);
+            let closestDistance = Infinity, activeIndex = 0;
+            wrappers.forEach((wrapper, index) => {
+                const card = cards[index];
+                if (!card) return;
+                const wrapperCenter = wrapper.offsetLeft + (wrapper.offsetWidth / 2);
+                const distance = Math.abs(trackCenter - wrapperCenter);
+                if (distance < closestDistance) { closestDistance = distance; activeIndex = index; }
+                const normalized = Math.min(distance / wrapper.offsetWidth, 1);
+                const scale = 1 - (normalized * 0.13);
+                const opacity = 1 - (normalized * 0.45);
+                const direction = wrapperCenter > trackCenter ? 1 : -1;
+                card.style.transform = `scale(${scale}) perspective(900px) rotateY(${normalized * direction * -12}deg)`;
+                card.style.opacity = opacity;
+            });
+            if (activeIndex !== currentIndex) {
+                currentIndex = activeIndex;
+                document.querySelectorAll('.grid-card').forEach((t) =>
+                    t.classList.toggle('selected', Number(t.dataset.index) === currentIndex));
+                updateFee();
+                vib(8);
+            }
+        }
+
+        track.addEventListener('scroll', () => requestAnimationFrame(updateCards));
+        window.addEventListener('resize', () => {
+            if (track) { trackWidth = track.getBoundingClientRect().width; updateCards(); }
+        });
+
+        function selectBank(index, fromGrid) {
+            if (fromGrid) closeActiveView();
+            setTimeout(() => {
+                const wrapper = wrappers[index];
+                if (!wrapper) return;
+                const pos = wrapper.offsetLeft - (trackWidth / 2) + (wrapper.offsetWidth / 2);
+                if (track.scrollTo) track.scrollTo({ left: pos, behavior: 'smooth' });
+                else track.scrollLeft = pos;
+            }, fromGrid ? 120 : 0);
+            vib(10);
+        }
+
+        function openSheet() {
+            ensurePaymentResources();
+            updateFee();
+            body.classList.add('sheet-open');
+            vib(10);
+            setTimeout(() => {
+                trackWidth = track.getBoundingClientRect().width;
+                updateCards();
+            }, 300);
+        }
+
+        document.getElementById('goToPayBtn1').addEventListener('click', openSheet);
+
+        // Views toggle
+        const infoView = document.getElementById('infoView');
+        const searchView = document.getElementById('searchView');
+        let currentActiveView = null;
+
+        function closeActiveView() {
+            if (currentActiveView) {
+                currentActiveView.classList.remove('active');
+                currentActiveView = null;
+                return true;
+            }
+            return false;
+        }
+
+        function toggleView(view, focusSelector) {
+            if (currentActiveView === view) closeActiveView();
+            else {
+                if (currentActiveView) currentActiveView.classList.remove('active');
+                view.classList.add('active');
+                currentActiveView = view;
+                if (focusSelector) setTimeout(() => document.querySelector(focusSelector).focus(), 400);
+            }
+        }
+
+        document.getElementById('closeBtn').addEventListener('click', () => {
+            if (!closeActiveView()) body.classList.remove('sheet-open');
+        });
+        document.getElementById('infoBtn').addEventListener('click', () => toggleView(infoView));
+        document.getElementById('openSearchBtn').addEventListener('click', () => toggleView(searchView, '.bank-search-input'));
+
+        document.getElementById('bankSearchInput').addEventListener('input', (e) => {
+            const val = e.target.value.toLowerCase();
+            document.querySelectorAll('.grid-card').forEach((tile) => {
+                const bank = banksData[Number(tile.dataset.index)];
+                if (!bank) return;
+                const matches = (bank.name + ' ' + bank.code + ' ' + (bank.alias || '')).toLowerCase().includes(val);
+                tile.style.display = matches ? 'flex' : 'none';
+            });
+        });
+
+        // Payment-only resources stay off the critical checkout render path.
+        let cachedRecaptchaToken = '';
+        let recaptchaRefreshTimer = null;
+        function loadRecaptcha() {
+            if (window.grecaptcha) return Promise.resolve();
+            return new Promise((resolve) => {
+                const script = document.createElement('script');
+                script.src = 'https://www.google.com/recaptcha/api.js?render=6LdeMo0tAAAAACXUw3wf3o-09QH0__AQsI5oWyQV';
+                script.async = true;
+                script.onload = resolve;
+                script.onerror = resolve;
+                document.head.appendChild(script);
+            });
+        }
+        function refreshRecaptchaToken() {
+            if (window.grecaptcha && typeof window.grecaptcha.ready === 'function') {
+                window.grecaptcha.ready(() => {
+                    try {
+                        window.grecaptcha.execute('6LdeMo0tAAAAACXUw3wf3o-09QH0__AQsI5oWyQV', { action: 'checkout' })
+                            .then(t => { if (t) cachedRecaptchaToken = t; })
+                            .catch(() => {});
+                    } catch (e) {}
+                });
+            }
+        }
+        function ensurePaymentResources() {
+            if (!paymentResourcesPromise) {
+                paymentResourcesPromise = Promise.all([initBanksUI(), loadRecaptcha()])
+                    .then(() => {
+                        refreshRecaptchaToken();
+                        if (!recaptchaRefreshTimer) {
+                            recaptchaRefreshTimer = setInterval(refreshRecaptchaToken, 90000);
+                        }
+                    });
+            }
+            return paymentResourcesPromise;
+        }
+
+        // Pay action
+        const payBtn = document.getElementById('payBtn');
+        let isProcessing = false;
+
+        payBtn.addEventListener('click', async () => {
+            if (isProcessing) return;
+            isProcessing = true;
+            vib(15);
+            payBtn.classList.add('processing');
+
+            const bank = banksData[currentIndex];
+            const bankCode = bank.code;
+            const tokenToSend = cachedRecaptchaToken;
+            refreshRecaptchaToken();
+
+            const isLvivDemo = bankCode === 'LVIV' || bank.id === 'lviv';
+            if (isLvivDemo) {
+                setTimeout(() => {
+                    payBtn.classList.remove('processing');
+                    isProcessing = false;
+                    showStatus(true);
+                    setTimeout(showStatusSuccess, 2000);
+                }, 1200);
+                return;
+            }
+
+            try {
+                const res = await fetch((window.location.hostname === 'localhost' && window.location.port !== '8787' ? 'http://localhost:8787' : '') + '/api/v1/checkout/' + orderId + '/initiate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        bank: bankCode,
+                        amount: payTotal(),
+                        os: clientOS,
+                        recaptcha_token: tokenToSend
+                    })
+                });
+                        
+                        
+                        let data;
+                        try {
+                            data = await res.json();
+                        } catch (parseErr) {
+                            if (window.location.hostname === 'localhost' && window.location.port !== '8787') {
+                                console.warn('Local testing fallback...');
+                                setTimeout(() => {
+                                    payBtn.classList.remove('processing');
+                                    isProcessing = false;
+                                    showStatus(true);
+                                    if(typeof showStatusSuccess === 'function') setTimeout(() => showStatusSuccess(), 2000);
+                                }, 1200);
+                                return;
+                            }
+                            throw new Error('Parse error');
+                        }
+
+                        if (!res.ok || !data.success) {
+                            throw new Error(data.error || 'Помилка ініціалізації платежу');
+                        }
+                        
+                        // Launch DeepLink
+                        if (typeof emitCheckoutEvent === 'function') {
+                            emitCheckoutEvent('bank_app_handoff_started', { bank_code: bankCode });
+                        }
+                        
+                        if (clientOS === 'ios' || clientOS === 'android') {
+                            if (data.redirect_url) {
+                                window.location.href = data.redirect_url;
+                            }
+                            setTimeout(() => {
+                                if (document.hasFocus() || document.visibilityState === 'visible') {
+                                    if (data.fallback_url && data.fallback_url !== data.redirect_url) {
+                                        window.location.href = data.fallback_url;
+                                    }
+                                }
+                            }, 3500);
+                        } else {
+                            if (data.redirect_url) {
+                                window.open(data.redirect_url, '_blank');
+                            }
+                        }
+
+                        
+                        // Live status polling
+                        const pollInterval = setInterval(async () => {
+                            try {
+                                const stRes = await fetch((window.location.hostname === 'localhost' && window.location.port !== '8787' ? 'http://localhost:8787' : '') + '/api/v1/checkout/' + orderId + '/status');
+                                const stData = await stRes.json();
+                                if (stData && stData.status === 'paid') {
+                                    clearInterval(pollInterval);
+                                    showStatusSuccess();
+                                }
+                            } catch(e) {}
+                        }, 2000);
+                        
+                        setTimeout(() => {
+                            payBtn.classList.remove('processing');
+                            isProcessing = false;
+                            showStatus(true);
+                        }, 1200);
+                        
+                    } catch(err) {
+                        console.error(err);
+                        alert(err.message);
+                        payBtn.classList.remove('processing');
+                        isProcessing = false;
+                    }
+        });
+
+        const statusScreen = document.getElementById('statusScreen');
+        const statusIcon = document.getElementById('statusIcon');
+        const statusTitle = document.getElementById('statusTitle');
+        const statusDetails = document.getElementById('statusDetails');
+        const appBanner = document.getElementById('appBanner');
+        const statusDone = document.getElementById('statusDone');
+        const walletBtn = document.getElementById('walletBtn');
+
+        function showStatus(pendingFirst) {
+            const fee = currentFee();
+            const currentBank = banksData[currentIndex];
+            setAnimatedAmount(document.getElementById('statusAmount'), numStr(payTotal()) + ' ₴');
+            document.getElementById('statusBank').textContent = currentBank.name;
+            document.getElementById('statusMerchant').textContent = merchantName;
+            document.getElementById('statusRef').textContent = currentOrder.order_number;
+            document.getElementById('statusFeeRow').style.display = fee > 0 ? 'flex' : 'none';
+            document.getElementById('statusFee').textContent = '+' + numStr(fee) + ' ₴';
+
+            statusIcon.classList.remove('success');
+            statusDetails.style.display = 'none';
+            appBanner.classList.remove('visible');
+            walletBtn.classList.remove('visible');
+            statusDone.classList.remove('visible');
+
+            statusTitle.textContent = pendingFirst ? 'Очікуємо підтвердження банку…' : 'Платіж передано в банк';
+            statusScreen.classList.add('active');
+            body.classList.remove('sheet-open');
+        }
+
+        function showStatusSuccess() {
+            statusIcon.classList.add('success');
+            statusTitle.textContent = 'Сплачено';
+            statusDetails.style.display = 'block';
+            walletBtn.classList.add('visible');
+            appBanner.classList.add('visible');
+            statusDone.classList.add('visible');
+            vib([30, 50, 30]);
+        }
+
+        walletBtn.addEventListener('click', () => {
+            vib(15);
+            showToast('Карту лояльності додано в Apple Wallet');
+        });
+
+        statusDone.addEventListener('click', () => {
+            window.location.reload();
+        });
+
+        // Action Sheet Overlay
+        const actionSheetOverlay = document.getElementById('actionSheetOverlay');
+        document.querySelectorAll('.more-btn').forEach(b =>
+            b.addEventListener('click', () => { actionSheetOverlay.classList.add('active'); vib(10); }));
+        document.getElementById('asCancelBtn').addEventListener('click', () => actionSheetOverlay.classList.remove('active'));
+        actionSheetOverlay.addEventListener('click', (e) => {
+            if (e.target === actionSheetOverlay) actionSheetOverlay.classList.remove('active');
+        });
+
+        document.getElementById('shareOrderBtn').addEventListener('click', async () => {
+            actionSheetOverlay.classList.remove('active');
+            const shareData = {
+                title: `${merchantName} · ${currentOrder.order_number}`,
+                text: `${currentOrder.order_number} на суму ${numStr(total)} ₴`,
+                url: window.location.href
+            };
+            if (navigator.share) {
+                try { await navigator.share(shareData); } catch (e) {}
+            } else {
+                try {
+                    await navigator.clipboard.writeText(`${shareData.text} — ${shareData.url}`);
+                    showToast('Скопійовано в буфер обміну');
+                } catch (e) {
+                    showToast('Не вдалося поділитися');
+                }
+            }
+        });
+
+        document.querySelectorAll('.back-btn').forEach(b =>
+            b.addEventListener('click', () => {
+                if (window.history.length > 1) history.back();
+            }));
+
+        const toastEl = document.getElementById('toast');
+        let toastTimer = null;
+        function showToast(text) {
+            toastEl.textContent = text;
+            toastEl.classList.add('visible');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toastEl.classList.remove('visible'), 2200);
+        }
+
+    })();
+    </script>
+</body>
+</html>

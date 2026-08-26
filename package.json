@@ -3,7 +3,7 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
-	"workspaces": ["apps/merchant-app"],
+	"workspaces": ["apps/merchant-app", "apps/checkout"],
 	"engines": {
 		"node": ">=22.13 <23 || >=24"
 	},
@@ -11,9 +11,13 @@
 		"dev": "vite dev",
 		"dev:worker": "npm --prefix ../core/worker run dev",
 		"dev:app": "npm --prefix apps/merchant-app run dev",
+		"dev:checkout": "npm --prefix apps/checkout run dev",
 		"build:app": "npm --prefix apps/merchant-app run build",
+		"build:checkout": "npm --prefix apps/checkout run build",
 		"check:app": "npm --prefix apps/merchant-app run check",
+		"check:checkout": "npm --prefix apps/checkout run check",
 		"test:app": "npm --prefix apps/merchant-app run test",
+		"test:checkout": "npm --prefix apps/checkout run test",
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",

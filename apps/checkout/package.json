@@ -1,0 +1,15 @@
+{
+  "name": "checkout",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --base=/checkout/",
+    "build": "node build.mjs",
+    "check": "node --check build.mjs && node --check js/checkout-api.js && node --check js/scenarios.js",
+    "test": "node --test js/*.test.mjs"
+  },
+  "devDependencies": {
+    "vite": "^8.0.16"
+  }
+}
