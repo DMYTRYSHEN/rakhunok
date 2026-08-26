@@ -11,26 +11,32 @@
 		Search,
 		ShoppingBasket,
 		Trash2,
+		Truck,
 		Utensils,
+		UserRound,
 		X
 	} from '@lucide/svelte';
-	import type { PosTerminal } from '../types';
+	import type { PosBoard, PosTerminal } from '../types';
 	import { formatMoney } from '../utils/format';
 	import { getPosDraftTotal, type PosDraft, type PosDraftAction } from './pos-drafts';
 	import { buildLegacyPosOrderInsert } from './pos-order-contract';
 
 	let {
 		merchantId,
+		board,
 		terminal,
 		draft,
 		onaction,
+		onselectterminal,
 		onsubmit,
 		onclose
 	}: {
 		merchantId: string;
+		board: PosBoard;
 		terminal: PosTerminal;
 		draft: PosDraft;
 		onaction: (action: PosDraftAction) => void;
+		onselectterminal: (terminalId: string) => void;
 		onsubmit: () => Promise<void>;
 		onclose: () => void;
 	} = $props();
@@ -47,6 +53,9 @@
 	const total = $derived(getPosDraftTotal(draft));
 	const orderContract = $derived(buildLegacyPosOrderInsert(merchantId, terminal, draft));
 	const itemCount = $derived(draft.items.reduce((count, item) => count + item.quantity, 0));
+	const servicePoints = $derived(
+		board.terminals.filter((item) => item.type === 'table' || item.type === 'kasa')
+	);
 	const keys = ['7', '8', '9', '⌫', '4', '5', '6', '+', '1', '2', '3', '−', '00', '0', '.', '='];
 	const categories = ['Усі', 'Кава', 'Їжа', 'Напої'];
 	const products = [
@@ -233,16 +242,107 @@
 				onclick={submitOrder}
 				class="mt-4 h-14 w-full rounded-md bg-[#1769e0] px-4 text-sm font-extrabold text-white disabled:bg-zinc-200 disabled:text-zinc-500"
 			>
-				{submitting ? 'Створюємо…' : orderContract.ok ? 'Створити замовлення' : 'Додайте суму або товар'}
+				{submitting
+					? 'Створюємо…'
+					: orderContract.ok
+						? 'Створити замовлення'
+						: 'Додайте суму або товар'}
 			</button>
 			{#if submitError}<p class="mt-3 text-xs text-red-700" role="alert">{submitError}</p>{/if}
 		</div>
 	</div>
 {/snippet}
 
+{#snippet servicePanel()}
+	<aside
+		class="hidden min-h-0 flex-col border-r border-zinc-200 bg-white xl:flex"
+		aria-label="Столи та обслуговування"
+	>
+		<div class="min-h-0 flex-1 overflow-y-auto p-4">
+			<div class="flex items-center justify-between gap-3">
+				<h3 class="text-sm font-extrabold">Столи та каси</h3>
+				<span class="text-xs font-semibold text-zinc-500">{servicePoints.length}</span>
+			</div>
+			<div class="mt-3 space-y-2">
+				{#each servicePoints as servicePoint (servicePoint.id)}
+					{@const activeOrder = board.activeOrders.find(
+						(order) => order.terminalId === servicePoint.id
+					)}
+					<button
+						type="button"
+						onclick={() => onselectterminal(servicePoint.id)}
+						aria-pressed={servicePoint.id === terminal.id}
+						class="flex min-h-16 w-full items-center justify-between gap-3 rounded-md border px-3 py-2.5 text-left {servicePoint.id ===
+						terminal.id
+							? 'border-blue-500 bg-blue-50'
+							: 'border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50'}"
+					>
+						<span class="min-w-0">
+							<strong class="block truncate text-sm">{servicePoint.name}</strong>
+							<span class="mt-1 block text-xs text-zinc-500">
+								{activeOrder
+									? 'Активне замовлення'
+									: servicePoint.type === 'kasa'
+										? 'Каса'
+										: 'Вільний стіл'}
+							</span>
+						</span>
+						<strong
+							class="shrink-0 text-sm tabular-nums {activeOrder
+								? 'text-zinc-950'
+								: 'text-zinc-400'}"
+						>
+							{activeOrder ? formatMoney(activeOrder.amount) : '0,00 грн'}
+						</strong>
+					</button>
+				{/each}
+			</div>
+		</div>
+
+		<div class="space-y-3 border-t border-zinc-200 p-4" aria-label="Виконавці замовлення">
+			<div>
+				<label
+					for="pos-waiter"
+					class="mb-1.5 flex items-center gap-2 text-xs font-bold text-zinc-700"
+				>
+					<UserRound size={15} aria-hidden="true" /> Офіціант
+				</label>
+				<select
+					id="pos-waiter"
+					disabled
+					class="h-11 w-full rounded-md border border-zinc-200 bg-zinc-100 px-3 text-sm text-zinc-500 disabled:cursor-not-allowed"
+				>
+					<option>Вибір готується</option>
+				</select>
+				<p class="mt-1.5 text-[0.6875rem] leading-4 text-zinc-500">
+					Буде використано для обліку чайових.
+				</p>
+			</div>
+			<div>
+				<label
+					for="pos-courier"
+					class="mb-1.5 flex items-center gap-2 text-xs font-bold text-zinc-700"
+				>
+					<Truck size={15} aria-hidden="true" /> Кур’єр
+				</label>
+				<select
+					id="pos-courier"
+					disabled
+					class="h-11 w-full rounded-md border border-zinc-200 bg-zinc-100 px-3 text-sm text-zinc-500 disabled:cursor-not-allowed"
+				>
+					<option>Вибір готується</option>
+				</select>
+				<p class="mt-1.5 text-[0.6875rem] leading-4 text-zinc-500">
+					Буде використано для доставки замовлення.
+				</p>
+			</div>
+		</div>
+	</aside>
+{/snippet}
+
 <section
 	aria-label="Чернетка замовлення"
-	class="fixed inset-x-0 top-18 bottom-0 z-20 flex min-h-0 flex-col overflow-hidden bg-[#f5f6f7] lg:left-[17.5rem]"
+	class="fixed inset-x-0 top-18 bottom-0 z-20 flex min-h-0 flex-col overflow-hidden bg-[#f5f6f7]"
 >
 	<header
 		class="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-zinc-200 bg-white px-4 sm:px-5"
@@ -266,8 +366,9 @@
 	</header>
 
 	<div
-		class="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_25rem]"
+		class="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[17.5rem_minmax(0,1fr)_25rem]"
 	>
+		{@render servicePanel()}
 		<div class="min-h-0 overflow-y-auto px-4 pt-4 pb-28 sm:px-5 md:pb-6">
 			<div class="mx-auto max-w-4xl">
 				<div class="grid grid-cols-2 rounded-md bg-zinc-200/70 p-1" aria-label="Режим чернетки">

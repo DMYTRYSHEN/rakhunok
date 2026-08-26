@@ -38,7 +38,17 @@
 	}: {
 		children: Snippet;
 		merchantName: string;
-		activeSection?: 'overview' | 'invoices' | 'invoice-rules' | 'payment-methods' | 'public-page' | 'pos' | 'settings' | 'structure' | 'team' | 'developer-api';
+		activeSection?:
+			| 'overview'
+			| 'invoices'
+			| 'invoice-rules'
+			| 'payment-methods'
+			| 'public-page'
+			| 'pos'
+			| 'settings'
+			| 'structure'
+			| 'team'
+			| 'developer-api';
 		demo?: boolean;
 		onSignOut: () => Promise<void>;
 	} = $props();
@@ -50,14 +60,51 @@
 	let signingOut = $state(false);
 	let signOutError = $state(false);
 	let invoicesExpanded = $state(true);
+	const isPosMode = $derived(activeSection === 'pos');
 
 	const invoiceScenarios = [
-		{ type: 'fixed', name: 'Фіксований рахунок', description: 'Інтернет-магазин, послуги, рахунок на суму', icon: Invoice01Icon, available: true },
-		{ type: 'open_amount', name: 'Вільна сума', description: 'Клієнт сам вказує суму: каса або донат', icon: CircleDollarSignIcon, available: true },
-		{ type: 'table', name: 'Рахунок за столиком', description: 'Ресторан, номер столика та чайові', icon: RestaurantTableIcon, available: true },
-		{ type: 'delivery', name: 'Нова пошта / Доставка', description: 'Відділення, поштамат і розрахунок', icon: Package01Icon, available: true },
-		{ type: 'recurring', name: 'Рекурентний платіж', description: 'Задана сума з повторенням за розкладом', icon: RepeatIcon, available: false },
-		{ type: 'rtp', name: 'RTP-запит', description: 'Запит постійному клієнту за його ідентифікатором', icon: MailSend01Icon, available: false }
+		{
+			type: 'fixed',
+			name: 'Фіксований рахунок',
+			description: 'Інтернет-магазин, послуги, рахунок на суму',
+			icon: Invoice01Icon,
+			available: true
+		},
+		{
+			type: 'open_amount',
+			name: 'Вільна сума',
+			description: 'Клієнт сам вказує суму: каса або донат',
+			icon: CircleDollarSignIcon,
+			available: true
+		},
+		{
+			type: 'table',
+			name: 'Рахунок за столиком',
+			description: 'Ресторан, номер столика та чайові',
+			icon: RestaurantTableIcon,
+			available: true
+		},
+		{
+			type: 'delivery',
+			name: 'Нова пошта / Доставка',
+			description: 'Відділення, поштамат і розрахунок',
+			icon: Package01Icon,
+			available: true
+		},
+		{
+			type: 'recurring',
+			name: 'Рекурентний платіж',
+			description: 'Задана сума з повторенням за розкладом',
+			icon: RepeatIcon,
+			available: false
+		},
+		{
+			type: 'rtp',
+			name: 'RTP-запит',
+			description: 'Запит постійному клієнту за його ідентифікатором',
+			icon: MailSend01Icon,
+			available: false
+		}
 	] as const;
 
 	function containFocus(event: KeyboardEvent, container: HTMLElement) {
@@ -88,9 +135,16 @@
 		mediaQuery.addEventListener('change', updateViewport);
 		const handleShortcut = (event: KeyboardEvent) => {
 			if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-			if (event.target instanceof HTMLElement && event.target.matches('input, textarea, select, [contenteditable="true"]')) return;
+			if (
+				event.target instanceof HTMLElement &&
+				event.target.matches('input, textarea, select, [contenteditable="true"]')
+			)
+				return;
 			const destinations: Record<string, string> = {
-				'1': '/dashboard', '2': '/dashboard/pos', '3': '/dashboard/invoices', n: '/dashboard/invoices/new'
+				'1': '/dashboard',
+				'2': '/dashboard/pos',
+				'3': '/dashboard/invoices',
+				n: '/dashboard/invoices/new'
 			};
 			const destination = destinations[event.key.toLowerCase()];
 			if (!destination) return;
@@ -109,8 +163,12 @@
 		if (signingOut) return;
 		signingOut = true;
 		signOutError = false;
-		try { await onSignOut(); }
-		catch { signOutError = true; signingOut = false; }
+		try {
+			await onSignOut();
+		} catch {
+			signOutError = true;
+			signingOut = false;
+		}
 	}
 
 	$effect(() => {
@@ -145,7 +203,7 @@
 	{#if menuOpen}
 		<button
 			type="button"
-			class="fixed inset-0 z-40 bg-zinc-950/45 lg:hidden"
+			class="fixed inset-0 z-40 bg-zinc-950/45 {isPosMode ? '' : 'lg:hidden'}"
 			aria-label="Закрити навігацію"
 			onclick={() => (menuOpen = false)}
 		></button>
@@ -154,9 +212,11 @@
 	<aside
 		bind:this={mobileNavigation}
 		class:translate-x-0={menuOpen}
-		class="fixed inset-y-0 left-0 z-50 flex w-[17.5rem] -translate-x-full flex-col border-r border-zinc-800 bg-[#111313] text-white transition-transform duration-200 lg:translate-x-0"
-		aria-hidden={!isDesktop && !menuOpen}
-		inert={!isDesktop && !menuOpen}
+		class="fixed inset-y-0 left-0 z-50 flex w-[17.5rem] -translate-x-full flex-col border-r border-zinc-800 bg-[#111313] text-white transition-transform duration-200 {isPosMode
+			? ''
+			: 'lg:translate-x-0'}"
+		aria-hidden={isPosMode ? !menuOpen : !isDesktop && !menuOpen}
+		inert={isPosMode ? !menuOpen : !isDesktop && !menuOpen}
 	>
 		<div class="flex h-18 items-center justify-between border-b border-white/10 px-5">
 			<a href={resolve('/')} class="flex items-center gap-2.5" aria-label="Rahunok, на головну">
@@ -168,7 +228,9 @@
 			<button
 				bind:this={closeMenuButton}
 				type="button"
-				class="grid size-9 place-items-center rounded-md text-zinc-400 hover:bg-white/10 hover:text-white lg:hidden"
+				class="grid size-9 place-items-center rounded-md text-zinc-400 hover:bg-white/10 hover:text-white {isPosMode
+					? ''
+					: 'lg:hidden'}"
 				aria-label="Закрити навігацію"
 				onclick={() => (menuOpen = false)}
 			>
@@ -235,17 +297,30 @@
 					<div id="invoice-scenarios" class="mt-1 space-y-0.5 border-l border-white/10 py-1 pl-3">
 						{#each invoiceScenarios as item (item.type)}
 							<a
-								href={resolve(`/dashboard/invoices/new?type=${item.type}${demo ? '&demo=1' : ''}` as '/')}
+								href={resolve(
+									`/dashboard/invoices/new?type=${item.type}${demo ? '&demo=1' : ''}` as '/'
+								)}
 								onclick={() => (menuOpen = false)}
 								class="group flex min-h-14 items-start gap-2.5 rounded-md px-2.5 py-2 text-zinc-400 hover:bg-white/7 hover:text-white"
 							>
-								<HugeiconsIcon icon={item.icon} size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+								<HugeiconsIcon
+									icon={item.icon}
+									size={15}
+									className="mt-0.5 shrink-0"
+									aria-hidden="true"
+								/>
 								<span class="min-w-0 flex-1">
 									<span class="flex items-center gap-2 text-xs font-bold">
 										{item.name}
-										{#if !item.available}<span class="rounded bg-zinc-800 px-1 py-0.5 text-[0.5rem] text-zinc-500">СКОРО</span>{/if}
+										{#if !item.available}<span
+												class="rounded bg-zinc-800 px-1 py-0.5 text-[0.5rem] text-zinc-500"
+												>СКОРО</span
+											>{/if}
 									</span>
-									<span class="mt-0.5 block text-[0.625rem] leading-4 text-zinc-600 group-hover:text-zinc-400">{item.description}</span>
+									<span
+										class="mt-0.5 block text-[0.625rem] leading-4 text-zinc-600 group-hover:text-zinc-400"
+										>{item.description}</span
+									>
 								</span>
 							</a>
 						{/each}
@@ -305,7 +380,9 @@
 			>
 				<HugeiconsIcon icon={UserGroupIcon} size={17} aria-hidden="true" />
 				Команда й касири
-				<span class="ml-auto rounded bg-zinc-800 px-1.5 py-0.5 text-[0.5625rem] text-zinc-400">СКОРО</span>
+				<span class="ml-auto rounded bg-zinc-800 px-1.5 py-0.5 text-[0.5625rem] text-zinc-400"
+					>СКОРО</span
+				>
 			</a>
 			<a
 				href={resolve(demo ? '/dashboard/developer-api?demo=1' : '/dashboard/developer-api')}
@@ -345,11 +422,13 @@
 				</span>
 				<HugeiconsIcon icon={Logout01Icon} size={16} className="text-zinc-500" aria-hidden="true" />
 			</button>
-			{#if signOutError}<p class="px-2 pb-1 text-xs text-red-300" role="alert">Не вдалося вийти. Спробуйте ще раз.</p>{/if}
+			{#if signOutError}<p class="px-2 pb-1 text-xs text-red-300" role="alert">
+					Не вдалося вийти. Спробуйте ще раз.
+				</p>{/if}
 		</div>
 	</aside>
 
-	<div class="min-h-screen lg:pl-[17.5rem]">
+	<div data-testid="dashboard-content" class="min-h-screen {isPosMode ? '' : 'lg:pl-[17.5rem]'}">
 		<header
 			class="sticky top-0 z-30 flex h-18 items-center justify-between border-b border-zinc-200 bg-white/95 px-4 backdrop-blur-md sm:px-6 lg:px-8"
 		>
@@ -357,14 +436,21 @@
 				<button
 					bind:this={openMenuButton}
 					type="button"
-					class="grid size-10 shrink-0 place-items-center rounded-md border border-zinc-200 bg-white text-zinc-700 lg:hidden"
+					class="grid size-10 shrink-0 place-items-center rounded-md border border-zinc-200 bg-white text-zinc-700 {isPosMode
+						? ''
+						: 'lg:hidden'}"
 					aria-label="Відкрити навігацію"
 					aria-expanded={menuOpen}
 					onclick={() => (menuOpen = true)}
 				>
 					<HugeiconsIcon icon={Menu01Icon} size={19} aria-hidden="true" />
 				</button>
-				<HugeiconsIcon icon={PanelLeftCloseIcon} size={17} className="hidden text-zinc-400 lg:block" aria-hidden="true" />
+				{#if !isPosMode}<HugeiconsIcon
+						icon={PanelLeftCloseIcon}
+						size={17}
+						className="hidden text-zinc-400 lg:block"
+						aria-hidden="true"
+					/>{/if}
 				<p class="truncate text-xs font-semibold text-zinc-500">{merchantName}</p>
 			</div>
 			<div class="flex items-center gap-2">

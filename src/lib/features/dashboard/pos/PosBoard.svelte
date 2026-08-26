@@ -102,14 +102,21 @@
 	{#if draftTerminal}
 		<PosCheckout
 			{merchantId}
+			{board}
 			terminal={draftTerminal}
 			draft={getPosDraft(draftState)}
 			onaction={dispatchDraft}
+			onselectterminal={openDraft}
 			onsubmit={submitDraft}
 			onclose={() => (draftTerminalId = null)}
 		/>
 	{:else}
-		{#if actionError}<p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{actionError}</p>{/if}
+		{#if actionError}<p
+				class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+				role="alert"
+			>
+				{actionError}
+			</p>{/if}
 		<header class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
 			<div>
 				<p class="text-xs font-bold tracking-[0.12em] text-blue-700 uppercase">Термінал & каса</p>
@@ -164,8 +171,21 @@
 						</a>
 						{#if order.status === 'pending'}
 							<div class="mt-2 flex gap-2">
-								<button type="button" disabled={Boolean(pendingAction) || !onMarkPaid} onclick={() => mutateOrder(order.id, 'paid')} class="inline-flex h-9 items-center gap-1.5 rounded-md bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-40"><Banknote size={14} aria-hidden="true" /> Готівкою</button>
-								<button type="button" disabled={Boolean(pendingAction) || !onCancel} onclick={() => mutateOrder(order.id, 'cancel')} aria-label="Скасувати замовлення" class="grid size-9 place-items-center rounded-md border border-red-200 text-red-700 disabled:opacity-40"><X size={15} aria-hidden="true" /></button>
+								<button
+									type="button"
+									disabled={Boolean(pendingAction) || !onMarkPaid}
+									onclick={() => mutateOrder(order.id, 'paid')}
+									class="inline-flex h-9 items-center gap-1.5 rounded-md bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-40"
+									><Banknote size={14} aria-hidden="true" /> Готівкою</button
+								>
+								<button
+									type="button"
+									disabled={Boolean(pendingAction) || !onCancel}
+									onclick={() => mutateOrder(order.id, 'cancel')}
+									aria-label="Скасувати замовлення"
+									class="grid size-9 place-items-center rounded-md border border-red-200 text-red-700 disabled:opacity-40"
+									><X size={15} aria-hidden="true" /></button
+								>
 							</div>
 						{/if}
 					{:else}

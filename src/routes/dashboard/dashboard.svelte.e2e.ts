@@ -32,25 +32,28 @@ test('keeps dark theme icons and controls distinguishable', async ({ page }) => 
 	await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
 	const contrastRatio = async (selector: string) =>
-		page.locator(selector).first().evaluate((element) => {
-			const channels = (color: string) => {
-				const match = color.match(/[\d.]+/g);
-				if (!match || match.length < 3) throw new Error(`Unsupported color: ${color}`);
-				return match.slice(0, 3).map(Number);
-			};
-			const luminance = (color: string) => {
-				const linear = channels(color).map((channel) => {
-					const value = channel / 255;
-					return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-				});
-				return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
-			};
-			const foreground = getComputedStyle(element).color;
-			const background = getComputedStyle(element).backgroundColor;
-			const lighter = Math.max(luminance(foreground), luminance(background));
-			const darker = Math.min(luminance(foreground), luminance(background));
-			return (lighter + 0.05) / (darker + 0.05);
-		});
+		page
+			.locator(selector)
+			.first()
+			.evaluate((element) => {
+				const channels = (color: string) => {
+					const match = color.match(/[\d.]+/g);
+					if (!match || match.length < 3) throw new Error(`Unsupported color: ${color}`);
+					return match.slice(0, 3).map(Number);
+				};
+				const luminance = (color: string) => {
+					const linear = channels(color).map((channel) => {
+						const value = channel / 255;
+						return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+					});
+					return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+				};
+				const foreground = getComputedStyle(element).color;
+				const background = getComputedStyle(element).backgroundColor;
+				const lighter = Math.max(luminance(foreground), luminance(background));
+				const darker = Math.min(luminance(foreground), luminance(background));
+				return (lighter + 0.05) / (darker + 0.05);
+			});
 
 	await expect.poll(() => contrastRatio('.bg-zinc-100.text-zinc-700')).toBeGreaterThanOrEqual(3);
 	await expect.poll(() => contrastRatio('button:has-text("Запросити")')).toBeGreaterThanOrEqual(3);
@@ -90,7 +93,9 @@ test('opens and dismisses the mobile dashboard navigation', async ({ page }) => 
 	await expect(page.locator('aside')).toHaveAttribute('aria-hidden', 'true');
 });
 
-test('opens invoice scenarios from the sidebar and selects the requested form', async ({ page }) => {
+test('opens invoice scenarios from the sidebar and selects the requested form', async ({
+	page
+}) => {
 	await page.goto('/dashboard/?demo=1');
 
 	await expect(page.getByRole('button', { name: 'Згорнути типи рахунків' })).toHaveAttribute(
@@ -108,6 +113,32 @@ test('opens invoice scenarios from the sidebar and selects the requested form', 
 		'true'
 	);
 	await expect(page.getByRole('textbox', { name: 'Відділення або поштомат' })).toBeVisible();
+});
+
+test('adapts payment scenarios to phone and tablet widths', async ({ page }) => {
+	for (const viewport of [
+		{ width: 390, height: 844, columns: 2 },
+		{ width: 820, height: 1180, columns: 3 }
+	]) {
+		await page.setViewportSize(viewport);
+		await page.goto('/dashboard/invoices/new?type=fixed&demo=1');
+
+		const scenarios = page.getByRole('region', { name: 'Бізнес-сценарій оплати' });
+		const cards = scenarios.getByRole('button');
+		await expect(scenarios).toBeVisible();
+		await expect(cards.first()).toHaveAttribute('aria-pressed', 'true');
+		await expect(page.getByRole('textbox', { name: 'Номер рахунку' })).toBeVisible();
+
+		const cardRows = await cards.evaluateAll((elements) =>
+			elements.slice(0, 3).map((element) => Math.round(element.getBoundingClientRect().top))
+		);
+		expect(cardRows[0]).toBe(cardRows[1]);
+		if (viewport.columns === 3) expect(cardRows[1]).toBe(cardRows[2]);
+		else expect(cardRows[2]).toBeGreaterThan(cardRows[1]);
+		expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+			viewport.width
+		);
+	}
 });
 
 test('browses, filters, and opens demo invoice details', async ({ page }) => {
@@ -194,23 +225,36 @@ test('saves invoice rules and applies them without overwriting manual edits', as
 
 test('opens the read-only POS board in demo mode', async ({ page }) => {
 	await page.goto('/dashboard/?demo=1');
-	await page.getByRole('link', { name: 'Каса' }).click();
+	await page.getByRole('link', { name: 'Каса', exact: true }).click();
 
 	await expect(page).toHaveURL(/\/dashboard\/pos\?demo=1$/);
+	await expect(page.locator('aside')).toHaveAttribute('aria-hidden', 'true');
+	await expect(page.getByRole('button', { name: 'Відкрити навігацію' })).toBeVisible();
+	await expect(page.getByTestId('dashboard-content')).toHaveCSS('padding-left', '0px');
 	await expect(page.getByRole('heading', { name: 'Робочі місця' })).toBeVisible();
 	await expect(page.getByRole('region', { name: 'Термінали' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Стіл 2' })).toBeVisible();
 	await expect(page.getByText('Очікує оплати')).toBeVisible();
 	await expect(page.getByText('Локальна демонстрація')).toBeVisible();
 
-	await page.getByRole('button', { name: 'Нове замовлення' }).first().click();
+	await page.getByRole('button', { name: 'Чернетка замовлення' }).first().click();
 	await expect(page.getByRole('region', { name: 'Чернетка замовлення' })).toBeVisible();
+	const servicePanel = page.getByRole('complementary', { name: 'Столи та обслуговування' });
+	await expect(servicePanel).toBeVisible();
+	await expect(servicePanel.getByRole('button', { name: /Стіл 2.*640,00 грн/ })).toBeVisible();
+	await expect(servicePanel.getByLabel('Офіціант')).toBeDisabled();
+	await expect(servicePanel.getByText('Буде використано для обліку чайових.')).toBeVisible();
+	await expect(servicePanel.getByLabel('Кур’єр')).toBeDisabled();
+	await expect(servicePanel.getByText('Буде використано для доставки замовлення.')).toBeVisible();
+	await servicePanel.getByRole('button', { name: /Головна каса.*0,00 грн/ }).click();
+	await expect(page.getByRole('heading', { name: 'Головна каса' })).toBeVisible();
+	await servicePanel.getByRole('button', { name: /Стіл 1.*0,00 грн/ }).click();
 	await page.getByRole('button', { name: '5', exact: true }).click();
 	await expect(page.getByTestId('pos-draft-total')).toHaveText(/5,00\s*(грн|₴)/);
 	await page.getByRole('button', { name: 'Товари' }).click();
 	await page.getByRole('button', { name: /Капучино/ }).click();
 	await expect(page.getByTestId('pos-draft-total')).toHaveText(/150,00\s*(грн|₴)/);
-	await expect(page.getByRole('button', { name: 'Чернетка готова до створення' })).toBeDisabled();
+	await expect(page.getByRole('button', { name: 'Створити замовлення' })).toBeVisible();
 });
 
 test('keeps the POS route protected outside demo mode', async ({ page }) => {
@@ -247,9 +291,10 @@ test('previews the future Device Event Gateway for kasa workplaces', async ({ pa
 test('keeps the POS checkout usable on a phone', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/dashboard/pos?demo=1');
-	await page.getByRole('button', { name: 'Нове замовлення' }).first().click();
+	await page.getByRole('button', { name: 'Чернетка замовлення' }).first().click();
 
 	await expect(page.getByRole('region', { name: 'Чернетка замовлення' })).toBeVisible();
+	await expect(page.getByRole('complementary', { name: 'Столи та обслуговування' })).toBeHidden();
 	await page.getByRole('button', { name: 'Товари' }).click();
 	await page.getByRole('button', { name: /Капучино/ }).click();
 	const openReceipt = page.getByRole('button', { name: 'Відкрити поточне замовлення' });
@@ -262,9 +307,7 @@ test('keeps the POS checkout usable on a phone', async ({ page }) => {
 	).toBeFocused();
 	await expect(page.locator('body')).toHaveCSS('overflow', 'hidden');
 	await expect(page.getByTestId('pos-draft-total').last()).toHaveText(/150,00\s*(грн|₴)/);
-	await expect(
-		page.getByRole('button', { name: 'Чернетка готова до створення' }).last()
-	).toBeDisabled();
+	await expect(page.getByRole('button', { name: 'Створити замовлення' }).last()).toBeVisible();
 	await page.keyboard.press('Escape');
 	await expect(mobileReceipt).toBeHidden();
 	await expect(openReceipt).toBeFocused();
