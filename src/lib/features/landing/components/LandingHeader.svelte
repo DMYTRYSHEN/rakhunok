@@ -6,6 +6,7 @@
 	let menuOpen = $state(false);
 	// Dashboard remains a legacy deployment route until that feature is migrated.
 	const dashboardPath = '/dashboard/' as '/';
+	const merchantAppPath = '/app/' as '/';
 
 	function closeMenu() {
 		menuOpen = false;
@@ -20,6 +21,7 @@
 		<div class="desktop-nav">
 			{#each primaryNav as link (link.href)}<a href={resolve(`/${link.href}`)}>{link.label}</a
 				>{/each}
+			<a href={resolve(merchantAppPath)}>TelegramApp</a>
 			<a class="account-link" href={resolve(dashboardPath)}>Особистий кабінет</a>
 		</div>
 		<div class="nav-actions">
@@ -41,6 +43,7 @@
 			{#each primaryNav as link (link.href)}<a href={resolve(`/${link.href}`)} onclick={closeMenu}
 					>{link.label}</a
 				>{/each}
+			<a href={resolve(merchantAppPath)} onclick={closeMenu}>TelegramApp</a>
 			<a href={resolve(dashboardPath)} onclick={closeMenu}>Особистий кабінет</a>
 			<a href={resolve('/#demo')} onclick={closeMenu}>Спробувати демо</a>
 			<button

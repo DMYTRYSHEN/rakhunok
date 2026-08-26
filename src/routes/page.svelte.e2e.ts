@@ -7,6 +7,10 @@ test('serves the Rahunok landing with preserved navigation', async ({ page }) =>
 	await expect(page.getByRole('heading', { level: 1 })).toContainText('Оплата одразу');
 	await expect(page.locator('#payment-flow')).toBeVisible();
 	await expect(page.locator('#pricing')).toBeVisible();
+	await expect(page.getByRole('link', { name: 'TelegramApp' }).first()).toHaveAttribute(
+		'href',
+		'/app/'
+	);
 	await expect(page.getByRole('link', { name: 'Особистий кабінет' }).first()).toHaveAttribute(
 		'href',
 		'/dashboard/'
