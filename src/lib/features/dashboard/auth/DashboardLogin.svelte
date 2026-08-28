@@ -4,8 +4,9 @@
 
 	let {
 		configurationRequired = false,
+		homeHref = resolve('/'),
 		onGoogleLogin
-	}: { configurationRequired?: boolean; onGoogleLogin?: () => Promise<void> } = $props();
+	}: { configurationRequired?: boolean; homeHref?: string; onGoogleLogin?: () => Promise<void> } = $props();
 	let pending = $state(false);
 	let message = $state<string | null>(null);
 
@@ -29,7 +30,7 @@
 	>
 		<div class="border-b border-zinc-200 px-6 py-5">
 			<a
-				href={resolve('/')}
+				href={homeHref}
 				class="inline-flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-zinc-950"
 			>
 				<ArrowLeft size={15} aria-hidden="true" />

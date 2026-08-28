@@ -80,9 +80,9 @@
 {#if sessionState.status === 'loading'}
 	<DashboardStateScreen loading />
 {:else if sessionState.status === 'configuration-required'}
-	<DashboardLogin configurationRequired />
+	<DashboardLogin configurationRequired homeHref="https://letsrealtalk.com/" />
 {:else if sessionState.status === 'guest'}
-	<DashboardLogin onGoogleLogin={loginWithGoogle} />
+	<DashboardLogin homeHref="https://letsrealtalk.com/" onGoogleLogin={loginWithGoogle} />
 {:else if sessionState.status === 'onboarding'}
 	<MerchantOnboarding user={sessionState.user} onComplete={completeOnboarding} />
 {:else if sessionState.status === 'error'}
