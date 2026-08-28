@@ -18,6 +18,6 @@ export function getDashboardGateway(): DashboardGateway | null {
 		}
 	});
 
-	gateway = createDashboardGateway(client);
+	gateway = createDashboardGateway(client, { eventsApiBase: '/dashboard' });
 	return gateway;
 }

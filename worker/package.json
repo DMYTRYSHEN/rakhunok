@@ -6,7 +6,10 @@
 		"build": "npm --prefix .. run build",
 		"check": "wrangler deploy --dry-run --env=\"\" --outdir .wrangler-dist",
 		"check:production": "wrangler deploy --dry-run --env production --outdir .wrangler-dist-production",
-		"dev": "npm run build && wrangler dev --env=\"\""
+		"check:dashboard": "wrangler deploy --dry-run --config wrangler.dashboard.jsonc --env=\"\" --outdir .wrangler-dist-dashboard",
+		"check:dashboard:production": "wrangler deploy --dry-run --config wrangler.dashboard.jsonc --env production --outdir .wrangler-dist-dashboard-production",
+		"dev": "npm run build && wrangler dev --env=\"\"",
+		"dev:dashboard": "npm run build && wrangler dev --config wrangler.dashboard.jsonc --env=\"\""
 	},
 	"devDependencies": {
 		"wrangler": "^4.0.0"

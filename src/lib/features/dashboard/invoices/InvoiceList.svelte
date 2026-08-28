@@ -139,7 +139,9 @@
 					{#if cancellation.eligible}
 						<button
 							type="button"
-							disabled={!onCancel || Boolean(cancellingId)} onclick={() => cancel(invoice.id)}
+							disabled={demo || !onCancel || Boolean(cancellingId)}
+							title={demo ? 'Буде доступно після перевірки політики RLS' : undefined}
+							onclick={() => cancel(invoice.id)}
 							class="col-span-2 h-9 justify-self-start rounded-md border border-red-200 px-3 text-xs font-bold text-red-700 opacity-60"
 						>
 							Скасувати
@@ -189,7 +191,9 @@
 								{#if cancellation.eligible}
 									<button
 										type="button"
-										disabled={!onCancel || Boolean(cancellingId)} onclick={() => cancel(invoice.id)}
+										disabled={demo || !onCancel || Boolean(cancellingId)}
+										title={demo ? 'Буде доступно після перевірки політики RLS' : undefined}
+										onclick={() => cancel(invoice.id)}
 										class="h-8 rounded-md border border-red-200 px-3 text-xs font-bold text-red-700 opacity-60"
 									>
 										Скасувати

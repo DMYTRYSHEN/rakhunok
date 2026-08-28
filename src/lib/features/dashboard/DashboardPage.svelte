@@ -414,7 +414,7 @@
 		lastInvoiceId = currentInvoiceId;
 		if (view === 'invoice' && sessionState.status === 'ready') {
 			stopRealtimeSync();
-			invoiceEvents = [];
+			invoiceEvents = sessionState.user.id === 'demo-user' ? demoInvoiceEvents : [];
 			void loadInvoices().then(startRealtimeSync);
 		}
 	});
