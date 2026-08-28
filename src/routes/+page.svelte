@@ -1,8 +1,20 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { replaceState } from '$app/navigation';
+	import { page } from '$app/state';
 	import LandingPage from '$lib/features/landing/LandingPage.svelte';
 	import { getAuthRedirectUrl } from '$lib/features/landing/utils/auth-redirect';
 	import '$lib/features/landing/landing.css';
+
+	let darkMode = $state(page.url.searchParams.get('money-vision') === 'apple-dark');
+
+	function toggleTheme() {
+		const url = new URL(page.url);
+		darkMode = !darkMode;
+		if (darkMode) url.searchParams.set('money-vision', 'apple-dark');
+		else url.searchParams.delete('money-vision');
+		replaceState(url, page.state);
+	}
 
 	onMount(() => {
 		const redirectUrl = getAuthRedirectUrl(
@@ -21,7 +33,10 @@
 		name="description"
 		content="Створюйте рахунки, приймайте оплату через QR, NFC або посилання, отримуйте підтверджений банком статус і керуйте касою зі смартфона."
 	/>
-	<meta name="theme-color" content="#0b0d0c" />
+	<meta
+		name="theme-color"
+		content={darkMode ? '#050506' : '#f2f1ec'}
+	/>
 	<meta name="robots" content="index, follow" />
 	<meta property="og:type" content="website" />
 	<meta property="og:locale" content="uk_UA" />
@@ -33,9 +48,11 @@
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
 	<link
-		href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Manrope:wght@400;500;600;700;800&display=swap"
+		href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
 		rel="stylesheet"
 	/>
 </svelte:head>
 
-<LandingPage />
+<div class="landing-vision" data-money-vision={darkMode ? 'apple-dark' : ''}>
+	<LandingPage {darkMode} onThemeToggle={toggleTheme} />
+</div>

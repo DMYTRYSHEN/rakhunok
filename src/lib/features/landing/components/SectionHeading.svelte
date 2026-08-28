@@ -9,7 +9,7 @@
 </script>
 
 <header class:dark class="section-heading">
-	<p class="eyebrow">{eyebrow}</p>
+	<div class="section-heading-label"><p class="eyebrow">{eyebrow}</p></div>
 	<h2>{title} <span>{accent}</span></h2>
 	{#if copy}<p class="section-copy">{copy}</p>{/if}
 </header>

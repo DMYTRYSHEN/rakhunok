@@ -6,38 +6,51 @@
 
 <section class="section paper" id="money-flow">
 	<div class="money-layout container">
-		<div>
-			<p class="eyebrow dark-text">Куди йдуть гроші</p>
-			<h2 class="section-title dark-text">Ваші кошти <span>не зберігаються в Rahunok.</span></h2>
-			<p class="section-copy dark-text">
-				У сценарії прямої оплати переказ спрямовується на банківський рахунок вашого ФОП або ТОВ.
-				Rahunok керує рахунком, QR, статусом, звіркою та пов’язаним фіскальним сценарієм.
-			</p>
-			<ul class="check-list">
-				<li><b>Реквізити відомі до оплати.</b> Клієнт бачить суму, продавця та призначення.</li>
-				<li><b>Авторизація виконується банком.</b> Rahunok не просить PIN або пароль.</li>
-				<li><b>Повернення у checkout не є доказом.</b> SUCCESS встановлює сервер.</li>
-			</ul>
+		<div class="money-copy">
+			<SectionHeading
+				dark
+				eyebrow="Куди йдуть гроші"
+				title="Ваші кошти"
+				accent="не зберігаються в Rahunok."
+				copy="У сценарії прямої оплати переказ спрямовується на банківський рахунок вашого ФОП або ТОВ. Rahunok керує рахунком, QR, статусом, звіркою та пов’язаним фіскальним сценарієм."
+			/>
+			<div class="money-assurances" aria-label="Принципи безпеки платежу">
+				<p><span>01</span><b>Реквізити видно до оплати</b></p>
+				<p><span>02</span><b>Авторизація тільки у банку</b></p>
+				<p><span>03</span><b>Статус підтверджує сервер</b></p>
+			</div>
 		</div>
-		<div class="money-diagram">
-			<article>
-				<b>01</b><span
-					><strong>Клієнт</strong><small>Підтверджує операцію у своєму банку</small></span
-				>
-			</article>
-			<i>↓ Авторизований переказ</i>
-			<article>
-				<b>02</b><span
-					><strong>Банківський платіжний контур</strong><small
-						>Обробляє платіж за умовами інтеграції</small
-					></span
-				>
-			</article>
-			<i>↓ Зарахування за реквізитами</i>
-			<article class="success">
-				<b>03</b><span><strong>IBAN вашого бізнесу</strong><small>Рахунок ФОП або ТОВ</small></span>
-			</article>
-			<p><b>Інформаційний контур:</b> банк/API → backend Rahunok → статус → ПРРО.</p>
+		<div class="money-route" aria-label="Маршрут банківського переказу">
+			<header>
+				<span>Прямий переказ</span>
+				<b>Rahunok не є отримувачем коштів</b>
+			</header>
+			<div class="money-route__path">
+				<article>
+					<span class="money-route__index">01</span>
+					<small>Відправник</small>
+					<strong>Клієнт</strong>
+					<p>Підтверджує платіж у застосунку свого банку</p>
+				</article>
+				<div class="money-route__connector" aria-hidden="true"><span>переказ</span></div>
+				<article>
+					<span class="money-route__index">02</span>
+					<small>Авторизація</small>
+					<strong>Банк клієнта</strong>
+					<p>Перевіряє та виконує операцію</p>
+				</article>
+				<div class="money-route__connector" aria-hidden="true"><span>зарахування</span></div>
+				<article class="money-route__destination">
+					<span class="money-route__index">03</span>
+					<small>Отримувач</small>
+					<strong>Ваш IBAN</strong>
+					<p>Рахунок ФОП або ТОВ</p>
+				</article>
+			</div>
+			<div class="money-route__signal">
+				<div><span class="money-route__pulse" aria-hidden="true"></span><b>Rahunok бачить статус, не гроші</b></div>
+				<p>банк / API <span>→</span> backend Rahunok <span>→</span> статус <span>→</span> ПРРО</p>
+			</div>
 		</div>
 	</div>
 	<p class="legal-note container">
@@ -49,16 +62,17 @@
 <section class="section" id="proof">
 	<div class="container">
 		<SectionHeading
-			eyebrow="Довіра без вигаданих логотипів"
-			title="Перевірте все"
-			accent="до запуску."
-			copy="Ми не підміняємо реальні докази маркетинговими цифрами. До підключення ви отримуєте список доступних інтеграцій, тарифів і відповідальних сторін."
+			eyebrow="Спокій у кожній операції"
+			title="Ви завжди знаєте,"
+			accent="що відбулося з оплатою."
+			copy="До запуску перевіряємо весь шлях: рахунок, оплату, підтвердження, звірку та фіскальний сценарій."
 		/>
-		<div class="card-grid four">
-			{#each proofItems as item (item.title)}<article class="content-card">
+		<div class="proof-ledger">
+			<header><span>CHECK</span><span>Що перевіряємо</span><span>Що отримує бізнес</span></header>
+			{#each proofItems as item (item.title)}<article>
 					<small>{item.label}</small>
 					<h3>{item.title}</h3>
-					<p>{item.description}</p>
+					<p>{item.description}</p><b aria-hidden="true">✓</b>
 				</article>{/each}
 		</div>
 	</div>
@@ -68,28 +82,31 @@
 	<div class="container">
 		<SectionHeading
 			dark
-			eyebrow="Тарифи"
-			title="Почніть безкоштовно."
-			accent="Масштабуйтеся за потреби."
+			eyebrow="Прозорі умови"
+			title="Почніть з однієї каси."
+			accent="Додайте більше, коли будете готові."
 			copy="Остаточна комісія залежить від банку, методу, інтеграції та комерційних умов."
 		/>
-		<div class="pricing-grid">
+		<div class="pricing-board">
+			<div class="pricing-axis" aria-hidden="true"><span>ПЛАН</span><span>МОЖЛИВОСТІ</span><span>ДІЯ</span></div>
+			<div class="pricing-grid">
 			{#each pricingPlans as plan (plan.name)}<article
 					class:popular={plan.popular}
 					class="price-card"
 				>
-					{#if plan.popular}<mark>Популярний</mark>{/if}<small>{plan.name}</small>
+					<div class="price-head">{#if plan.popular}<mark>Основний</mark>{/if}<small>{plan.name}</small>
 					<h3>{plan.price}</h3>
-					<p>{plan.description}</p>
+					<p>{plan.description}</p></div>
 					<ul>
 						{#each plan.features as feature (feature)}<li>{feature}</li>{/each}
 					</ul>
-					<button
+					<div class="price-action"><button
 						class="button {plan.popular ? 'button-primary' : 'button-dark'}"
 						type="button"
 						onclick={onSignup}>{plan.cta}</button
-					><small>{plan.note}</small>
+					><small>{plan.note}</small></div>
 				</article>{/each}
+			</div>
 		</div>
 	</div>
 </section>
@@ -113,13 +130,15 @@
 <section class="section final-section" id="final-cta">
 	<div class="container">
 		<div class="final-card">
-			<p class="eyebrow dark-text">Почніть із першої каси</p>
-			<h2>Готові приймати оплату <span>без окремого POS?</span></h2>
-			<p>Підключіть Rahunok, налаштуйте реквізити та протестуйте перший платіжний сценарій.</p>
-			<div>
+			<header><p class="eyebrow dark-text">Наступний платіжний канал · ваш</p><span>R/ SCALE</span></header>
+			<h2>Зробіть кожен рахунок<br /><span>точкою приймання оплат.</span></h2>
+			<div class="final-actions">
+				<p>Запустіть пілот для власного бізнесу, партнерської мережі або клієнтів банку. Одна інтеграція — багато сценаріїв і точок входу.</p>
+				<div>
 				<button class="button button-dark" type="button" onclick={onSignup}
-					>Створити першу касу →</button
+					>Обговорити запуск →</button
 				><a class="button button-outline" href="#demo">Ще раз пройти демо</a>
+				</div>
 			</div>
 			<footer>
 				<span>Безкоштовний Start</span><span>Без окремого термінала</span><span

@@ -11,6 +11,7 @@
 | `/pos/:id`                | POS checkout alias                                                                     | `src/routes/pos/[id]/+page.svelte`  | Preserve identifier semantics                 |
 | `/pay/:id`                | Legacy payment alias/redirect                                                          | `src/routes/pay/[id]/+page.svelte`  | Preserve existing shared URLs                 |
 | `/dashboard/`             | Merchant cabinet                                                                       | `src/routes/dashboard/+page.svelte` | Preserve Auth return path                     |
+| `/corex/`                 | New authenticated deployment subproduct                                                | `src/routes/corex/+page.svelte`     | Mock/read-only; target letsrealtalk.com only  |
 | `/doc/`                   | API documentation                                                                      | `src/routes/doc/+page.svelte`       | Preserve static documentation                 |
 | `/doc`, `/docs`, `/docs/` | Redirect to `/doc/`                                                                    | Compatibility routes                | Do not alter production redirect yet          |
 

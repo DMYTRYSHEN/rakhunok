@@ -20,6 +20,9 @@ export default defineConfig({
 		})
 	],
 	server: {
+		fs: {
+			allow: ['.']
+		},
 		proxy: {
 			'/api': 'http://localhost:8787'
 		}

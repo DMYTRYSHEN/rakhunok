@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { calculateAcquiringCosts, formatMoney } from '../utils/calculator';
+	import SectionHeading from './SectionHeading.svelte';
 	let turnover = $state(500_000);
 	let fee = $state(1.5);
 	let terminals = $state(2);
@@ -8,14 +9,12 @@
 
 <section class="section" id="calculator">
 	<div class="calculator-layout container">
-		<div>
-			<p class="eyebrow">Орієнтовний розрахунок</p>
-			<h2 class="section-title">Скільки коштує ваш <span>поточний еквайринг?</span></h2>
-			<p class="section-copy">
-				Вкажіть місячний оборот, ставку та кількість терміналів. Калькулятор покаже орієнтовні річні
-				витрати.
-			</p>
-		</div>
+		<SectionHeading
+			eyebrow="Орієнтовний розрахунок"
+			title="Скільки коштує ваш"
+			accent="поточний еквайринг?"
+			copy="Вкажіть місячний оборот, ставку та кількість терміналів. Калькулятор покаже орієнтовні річні витрати."
+		/>
 		<div class="panel calculator-card">
 			<label
 				><span>Оборот на місяць <b>{formatMoney(turnover)}</b></span><input

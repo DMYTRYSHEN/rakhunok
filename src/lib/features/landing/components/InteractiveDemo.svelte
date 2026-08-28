@@ -7,13 +7,9 @@
 	let table = $state('Стіл 12');
 	let invoice: { purpose: string; amount: number; table: string } | null = $state(null);
 	let status: 'waiting' | 'processing' | 'success' = $state('waiting');
+	let selectedBank = $state('Bank Lviv Online');
 	let timer: ReturnType<typeof setTimeout> | undefined;
-	const qrCells = Array.from({ length: 49 }, (_, index) =>
-		[
-			0, 1, 2, 4, 5, 6, 7, 9, 11, 13, 14, 15, 16, 18, 20, 22, 24, 27, 28, 29, 30, 32, 35, 36, 37,
-			39, 41, 42, 43, 44, 46, 48
-		].includes(index)
-	);
+	const banks = ['Bank Lviv Online', 'monobank', 'ПриватБанк'];
 
 	function createInvoice() {
 		if (!Number.isFinite(amount) || amount < 1) return;
@@ -36,82 +32,64 @@
 
 <section class="section" id="demo">
 	<div class="container">
-		<header class="section-heading">
-			<p class="eyebrow">Інтерактивне демо</p>
-			<h2>Пройдіть шлях клієнта самі.</h2>
-			<p class="section-copy">
-				Це демонстрація інтерфейсу: реальний платіж не створюється, гроші не списуються.
-			</p>
+		<header class="integration-heading">
+			<p class="eyebrow"><i></i> Integrations · живий сценарій без реального списання</p>
+			<h2>Додайте Pay by Bank<br />до будь-якого checkout.</h2>
+			<p>Вбудуйте у власний checkout, надішліть платіжне посилання або покажіть QR. Rahunok працює поверх вашого поточного сценарію, не змінюючи операційні процеси.</p>
 		</header>
-		<div class="demo-grid">
-			<form
-				class="panel"
-				onsubmit={(event) => {
-					event.preventDefault();
-					createInvoice();
-				}}
-			>
-				<small>Інтерфейс бізнесу</small>
-				<h3>Створіть тестовий рахунок</h3>
-				<label>Призначення<input bind:value={purpose} maxlength="48" /></label>
-				<label>Сума, ₴<input bind:value={amount} type="number" min="1" max="1000000" /></label>
-				<label>Мітка або столик<input bind:value={table} maxlength="32" /></label>
-				<button class="button button-primary" type="submit">Створити QR-рахунок →</button>
-				<p class="microcopy">Демо не підключене до банку та не створює реального переказу.</p>
-			</form>
-			<div class="panel client-panel">
-				<small>Інтерфейс клієнта</small>
-				{#if invoice}
-					<div class="phone-demo">
-						<p>Отримувач <strong>Ваш бізнес</strong></p>
-						<div class="payment-summary">
-							<small>До сплати</small><b>{formatMoney(invoice.amount)}</b><span
-								>{invoice.purpose}</span
-							><small>{invoice.table}</small>
-						</div>
-						<div class="demo-qr" aria-label="Демонстраційний QR">
-							{#each qrCells as dark, index (index)}<i class:dark></i>{/each}
-						</div>
-						{#if status === 'success'}<div class="success-state">
-								<b>✓</b>
-								<h3>Оплату підтверджено</h3>
-								<p>Демо-backend отримав статус SUCCESS.</p>
-							</div>{:else}<button
-								class="button button-primary full"
-								type="button"
-								disabled={status === 'processing'}
-								onclick={simulatePayment}
-								>{status === 'processing'
-									? 'Очікуємо відповідь банку…'
-									: 'Обрати банк і підтвердити'}</button
-							>{/if}
-					</div>
-					<div class="status-list">
-						<p>
-							<span>Рахунок</span><b
-								>{status === 'success'
-									? 'Оплату підтверджено'
-									: status === 'processing'
-										? 'Перевірка backend'
-										: 'Очікує оплати'}</b
-							>
-						</p>
-						<p>
-							<span>Банківський статус</span><b
-								>{status === 'waiting' ? 'Не отримано' : status.toUpperCase()}</b
-							>
-						</p>
-						<p>
-							<span>ПРРО</span><b
-								>{status === 'success' ? 'Чек створено у демо' : 'Очікує SUCCESS'}</b
-							>
-						</p>
-					</div>
-				{:else}<div class="placeholder">
-						<b>QR</b><strong>Створіть тестовий рахунок</strong>
-						<p>Тут з’явиться платіжний екран із сумою, призначенням та демонстраційним QR.</p>
-					</div>{/if}
+
+		<div class="integration-shell" data-state={invoice ? status : 'empty'}>
+			<div class="integration-intro">
+				<span>PAYMENT FLOW / 01</span>
+				<h3>Прямий платіж<br />з рахунку на рахунок.</h3>
+				<p>Без картки посередині.</p>
+				<div class="account-route" aria-label="Шлях платежу">
+					<div><i>UA</i><span><b>Клієнт</b><small>рахунок у банку</small></span></div>
+					<strong><i></i><span>миттєвий переказ</span></strong>
+					<div><i>R/</i><span><b>Ваш бізнес</b><small>IBAN рахунок</small></span></div>
+				</div>
 			</div>
+
+			<div class="integration-live">
+				<div class="integration-live-head"><span><i></i> LIVE SANDBOX</span><b>Гроші не списуються</b></div>
+				<div class="integration-grid">
+					<form class="integration-step integration-form" onsubmit={(event) => { event.preventDefault(); createInvoice(); }}>
+						<header><span>01</span><div><small>Ваш checkout</small><h4>Створіть рахунок</h4></div></header>
+						<label><span>Що оплачує клієнт</span><input bind:value={purpose} maxlength="48" /></label>
+						<div class="demo-input-row">
+							<label><span>Сума, ₴</span><input bind:value={amount} type="number" min="1" max="1000000" /></label>
+							<label><span>Мітка</span><input bind:value={table} maxlength="32" /></label>
+						</div>
+						<button class="integration-action" type="submit">Створити платіж <span>→</span></button>
+					</form>
+
+					<div class="integration-step integration-checkout">
+						<header><span>02</span><div><small>Клієнт</small><h4>Обирає свій банк</h4></div></header>
+						{#if invoice}
+							<div class="embedded-checkout">
+								<div class="embedded-summary"><span>Rahunok Coffee · {invoice.table}</span><strong>{formatMoney(invoice.amount)}</strong><small>{invoice.purpose}</small></div>
+								<div class="embedded-banks">
+									{#each banks as bank (bank)}
+										<button type="button" class:active={selectedBank === bank} onclick={() => (selectedBank = bank)}><i>{bank === 'Bank Lviv Online' ? 'BL' : bank.slice(0, 2)}</i><span><b>{bank}</b><small>Pay by Bank</small></span><em>›</em></button>
+									{/each}
+								</div>
+								<button class="integration-action" type="button" disabled={status === 'processing'} onclick={simulatePayment}>{status === 'processing' ? `Підтвердження у ${selectedBank}…` : status === 'success' ? 'Оплату підтверджено' : `Продовжити з ${selectedBank}`}</button>
+							</div>
+						{:else}
+							<div class="integration-empty"><i>+</i><span><b>Checkout готовий</b><small>Створіть платіж на першому кроці</small></span></div>
+						{/if}
+					</div>
+
+					<div class="integration-step integration-result">
+						<header><span>03</span><div><small>Rahunok backend</small><h4>Підтверджує оплату</h4></div></header>
+						<div class="verification-orbit" class:processing={status === 'processing'} class:success={status === 'success'}><i>R/</i><span></span><b>{status === 'success' ? '✓' : status === 'processing' ? '•••' : '03'}</b></div>
+						<div class="verification-copy"><strong>{status === 'success' ? 'Verified SUCCESS' : status === 'processing' ? 'Перевіряємо webhook' : 'Очікуємо платіж'}</strong><p>{status === 'success' ? `${formatMoney(invoice?.amount ?? amount)} зараховано на IBAN бізнесу. Рахунок можна закривати.` : 'Статус у checkout зміниться лише після server-side підтвердження банку.'}</p></div>
+						<div class="verification-meta"><span>BANK CALLBACK</span><i>→</i><span>WEBHOOK</span><i>→</i><b>LEDGER</b></div>
+					</div>
+				</div>
+			</div>
+
+			<footer class="integration-footer"><span>Hosted Checkout</span><span>Web SDK</span><span>Payment Links</span><span>QR · NFC</span><b>Одна інтеграція</b></footer>
 		</div>
 	</div>
 </section>

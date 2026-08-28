@@ -43,9 +43,9 @@
 					<button class="button button-dark" type="button" onclick={close}>Готово</button>
 				</div>
 			{:else}
-				<p class="eyebrow dark-text">Заявка на підключення</p>
-				<h2 id="signup-title">Створіть першу касу</h2>
-				<p>Розкажіть коротко про бізнес. Це демонстраційна форма без мережевого запиту.</p>
+				<p class="eyebrow dark-text">Пілот Rahunok</p>
+				<h2 id="signup-title">Побудуємо ваш сценарій запуску</h2>
+				<p>Для однієї каси, мережі або банківського продукту. Це демонстраційна форма без мережевого запиту.</p>
 				<form
 					onsubmit={(event) => {
 						event.preventDefault();
@@ -63,11 +63,11 @@
 						/></label
 					>
 					<label
-						>Тип бізнесу<select name="business" required
+						>Масштаб запуску<select name="business" required
 							><option value="">Оберіть варіант</option><option>Кафе або ресторан</option><option
 								>Магазин</option
-							><option>Сфера послуг</option><option>Онлайн-бізнес</option><option>Мережа</option
-							><option>Інше</option></select
+							><option>Сфера послуг</option><option>Онлайн-бізнес</option><option>Мережа бізнесів</option
+							><option>Банк або фінансова компанія</option><option>Інше</option></select
 						></label
 					>
 					<label class="consent"
@@ -75,7 +75,7 @@
 							>Погоджуюся на обробку контактних даних для відповіді на заявку.</span
 						></label
 					>
-					<button class="button button-primary full" type="submit">Надіслати заявку</button>
+					<button class="button button-primary full" type="submit">Обговорити пілот</button>
 				</form>
 			{/if}
 		</div>

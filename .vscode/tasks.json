@@ -14,6 +14,46 @@
 				"$tsc"
 			],
 			"group": "test"
+		},
+		{
+			"label": "Copy landing image assets",
+			"type": "shell",
+			"command": "Copy-Item",
+			"args": [
+				"-LiteralPath",
+				"1.jpg,2.jpg,3.jpg,4.jpg",
+				"-Destination",
+				"static/images/landing"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Check landing image integration",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"check"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			]
+		},
+		{
+			"label": "check-accessibility-slice",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"check"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "test"
 		}
 	]
 }

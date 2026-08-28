@@ -77,7 +77,7 @@
 				class="mt-7 flex items-start gap-3 border-t border-zinc-100 pt-5 text-xs leading-5 text-zinc-500"
 			>
 				<ShieldCheck size={17} class="mt-0.5 shrink-0 text-emerald-700" aria-hidden="true" />
-				<span>Сесія зберігається Supabase у браузері та захищається чинними RLS-політиками.</span>
+				<span>Сесія зберігається database у браузері та захищається чинними RLS-політиками.</span>
 			</div>
 		</div>
 	</section>

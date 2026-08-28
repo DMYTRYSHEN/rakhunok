@@ -7,10 +7,7 @@ test('serves the Rahunok landing with preserved navigation', async ({ page }) =>
 	await expect(page.getByRole('heading', { level: 1 })).toContainText('Оплата одразу');
 	await expect(page.locator('#payment-flow')).toBeVisible();
 	await expect(page.locator('#pricing')).toBeVisible();
-	await expect(page.getByRole('link', { name: 'TelegramApp' }).first()).toHaveAttribute(
-		'href',
-		'/app/'
-	);
+	await expect(page.getByRole('link', { name: 'Каса', exact: true }).first()).toHaveAttribute('href', '/app/');
 	await expect(page.getByRole('link', { name: 'Особистий кабінет' }).first()).toHaveAttribute(
 		'href',
 		'/dashboard/'
@@ -27,7 +24,7 @@ test('runs the local demo, calculator, and signup flow', async ({ page }) => {
 
 	await expect(page.getByText('99 600 грн').first()).toBeVisible();
 
-	await page.getByRole('button', { name: 'Створити касу' }).click();
+	await page.getByRole('button', { name: 'Почати', exact: true }).click();
 	await expect(page.getByRole('dialog')).toBeVisible();
 	await page.getByLabel('Ім’я').fill('Тест');
 	await page.getByLabel('Телефон або Telegram').fill('+380501234567');
