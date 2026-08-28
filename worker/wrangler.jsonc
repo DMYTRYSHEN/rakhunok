@@ -22,8 +22,8 @@
 			"preview_urls": false,
 			"routes": [
 				{
-					"pattern": "letsrealtalk.com",
-					"custom_domain": true
+					"pattern": "letsrealtalk.com/*",
+					"zone_name": "letsrealtalk.com"
 				}
 			]
 		}
