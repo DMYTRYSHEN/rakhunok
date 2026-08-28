@@ -341,8 +341,15 @@ export function createDashboardGateway(
 			throw new Error('API рахунків недоступне. Перевірте підключення або запуск локального Worker.');
 		}
 		if (!response.ok) {
-			const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-			throw new Error(payload?.error || 'Запит не виконано.');
+			const payload = (await response.json().catch(() => null)) as {
+				error?: string | boolean;
+				message?: string;
+				details?: { message?: string } | string;
+			} | null;
+			const details = typeof payload?.details === 'string' ? payload.details : payload?.details?.message;
+			throw new Error(
+				payload?.message || (typeof payload?.error === 'string' ? payload.error : null) || details || 'Запит не виконано.'
+			);
 		}
 		return response;
 	}

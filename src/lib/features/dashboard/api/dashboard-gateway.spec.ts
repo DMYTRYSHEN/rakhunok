@@ -210,6 +210,29 @@ describe('dashboard gateway', () => {
 		);
 	});
 
+	it('surfaces the message from a structured Worker error', async () => {
+		const { client } = createClient();
+		vi.mocked(client.auth.getSession).mockResolvedValue({
+			data: { session: { ...session, access_token: 'access-token' } as Session },
+			error: null
+		});
+		const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+			new Response(
+				JSON.stringify({
+					error: true,
+					message: 'Failed to create order',
+					details: { message: 'Database rejected the order' }
+				}),
+				{ status: 500, headers: { 'Content-Type': 'application/json' } }
+			)
+		);
+		const gateway = createDashboardGateway(client, { fetcher });
+
+		await expect(
+			gateway.createInvoice({ type: 'fixed', reference: 'INV-1', title: 'Test invoice', amount: 100 })
+		).rejects.toThrow('Failed to create order');
+	});
+
 	it('uses same-origin Worker routes by default', async () => {
 		const { client } = createClient();
 		vi.mocked(client.auth.getSession).mockResolvedValue({
