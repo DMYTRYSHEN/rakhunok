@@ -12,7 +12,7 @@
 	},
 	"scripts": {
 		"dev": "vite dev",
-		"dev:worker": "npm --prefix ../core/worker run dev",
+		"dev:worker": "npm --prefix worker run dev",
 		"dev:app": "npm --prefix apps/merchant-app run dev",
 		"dev:checkout": "npm --prefix apps/checkout run dev",
 		"build:app": "npm --prefix apps/merchant-app run build",

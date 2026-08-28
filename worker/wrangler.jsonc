@@ -1,0 +1,28 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "letsrealtalk-web-preview",
+	"compatibility_date": "2026-08-28",
+	"workers_dev": true,
+	"preview_urls": true,
+	"assets": {
+		"directory": "../build",
+		"not_found_handling": "single-page-application"
+	},
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
+	"env": {
+		"production": {
+			"name": "letsrealtalk-web",
+			"workers_dev": false,
+			"preview_urls": false,
+			"routes": [
+				{
+					"pattern": "letsrealtalk.com",
+					"custom_domain": true
+				}
+			]
+		}
+	}
+}
