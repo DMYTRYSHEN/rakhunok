@@ -4,6 +4,8 @@ node_modules/
 .wrangler-dist-production/
 .wrangler-dist-checkout/
 .wrangler-dist-checkout-production/
+.wrangler-dist-corex/
+.wrangler-dist-corex-production/
 .dev.vars
 .dev.vars.*
 .env

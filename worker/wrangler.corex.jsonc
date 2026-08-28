@@ -1,0 +1,35 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "letsrealtalk-corex-preview",
+	"main": "src/corex.ts",
+	"compatibility_date": "2026-08-28",
+	"workers_dev": true,
+	"preview_urls": true,
+	"assets": {
+		"directory": "../build",
+		"binding": "ASSETS",
+		"run_worker_first": true,
+		"not_found_handling": "single-page-application"
+	},
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
+	"env": {
+		"production": {
+			"name": "letsrealtalk-corex",
+			"workers_dev": false,
+			"preview_urls": false,
+			"routes": [
+				{
+					"pattern": "letsrealtalk.com/corex",
+					"zone_name": "letsrealtalk.com"
+				},
+				{
+					"pattern": "letsrealtalk.com/corex/*",
+					"zone_name": "letsrealtalk.com"
+				}
+			]
+		}
+	}
+}

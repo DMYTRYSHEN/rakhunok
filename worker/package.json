@@ -13,12 +13,18 @@
 		"check:app:production": "wrangler deploy --dry-run --config wrangler.app.jsonc --env production --outdir .wrangler-dist-app-production",
 		"check:checkout": "wrangler deploy --dry-run --config wrangler.checkout.jsonc --env=\"\" --outdir .wrangler-dist-checkout",
 		"check:checkout:production": "wrangler deploy --dry-run --config wrangler.checkout.jsonc --env production --outdir .wrangler-dist-checkout-production",
+		"check:corex": "wrangler deploy --dry-run --config wrangler.corex.jsonc --env=\"\" --outdir .wrangler-dist-corex",
+		"check:corex:production": "wrangler deploy --dry-run --config wrangler.corex.jsonc --env production --outdir .wrangler-dist-corex-production",
+		"test:corex": "node --experimental-strip-types --test src/corex.test.mjs",
 		"deploy:checkout:preview": "wrangler deploy --config wrangler.checkout.jsonc --env=\"\"",
 		"deploy:checkout:production": "wrangler deploy --config wrangler.checkout.jsonc --env production",
+		"deploy:corex:preview": "wrangler deploy --config wrangler.corex.jsonc --env=\"\"",
+		"deploy:corex:production": "wrangler deploy --config wrangler.corex.jsonc --env production",
 		"dev": "npm run build && wrangler dev --env=\"\"",
 		"dev:dashboard": "npm run build && wrangler dev --config wrangler.dashboard.jsonc --env=\"\"",
 		"dev:app": "npm --prefix .. run build:app && wrangler dev --config wrangler.app.jsonc --env=\"\"",
-		"dev:checkout": "npm --prefix .. run build:checkout && wrangler dev --config wrangler.checkout.jsonc --env=\"\""
+		"dev:checkout": "npm --prefix .. run build:checkout && wrangler dev --config wrangler.checkout.jsonc --env=\"\"",
+		"dev:corex": "npm --prefix .. run build && wrangler dev --config wrangler.corex.jsonc --env=\"\""
 	},
 	"devDependencies": {
 		"wrangler": "^4.0.0"
