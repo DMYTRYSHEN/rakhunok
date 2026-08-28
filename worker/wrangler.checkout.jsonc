@@ -1,0 +1,42 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "letsrealtalk-checkout-preview",
+	"main": "src/checkout.js",
+	"compatibility_date": "2026-08-28",
+	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": true,
+	"preview_urls": true,
+	"assets": {
+		"directory": "../apps/checkout/dist",
+		"binding": "ASSETS",
+		"run_worker_first": true
+	},
+	"services": [
+		{ "binding": "API", "service": "rahunok" }
+	],
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
+	"env": {
+		"production": {
+			"name": "letsrealtalk-checkout",
+			"workers_dev": false,
+			"preview_urls": false,
+			"services": [
+				{ "binding": "API", "service": "rahunok" }
+			],
+			"routes": [
+				{ "pattern": "letsrealtalk.com/checkout*", "zone_name": "letsrealtalk.com" },
+				{ "pattern": "letsrealtalk.com/o/*", "zone_name": "letsrealtalk.com" },
+				{ "pattern": "letsrealtalk.com/t/*", "zone_name": "letsrealtalk.com" },
+				{ "pattern": "letsrealtalk.com/tag/*", "zone_name": "letsrealtalk.com" },
+				{ "pattern": "letsrealtalk.com/pos/*", "zone_name": "letsrealtalk.com" },
+				{ "pattern": "letsrealtalk.com/pay/*", "zone_name": "letsrealtalk.com" },
+				{ "pattern": "letsrealtalk.com/api/v1/checkout*", "zone_name": "letsrealtalk.com" },
+				{ "pattern": "letsrealtalk.com/api/v1/banks*", "zone_name": "letsrealtalk.com" },
+				{ "pattern": "letsrealtalk.com/api/v1/logos*", "zone_name": "letsrealtalk.com" }
+			]
+		}
+	}
+}

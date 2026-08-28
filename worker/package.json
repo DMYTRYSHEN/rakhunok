@@ -2,14 +2,23 @@
 	"name": "letsrealtalk-web-worker",
 	"private": true,
 	"version": "0.0.1",
+	"type": "module",
 	"scripts": {
 		"build": "npm --prefix .. run build",
 		"check": "wrangler deploy --dry-run --env=\"\" --outdir .wrangler-dist",
 		"check:production": "wrangler deploy --dry-run --env production --outdir .wrangler-dist-production",
 		"check:dashboard": "wrangler deploy --dry-run --config wrangler.dashboard.jsonc --env=\"\" --outdir .wrangler-dist-dashboard",
 		"check:dashboard:production": "wrangler deploy --dry-run --config wrangler.dashboard.jsonc --env production --outdir .wrangler-dist-dashboard-production",
+		"check:app": "wrangler deploy --dry-run --config wrangler.app.jsonc --env=\"\" --outdir .wrangler-dist-app",
+		"check:app:production": "wrangler deploy --dry-run --config wrangler.app.jsonc --env production --outdir .wrangler-dist-app-production",
+		"check:checkout": "wrangler deploy --dry-run --config wrangler.checkout.jsonc --env=\"\" --outdir .wrangler-dist-checkout",
+		"check:checkout:production": "wrangler deploy --dry-run --config wrangler.checkout.jsonc --env production --outdir .wrangler-dist-checkout-production",
+		"deploy:checkout:preview": "wrangler deploy --config wrangler.checkout.jsonc --env=\"\"",
+		"deploy:checkout:production": "wrangler deploy --config wrangler.checkout.jsonc --env production",
 		"dev": "npm run build && wrangler dev --env=\"\"",
-		"dev:dashboard": "npm run build && wrangler dev --config wrangler.dashboard.jsonc --env=\"\""
+		"dev:dashboard": "npm run build && wrangler dev --config wrangler.dashboard.jsonc --env=\"\"",
+		"dev:app": "npm --prefix .. run build:app && wrangler dev --config wrangler.app.jsonc --env=\"\"",
+		"dev:checkout": "npm --prefix .. run build:checkout && wrangler dev --config wrangler.checkout.jsonc --env=\"\""
 	},
 	"devDependencies": {
 		"wrangler": "^4.0.0"

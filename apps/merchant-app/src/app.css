@@ -167,7 +167,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #155ce6; outline-offs
 .payment-sheet { position: relative; width: min(100%, 480px); max-height: calc(100svh - 12px); overflow-y: auto; border: 1px solid var(--line); border-radius: 22px 22px 0 0; padding: 26px 22px calc(24px + env(safe-area-inset-bottom)); color: var(--ink); text-align: center; background: var(--surface); animation: rise 180ms ease-out; }
 .payment-sheet h2 { margin: 7px 0 20px; font-size: 32px; }
 .terminal-summary { margin: -10px 0 18px; color: var(--muted); font-size: 13px; }
-.sheet-close { position: absolute; top: 16px; right: 16px; width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 50%; color: var(--ink); font-size: 25px; background: var(--key); }
+.sheet-close { position: absolute; top: 16px; right: 16px; display: grid; width: 38px; min-width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border: 1px solid var(--line); border-radius: 50%; padding: 0; color: var(--ink); font-size: 25px; background: var(--key); appearance: none; }
 .qr-pending { display: grid; min-height: 168px; place-items: center; margin: 0; border: 1px dashed var(--line); border-radius: 16px; color: var(--muted); font-size: 12px; }
 .sheet-copy { max-width: 290px; margin: 20px auto; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .primary-button { width: 100%; height: 52px; border: 0; border-radius: 8px; color: white; font-size: 14px; font-weight: 850; background: var(--brand); }

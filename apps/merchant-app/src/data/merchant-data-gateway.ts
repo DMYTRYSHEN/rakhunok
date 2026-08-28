@@ -28,6 +28,15 @@ export type OrderSummary = {
 	shareUrl: string;
 };
 
+export type CreateOrderInput = {
+	type: 'fixed' | 'table' | 'open_amount';
+	amount: number;
+	orderNumber: string;
+	title: string;
+	description?: string;
+	tableNumber?: number;
+};
+
 type EntityRow = {
 	id: string;
 	business_name: string;
@@ -52,12 +61,12 @@ type OrderRow = {
 	share_url: string;
 };
 
-export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeof fetch = fetch) {
+export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeof fetch = fetch, apiBase = '/app') {
 	async function workerRequest(path: string, init: RequestInit) {
 		const session = await client.auth.getSession();
 		const accessToken = session.data.session?.access_token;
 		if (session.error || !accessToken) throw new Error('Сесію втрачено. Увійдіть ще раз.');
-		const response = await fetcher(path, {
+		const response = await fetcher(`${apiBase}${path}`, {
 			...init,
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
@@ -65,10 +74,39 @@ export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeo
 				...init.headers
 			}
 		});
-		if (!response.ok) throw new Error('Не вдалося скасувати рахунок.');
+		if (!response.ok) {
+			const payload = (await response.json().catch(() => null)) as { error?: string | boolean; message?: string } | null;
+			throw new Error(payload?.message || (typeof payload?.error === 'string' ? payload.error : null) || 'Запит не виконано.');
+		}
+		return response;
 	}
 
 	return {
+		async createOrder(input: CreateOrderInput): Promise<OrderSummary> {
+			const response = await workerRequest('/api/v1/orders', {
+				method: 'POST',
+				body: JSON.stringify({
+					type: input.type,
+					order_number: input.orderNumber,
+					title: input.title,
+					description: input.description,
+					amount: input.amount,
+					table_number: input.tableNumber
+				})
+			});
+			const payload = (await response.json()) as { order: OrderRow };
+			const order = payload.order;
+			return {
+				id: order.id,
+				amount: Number(order.total_amount) || 0,
+				status: order.status,
+				createdAt: order.created_at,
+				orderNumber: order.order_number,
+				type: order.type,
+				shareUrl: order.share_url
+			};
+		},
+
 		async getStructure(userId: string): Promise<MerchantStructure> {
 			const [entityResult, terminalResult] = await Promise.all([
 				client

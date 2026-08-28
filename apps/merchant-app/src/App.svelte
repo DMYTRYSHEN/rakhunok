@@ -42,6 +42,8 @@
 	let wheelRevision = $state(0);
 	let scenario = $state<Scenario>('fixed');
 	let previewOpen = $state(false);
+	let orderCreating = $state(false);
+	let orderCreateError = $state('');
 	let activeView = $state<'kasa' | 'history' | 'profile'>('kasa');
 	let lightTheme = $state(false);
 	let authState = $state<AuthState>({ status: 'loading' });
@@ -218,16 +220,21 @@
 		voicePhase = 'idle';
 	}
 
-	function confirmVoiceCommand() {
+	async function confirmVoiceCommand() {
 		const valueMinor = voiceCommand?.entities.amount?.value_minor;
-		if (!voiceCommand?.validation.valid || valueMinor === undefined) return;
+		if (!voiceCommand?.validation.valid || valueMinor === undefined || orderCreating) return;
 		const major = Math.floor(valueMinor / 100);
 		const minor = valueMinor % 100;
+		const voiceAmount = valueMinor / 100;
+		const customerName = voiceCommand.entities.customer?.name;
 		scenario = 'fixed';
 		setExpression(minor ? `${major}.${String(minor).padStart(2, '0')}` : String(major), 1);
-		closeVoice();
-		previewOpen = true;
-		haptic('medium');
+		voiceError = '';
+		if (await submitOrder(voiceAmount, customerName ? `Рахунок для ${customerName}` : undefined)) {
+			closeVoice();
+		} else {
+			voiceError = orderCreateError;
+		}
 	}
 
 	async function restoreSession() {
@@ -316,7 +323,7 @@
 	function orderType(type: string) {
 		if (type === 'table') return 'Стіл';
 		if (type === 'delivery') return 'Доставка';
-		if (type === 'open') return 'Вільна сума';
+		if (type === 'open' || type === 'open_amount') return 'Вільна сума';
 		return 'Фіксований рахунок';
 	}
 
@@ -469,8 +476,43 @@
 
 	function openPreview() {
 		if (!canPreview) return;
+		orderCreateError = '';
 		previewOpen = true;
 		haptic('medium');
+	}
+
+	async function submitOrder(orderAmount: number, title?: string) {
+		if (!merchantDataGateway || authState.status !== 'ready' || orderCreating) return;
+		orderCreating = true;
+		orderCreateError = '';
+		const orderNumber = `APP-${Date.now().toString().slice(-8)}`;
+		try {
+			const order = await merchantDataGateway.createOrder({
+				type: scenario === 'open' ? 'open_amount' : scenario,
+				amount: orderAmount,
+				orderNumber,
+				title: title || (scenario === 'table' && selectedTerminal ? selectedTerminal.name : `Рахунок ${orderNumber}`),
+				description: scenario === 'table' && selectedTerminal ? `Оплата через ${selectedTerminal.name}` : undefined,
+				tableNumber: scenario === 'table' && selectedTerminal && /^\d+$/.test(selectedTerminal.code)
+					? Number(selectedTerminal.code)
+					: undefined
+			});
+			orders = [order, ...orders.filter((existing) => existing.id !== order.id)];
+			previewOpen = false;
+			selectedOrder = order;
+			setExpression('', -1);
+			haptic('medium');
+			return true;
+		} catch (error) {
+			orderCreateError = error instanceof Error ? error.message : 'Не вдалося створити рахунок.';
+			return false;
+		} finally {
+			orderCreating = false;
+		}
+	}
+
+	async function createOrder() {
+		await submitOrder(amount);
 	}
 </script>
 
@@ -683,7 +725,10 @@
 					{#if voiceCommand.entities.customer}<small>Для: {voiceCommand.entities.customer.name}</small>{/if}
 					{#if voiceCommand.validation.requires_confirmation}<p>Сума розпізнана приблизно. Уважно перевірте її.</p>{/if}
 				</div>
-				<button class="primary-button" type="button" onclick={confirmVoiceCommand}>Створити рахунок</button>
+				{#if voiceError}<p class="voice-error" role="alert">{voiceError}</p>{/if}
+				<button class="primary-button" type="button" onclick={confirmVoiceCommand} disabled={orderCreating}>
+					{orderCreating ? 'Створення...' : 'Створити рахунок'}
+				</button>
 			{:else if voicePhase === 'error'}
 				<p class="voice-error" role="alert">{voiceError}</p>
 				<button class="primary-button" type="button" onclick={startListening}>Спробувати ще раз</button>
@@ -734,8 +779,10 @@
 				<div><span>Тип</span><strong>{scenario === 'table' ? 'Термінал' : scenario === 'open' ? 'Вільна сума' : 'Фіксований'}</strong></div>
 				<div><span>Статус</span><strong>Не створено</strong></div>
 			</div>
-			<p class="sheet-copy">Після підключення каси тут з’явиться одноразове посилання та QR для покупця.</p>
-			<a class="primary-button creation-action" href="/dashboard/structure"><Landmark size={18} /> Підключити реквізити</a>
+			{#if orderCreateError}<p class="sheet-copy" role="alert">{orderCreateError}</p>{/if}
+			<button class="primary-button creation-action" type="button" onclick={createOrder} disabled={orderCreating}>
+				{orderCreating ? 'Створення...' : 'Створити рахунок і QR'}
+			</button>
 		</div>
 	</div>
 {/if}

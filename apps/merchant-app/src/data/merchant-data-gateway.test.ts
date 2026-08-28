@@ -16,6 +16,44 @@ function query(data: unknown[] | null, error: Error | null = null) {
 }
 
 describe('merchant data gateway', () => {
+	it('creates an order through the scoped authenticated Worker API', async () => {
+		const getSession = vi.fn().mockResolvedValue({ data: { session: { access_token: 'token-1' } }, error: null });
+		const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+			order: {
+				id: 'order-1', total_amount: 125.5, status: 'pending', created_at: '2026-08-28T08:00:00Z',
+				order_number: 'APP-1', type: 'fixed', share_url: 'https://rakhunok.com/pay/order-1'
+			}
+		}), { status: 201 }));
+		const client = { auth: { getSession } } as unknown as SupabaseClient;
+
+		const result = await createMerchantDataGateway(client, fetcher).createOrder({
+			type: 'fixed', amount: 125.5, orderNumber: 'APP-1', title: 'Рахунок APP-1'
+		});
+
+		expect(fetcher).toHaveBeenCalledWith('/app/api/v1/orders', expect.objectContaining({
+			method: 'POST',
+			headers: expect.objectContaining({ Authorization: 'Bearer token-1' }),
+			body: expect.stringContaining('"amount":125.5')
+		}));
+		expect(result).toEqual({
+			id: 'order-1', amount: 125.5, status: 'pending', createdAt: '2026-08-28T08:00:00Z',
+			orderNumber: 'APP-1', type: 'fixed', shareUrl: 'https://rakhunok.com/pay/order-1'
+		});
+	});
+
+	it('surfaces structured Worker API errors', async () => {
+		const getSession = vi.fn().mockResolvedValue({ data: { session: { access_token: 'token-1' } }, error: null });
+		const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+			error: true,
+			message: 'Реквізити мерчанта не налаштовані.'
+		}), { status: 422 }));
+		const client = { auth: { getSession } } as unknown as SupabaseClient;
+
+		await expect(createMerchantDataGateway(client, fetcher).createOrder({
+			type: 'fixed', amount: 125.5, orderNumber: 'APP-1', title: 'Рахунок APP-1'
+		})).rejects.toThrow('Реквізити мерчанта не налаштовані.');
+	});
+
 	it('scopes active entities and terminals to the authenticated user', async () => {
 		const entities = query([{ id: 'entity-1', business_name: 'ТОВ Рахунок', display_name: 'Кавʼярня' }]);
 		const terminals = query([{ id: 'terminal-1', name: 'Стіл 1', code: 'table-1', type: 'table', entity_id: 'entity-1' }]);
@@ -64,7 +102,7 @@ describe('merchant data gateway', () => {
 
 		await createMerchantDataGateway(client, fetcher).cancelOrder('order/1');
 
-		expect(fetcher).toHaveBeenCalledWith('/api/v1/orders/order%2F1', expect.objectContaining({
+		expect(fetcher).toHaveBeenCalledWith('/app/api/v1/orders/order%2F1', expect.objectContaining({
 			method: 'PATCH',
 			headers: expect.objectContaining({ Authorization: 'Bearer token-1' }),
 			body: JSON.stringify({ status: 'cancelled' })

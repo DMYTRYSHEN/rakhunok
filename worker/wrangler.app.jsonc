@@ -1,0 +1,35 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "letsrealtalk-app-preview",
+	"main": "src/app.ts",
+	"compatibility_date": "2026-08-28",
+	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": true,
+	"preview_urls": true,
+	"assets": {
+		"directory": "../apps/merchant-app/dist",
+		"binding": "ASSETS",
+		"run_worker_first": true,
+		"not_found_handling": "single-page-application"
+	},
+	"services": [
+		{ "binding": "API", "service": "rahunok" }
+	],
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
+	"env": {
+		"production": {
+			"name": "letsrealtalk-app",
+			"workers_dev": false,
+			"preview_urls": false,
+			"services": [
+				{ "binding": "API", "service": "rahunok" }
+			],
+			"routes": [
+				{ "pattern": "letsrealtalk.com/app*", "zone_name": "letsrealtalk.com" }
+			]
+		}
+	}
+}
