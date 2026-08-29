@@ -58,6 +58,7 @@
 				<button
 					type="button"
 					class="mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-70"
+					style="background-color: #2563eb; color: #ffffff;"
 					disabled={pending}
 					onclick={login}
 				>
