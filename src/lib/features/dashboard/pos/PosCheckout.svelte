@@ -292,7 +292,7 @@
 								? 'text-zinc-950'
 								: 'text-zinc-400'}"
 						>
-							{activeOrder ? formatMoney(activeOrder.amount) : '0,00 грн'}
+							{activeOrder ? formatMoney(activeOrder.amount) : '0,00 ₴'}
 						</strong>
 					</button>
 				{/each}

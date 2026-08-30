@@ -393,7 +393,7 @@
 						<div
 							class="flex items-center rounded-md border border-blue-200 bg-blue-50 px-4 text-xs leading-5 text-blue-950"
 						>
-							Сума 0 грн дозволена: клієнт зможе вказати її під час оплати.
+							Сума 0 ₴ дозволена: клієнт зможе вказати її під час оплати.
 						</div>
 					{/if}
 

@@ -7,9 +7,9 @@ test('does not impersonate a merchant without an authenticated session', async (
 	await expect(page.getByRole('heading', { name: 'Фінансовий огляд' })).not.toBeVisible();
 	await expect(
 		page
-			.getByRole('button', { name: 'Увійти через Google' })
-			.or(page.getByText('Потрібна конфігурація Supabase'))
-	).toBeVisible();
+			.locator('iframe[title*="Google"]')
+			.or(page.getByText('Сервіс входу тимчасово недоступний'))
+	).toBeAttached();
 });
 
 test('renders the dashboard overview with the financial baseline', async ({ page }) => {
@@ -241,14 +241,14 @@ test('opens the read-only POS board in demo mode', async ({ page }) => {
 	await expect(page.getByRole('region', { name: 'Чернетка замовлення' })).toBeVisible();
 	const servicePanel = page.getByRole('complementary', { name: 'Столи та обслуговування' });
 	await expect(servicePanel).toBeVisible();
-	await expect(servicePanel.getByRole('button', { name: /Стіл 2.*640,00 грн/ })).toBeVisible();
+	await expect(servicePanel.getByRole('button', { name: /Стіл 2.*640,00 ₴/ })).toBeVisible();
 	await expect(servicePanel.getByLabel('Офіціант')).toBeDisabled();
 	await expect(servicePanel.getByText('Буде використано для обліку чайових.')).toBeVisible();
 	await expect(servicePanel.getByLabel('Кур’єр')).toBeDisabled();
 	await expect(servicePanel.getByText('Буде використано для доставки замовлення.')).toBeVisible();
-	await servicePanel.getByRole('button', { name: /Головна каса.*0,00 грн/ }).click();
+	await servicePanel.getByRole('button', { name: /Головна каса.*0,00 ₴/ }).click();
 	await expect(page.getByRole('heading', { name: 'Головна каса' })).toBeVisible();
-	await servicePanel.getByRole('button', { name: /Стіл 1.*0,00 грн/ }).click();
+	await servicePanel.getByRole('button', { name: /Стіл 1.*0,00 ₴/ }).click();
 	await page.getByRole('button', { name: '5', exact: true }).click();
 	await expect(page.getByTestId('pos-draft-total')).toHaveText(/5,00\s*(грн|₴)/);
 	await page.getByRole('button', { name: 'Товари' }).click();

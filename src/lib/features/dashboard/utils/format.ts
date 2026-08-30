@@ -1,6 +1,4 @@
 const currencyFormatter = new Intl.NumberFormat('uk-UA', {
-	style: 'currency',
-	currency: 'UAH',
 	minimumFractionDigits: 2,
 	maximumFractionDigits: 2
 });
@@ -13,7 +11,7 @@ const dateFormatter = new Intl.DateTimeFormat('uk-UA', {
 });
 
 export function formatMoney(amount: number) {
-	return currencyFormatter.format(amount);
+	return `${currencyFormatter.format(amount)} ₴`;
 }
 
 export function formatInvoiceDate(value: string) {
