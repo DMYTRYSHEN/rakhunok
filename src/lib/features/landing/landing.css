@@ -4066,12 +4066,12 @@ button {
 
 .footer-grid {
 	display: grid;
-	grid-template-columns: 2fr 1fr 1fr 1fr;
-	gap: 48px;
+	grid-template-columns: minmax(240px, 1.7fr) repeat(4, minmax(130px, 1fr));
+	gap: 32px;
 	margin-bottom: 60px;
 }
 
-@media (max-width: 840px) {
+@media (max-width: 1080px) {
 	.footer-grid {
 		grid-template-columns: 1fr 1fr;
 		gap: 36px;
@@ -4086,15 +4086,6 @@ button {
 
 .site-footer .brand {
 	margin-bottom: 14px;
-}
-
-.footer-domain {
-	display: block;
-	width: fit-content;
-	margin-bottom: 10px;
-	font-size: 14px;
-	font-weight: 700;
-	color: var(--text-primary);
 }
 
 .site-footer p {

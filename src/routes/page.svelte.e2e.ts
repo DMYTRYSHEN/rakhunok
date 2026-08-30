@@ -22,6 +22,23 @@ test('serves the Rahunok landing with preserved navigation', async ({ page }) =>
 		'href',
 		'/dashboard/'
 	);
+
+	const footer = page.locator('.site-footer');
+	await expect(
+		footer.getByText('Сучасна платіжна інфраструктура A2A оплат для бізнесу в Україні.')
+	).toBeVisible();
+	await expect(footer.getByRole('link', { name: 'Особистий кабінет' })).toHaveAttribute(
+		'href',
+		'/dashboard/'
+	);
+	await expect(footer.getByRole('link', { name: '+380 67 669 60 60' })).toHaveAttribute(
+		'href',
+		'tel:+380676696060'
+	);
+	await expect(footer.getByRole('link', { name: 'rahunok@rahunok.com' })).toHaveAttribute(
+		'href',
+		'mailto:rahunok@rahunok.com'
+	);
 });
 
 test('runs the local demo, calculator, and signup flow', async ({ page }) => {

@@ -3,6 +3,7 @@
 	import type { Translations } from '../data/translations';
 
 	let { t }: { t: Translations } = $props();
+	const dashboardPath = '/dashboard/' as '/';
 </script>
 
 <footer class="site-footer">
@@ -35,29 +36,33 @@
 					<!--       	<span class="brand-dot" aria-hidden="true"></span>  -->
 				</span>
 			</a>
-			<a class="footer-domain" href="https://rahunok.com/">Rahunok.com</a>
-			<p>
-				Building the sovereign financial infrastructure for the digital age. Diia.City Resident.
-			</p>
+			<p>{t.footer.description}</p>
 		</div>
 
-		<nav aria-label="Ecosystem">
-			<strong>Ecosystem</strong>
-			<a href="https://rahunok.com/#apps">Demo App</a>
-			<a href="https://rahunok.com/#solutions">ORC-Loyalty system</a>
-			<a href="https://rahunok.com/#solutions">SoftPOS Terminal</a>
-			<a href="https://rahunok.com/#solutions">Payment Links</a>
+		<nav aria-label="Навігація">
+			<strong>{t.footer.navTitle}</strong>
+			<a href={resolve('/#payment-flow')}>{t.nav.howItWorks}</a>
+			<a href={resolve('/#demo')}>Sandbox</a>
+			<a href={resolve('/#solutions')}>{t.nav.forBusiness}</a>
+			<a href={resolve('/#pricing')}>{t.nav.pricing}</a>
+		</nav>
+
+		<nav aria-label="Юридична інформація">
+			<strong>{t.footer.legalTitle}</strong>
+			<a href={resolve('/#money-flow')}>{t.nav.moneyFlow}</a>
+			<a href={resolve('/#faq')}>{t.nav.faq}</a>
+			<a href={resolve(dashboardPath)}>{t.nav.account}</a>
 		</nav>
 
 		<div class="footer-column" aria-label="Company">
-			<strong>Company</strong>
+			<strong>Компанія</strong>
 			<span>RAHUNOK</span>
 			<span>Limited Liability Company</span>
 			<span>45679768</span>
 		</div>
 
 		<address class="footer-column">
-			<strong>Contact</strong>
+			<strong>Контакти</strong>
 			<a href="tel:+380676696060">+380 67 669 60 60</a>
 			<a href="mailto:rahunok@rahunok.com">rahunok@rahunok.com</a>
 			<a
