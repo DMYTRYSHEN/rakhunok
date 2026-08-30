@@ -25,6 +25,29 @@ test('renders the dashboard overview with the financial baseline', async ({ page
 	await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll');
 });
 
+test('documents the current merchant OpenAPI contract', async ({ page, context }) => {
+	await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+	await page.goto('/dashboard/developer-api?demo=1');
+
+	await expect(page.getByRole('heading', { name: 'API для розробників' })).toBeVisible();
+	await expect(page.getByText('OpenAPI 3.1 · v1.1.0')).toBeVisible();
+	await expect(page.getByText('/orders/{id}/sync')).toHaveCount(0);
+
+	const operations = page.getByRole('region', { name: 'Операції Merchant API' });
+	await expect(operations.getByRole('button')).toHaveCount(5);
+	await operations.getByRole('button', { name: 'POST /orders', exact: true }).click();
+	await expect(page.getByText('"order_number": "4812-A"')).toBeVisible();
+	await expect(page.getByText('"base_amount": 180.00')).toBeVisible();
+
+	await page.getByRole('button', { name: 'Скопіювати cURL приклад' }).click();
+	await expect
+		.poll(() => page.evaluate(() => navigator.clipboard.readText()))
+		.toContain('/api/v1/orders');
+
+	await operations.getByRole('button', { name: 'GET /stats/summary', exact: true }).click();
+	await expect(page.getByText('200 · totals, volume, conversion_pct')).toBeVisible();
+});
+
 test('keeps dark theme icons and controls distinguishable', async ({ page }) => {
 	await page.addInitScript(() => localStorage.setItem('rahunok_theme', 'dark'));
 	await page.goto('/dashboard/team?demo=1');
