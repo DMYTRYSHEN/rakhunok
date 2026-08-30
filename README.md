@@ -17,6 +17,16 @@ npm run dev
 
 The development server prints its local URL. Use `npm run build` to generate the static application in `build/` and `npm run preview` to inspect that build.
 
+For production, configure `PUBLIC_SUPABASE_URL` and `PUBLIC_SUPABASE_ANON_KEY` in the
+deployment environment or the ignored local `.env`, then run:
+
+```powershell
+npm run deploy:production
+```
+
+The command validates the public configuration, builds once, checks both Worker packages, and
+deploys the root Worker before the Dashboard Worker so their HTML and `/_app` assets stay aligned.
+
 Dashboard invoice and onboarding requests use the same-origin `/api` path. During local development, run the existing Worker in a second terminal so Vite can proxy those requests to port `8787`:
 
 ```powershell

@@ -16,6 +16,8 @@
 		"check:corex": "wrangler deploy --dry-run --config wrangler.corex.jsonc --env=\"\" --outdir .wrangler-dist-corex",
 		"check:corex:production": "wrangler deploy --dry-run --config wrangler.corex.jsonc --env production --outdir .wrangler-dist-corex-production",
 		"test:corex": "node --experimental-strip-types --test src/corex.test.mjs",
+		"deploy:production": "wrangler deploy --env production",
+		"deploy:dashboard:production": "wrangler deploy --config wrangler.dashboard.jsonc --env production",
 		"deploy:checkout:preview": "wrangler deploy --config wrangler.checkout.jsonc --env=\"\"",
 		"deploy:checkout:production": "wrangler deploy --config wrangler.checkout.jsonc --env production",
 		"deploy:corex:preview": "wrangler deploy --config wrangler.corex.jsonc --env=\"\"",

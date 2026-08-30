@@ -49,10 +49,10 @@
 			{#if configurationRequired}
 				<div
 					class="mt-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950"
-					role="status"
+					role="alert"
 				>
-					<strong class="block">Потрібна конфігурація Supabase</strong>
-					Додайте `PUBLIC_SUPABASE_URL` і `PUBLIC_SUPABASE_ANON_KEY` до локального `.env`.
+					<strong class="block">Сервіс входу тимчасово недоступний</strong>
+					Спробуйте оновити сторінку пізніше.
 				</div>
 			{:else}
 				<button

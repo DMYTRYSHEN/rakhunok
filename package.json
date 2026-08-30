@@ -31,7 +31,12 @@
 		"test:unit": "vitest run --passWithNoTests",
 		"test:invoice-db": "node scripts/invoice-db-scenarios.mjs",
 		"test": "npm run test:unit && npm run test:e2e",
-		"test:e2e": "playwright test"
+		"test:e2e": "playwright test",
+		"worker:check:production": "npm --prefix worker run check:production",
+		"worker:check:dashboard:production": "npm --prefix worker run check:dashboard:production",
+		"worker:deploy:production": "npm --prefix worker run deploy:production",
+		"worker:deploy:dashboard:production": "npm --prefix worker run deploy:dashboard:production",
+		"deploy:production": "node scripts/deploy-production.mjs"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
