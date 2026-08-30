@@ -20,9 +20,9 @@ export function calculateAcquiringCosts(
 }
 
 export function formatMoney(value: number): string {
-	return new Intl.NumberFormat('uk-UA', {
-		style: 'currency',
-		currency: 'UAH',
-		maximumFractionDigits: 0
+	const formatted = new Intl.NumberFormat('uk-UA', {
+		minimumFractionDigits: 0,
+		maximumFractionDigits: 2
 	}).format(value);
+	return `${formatted} ₴`;
 }

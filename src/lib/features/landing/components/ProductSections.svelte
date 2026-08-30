@@ -1,109 +1,238 @@
 <script lang="ts">
+	import {
+		ArrowUpRight,
+		Check,
+		ShieldCheck,
+		Sparkles,
+		Zap,
+		Coffee,
+		ShoppingBag,
+		Send,
+		QrCode,
+		SmartphoneNfc,
+		Link,
+		Server,
+		ReceiptText,
+		LineChart,
+		Bot,
+		Webhook
+	} from '@lucide/svelte';
 	import horecaImage from '../../../../../2.jpg';
 	import retailImage from '../../../../../3.jpg';
 	import servicesImage from '../../../../../4.jpg';
+	import apiImage from '../../../../../1.jpg';
 	import { reveal } from '../actions/reveal';
-	import { comparisonRows, features, paymentSteps, solutions, trustItems } from '../data/content';
+	import { paymentSteps } from '../data/content';
 	import SectionHeading from './SectionHeading.svelte';
-	let { onSignup }: { onSignup: () => void } = $props();
+	import SolutionDetailModal from './SolutionDetailModal.svelte';
+	import type { Translations } from '../data/translations';
+
+	let { onSignup, t }: { onSignup: () => void; t: Translations } = $props();
+
+	let solutionModalOpen = $state(false);
+	let selectedSolutionIndex = $state(0);
+
+	function openSolutionModal(index: number) {
+		selectedSolutionIndex = index;
+		solutionModalOpen = true;
+	}
+
 	const solutionImages = [
 		{ src: horecaImage, alt: 'Оплата QR-рахунку за столиком' },
 		{ src: retailImage, alt: 'Смартфон як каса у компактній торговій точці' },
-		{ src: servicesImage, alt: 'Цифровий платіжний сценарій на смартфоні' }
+		{ src: servicesImage, alt: 'Цифровий платіжний сценарій на смартфоні' },
+		{ src: apiImage, alt: 'Інтеграція платіжного API' }
 	];
 </script>
 
+<!-- Trust Principles Strip -->
 <section class="trust-strip" aria-label="Ключові принципи довіри">
 	<div class="trust-grid container">
-		{#each trustItems as item (item.title)}<article>
+		{#each t.trustAndPricing.trustItems as item (item.title)}
+			<article>
 				<strong>{item.title}</strong>
 				<p>{item.description}</p>
-			</article>{/each}
+			</article>
+		{/each}
 	</div>
 </section>
 
-<section class="section paper" id="payment-flow">
+<!-- Payment Flow Section -->
+<section class="section" id="payment-flow">
 	<div class="container">
 		<SectionHeading
-			dark
-			eyebrow="Як це працює"
-			title="Клієнт платить у банку."
-			accent="Ви одразу бачите результат."
-			copy="Без нових звичок для покупця і без ручної перевірки для вас. Від рахунку до підтвердження — один зрозумілий процес."
+			eyebrow={t.productSections.architectureEyebrow}
+			title={t.productSections.architectureTitle}
+			accent=""
+			copy={t.productSections.architectureDesc}
 		/>
+
 		<div class="payment-route">
-			{#each paymentSteps as step (step.label)}<article use:reveal>
-					<div class="route-marker"><b>{step.label}</b><i></i></div>
+			{#each t.productSections.architectureSteps as step (step.label)}
+				<article use:reveal>
+					<div class="route-marker">
+						<b>{step.label}</b>
+					</div>
 					<div class="route-copy">
-						<small>{step.label === '05' ? 'ДОКАЗ' : step.label === '03' || step.label === '04' ? 'БАНК' : 'RAHUNOK'}</small>
+						<small
+							>{step.label === '05'
+								? 'LEDGER'
+								: step.label === '03' || step.label === '04'
+									? 'BANK A2A'
+									: 'RAHUNOK'}</small
+						>
 						<h3>{step.title}</h3>
 						<p>{step.description}</p>
 					</div>
-				</article>{/each}
+				</article>
+			{/each}
 		</div>
+
 		<p class="section-note">
-			<strong>iOS та Android:</strong> архітектура може використовувати App Clip, App Link/Payment Activity
-			або web checkout. Сценарій залежить від готовності клієнтського модуля та банківської інтеграції.
+			<strong>iOS, Android & Web:</strong> App Clip, Universal Links, Bank Payment Activity & adaptive
+			web checkout.
 		</p>
 	</div>
 </section>
 
-<section class="section paper" id="comparison">
+<!-- Comparison Table: POS vs Rahunok -->
+<section class="section" id="comparison">
 	<div class="container">
 		<SectionHeading
-			dark
-			eyebrow="POS vs Rahunok"
-			title="Приймайте оплату без окремого"
-			accent="банківського термінала."
+			eyebrow={t.productSections.comparisonEyebrow}
+			title={t.productSections.comparisonTitle}
+			accent=""
+			copy={t.productSections.comparisonDesc}
 		/>
+
 		<div class="comparison">
-			<div class="comparison-head"><b>Можливість</b><b>Класичний POS</b><b>Rahunok</b></div>
-			{#each comparisonRows as row (row[0])}<div>
-					{#each row as cell, index (`${row[0]}-${index}`)}{#if index === 2}<strong>{cell}</strong
-							>{:else}<span>{cell}</span>{/if}{/each}
-				</div>{/each}
+			<div class="comparison-head">
+				<b>{t.productSections.comparisonHeaders[0]}</b>
+				<b>{t.productSections.comparisonHeaders[1]}</b>
+				<b>{t.productSections.comparisonHeaders[2]}</b>
+			</div>
+			{#each t.productSections.comparisonRows as row (row[0])}
+				<div>
+					{#each row as cell, index (`${row[0]}-${index}`)}
+						{#if index === 2}
+							<strong>{cell}</strong>
+						{:else}
+							<span>{cell}</span>
+						{/if}
+					{/each}
+				</div>
+			{/each}
 		</div>
 	</div>
 </section>
 
+<!-- Business Solutions Bento Grid -->
 <section class="section" id="solutions">
 	<div class="container">
 		<SectionHeading
-			eyebrow="Для вашого бізнесу"
-			title="Знайомий робочий день."
-			accent="Простіша оплата."
-			copy="Rahunok підлаштовується під те, як ви вже продаєте: за столиком, біля прилавка, у месенджері або онлайн."
+			eyebrow={t.productSections.solutionsEyebrow}
+			title={t.productSections.solutionsTitle}
+			accent=""
+			copy={t.productSections.solutionsDesc}
 		/>
+
 		<div class="solution-index">
-			{#each solutions as item, index (item.title)}<article use:reveal>
-					<header><b>0{index + 1}</b><small>{item.label}</small></header>
-					{#if solutionImages[index]}<figure>
-						<img src={solutionImages[index].src} alt={solutionImages[index].alt} loading="lazy" />
-					</figure>{:else}<figure class="api-visual" aria-label="Схема API-події">
-						<span>POST /invoice</span><i></i><strong>200 · SUCCESS</strong>
-					</figure>{/if}
-					<div><h3>{item.title}</h3><p>{item.description}</p></div>
-					{#if index === 3}<button class="solution-action" type="button" onclick={onSignup} aria-label="Запросити API-документацію">↗</button
-						>{:else}<a class="solution-action" href="#final-cta" aria-label={`Підключити сценарій ${item.label}`}>↗</a>{/if}
-				</article>{/each}
+			{#each t.productSections.solutions as item, index (item.title)}
+				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+				<article use:reveal onclick={() => openSolutionModal(index)}>
+					<header>
+						<b>0{index + 1}</b>
+						<small>{item.label}</small>
+					</header>
+
+					<figure class="solution-visual" data-index={index}>
+						{#if solutionImages[index]}
+							<img
+								src={solutionImages[index].src}
+								alt={solutionImages[index].alt}
+								class="solution-visual__img"
+								loading="lazy"
+							/>
+						{/if}
+						<div class="solution-visual__overlay">
+							{#if index === 0}
+								<div class="visual-icon-wrap"><Coffee size={40} /></div>
+								<div class="visual-tag">Table 12 · 850 ₴</div>
+							{:else if index === 1}
+								<div class="visual-icon-wrap"><ShoppingBag size={40} /></div>
+								<div class="visual-tag">POS · QR Scan</div>
+							{:else if index === 2}
+								<div class="visual-icon-wrap"><Send size={40} /></div>
+								<div class="visual-tag">pay.rahunok.app/link</div>
+							{:else}
+								<div class="api-visual">
+									<span>POST /v1/invoices/create</span>
+									<i></i>
+									<strong>200 OK — SETTLED ON IBAN</strong>
+								</div>
+							{/if}
+						</div>
+					</figure>
+
+					<div>
+						<h3>{item.title}</h3>
+						<p>{item.description}</p>
+					</div>
+
+					<button
+						class="solution-action"
+						type="button"
+						onclick={() => openSolutionModal(index)}
+						aria-label={`Дізнатися більше про рішення ${item.label}`}
+					>
+						<ArrowUpRight size={18} />
+					</button>
+				</article>
+			{/each}
 		</div>
 	</div>
 </section>
 
-<section class="section paper" id="features">
+<SolutionDetailModal
+	bind:open={solutionModalOpen}
+	bind:solutionIndex={selectedSolutionIndex}
+	{onSignup}
+	{t}
+/>
+
+<!-- Capability Matrix -->
+<section class="section" id="features">
 	<div class="container">
 		<SectionHeading
-			dark
-			eyebrow="Все необхідне"
-			title="Менше ручної роботи."
-			accent="Більше ясності в кожній оплаті."
+			eyebrow={t.productSections.featuresEyebrow}
+			title={t.productSections.featuresTitle}
+			accent=""
+			copy={t.productSections.featuresDesc}
 		/>
+
 		<div class="capability-matrix">
-			{#each features as item, index (item.title)}<article>
-					<span>{String(index + 1).padStart(2, '0')}</span>
+			{#each t.productSections.features as item, index (item.title)}
+				{@const IconComp = [
+					QrCode,
+					SmartphoneNfc,
+					Link,
+					Server,
+					ReceiptText,
+					LineChart,
+					Bot,
+					Webhook
+				][index]}
+				<article class="feature-card" use:reveal>
+					<div class="feature-icon">
+						<IconComp size={24} />
+					</div>
 					<small>{item.label}</small>
-					<div><h3>{item.title}</h3><p>{item.description}</p></div>
-				</article>{/each}
+					<div>
+						<h3>{item.title}</h3>
+						<p>{item.description}</p>
+					</div>
+				</article>
+			{/each}
 		</div>
 	</div>
 </section>

@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	let { open = $bindable(false) }: { open: boolean } = $props();
+	import { CheckCircle2, Sparkles, X } from '@lucide/svelte';
+	import type { Translations } from '../data/translations';
+
+	let { open = $bindable(false), t }: { open: boolean; t: Translations } = $props();
 	let submitted = $state(false);
 	let nameInput = $state<HTMLInputElement>();
 	let previousFocus: HTMLElement | null = null;
@@ -27,55 +30,67 @@
 		if (event.key === 'Escape' && open) close();
 	}}
 />
+
 {#if open}
 	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="signup-title">
 		<button class="backdrop" type="button" aria-label="Закрити форму" onclick={close}></button>
+
 		<div class="modal-card">
-			<button class="modal-close" type="button" aria-label="Закрити" onclick={close}>×</button>
+			<button class="modal-close" type="button" aria-label="Закрити" onclick={close}>
+				<X size={18} />
+			</button>
+
 			{#if submitted}
 				<div class="modal-success">
 					<b>✓</b>
-					<h2>Заявку збережено</h2>
+					<h2 id="signup-title">{t.modal.successTitle}</h2>
 					<p>
-						Демо-форма спрацювала. Production-відправлення буде підключене лише до погодженого
-						backend.
+						{t.modal.demoNotice}
 					</p>
-					<button class="button button-dark" type="button" onclick={close}>Готово</button>
+					<button class="button button-primary full" type="button" onclick={close}>
+						{t.modal.closeBtn}
+					</button>
 				</div>
 			{:else}
-				<p class="eyebrow dark-text">Пілот Rahunok</p>
-				<h2 id="signup-title">Побудуємо ваш сценарій запуску</h2>
-				<p>Для однієї каси, мережі або банківського продукту. Це демонстраційна форма без мережевого запиту.</p>
+				<p class="eyebrow" style="margin-bottom: 12px;">
+					<span>{t.modal.badge}</span>
+				</p>
+				<h2 id="signup-title">{t.modal.title}</h2>
+				<p>
+					{t.modal.desc}
+				</p>
+				<p>{t.modal.demoNotice}</p>
+
 				<form
 					onsubmit={(event) => {
 						event.preventDefault();
 						submitted = true;
 					}}
 				>
-					<label>Ім’я<input bind:this={nameInput} name="name" autocomplete="name" required /></label
-					>
-					<label
-						>Телефон або Telegram<input
-							name="phone"
-							autocomplete="tel"
-							placeholder="+380..."
+					<label>
+						{t.modal.nameLabel}
+						<input
+							bind:this={nameInput}
+							name="name"
+							autocomplete="name"
+							placeholder="Олександр"
 							required
-						/></label
-					>
-					<label
-						>Масштаб запуску<select name="business" required
-							><option value="">Оберіть варіант</option><option>Кафе або ресторан</option><option
-								>Магазин</option
-							><option>Сфера послуг</option><option>Онлайн-бізнес</option><option>Мережа бізнесів</option
-							><option>Банк або фінансова компанія</option><option>Інше</option></select
-						></label
-					>
-					<label class="consent"
-						><input type="checkbox" required /><span
-							>Погоджуюся на обробку контактних даних для відповіді на заявку.</span
-						></label
-					>
-					<button class="button button-primary full" type="submit">Обговорити пілот</button>
+						/>
+					</label>
+
+					<label>
+						{t.modal.phoneLabel}
+						<input name="phone" autocomplete="tel" placeholder="+380... / email" required />
+					</label>
+
+					<label>
+						{t.modal.businessLabel}
+						<input name="business" placeholder="Coffee shop / Brand / Store" required />
+					</label>
+
+					<button class="button button-primary full" type="submit" style="margin-top: 12px;">
+						{t.modal.submitBtn}
+					</button>
 				</form>
 			{/if}
 		</div>
