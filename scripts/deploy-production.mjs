@@ -51,7 +51,9 @@ for (const name of requiredPublicEnv) {
 
 runNpmScript('worker:check:production');
 runNpmScript('worker:check:dashboard:production');
+runNpmScript('worker:check:corex:production');
 runNpmScript('worker:deploy:production');
 runNpmScript('worker:deploy:dashboard:production');
+runNpmScript('worker:deploy:corex:production');
 
-console.log('Root and Dashboard Workers now serve the same production build.');
+console.log('Root, Dashboard, and Corex Workers now serve the same production build.');

@@ -12,6 +12,7 @@
 		CircleDollarSignIcon,
 		CodeIcon,
 		DashboardSquare01Icon,
+		FlaskConicalIcon,
 		Invoice01Icon,
 		Logout01Icon,
 		MailSend01Icon,
@@ -45,6 +46,7 @@
 			| 'payment-methods'
 			| 'public-page'
 			| 'pos'
+			| 'sandbox'
 			| 'settings'
 			| 'structure'
 			| 'team'
@@ -393,6 +395,16 @@
 			>
 				<HugeiconsIcon icon={CodeIcon} size={17} aria-hidden="true" />
 				Розробникам
+			</a>
+			<a
+				href={resolve(demo ? '/dashboard/sandbox?demo=1' : '/dashboard/sandbox')}
+				onclick={() => (menuOpen = false)}
+				aria-current={activeSection === 'sandbox' ? 'page' : undefined}
+				class:nav-active={activeSection === 'sandbox'}
+				class="mt-1 flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-semibold text-zinc-400"
+			>
+				<HugeiconsIcon icon={FlaskConicalIcon} size={17} aria-hidden="true" />
+				Пісочниця
 			</a>
 			<a
 				href={resolve(demo ? '/dashboard/settings?demo=1' : '/dashboard/settings')}

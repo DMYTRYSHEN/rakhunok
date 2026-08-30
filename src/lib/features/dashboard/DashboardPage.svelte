@@ -9,10 +9,7 @@
 	import { overviewSnapshot } from './data/overview';
 	import { demoPosBoard } from './data/pos';
 	import { getDashboardGateway } from './api/supabase-browser';
-	import type {
-		DashboardRealtimeResource,
-		DashboardRealtimeScope
-	} from './api/dashboard-gateway';
+	import type { DashboardRealtimeResource, DashboardRealtimeScope } from './api/dashboard-gateway';
 	import type {
 		BusinessEntityInput,
 		BusinessStructureData,
@@ -44,6 +41,7 @@
 	);
 	const loadTeamSettings = lazyModule(() => import('./team/TeamSettings.svelte'));
 	const loadDeveloperApi = lazyModule(() => import('./developer-api/DeveloperApi.svelte'));
+	const loadPaymentSandbox = lazyModule(() => import('./sandbox/PaymentSandbox.svelte'));
 	const loadBusinessStructure = lazyModule(() => import('./structure/BusinessStructure.svelte'));
 	const loadInvoiceDetail = lazyModule(() => import('./invoices/InvoiceDetail.svelte'));
 
@@ -51,7 +49,20 @@
 		view = 'overview',
 		invoiceId
 	}: {
-		view?: 'overview' | 'invoices' | 'invoice' | 'invoice-create' | 'invoice-rules' | 'payment-methods' | 'public-page' | 'pos' | 'settings' | 'structure' | 'team' | 'developer-api';
+		view?:
+			| 'overview'
+			| 'invoices'
+			| 'invoice'
+			| 'invoice-create'
+			| 'invoice-rules'
+			| 'payment-methods'
+			| 'public-page'
+			| 'pos'
+			| 'sandbox'
+			| 'settings'
+			| 'structure'
+			| 'team'
+			| 'developer-api';
 		invoiceId?: string;
 	} = $props();
 
@@ -68,7 +79,8 @@
 			settings: loadDashboardSettings,
 			structure: loadBusinessStructure,
 			team: loadTeamSettings,
-			'developer-api': loadDeveloperApi
+			'developer-api': loadDeveloperApi,
+			sandbox: loadPaymentSandbox
 		};
 		return loaders[view]();
 	}
@@ -100,8 +112,22 @@
 			invoiceEvents = demoInvoiceEvents;
 			posBoard = demoPosBoard;
 			structureData = {
-				entities: [{ id: 'demo-entity', businessType: 'fop', businessName: overviewSnapshot.merchantName, displayName: overviewSnapshot.merchantName, taxId: '1234567890', bankName: 'Demo Bank', iban: 'UA123456789012345678901234567', isActive: true }],
-				terminals: demoPosBoard.terminals.map((terminal) => ({ ...terminal, entityId: 'demo-entity' }))
+				entities: [
+					{
+						id: 'demo-entity',
+						businessType: 'fop',
+						businessName: overviewSnapshot.merchantName,
+						displayName: overviewSnapshot.merchantName,
+						taxId: '1234567890',
+						bankName: 'Demo Bank',
+						iban: 'UA123456789012345678901234567',
+						isActive: true
+					}
+				],
+				terminals: demoPosBoard.terminals.map((terminal) => ({
+					...terminal,
+					entityId: 'demo-entity'
+				}))
 			};
 			sessionState = {
 				status: 'ready',
@@ -134,7 +160,8 @@
 				if (destroyed) return;
 				sessionState = { ...sessionState, snapshot };
 			} catch (error) {
-				contentError = error instanceof Error ? error.message : 'Не вдалося завантажити фінансовий огляд.';
+				contentError =
+					error instanceof Error ? error.message : 'Не вдалося завантажити фінансовий огляд.';
 			} finally {
 				contentLoading = false;
 			}
@@ -144,7 +171,18 @@
 	}
 
 	async function loadInvoices() {
-		if (view === 'overview' || view === 'settings' || view === 'invoice-rules' || view === 'payment-methods' || view === 'public-page' || view === 'team' || view === 'developer-api' || sessionState.status !== 'ready' || !gateway)
+		if (
+			view === 'overview' ||
+			view === 'settings' ||
+			view === 'invoice-rules' ||
+			view === 'payment-methods' ||
+			view === 'public-page' ||
+			view === 'team' ||
+			view === 'developer-api' ||
+			view === 'sandbox' ||
+			sessionState.status !== 'ready' ||
+			!gateway
+		)
 			return;
 		contentLoading = true;
 		contentError = null;
@@ -434,27 +472,27 @@
 {:else}
 	<DashboardShell
 		merchantName={sessionState.snapshot.merchantName}
-		activeSection={
-			view === 'overview'
-				? 'overview'
-				: view === 'pos'
-					? 'pos'
-					: view === 'settings'
-						? 'settings'
-						: view === 'invoice-rules'
-							? 'invoice-rules'
-							: view === 'payment-methods'
-								? 'payment-methods'
-								: view === 'public-page'
-									? 'public-page'
-									: view === 'team'
-										? 'team'
-													: view === 'developer-api'
-														? 'developer-api'
-						: view === 'structure'
-							? 'structure'
-							: 'invoices'
-		}
+		activeSection={view === 'overview'
+			? 'overview'
+			: view === 'pos'
+				? 'pos'
+				: view === 'settings'
+					? 'settings'
+					: view === 'invoice-rules'
+						? 'invoice-rules'
+						: view === 'payment-methods'
+							? 'payment-methods'
+							: view === 'public-page'
+								? 'public-page'
+								: view === 'team'
+									? 'team'
+									: view === 'developer-api'
+										? 'developer-api'
+										: view === 'sandbox'
+											? 'sandbox'
+											: view === 'structure'
+												? 'structure'
+												: 'invoices'}
 		demo={sessionState.user.id === 'demo-user'}
 		onSignOut={signOut}
 	>
@@ -492,13 +530,21 @@
 			{#await loadInvoiceList()}
 				<DashboardStateScreen loading />
 			{:then module}
-				<module.default {invoices} onCancel={cancelInvoice} demo={sessionState.user.id === 'demo-user'} />
+				<module.default
+					{invoices}
+					onCancel={cancelInvoice}
+					demo={sessionState.user.id === 'demo-user'}
+				/>
 			{/await}
 		{:else if view === 'invoice-create'}
 			{#await loadInvoiceCreate()}
 				<DashboardStateScreen loading />
 			{:then module}
-				<module.default terminals={posBoard.terminals} onCreate={createInvoice} demo={sessionState.user.id === 'demo-user'} />
+				<module.default
+					terminals={posBoard.terminals}
+					onCreate={createInvoice}
+					demo={sessionState.user.id === 'demo-user'}
+				/>
 			{/await}
 		{:else if view === 'settings'}
 			{#await loadDashboardSettings() then module}<module.default />{/await}
@@ -512,6 +558,8 @@
 			{#await loadTeamSettings() then module}<module.default />{/await}
 		{:else if view === 'developer-api'}
 			{#await loadDeveloperApi() then module}<module.default />{/await}
+		{:else if view === 'sandbox'}
+			{#await loadPaymentSandbox() then module}<module.default />{/await}
 		{:else if view === 'structure'}
 			{#await loadBusinessStructure()}
 				<DashboardStateScreen loading />

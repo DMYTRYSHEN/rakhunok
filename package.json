@@ -21,10 +21,11 @@
 		"check:checkout": "npm --prefix apps/checkout run check",
 		"test:app": "npm --prefix apps/merchant-app run test",
 		"test:checkout": "npm --prefix apps/checkout run test",
-		"build": "vite build",
+		"generate:processes": "node --experimental-strip-types scripts/generate-process-manifest.ts",
+		"build": "npm run generate:processes && vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
-		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check": "npm run generate:processes && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
@@ -34,8 +35,10 @@
 		"test:e2e": "playwright test",
 		"worker:check:production": "npm --prefix worker run check:production",
 		"worker:check:dashboard:production": "npm --prefix worker run check:dashboard:production",
+		"worker:check:corex:production": "npm --prefix worker run check:corex:production",
 		"worker:deploy:production": "npm --prefix worker run deploy:production",
 		"worker:deploy:dashboard:production": "npm --prefix worker run deploy:dashboard:production",
+		"worker:deploy:corex:production": "npm --prefix worker run deploy:corex:production",
 		"deploy:production": "node scripts/deploy-production.mjs"
 	},
 	"devDependencies": {
@@ -59,7 +62,8 @@
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.60.1",
 		"vite": "^8.0.16",
-		"vitest": "^4.1.8"
+		"vitest": "^4.1.8",
+		"yaml": "^2.9.0"
 	},
 	"dependencies": {
 		"@hugeicons/core-free-icons": "4.2.3",

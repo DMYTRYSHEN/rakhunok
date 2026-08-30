@@ -1,5 +1,7 @@
 import { mockFlowEdges as deployEdges, mockFlowNodes as deployNodes } from './mock-flow';
 import { extendedFlowScenarios } from './extended-flow-scenarios';
+import { ksoSandboxScenario, ksoTargetScenario } from './kso-flow-scenarios';
+import { generatedFlowScenarios } from './process-manifest';
 import type { FlowEdge, FlowNode, FlowNodeLayer, FlowScenario } from './types';
 
 type NodeInput = Omit<FlowNode, 'kind' | 'position'> & {
@@ -94,4 +96,4 @@ const deploy: FlowScenario = {
 	nodes: deployNodes.map((item) => ({ ...item, layer: item.id === 'publish' || item.id === 'health' ? 'deploy' as FlowNodeLayer : item.layer ?? 'deploy' })), edges: deployEdges
 };
 
-export const flowScenarios: FlowScenario[] = [login, ...extendedFlowScenarios, invoiceScenario('fixed'), invoiceScenario('open_amount'), tablePos, payment, deploy];
+export const flowScenarios: FlowScenario[] = [login, ...extendedFlowScenarios, invoiceScenario('fixed'), invoiceScenario('open_amount'), tablePos, payment, ksoSandboxScenario, ksoTargetScenario, ...generatedFlowScenarios, deploy];

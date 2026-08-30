@@ -71,6 +71,8 @@ const scenarioUk: Record<string, { label: string; title: string; description: st
 	open_amount: { label: 'Вільна сума', title: 'Створення посилання з вільною сумою', description: 'Як мерчант створює платіжне посилання, в якому клієнт визначає суму в checkout.' },
 	'table-pos': { label: 'Стіл / POS', title: 'Життєвий цикл QR столу і POS-рахунку', description: 'Як багаторазова адреса термінала знаходить стіл і створює рахунок для клієнта.' },
 	payment: { label: 'Оплата', title: 'Публічний checkout і підтвердження платежу', description: 'Від відкриття публічного URL до переходу в банк, webhook та realtime-оновлення панелі.' },
+	'kso-sandbox': { label: 'KSO sandbox', title: 'Ізольована симуляція KSO callback', description: 'Реалізований у dashboard Worker процес створює та перевіряє підписану тестову подію без звернень до production-сервісів або сховищ.' },
+	'kso-target': { label: 'Цільовий KSO', title: 'KSO-ідентифікація, лояльність і Pay by Bank', description: 'Запланований мережево-нейтральний процес від контексту покупця й loyalty quote до checkout та підтвердження вхідного платежу.' },
 	deploy: { label: 'Розгортання', title: 'Build, review і захищене розгортання', description: 'Ізольований release pipeline. Керування змінами заблоковане до явного підтвердження готовності.' }
 };
 

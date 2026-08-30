@@ -1,0 +1,341 @@
+{
+	"schemaVersion": 1,
+	"workers": [
+		{
+			"id": "letsrealtalk-web",
+			"name": "letsrealtalk-web",
+			"entrypoint": "worker/src/index.ts",
+			"config": "worker/wrangler.jsonc",
+			"publicRoutes": ["letsrealtalk.com/*"],
+			"bindings": [{ "name": "ASSETS", "type": "assets", "target": "../build" }],
+			"routes": [
+				{
+					"method": "ANY",
+					"path": "/_app/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				}
+			]
+		},
+		{
+			"id": "letsrealtalk-dashboard",
+			"name": "letsrealtalk-dashboard",
+			"entrypoint": "worker/src/dashboard.ts",
+			"config": "worker/wrangler.dashboard.jsonc",
+			"publicRoutes": ["letsrealtalk.com/dashboard*"],
+			"bindings": [
+				{ "name": "API", "type": "service", "target": "rahunok" },
+				{ "name": "ASSETS", "type": "assets", "target": "../build" }
+			],
+			"routes": [
+				{
+					"method": "ANY",
+					"path": "/_app/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/dashboard",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/dashboard/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/dashboard/api",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/dashboard/api/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/dashboard/api/sandbox/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/dashboard/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/favicon.ico",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				}
+			]
+		},
+		{
+			"id": "letsrealtalk-app",
+			"name": "letsrealtalk-app",
+			"entrypoint": "worker/src/app.ts",
+			"config": "worker/wrangler.app.jsonc",
+			"publicRoutes": ["letsrealtalk.com/app*"],
+			"bindings": [
+				{ "name": "API", "type": "service", "target": "rahunok" },
+				{ "name": "ASSETS", "type": "assets", "target": "../apps/merchant-app/dist" }
+			],
+			"routes": [
+				{
+					"method": "ANY",
+					"path": "/app",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/app.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/app/",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/app.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/app/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/app.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/app/api",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/app.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/app/api/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/app.ts"
+				}
+			]
+		},
+		{
+			"id": "letsrealtalk-checkout",
+			"name": "letsrealtalk-checkout",
+			"entrypoint": "worker/src/checkout.js",
+			"config": "worker/wrangler.checkout.jsonc",
+			"publicRoutes": [
+				"letsrealtalk.com/api/v1/banks*",
+				"letsrealtalk.com/api/v1/checkout*",
+				"letsrealtalk.com/api/v1/logos*",
+				"letsrealtalk.com/checkout*",
+				"letsrealtalk.com/o/*",
+				"letsrealtalk.com/pay/*",
+				"letsrealtalk.com/pos/*",
+				"letsrealtalk.com/t/*",
+				"letsrealtalk.com/tag/*"
+			],
+			"bindings": [
+				{ "name": "API", "type": "service", "target": "rahunok" },
+				{ "name": "ASSETS", "type": "assets", "target": "../apps/checkout/dist" }
+			],
+			"routes": [
+				{
+					"method": "ANY",
+					"path": "/checkout/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/checkout.js"
+				}
+			]
+		},
+		{
+			"id": "letsrealtalk-corex",
+			"name": "letsrealtalk-corex",
+			"entrypoint": "worker/src/corex.ts",
+			"config": "worker/wrangler.corex.jsonc",
+			"publicRoutes": ["letsrealtalk.com/corex", "letsrealtalk.com/corex/*"],
+			"bindings": [{ "name": "ASSETS", "type": "assets", "target": "../build" }],
+			"routes": [
+				{
+					"method": "ANY",
+					"path": "/_app/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/corex.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/corex",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/corex.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/corex/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/corex.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/favicon.ico",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/corex.ts"
+				}
+			]
+		}
+	],
+	"contracts": [
+		{
+			"id": "kso-mobile-api",
+			"title": "Rahunok KSO and Mobile API",
+			"version": "0.1.0",
+			"servers": ["https://letsrealtalk.com/api/v1", "https://sandbox.rahunok.app/api/v1"],
+			"routes": [
+				{
+					"method": "POST",
+					"path": "/kso/customer-sessions",
+					"operationId": "createKsoCustomerSession",
+					"summary": "Resolve or register customer context for a KSO session",
+					"tags": ["KSO customer"],
+					"status": "planned",
+					"source": "docs/kso-mobile-openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/kso/customer-sessions/{session_id}/quote",
+					"operationId": "quoteKsoBasket",
+					"summary": "Obtain a network-authoritative loyalty quote",
+					"tags": ["KSO customer"],
+					"status": "planned",
+					"source": "docs/kso-mobile-openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/kso/checkout-requests",
+					"operationId": "createKsoCheckoutRequest",
+					"summary": "Create a guest, loyalty, or mobile-push checkout",
+					"tags": ["KSO checkout"],
+					"status": "planned",
+					"source": "docs/kso-mobile-openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/kso/checkout-requests/{checkout_request_id}",
+					"operationId": "getKsoCheckoutRequest",
+					"summary": "Get payment, loyalty, and link status",
+					"tags": ["KSO checkout"],
+					"status": "planned",
+					"source": "docs/kso-mobile-openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/kso/checkout-requests/{checkout_request_id}/cancel",
+					"operationId": "cancelKsoCheckoutRequest",
+					"summary": "Cancel an unpaid checkout",
+					"tags": ["KSO checkout"],
+					"status": "planned",
+					"source": "docs/kso-mobile-openapi.yaml"
+				},
+				{
+					"method": "PUT",
+					"path": "/kso/terminals/{terminal_id}/active-checkout",
+					"operationId": "assignTerminalCheckout",
+					"summary": "Assign a checkout to the terminal's static NFC resolver",
+					"tags": ["KSO checkout"],
+					"status": "planned",
+					"source": "docs/kso-mobile-openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/mobile/devices",
+					"operationId": "registerMobileDevice",
+					"summary": "Register or rotate a mobile push token",
+					"tags": ["Mobile devices"],
+					"status": "planned",
+					"source": "docs/kso-mobile-openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/mobile/identity-token",
+					"operationId": "getMobileIdentityToken",
+					"summary": "Get the opaque token displayed as QR or Wallet identity",
+					"tags": ["Mobile devices"],
+					"status": "planned",
+					"source": "docs/kso-mobile-openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/mobile/identity-token",
+					"operationId": "rotateMobileIdentityToken",
+					"summary": "Rotate the opaque customer identity token",
+					"tags": ["Mobile devices"],
+					"status": "planned",
+					"source": "docs/kso-mobile-openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/mobile/payment-requests",
+					"operationId": "listMobilePaymentRequests",
+					"summary": "List payment requests for the authenticated customer",
+					"tags": ["Mobile payments"],
+					"status": "planned",
+					"source": "docs/kso-mobile-openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/mobile/payment-requests/{payment_request_id}",
+					"operationId": "getMobilePaymentRequest",
+					"summary": "Get an authenticated payment request",
+					"tags": ["Mobile payments"],
+					"status": "planned",
+					"source": "docs/kso-mobile-openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/mobile/payment-requests/{payment_request_id}/open-checkout",
+					"operationId": "openMobileCheckout",
+					"summary": "Create a single-use handoff to the existing checkout",
+					"tags": ["Mobile payments"],
+					"status": "planned",
+					"source": "docs/kso-mobile-openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/mobile/payment-requests/{payment_request_id}/decline",
+					"operationId": "declineMobilePaymentRequest",
+					"summary": "Decline a pending payment request",
+					"tags": ["Mobile payments"],
+					"status": "planned",
+					"source": "docs/kso-mobile-openapi.yaml"
+				}
+			]
+		}
+	]
+}

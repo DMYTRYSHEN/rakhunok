@@ -1,0 +1,1039 @@
+openapi: 3.1.0
+info:
+  title: Rahunok KSO and Mobile API
+  version: 0.1.0
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+  description: |
+    Additive orchestration API for retail self-checkouts and the Rahunok customer
+    application. Payment execution continues through the existing Rahunok checkout.
+    Only a reconciled incoming-credit event can produce the final paid state.
+servers:
+  - url: https://letsrealtalk.com/api/v1
+    description: Production
+  - url: https://sandbox.rahunok.app/api/v1
+    description: Partner sandbox
+tags:
+  - name: KSO customer
+    description: Customer recognition and retail-network loyalty context.
+  - name: KSO checkout
+    description: Checkout creation, presentation, lifecycle, and KSO notification.
+  - name: Mobile devices
+    description: Authenticated device and customer identity-token management.
+  - name: Mobile payments
+    description: Customer payment inbox and existing-checkout handoff.
+paths:
+  /kso/customer-sessions:
+    post:
+      tags: [KSO customer]
+      summary: Resolve or register customer context for a KSO session
+      description: |
+        Accepts exactly one identification source. A Rahunok token can resolve to the
+        retail network's loyalty reference. A network loyalty reference can establish
+        context for first-link processing after a settled payment. An unrecognized
+        token returns a successful response with `recognized: false`.
+      operationId: createKsoCustomerSession
+      security:
+        - ksoPartner: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/KeyId'
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerSessionRequest'
+      responses:
+        '201':
+          description: Customer session created
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerSession'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /kso/customer-sessions/{session_id}/quote:
+    post:
+      tags: [KSO customer]
+      summary: Obtain a network-authoritative loyalty quote
+      operationId: quoteKsoBasket
+      security:
+        - ksoPartner: []
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/KeyId'
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoyaltyQuoteRequest'
+      responses:
+        '200':
+          description: Loyalty quote
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyQuote'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /kso/checkout-requests:
+    post:
+      tags: [KSO checkout]
+      summary: Create a guest, loyalty, or mobile-push checkout
+      description: |
+        Creates an order through the existing Rahunok checkout mechanism. Guest
+        requests omit `customer_session_token` and `loyalty_quote_token`.
+      operationId: createKsoCheckoutRequest
+      security:
+        - ksoPartner: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/KeyId'
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCheckoutRequest'
+      responses:
+        '201':
+          description: Checkout created
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /kso/checkout-requests/{checkout_request_id}:
+    get:
+      tags: [KSO checkout]
+      summary: Get payment, loyalty, and link status
+      operationId: getKsoCheckoutRequest
+      security:
+        - ksoPartner: []
+      parameters:
+        - $ref: '#/components/parameters/CheckoutRequestId'
+        - $ref: '#/components/parameters/KeyId'
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      responses:
+        '200':
+          description: Current checkout state
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /kso/checkout-requests/{checkout_request_id}/cancel:
+    post:
+      tags: [KSO checkout]
+      summary: Cancel an unpaid checkout
+      operationId: cancelKsoCheckoutRequest
+      security:
+        - ksoPartner: []
+      parameters:
+        - $ref: '#/components/parameters/CheckoutRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/KeyId'
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  enum: [basket_changed, customer_cancelled, terminal_timeout, operator_cancelled]
+      responses:
+        '200':
+          description: Current checkout state after cancellation attempt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutStatus'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /kso/terminals/{terminal_id}/active-checkout:
+    put:
+      tags: [KSO checkout]
+      summary: Assign a checkout to the terminal's static NFC resolver
+      operationId: assignTerminalCheckout
+      security:
+        - ksoPartner: []
+      parameters:
+        - name: terminal_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/KeyId'
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [checkout_request_id]
+              properties:
+                checkout_request_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: NFC assignment
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [nfc_url, expires_at]
+                properties:
+                  nfc_url:
+                    type: string
+                    format: uri
+                  expires_at:
+                    type: string
+                    format: date-time
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /mobile/devices:
+    post:
+      tags: [Mobile devices]
+      summary: Register or rotate a mobile push token
+      operationId: registerMobileDevice
+      security:
+        - mobileBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+      responses:
+        '200':
+          description: Device registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /mobile/identity-token:
+    get:
+      tags: [Mobile devices]
+      summary: Get the opaque token displayed as QR or Wallet identity
+      operationId: getMobileIdentityToken
+      security:
+        - mobileBearer: []
+      responses:
+        '200':
+          description: Current customer identity token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobileIdentityToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Mobile devices]
+      summary: Rotate the opaque customer identity token
+      description: Revokes the previous token after a short overlap period for active KSO sessions.
+      operationId: rotateMobileIdentityToken
+      security:
+        - mobileBearer: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Rotated customer identity token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobileIdentityToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /mobile/payment-requests:
+    get:
+      tags: [Mobile payments]
+      summary: List payment requests for the authenticated customer
+      operationId: listMobilePaymentRequests
+      security:
+        - mobileBearer: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, completed, all]
+            default: pending
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment request page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MobilePaymentRequest'
+                  next_cursor:
+                    type: [string, 'null']
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /mobile/payment-requests/{payment_request_id}:
+    get:
+      tags: [Mobile payments]
+      summary: Get an authenticated payment request
+      operationId: getMobilePaymentRequest
+      security:
+        - mobileBearer: []
+      parameters:
+        - $ref: '#/components/parameters/PaymentRequestId'
+      responses:
+        '200':
+          description: Payment request details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobilePaymentRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /mobile/payment-requests/{payment_request_id}/open-checkout:
+    post:
+      tags: [Mobile payments]
+      summary: Create a single-use handoff to the existing checkout
+      operationId: openMobileCheckout
+      security:
+        - mobileBearer: []
+      parameters:
+        - $ref: '#/components/parameters/PaymentRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Authenticated checkout handoff
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [checkout_url, handoff_token, expires_at]
+                properties:
+                  checkout_url:
+                    type: string
+                    format: uri
+                  handoff_token:
+                    type: string
+                    description: Single-use opaque token bound to customer, device, and payment request.
+                  expires_at:
+                    type: string
+                    format: date-time
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '410':
+          $ref: '#/components/responses/Gone'
+  /mobile/payment-requests/{payment_request_id}/decline:
+    post:
+      tags: [Mobile payments]
+      summary: Decline a pending payment request
+      operationId: declineMobilePaymentRequest
+      security:
+        - mobileBearer: []
+      parameters:
+        - $ref: '#/components/parameters/PaymentRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Updated request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobilePaymentRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+webhooks:
+  ksoCheckoutStatusChanged:
+    post:
+      tags: [KSO checkout]
+      summary: Notify a KSO partner about checkout state changes
+      operationId: notifyKsoCheckoutStatusChanged
+      description: |
+        After authenticating and reconciling a bank event, the Rahunok Worker commits
+        the canonical checkout state and enqueues this callback in the same logical
+        transaction. Rahunok sends it to the partner's allowlisted endpoint; arbitrary
+        callback URLs are not accepted. Delivery is at least once, so receivers must
+        deduplicate by `event_id`. `payload_mode` is `compact` or `full` as requested
+        for the checkout and permitted by the partner profile. Even in `full` mode,
+        Rahunok sends normalized settlement data, never the raw bank payload or payer
+        personal/account data.
+      security:
+        - ksoWebhookSignature: []
+      parameters:
+        - name: X-Rahunok-Webhook-Timestamp
+          in: header
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: X-Rahunok-Webhook-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Rahunok-Webhook-Key-ID
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Rahunok-Webhook-Delivery-ID
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KsoCheckoutStatusEvent'
+            examples:
+              compactPaid:
+                summary: Minimal terminal-facing paid event
+                value:
+                  event_id: 018f4f9c-e7e3-7dc1-9b0a-64d292343cee
+                  event_type: checkout.paid
+                  occurred_at: '2026-08-30T14:31:22Z'
+                  payload_mode: compact
+                  checkout:
+                    checkout_request_id: 018f4f91-294e-7d97-a131-785df782bc58
+                    order_reference: KSO-42-9182
+                    kso_session_id: ATB-STORE17-KSO42-9182
+                    payment_status: paid
+              fullPaid:
+                summary: Paid event with normalized settlement details
+                value:
+                  event_id: 018f4f9c-e7e3-7dc1-9b0a-64d292343cee
+                  event_type: checkout.paid
+                  occurred_at: '2026-08-30T14:31:22Z'
+                  payload_mode: full
+                  checkout:
+                    checkout_request_id: 018f4f91-294e-7d97-a131-785df782bc58
+                    order_reference: KSO-42-9182
+                    kso_session_id: ATB-STORE17-KSO42-9182
+                    payment_status: paid
+                    amount_minor: 42800
+                    currency: UAH
+                    loyalty_status: pending
+                    link_status: not_requested
+                    paid_at: '2026-08-30T14:31:21Z'
+                  settlement:
+                    provider_code: ABANK
+                    provider_event_id: ab-event-791428
+                    provider_payment_reference: ab-payment-582013
+                    reconciled_at: '2026-08-30T14:31:22Z'
+      responses:
+        '200':
+          description: Event accepted
+        '204':
+          description: Event accepted without a response body
+components:
+  securitySchemes:
+    ksoPartner:
+      type: apiKey
+      in: header
+      name: X-Partner-ID
+      description: |
+        Network-scoped partner identifier. Every KSO request is authenticated by an
+        HMAC-SHA256 signature and must also include key ID, timestamp, and nonce.
+    mobileBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ksoWebhookSignature:
+      type: apiKey
+      in: header
+      name: X-Rahunok-Webhook-Signature
+      description: HMAC-SHA256 signature using the partner's dedicated outbound webhook key.
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+    KeyId:
+      name: X-Rahunok-Key-ID
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+      description: Identifies the active inbound signing secret and enables zero-downtime rotation.
+    Timestamp:
+      name: X-Rahunok-Timestamp
+      in: header
+      required: true
+      schema:
+        type: string
+        format: date-time
+      description: UTC timestamp accepted within five minutes of Rahunok server time.
+    Nonce:
+      name: X-Rahunok-Nonce
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+      description: Unique request value retained for the replay-protection window.
+    Signature:
+      name: X-Rahunok-Signature
+      in: header
+      required: true
+      schema:
+        type: string
+        pattern: '^v1=[A-Za-z0-9_-]{43}$'
+      description: Base64url HMAC-SHA256 signature prefixed with `v1=`.
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CheckoutRequestId:
+      name: checkout_request_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PaymentRequestId:
+      name: payment_request_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  headers:
+    CorrelationId:
+      description: Rahunok request correlation identifier.
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    CreateCustomerSessionRequest:
+      type: object
+      required: [network_id, location_id, terminal_id, kso_session_id, identification]
+      properties:
+        network_id:
+          type: string
+        location_id:
+          type: string
+        terminal_id:
+          type: string
+        kso_session_id:
+          type: string
+        identification:
+          oneOf:
+            - $ref: '#/components/schemas/RahunokIdentification'
+            - $ref: '#/components/schemas/NetworkLoyaltyIdentification'
+    RahunokIdentification:
+      type: object
+      required: [type, token]
+      properties:
+        type:
+          type: string
+          enum: [rahunok_token]
+        token:
+          type: string
+          description: Opaque, revocable Wallet or application token.
+    NetworkLoyaltyIdentification:
+      type: object
+      required: [type, network_customer_ref, proof]
+      properties:
+        type:
+          type: string
+          enum: [network_loyalty]
+        network_customer_ref:
+          type: string
+        proof:
+          type: string
+          description: Opaque proof produced or verifiable by the network adapter.
+    CustomerSession:
+      type: object
+      required: [session_id, recognized, loyalty, expires_at]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        customer_session_token:
+          type: [string, 'null']
+        recognized:
+          type: boolean
+        customer_label:
+          type: [string, 'null']
+          description: Optional masked label approved for KSO display.
+        loyalty:
+          $ref: '#/components/schemas/LoyaltyContext'
+        expires_at:
+          type: string
+          format: date-time
+    LoyaltyContext:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [not_provided, recognized, not_found, unavailable]
+        network_customer_ref:
+          type: [string, 'null']
+          description: Retail-network identifier; no Rahunok customer identifier is exposed.
+        display_summary:
+          type: [string, 'null']
+    BasketLine:
+      type: object
+      required: [line_id, sku, quantity, unit_amount_minor, total_amount_minor]
+      properties:
+        line_id:
+          type: string
+        sku:
+          type: string
+        quantity:
+          type: number
+          exclusiveMinimum: 0
+        unit_amount_minor:
+          type: integer
+          minimum: 0
+        total_amount_minor:
+          type: integer
+          minimum: 0
+    LoyaltyQuoteRequest:
+      type: object
+      required: [currency, subtotal_minor, lines]
+      properties:
+        currency:
+          type: string
+          const: UAH
+        subtotal_minor:
+          type: integer
+          minimum: 0
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/BasketLine'
+    LoyaltyQuote:
+      type: object
+      required: [loyalty_quote_token, subtotal_minor, discount_minor, total_minor, expires_at]
+      properties:
+        loyalty_quote_token:
+          type: string
+        subtotal_minor:
+          type: integer
+        discount_minor:
+          type: integer
+        total_minor:
+          type: integer
+        messages:
+          type: array
+          items:
+            type: string
+        expires_at:
+          type: string
+          format: date-time
+    CreateCheckoutRequest:
+      type: object
+      required:
+        - network_id
+        - location_id
+        - terminal_id
+        - kso_session_id
+        - order_reference
+        - amount_minor
+        - currency
+        - presentation_mode
+      properties:
+        network_id:
+          type: string
+        location_id:
+          type: string
+        terminal_id:
+          type: string
+        kso_session_id:
+          type: string
+        order_reference:
+          type: string
+        customer_session_token:
+          type: string
+        loyalty_quote_token:
+          type: string
+        amount_minor:
+          type: integer
+          minimum: 1
+        currency:
+          type: string
+          const: UAH
+        presentation_mode:
+          type: string
+          enum: [qr, nfc, mobile_push]
+        callback_payload_mode:
+          type: string
+          enum: [compact, full]
+          default: compact
+          description: Requested mode; Rahunok applies the most restrictive mode allowed by the partner profile.
+    CheckoutRequest:
+      allOf:
+        - $ref: '#/components/schemas/CheckoutStatus'
+        - type: object
+          required: [checkout_url, presentation]
+          properties:
+            checkout_url:
+              type: string
+              format: uri
+            presentation:
+              type: object
+              required: [mode]
+              properties:
+                mode:
+                  type: string
+                  enum: [qr, nfc, mobile_push]
+                qr_payload:
+                  type: [string, 'null']
+                nfc_url:
+                  type: [string, 'null']
+                payment_request_id:
+                  type: [string, 'null']
+                  format: uuid
+    CheckoutStatus:
+      type: object
+      required:
+        - checkout_request_id
+        - payment_id
+        - payment_status
+        - loyalty_status
+        - link_status
+        - expires_at
+      properties:
+        checkout_request_id:
+          type: string
+          format: uuid
+        payment_id:
+          type: string
+        payment_status:
+          type: string
+          enum:
+            - created
+            - presented
+            - opened
+            - bank_selected
+            - payment_initiated
+            - awaiting_settlement
+            - paid
+            - declined
+            - expired
+            - failed
+            - cancelled
+        loyalty_status:
+          type: string
+          enum: [not_applicable, pending, committed, retrying, failed]
+        link_status:
+          type: string
+          enum: [not_requested, pending, linked, conflict, rejected]
+        paid_at:
+          type: [string, 'null']
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+    RegisterDeviceRequest:
+      type: object
+      required: [installation_id, platform, push_token, app_version]
+      properties:
+        installation_id:
+          type: string
+        platform:
+          type: string
+          enum: [ios, android]
+        push_token:
+          type: string
+        app_version:
+          type: string
+    Device:
+      type: object
+      required: [device_id, platform, status, updated_at]
+      properties:
+        device_id:
+          type: string
+          format: uuid
+        platform:
+          type: string
+          enum: [ios, android]
+        status:
+          type: string
+          enum: [active, revoked]
+        updated_at:
+          type: string
+          format: date-time
+    MobileIdentityToken:
+      type: object
+      required: [token, qr_payload, issued_at]
+      properties:
+        token:
+          type: string
+          description: Opaque revocable token. It contains no customer or loyalty data.
+        qr_payload:
+          type: string
+          description: Value rendered by the application or embedded in a Wallet pass.
+        issued_at:
+          type: string
+          format: date-time
+        previous_valid_until:
+          type: [string, 'null']
+          format: date-time
+    MobilePaymentRequest:
+      type: object
+      required:
+        - payment_request_id
+        - merchant
+        - amount_minor
+        - currency
+        - payment_status
+        - expires_at
+      properties:
+        payment_request_id:
+          type: string
+          format: uuid
+        merchant:
+          type: object
+          required: [network_id, display_name, location_name]
+          properties:
+            network_id:
+              type: string
+            display_name:
+              type: string
+            location_name:
+              type: string
+        amount_minor:
+          type: integer
+        currency:
+          type: string
+          const: UAH
+        payment_status:
+          type: string
+          enum:
+            [
+              created,
+              opened,
+              payment_initiated,
+              awaiting_settlement,
+              paid,
+              declined,
+              expired,
+              failed,
+              cancelled
+            ]
+        loyalty_summary:
+          type: [string, 'null']
+        expires_at:
+          type: string
+          format: date-time
+    KsoCheckoutStatusEvent:
+      type: object
+      required: [event_id, event_type, occurred_at, payload_mode, checkout]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+          enum:
+            - checkout.status_changed
+            - checkout.paid
+            - loyalty.status_changed
+            - identity_link.status_changed
+        occurred_at:
+          type: string
+          format: date-time
+        payload_mode:
+          type: string
+          enum: [compact, full]
+        checkout:
+          $ref: '#/components/schemas/KsoCheckoutCallbackStatus'
+        settlement:
+          oneOf:
+            - $ref: '#/components/schemas/NormalizedSettlement'
+            - type: 'null'
+          description: Present only for a reconciled payment event in `full` mode.
+    KsoCheckoutCallbackStatus:
+      type: object
+      required:
+        - checkout_request_id
+        - order_reference
+        - kso_session_id
+        - payment_status
+      properties:
+        checkout_request_id:
+          type: string
+          format: uuid
+        order_reference:
+          type: string
+        kso_session_id:
+          type: string
+        payment_status:
+          type: string
+          enum:
+            - created
+            - presented
+            - opened
+            - bank_selected
+            - payment_initiated
+            - awaiting_settlement
+            - paid
+            - declined
+            - expired
+            - failed
+            - cancelled
+        amount_minor:
+          type: integer
+          description: Present in `full` mode.
+        currency:
+          type: string
+          description: Present in `full` mode.
+        loyalty_status:
+          type: string
+          enum: [not_applicable, pending, committed, retrying, failed]
+          description: Present in `full` mode.
+        link_status:
+          type: string
+          enum: [not_requested, pending, linked, conflict, rejected]
+          description: Present in `full` mode.
+        paid_at:
+          type: [string, 'null']
+          format: date-time
+          description: Present in `full` mode after settlement.
+    NormalizedSettlement:
+      type: object
+      required: [provider_code, provider_event_id, reconciled_at]
+      properties:
+        provider_code:
+          type: string
+          description: Rahunok settlement-adapter code, for example `ABANK`.
+        provider_event_id:
+          type: string
+          description: Stable provider event reference for support and reconciliation.
+        provider_payment_reference:
+          type: [string, 'null']
+          description: Provider payment reference when contractually available and safe to disclose.
+        reconciled_at:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      required: [code, message, correlation_id]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        correlation_id:
+          type: string
+          format: uuid
+        field_errors:
+          type: array
+          items:
+            type: object
+            required: [field, code]
+            properties:
+              field:
+                type: string
+              code:
+                type: string
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid credentials or signature
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found within the authenticated scope
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: State or idempotency conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Gone:
+      description: Payment request or handoff expired
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unprocessable:
+      description: Valid request that cannot be processed in the current business state
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

@@ -6,9 +6,7 @@ test('does not impersonate a merchant without an authenticated session', async (
 	await expect(page.getByRole('heading', { name: 'Вхід у Rahunok' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Фінансовий огляд' })).not.toBeVisible();
 	await expect(
-		page
-			.locator('iframe[title*="Google"]')
-			.or(page.getByText('Сервіс входу тимчасово недоступний'))
+		page.locator('iframe[title*="Google"]').or(page.getByText('Сервіс входу тимчасово недоступний'))
 	).toBeAttached();
 });
 
@@ -114,6 +112,55 @@ test('opens and dismisses the mobile dashboard navigation', async ({ page }) => 
 	await page.getByRole('link', { name: 'Рахунки', exact: true }).click();
 	await expect(page).toHaveURL(/\/dashboard\/invoices\?demo=1$/);
 	await expect(page.locator('aside')).toHaveAttribute('aria-hidden', 'true');
+});
+
+test('simulates a verified payment in the isolated sandbox', async ({ page }) => {
+	await page.route('**/dashboard/api/sandbox/simulate', async (route) => {
+		await route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			body: JSON.stringify({
+				event: {
+					deliveryId: 'delivery-demo-1',
+					eventType: 'payment.succeeded',
+					createdAt: '2026-08-30T18:00:00.000Z',
+					payment: {
+						id: 'pay_demo_1',
+						amountMinor: 12500,
+						currency: 'UAH',
+						status: 'succeeded',
+						bankCode: 'UNJS'
+					}
+				},
+				headers: {
+					'Rahunok-Delivery-Id': 'delivery-demo-1',
+					'Rahunok-Signature': `v1=${'a'.repeat(64)}`,
+					'Rahunok-Timestamp': '1788112800'
+				},
+				verified: true
+			})
+		});
+	});
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/dashboard/sandbox?demo=1');
+
+	await expect(page).toHaveTitle('Пісочниця платежів · Rahunok');
+	await expect(page.getByRole('heading', { name: 'Пісочниця платежів' })).toBeVisible();
+	await expect(page.getByText('Без записів')).toBeVisible();
+	await expect(page.getByText(/не потрапляє у production Supabase/)).toBeVisible();
+
+	await page.getByRole('button', { name: 'Змоделювати оплату' }).click();
+	await expect(page.getByText('payment.succeeded')).toBeVisible();
+	await expect(page.getByText('Підпис перевірено')).toBeVisible();
+	await expect(page.getByText('delivery-demo-1')).toBeVisible();
+	await expect(page.getByText(/125,00/)).toBeVisible();
+	await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll');
+
+	await page.getByRole('button', { name: 'Відкрити навігацію' }).click();
+	await expect(page.getByRole('link', { name: 'Пісочниця' })).toHaveAttribute(
+		'aria-current',
+		'page'
+	);
 });
 
 test('opens invoice scenarios from the sidebar and selects the requested form', async ({
