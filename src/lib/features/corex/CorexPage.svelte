@@ -43,10 +43,10 @@
 		if (!destroyed) sessionState = restoredState;
 	}
 
-	async function loginWithGoogle() {
+	async function loginWithGoogle(credential: string, nonce: string) {
 		if (!gateway) return;
-		localStorage.setItem('auth_redirect', '/corex/');
-		await gateway.signInWithGoogle(`${window.location.origin}/corex/`);
+		await gateway.signInWithGoogleIdToken(credential, nonce);
+		await restore();
 	}
 
 	async function completeOnboarding(input: MerchantOnboardingInput) {

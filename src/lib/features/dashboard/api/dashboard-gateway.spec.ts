@@ -78,7 +78,7 @@ function createClient(options?: { merchantError?: Error; merchantMissing?: boole
 	const client = {
 		auth: {
 			getSession: vi.fn(async () => ({ data: { session }, error: null })),
-			signInWithOAuth: vi.fn(),
+			signInWithIdToken: vi.fn(async () => ({ data: { session }, error: null })),
 			signOut: vi.fn()
 		},
 		from: vi.fn((table: string) => {
@@ -96,6 +96,18 @@ afterEach(() => {
 });
 
 describe('dashboard gateway', () => {
+	it('exchanges a Google credential and nonce without an OAuth redirect', async () => {
+		const { client } = createClient();
+
+		await createDashboardGateway(client).signInWithGoogleIdToken('google-credential', 'nonce');
+
+		expect(client.auth.signInWithIdToken).toHaveBeenCalledWith({
+			provider: 'google',
+			token: 'google-credential',
+			nonce: 'nonce'
+		});
+	});
+
 	it('returns guest when Supabase has no session', async () => {
 		const client = {
 			auth: { getSession: vi.fn(async () => ({ data: { session: null }, error: null })) }

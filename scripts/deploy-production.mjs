@@ -5,7 +5,11 @@ if (existsSync('.env')) {
 	process.loadEnvFile('.env');
 }
 
-const requiredPublicEnv = ['PUBLIC_SUPABASE_URL', 'PUBLIC_SUPABASE_ANON_KEY'];
+const requiredPublicEnv = [
+	'PUBLIC_SUPABASE_URL',
+	'PUBLIC_SUPABASE_ANON_KEY',
+	'PUBLIC_GOOGLE_CLIENT_ID'
+];
 const missing = requiredPublicEnv.filter((name) => !process.env[name]?.trim());
 
 if (missing.length > 0) {

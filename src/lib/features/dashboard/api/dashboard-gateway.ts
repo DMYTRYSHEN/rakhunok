@@ -109,7 +109,7 @@ export type DashboardGateway = {
 		scope: DashboardRealtimeScope,
 		onChange: (resource: DashboardRealtimeResource) => void
 	): () => void;
-	signInWithGoogle(redirectTo: string): Promise<void>;
+	signInWithGoogleIdToken(token: string, nonce: string): Promise<void>;
 	signOut(): Promise<void>;
 };
 
@@ -780,10 +780,11 @@ export function createDashboardGateway(
 			};
 		},
 
-		async signInWithGoogle(redirectTo) {
-			const { error } = await client.auth.signInWithOAuth({
+		async signInWithGoogleIdToken(token, nonce) {
+			const { error } = await client.auth.signInWithIdToken({
 				provider: 'google',
-				options: { redirectTo }
+				token,
+				nonce
 			});
 			if (error) throw error;
 		},

@@ -302,9 +302,10 @@
 		}
 	}
 
-	async function loginWithGoogle() {
+	async function loginWithGoogle(credential: string, nonce: string) {
 		if (!gateway) return;
-		await gateway.signInWithGoogle(`${window.location.origin}/dashboard`);
+		await gateway.signInWithGoogleIdToken(credential, nonce);
+		await restore();
 	}
 
 	async function signOut() {

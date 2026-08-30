@@ -1,27 +1,67 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { env } from '$env/dynamic/public';
 	import { ArrowLeft, KeyRound, LoaderCircle, ShieldCheck } from '@lucide/svelte';
 	import { resolve } from '$app/paths';
+	import { createGoogleNonce, loadGoogleIdentityServices } from './google-identity';
 
 	let {
 		configurationRequired = false,
 		homeHref = resolve('/'),
 		onGoogleLogin
-	}: { configurationRequired?: boolean; homeHref?: string; onGoogleLogin?: () => Promise<void> } = $props();
+	}: {
+		configurationRequired?: boolean;
+		homeHref?: string;
+		onGoogleLogin?: (credential: string, nonce: string) => Promise<void>;
+	} = $props();
 	let pending = $state(false);
+	let googleButton = $state<HTMLDivElement>();
 	let message = $state<string | null>(null);
 
-	async function login() {
+	async function handleCredential(credential: string, nonce: string) {
 		if (!onGoogleLogin || pending) return;
 		pending = true;
 		message = null;
 
 		try {
-			await onGoogleLogin();
+			await onGoogleLogin(credential, nonce);
 		} catch {
-			message = 'Не вдалося розпочати вхід через Google. Спробуйте ще раз.';
+			message = 'Не вдалося увійти через Google. Спробуйте ще раз.';
 			pending = false;
 		}
 	}
+
+	onMount(() => {
+		if (configurationRequired || !onGoogleLogin) return;
+		const clientId = env.PUBLIC_GOOGLE_CLIENT_ID?.trim();
+		if (!clientId) {
+			message = 'Сервіс входу тимчасово недоступний.';
+			return;
+		}
+
+		void Promise.all([loadGoogleIdentityServices(), createGoogleNonce()])
+			.then(([google, nonce]) => {
+				if (!googleButton) throw new Error('Google sign-in button is unavailable.');
+				google.accounts.id.initialize({
+					client_id: clientId,
+					nonce: nonce.hashed,
+					callback: (response) => {
+						if (response.credential) void handleCredential(response.credential, nonce.raw);
+					}
+				});
+				google.accounts.id.renderButton(googleButton, {
+					type: 'standard',
+					theme: 'outline',
+					size: 'large',
+					text: 'signin_with',
+					shape: 'rectangular',
+					width: 320
+				});
+			})
+			.catch(() => {
+				message = 'Не вдалося завантажити вхід через Google. Оновіть сторінку.';
+			});
+	});
 </script>
 
 <main class="grid min-h-screen bg-[#f6f7f8] px-4 py-8 text-zinc-950 sm:place-items-center">
@@ -55,20 +95,15 @@
 					Спробуйте оновити сторінку пізніше.
 				</div>
 			{:else}
-				<button
-					type="button"
-					class="mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-70"
-					style="background-color: #2563eb; color: #ffffff;"
-					disabled={pending}
-					onclick={login}
-				>
+				<div class="relative mt-7 flex h-11 w-full items-center justify-center">
+					<div bind:this={googleButton} class:invisible={pending}></div>
 					{#if pending}
+						<div class="absolute inset-0 flex items-center justify-center gap-2 text-sm font-semibold text-zinc-700">
 						<LoaderCircle size={18} class="animate-spin" aria-hidden="true" />
-						Перенаправлення…
-					{:else}
-						Увійти через Google
+						Вхід…
+						</div>
 					{/if}
-				</button>
+				</div>
 			{/if}
 
 			{#if message}
