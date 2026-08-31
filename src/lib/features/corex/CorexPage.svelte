@@ -134,7 +134,7 @@
 				</div>
 			</section>
 
-			<ReleaseFlowCanvas {locale} />
+			<ReleaseFlowCanvas {locale} ownerUserId={sessionState.user.id} />
 
 			<section class="safety-grid">
 				<div><span>{text.environment}</span><strong>{text.preview}</strong></div>

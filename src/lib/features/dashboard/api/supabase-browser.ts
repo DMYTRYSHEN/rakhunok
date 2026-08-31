@@ -1,23 +1,32 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseBrowserConfig } from './config';
 import { createDashboardGateway, type DashboardGateway } from './dashboard-gateway';
 
 let gateway: DashboardGateway | null = null;
+let client: SupabaseClient | null = null;
 
-export function getDashboardGateway(): DashboardGateway | null {
-	if (gateway) return gateway;
+export function getSupabaseBrowserClient(): SupabaseClient | null {
+	if (client) return client;
 
 	const config = getSupabaseBrowserConfig();
 	if (!config) return null;
 
-	const client = createClient(config.url, config.anonKey, {
+	client = createClient(config.url, config.anonKey, {
 		auth: {
 			persistSession: true,
 			autoRefreshToken: true,
 			detectSessionInUrl: true
 		}
 	});
+	return client;
+}
 
-	gateway = createDashboardGateway(client, { eventsApiBase: '/dashboard' });
+export function getDashboardGateway(): DashboardGateway | null {
+	if (gateway) return gateway;
+
+	const browserClient = getSupabaseBrowserClient();
+	if (!browserClient) return null;
+
+	gateway = createDashboardGateway(browserClient, { eventsApiBase: '/dashboard' });
 	return gateway;
 }

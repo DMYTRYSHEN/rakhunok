@@ -1,39 +1,16 @@
-interface Env {
-	ASSETS: Fetcher;
-}
+import { createSupabaseCorexControlPlane } from './corex-control-plane.ts';
+import { routeCorexRequest } from './corex-router.ts';
 
-function isCorexPath(pathname: string): boolean {
-	return pathname === '/corex' || pathname.startsWith('/corex/');
-}
-
-function isCorexAsset(pathname: string): boolean {
-	return pathname.startsWith('/_app/') || pathname === '/favicon.ico';
-}
-
-export async function routeCorexRequest(request: Request, env: Env): Promise<Response> {
-	const url = new URL(request.url);
-
-	if (isCorexPath(url.pathname)) {
-		url.pathname = '/200';
-		return env.ASSETS.fetch(new Request(url, request));
-	}
-
-	if (isCorexAsset(url.pathname)) {
-		return env.ASSETS.fetch(request);
-	}
-
-	return new Response('Not Found', {
-		status: 404,
-		headers: {
-			'Cache-Control': 'no-store',
-			'Content-Type': 'text/plain; charset=utf-8',
-			'X-Robots-Tag': 'noindex'
-		}
-	});
-}
+export { CorexProcessWorkflow } from './corex-workflow.ts';
 
 export default {
 	async fetch(request, env): Promise<Response> {
-		return routeCorexRequest(request, env);
+		const controlPlane = createSupabaseCorexControlPlane({
+			url: env.SUPABASE_URL,
+			publishableKey: env.SUPABASE_PUBLISHABLE_KEY,
+			serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
+			workflow: env.COREX_PROCESS_WORKFLOW
+		});
+		return routeCorexRequest(request, env, controlPlane);
 	}
 } satisfies ExportedHandler<Env>;

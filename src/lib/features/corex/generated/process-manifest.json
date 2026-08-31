@@ -179,36 +179,7 @@
 			"config": "worker/wrangler.corex.jsonc",
 			"publicRoutes": ["letsrealtalk.com/corex", "letsrealtalk.com/corex/*"],
 			"bindings": [{ "name": "ASSETS", "type": "assets", "target": "../build" }],
-			"routes": [
-				{
-					"method": "ANY",
-					"path": "/_app/",
-					"match": "prefix",
-					"status": "implemented",
-					"source": "worker/src/corex.ts"
-				},
-				{
-					"method": "ANY",
-					"path": "/corex",
-					"match": "exact",
-					"status": "implemented",
-					"source": "worker/src/corex.ts"
-				},
-				{
-					"method": "ANY",
-					"path": "/corex/",
-					"match": "prefix",
-					"status": "implemented",
-					"source": "worker/src/corex.ts"
-				},
-				{
-					"method": "ANY",
-					"path": "/favicon.ico",
-					"match": "exact",
-					"status": "implemented",
-					"source": "worker/src/corex.ts"
-				}
-			]
+			"routes": []
 		}
 	],
 	"contracts": [

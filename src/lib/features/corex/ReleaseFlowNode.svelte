@@ -25,7 +25,12 @@
 		<p>{node.detail}</p>
 	</div>
 	<footer>{node.meta}</footer>
-	<Handle type="source" position={Position.Right} class="port" />
+	{#if node.kind === 'decision'}
+		<Handle id="true" type="source" position={Position.Right} class="port branch-port true-port" />
+		<Handle id="false" type="source" position={Position.Right} class="port branch-port false-port" />
+	{:else if node.kind !== 'terminal'}
+		<Handle id="next" type="source" position={Position.Right} class="port" />
+	{/if}
 </article>
 
 <style>
@@ -52,5 +57,7 @@
 	p { margin: 0; color: #6e6e73; font-size: 10px; line-height: 1.45; }
 	footer { padding: 8px 14px; border-top: 1px solid rgb(60 60 67 / 9%); color: #8e8e93; background: #fbfbfc; font: 700 9px/1 'Manrope', sans-serif; text-transform: uppercase; }
 	:global(.port) { width: 12px !important; height: 12px !important; border: 3px solid #fff !important; background: #007aff !important; box-shadow: 0 0 0 1px rgb(0 122 255 / 65%), 0 2px 5px rgb(0 0 0 / 16%); }
+	:global(.branch-port.true-port) { top: 38%; background: #34c759 !important; box-shadow: 0 0 0 1px rgb(52 199 89 / 70%), 0 2px 5px rgb(0 0 0 / 16%); }
+	:global(.branch-port.false-port) { top: 68%; background: #ff453a !important; box-shadow: 0 0 0 1px rgb(255 69 58 / 70%), 0 2px 5px rgb(0 0 0 / 16%); }
 	@keyframes spin { to { transform: rotate(360deg); } }
 </style>
