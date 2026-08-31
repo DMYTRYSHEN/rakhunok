@@ -30,6 +30,14 @@ function graphPlan(nodes, entryNodeId = nodes[0].id) {
 	};
 }
 
+function durableWorkflow() {
+	return {
+		async do(_name, optionsOrCallback, callback) {
+			return (callback ?? optionsOrCallback)();
+		}
+	};
+}
+
 test('executes an HTTP action with JSON input and an idempotency key', async () => {
 	let captured;
 	const result = await executeHttpAction(action(), { paymentId: 42, amount: 100 }, async (url, init) => {
@@ -160,6 +168,37 @@ test('executes a plan with deterministic durable lifecycle events', async () => 
 		[3, 'complete', 'run_completed']
 	]);
 	assert.deepEqual(result, { accepted: true });
+});
+
+test('projects the completed run output through the success terminal expression', async () => {
+	const events = [];
+	const plan = graphPlan([
+		{
+			id: 'shape', name: 'shape-input', type: 'transform', next: 'done',
+			config: { mode: 'merge', mappings: { result: '$.payment' } }
+		}
+	]);
+	plan.nodes.at(-1).config.outputExpression = '$.result';
+
+	const output = await executeCorexWorkflow(
+		{ runId: 'run-1', ownerUserId: 'user-1', input: { payment: { id: 'pay-42' }, internal: true }, plan },
+		durableWorkflow(),
+		async (event) => events.push(event)
+	);
+
+	assert.deepEqual(output, { id: 'pay-42' });
+	assert.deepEqual(events.at(-1).output, { id: 'pay-42' });
+});
+
+test('returns the complete context when the success terminal has no output expression', async () => {
+	const input = { payment: { id: 'pay-42' } };
+	const output = await executeCorexWorkflow(
+		{ runId: 'run-1', ownerUserId: 'user-1', input, plan: graphPlan([] , 'done') },
+		durableWorkflow(),
+		async () => undefined
+	);
+
+	assert.deepEqual(output, input);
 });
 
 test('transforms context, selects a condition branch, and performs a durable wait', async () => {

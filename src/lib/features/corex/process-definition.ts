@@ -111,6 +111,7 @@ export type ProcessValidationCode =
 	| 'invalid-http-path'
 	| 'invalid-http-url'
 	| 'invalid-condition'
+	| 'invalid-output-expression'
 	| 'invalid-retry-limit'
 	| 'invalid-revision'
 	| 'invalid-timeout'
@@ -237,6 +238,9 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			if (!JSON_PATH.test(node.config.path) || (node.config.operator !== 'exists' && !Object.hasOwn(node.config, 'value'))) {
 				issues.push({ code: 'invalid-condition', message: 'Conditions require a safe JSON path and a comparison value.', nodeId: node.id });
 			}
+		}
+		if (node.type === 'end-success' && node.config.outputExpression !== undefined && !JSON_PATH.test(node.config.outputExpression)) {
+			issues.push({ code: 'invalid-output-expression', message: 'Success output requires a safe JSON path.', nodeId: node.id });
 		}
 		if (node.type === 'wait' && (!Number.isInteger(node.config.durationMs) || node.config.durationMs < 1 || node.config.durationMs > 31_536_000_000)) {
 			issues.push({ code: 'invalid-wait', message: 'Wait duration must be between 1 ms and 365 days.', nodeId: node.id });

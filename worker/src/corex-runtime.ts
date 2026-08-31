@@ -227,13 +227,19 @@ export async function executeCorexWorkflow(
 	let context = params.input;
 	let currentNodeId: string | undefined = params.plan.entryNodeId;
 	let currentStep: CorexExecutionStep | undefined;
+	let output: unknown;
 	let sequence = 1;
 	let traversalIndex = 0;
 	try {
 		while (currentNodeId) {
 			currentStep = nodesById.get(currentNodeId);
 			if (!currentStep) throw new Error(`Execution step "${currentNodeId}" does not exist.`);
-			if (currentStep.type === 'end-success') break;
+			if (currentStep.type === 'end-success') {
+				output = currentStep.config.outputExpression
+					? resolveJsonPath(currentStep.config.outputExpression, context)
+					: context;
+				break;
+			}
 			if (traversalIndex >= params.plan.nodes.length) throw new Error('Execution traversal exceeded the compiled graph.');
 
 			const step = currentStep;
@@ -345,8 +351,8 @@ export async function executeCorexWorkflow(
 			status: 'complete',
 			eventType: 'run_completed',
 			payload: {},
-			output: context
+			output
 		}))
 	);
-	return context;
+	return output;
 }

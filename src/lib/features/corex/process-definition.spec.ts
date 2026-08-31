@@ -57,6 +57,21 @@ describe('validateProcessDefinition', () => {
 		expect(validateProcessDefinition(validDefinition())).toEqual({ valid: true, issues: [] });
 	});
 
+	it('rejects unsafe success output expressions', () => {
+		const definition = validDefinition();
+		const terminal = definition.nodes[2];
+		if (terminal.type !== 'end-success') throw new Error('Expected success terminal fixture.');
+		terminal.config.outputExpression = 'forward.response';
+
+		const result = validateProcessDefinition(definition);
+		expect(result.valid).toBe(false);
+		expect(result.issues).toContainEqual({
+			code: 'invalid-output-expression',
+			message: 'Success output requires a safe JSON path.',
+			nodeId: 'success'
+		});
+	});
+
 	it('rejects cycles and nodes that are unreachable from the trigger', () => {
 		const definition = validDefinition();
 		definition.nodes.push({
