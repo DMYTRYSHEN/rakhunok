@@ -32,6 +32,10 @@
 			: (`/dashboard/invoices/${invoiceId}` as '/');
 	}
 
+	function cancellationFor(invoice: InvoiceRecord) {
+		return buildLegacyInvoiceCancellation(invoice, demo ? new Date(invoice.createdAt) : new Date());
+	}
+
 	async function cancel(invoiceId: string) {
 		if (!onCancel || cancellingId || !confirm('Скасувати цей рахунок?')) return;
 		cancellingId = invoiceId;
@@ -121,7 +125,7 @@
 
 		<div class="divide-y divide-zinc-100 md:hidden" data-testid="mobile-invoice-list">
 			{#each visibleInvoices as invoice (invoice.id)}
-				{@const cancellation = buildLegacyInvoiceCancellation(invoice)}
+				{@const cancellation = cancellationFor(invoice)}
 				<div class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 p-4">
 					<div class="min-w-0">
 						<a
@@ -170,7 +174,7 @@
 				</thead>
 				<tbody class="divide-y divide-zinc-100">
 					{#each visibleInvoices as invoice (invoice.id)}
-						{@const cancellation = buildLegacyInvoiceCancellation(invoice)}
+						{@const cancellation = cancellationFor(invoice)}
 						<tr class="group hover:bg-zinc-50">
 							<td class="px-5 py-4">
 								<a href={resolve(detailHref(invoice.id))} class="block">

@@ -34,13 +34,13 @@
 	<footer>
 		<span class="meta-badge">{node.meta}</span>
 	</footer>
-	{#if node.workflow?.type === 'switch'}
+	{#if node.workflow?.type === 'switch' || node.workflow?.type === 'loop' || (node.workflow?.type === 'parallel' && (node.workflow?.branches?.length ?? 0) > 0)}
 		{#each node.workflow.branches ?? [] as branch, index (branch)}
 			<Handle
 				id={branch}
 				type="source"
 				position={Position.Right}
-				class={`port branch-port switch-port${branch === 'default' ? ' default-port' : ''}`}
+				class={`port branch-port switch-port${branch === 'default' || branch === 'exit' ? ' default-port' : ''}`}
 				style={`top: ${((index + 1) / ((node.workflow?.branches?.length ?? 0) + 1)) * 100}%`}
 				title={branch}
 			/>

@@ -71,6 +71,15 @@ const parentCallbackOutboxMigration = readFileSync(
 	),
 	'utf8'
 ).toLowerCase();
+const stepAttemptsMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/20260901083622_corex_step_attempts.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
 const outboxDeadLettersMigration = readFileSync(
 	fileURLToPath(
 		new URL(
@@ -727,5 +736,20 @@ describe('Corex control-plane migration', () => {
 		expect(migration).toContain(
 			'revoke all on function public.corex_record_run_event(uuid, uuid, integer, public.corex_run_status, text, text, jsonb, jsonb, jsonb) from public, anon, authenticated'
 		);
+	});
+
+	it('stores owner-readable HTTP attempts through an idempotent service-only RPC', () => {
+		expect(stepAttemptsMigration).toContain('create table public.corex_step_attempts');
+		expect(stepAttemptsMigration).toContain(
+			'primary key (run_id, execution_generation, step_id, visit, attempt)'
+		);
+		expect(stepAttemptsMigration).toContain('alter table public.corex_step_attempts enable row level security');
+		expect(stepAttemptsMigration).toContain('using (owner_user_id = (select auth.uid()))');
+		expect(stepAttemptsMigration).toContain('on conflict (run_id, execution_generation, step_id, visit, attempt) do nothing');
+		expect(stepAttemptsMigration).toContain("raise exception 'conflicting corex step attempt'");
+		expect(stepAttemptsMigration).toMatch(
+			/grant execute on function public\.corex_record_step_attempt\(\s*uuid, uuid, integer, text, integer, text, integer, timestamptz, timestamptz,\s*text, jsonb, jsonb, jsonb\s*\) to service_role/
+		);
+		expect(stepAttemptsMigration).not.toContain('security definer');
 	});
 });

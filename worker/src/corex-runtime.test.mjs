@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { executeCorexWorkflow, executeHttpAction, recordCorexRunEvent } from './corex-runtime.ts';
+import {
+	executeCorexWorkflow,
+	executeHttpAction,
+	recordCorexRunEvent,
+	recordCorexStepAttempt
+} from './corex-runtime.ts';
 
 function action(overrides = {}) {
 	return {
@@ -55,6 +60,7 @@ test('executes an HTTP action with JSON input and an idempotency key', async () 
 	assert.deepEqual(result, {
 		status: 202,
 		contentType: 'application/json',
+		bytes: 17,
 		body: { accepted: true }
 	});
 });
@@ -81,6 +87,158 @@ test('rejects response bodies larger than the durable output limit', async () =>
 		executeHttpAction(action(), {}, async () => new Response('x'.repeat(64 * 1024 + 1))),
 		/exceeds 64 KiB/
 	);
+});
+
+test('records HTTP retry attempts with stable identity and sanitized metadata', async () => {
+	const attempts = [];
+	let requestCount = 0;
+	const workflow = {
+		async do(_name, optionsOrCallback, callback) {
+			const operation = callback ?? optionsOrCallback;
+			if (!callback) return operation({ step: { name: _name, count: 1 }, attempt: 1, config: {} });
+			try {
+				return await operation({ step: { name: _name, count: 1 }, attempt: 1, config: {} });
+			} catch {
+				return operation({ step: { name: _name, count: 1 }, attempt: 2, config: {} });
+			}
+		}
+	};
+
+	const result = await executeCorexWorkflow(
+		{
+			runId: 'run-1',
+			ownerUserId: 'user-1',
+			input: { paymentId: 'pay-42' },
+			plan: graphPlan([action()])
+		},
+		workflow,
+		async () => undefined,
+		async () => {
+			requestCount += 1;
+			return requestCount === 1
+				? new Response('private upstream failure', { status: 503 })
+				: Response.json({ accepted: true }, { status: 202 });
+		},
+		undefined,
+		undefined,
+		4,
+		async (attempt) => attempts.push(attempt)
+	);
+
+	assert.deepEqual(result, { accepted: true });
+	assert.equal(attempts.length, 2);
+	assert.deepEqual(
+		attempts.map(({ startedAt, finishedAt, ...attempt }) => attempt),
+		[
+			{
+				runId: 'run-1',
+				ownerUserId: 'user-1',
+				executionGeneration: 4,
+				stepId: 'forward',
+				visit: 0,
+				durableStepName: 'forward-payment',
+				attempt: 1,
+				outcome: 'failed',
+				retry: { limit: 3, backoff: 'exponential', timeoutMs: 30_000 },
+				error: { code: 'http_action_failed' }
+			},
+			{
+				runId: 'run-1',
+				ownerUserId: 'user-1',
+				executionGeneration: 4,
+				stepId: 'forward',
+				visit: 0,
+				durableStepName: 'forward-payment',
+				attempt: 2,
+				outcome: 'complete',
+				retry: { limit: 3, backoff: 'exponential', timeoutMs: 30_000 },
+				output: { status: 202, contentType: 'application/json', bytes: 17 }
+			}
+		]
+	);
+	assert.equal(JSON.stringify(attempts).includes('private upstream failure'), false);
+	assert.equal(attempts.every((attempt) => Date.parse(attempt.finishedAt) >= Date.parse(attempt.startedAt)), true);
+});
+
+test('ignores an attempt recorder failure after one successful HTTP side effect', async () => {
+	let requestCount = 0;
+	const result = await executeCorexWorkflow(
+		{ runId: 'run-1', ownerUserId: 'user-1', input: {}, plan: graphPlan([action()]) },
+		{
+			async do(name, optionsOrCallback, callback) {
+				return (callback ?? optionsOrCallback)({
+					step: { name, count: 1 }, attempt: 1, config: {}
+				});
+			}
+		},
+		async () => undefined,
+		async () => {
+			requestCount += 1;
+			return Response.json({ accepted: true });
+		},
+		undefined,
+		undefined,
+		1,
+		async () => {
+			throw new Error('telemetry unavailable');
+		}
+	);
+
+	assert.deepEqual(result, { accepted: true });
+	assert.equal(requestCount, 1);
+});
+
+test('preserves the HTTP action failure when failed-attempt recording also fails', async () => {
+	await assert.rejects(
+		executeCorexWorkflow(
+			{ runId: 'run-1', ownerUserId: 'user-1', input: {}, plan: graphPlan([action()]) },
+			{
+				async do(name, optionsOrCallback, callback) {
+					return (callback ?? optionsOrCallback)({
+						step: { name, count: 1 }, attempt: 1, config: {}
+					});
+				}
+			},
+			async () => undefined,
+			async () => new Response('private upstream failure', { status: 503 }),
+			undefined,
+			undefined,
+			1,
+			async () => {
+				throw new Error('telemetry unavailable');
+			}
+		),
+		/HTTP action failed with status 503/
+	);
+});
+
+test('records a step attempt through the service-only RPC', async () => {
+	let request;
+	await recordCorexStepAttempt(
+		{ url: 'https://project.supabase.co/', serviceRoleKey: 'secret' },
+		{
+			runId: 'run-1', ownerUserId: 'user-1', executionGeneration: 2,
+			stepId: 'forward', visit: 3, durableStepName: 'forward-payment [visit 3]', attempt: 2,
+			startedAt: '2026-09-01T08:00:00.000Z', finishedAt: '2026-09-01T08:00:01.000Z',
+			outcome: 'complete', retry: { limit: 3, backoff: 'exponential', timeoutMs: 30_000 },
+			output: { status: 202, contentType: 'application/json', bytes: 17 }
+		},
+		async (url, init) => {
+			request = { url, init };
+			return Response.json({ accepted: true });
+		}
+	);
+
+	assert.equal(request.url, 'https://project.supabase.co/rest/v1/rpc/corex_record_step_attempt');
+	assert.equal(request.init.headers.Authorization, 'Bearer secret');
+	assert.deepEqual(JSON.parse(request.init.body), {
+		p_run_id: 'run-1', p_owner_user_id: 'user-1', p_execution_generation: 2,
+		p_step_id: 'forward', p_visit: 3, p_durable_step_name: 'forward-payment [visit 3]',
+		p_attempt: 2, p_started_at: '2026-09-01T08:00:00.000Z',
+		p_finished_at: '2026-09-01T08:00:01.000Z', p_outcome: 'complete',
+		p_retry: { limit: 3, backoff: 'exponential', timeoutMs: 30_000 },
+		p_output: { status: 202, contentType: 'application/json', bytes: 17 }, p_error: null
+	});
 });
 
 test('records a run lifecycle event through the service-only RPC', async () => {
@@ -175,6 +333,101 @@ test('executes a plan with deterministic durable lifecycle events', async () => 
 		]
 	);
 	assert.deepEqual(result, { accepted: true });
+});
+
+test('executes parallel branches concurrently and merges results in configured order', async () => {
+	const durableSteps = [];
+	const events = [];
+	const releases = new Map();
+	const started = [];
+	const plan = graphPlan([
+		{
+			id: 'parallel',
+			name: 'prepare-payment',
+			type: 'parallel',
+			config: { branches: [{ id: 'risk' }, { id: 'receipt' }], resultKey: 'preparation' },
+			branchTargets: { risk: 'risk', receipt: 'receipt' },
+			joinTarget: 'join',
+			continuationTarget: 'finish'
+		},
+		{
+			id: 'risk',
+			name: 'calculate-risk',
+			type: 'http-request',
+			config: {
+				method: 'POST',
+				url: 'https://api.example.com/risk',
+				timeoutMs: 30_000,
+				retry: { limit: 1, backoff: 'constant' }
+			},
+			next: 'join'
+		},
+		{
+			id: 'receipt',
+			name: 'prepare-receipt',
+			type: 'http-request',
+			config: {
+				method: 'POST',
+				url: 'https://api.example.com/receipt',
+				timeoutMs: 30_000,
+				retry: { limit: 1, backoff: 'constant' }
+			},
+			next: 'join'
+		},
+		{
+			id: 'finish',
+			name: 'finish-payment',
+			type: 'transform',
+			config: { mode: 'merge', mappings: { finished: '$.paymentId' } },
+			next: 'done'
+		}
+	]);
+
+	const execution = executeCorexWorkflow(
+		{ runId: 'run-parallel', ownerUserId: 'user-1', input: { paymentId: 'pay-42' }, plan },
+		{
+			async do(name, optionsOrCallback, callback) {
+				durableSteps.push(name);
+				return (callback ?? optionsOrCallback)();
+			}
+		},
+		async (event) => events.push(event),
+		async (url, init) => {
+			const branch = url.endsWith('/risk') ? 'risk' : 'receipt';
+			started.push(branch);
+			assert.deepEqual(JSON.parse(init.body), { paymentId: 'pay-42' });
+			await new Promise((resolve) => releases.set(branch, resolve));
+			return Response.json({ branch });
+		}
+	);
+
+	while (started.length < 2) await new Promise((resolve) => setImmediate(resolve));
+	assert.deepEqual(started, ['risk', 'receipt']);
+	assert.equal(events.some((event) => event.eventType === 'run_completed'), false);
+	for (const branch of ['receipt', 'risk']) releases.get(branch)();
+
+	const output = await execution;
+	assert.deepEqual(Object.keys(output.preparation), ['risk', 'receipt']);
+	assert.deepEqual(output, {
+		paymentId: 'pay-42',
+		preparation: {
+			risk: { branch: 'risk' },
+			receipt: { branch: 'receipt' }
+		},
+		finished: 'pay-42'
+	});
+	assert.equal(events.filter((event) => event.stepName === 'finish-payment').length, 2);
+	assert.deepEqual(events[2].payload.branches, ['risk', 'receipt']);
+	assert.deepEqual(events[2].payload.starts, [
+		{ id: 'risk', index: 0 },
+		{ id: 'receipt', index: 1 }
+	]);
+	assert.deepEqual(events[2].payload.resolves, [
+		{ id: 'receipt', index: 0 },
+		{ id: 'risk', index: 1 }
+	]);
+	assert.equal(durableSteps.includes('prepare-payment:parallel-risk:calculate-risk'), true);
+	assert.equal(durableSteps.includes('prepare-payment:parallel-receipt:prepare-receipt'), true);
 });
 
 test('projects the completed run output through the success terminal expression', async () => {
@@ -334,6 +587,87 @@ test('selects typed switch cases and falls back to the default route', async () 
 
 	assert.equal(matched, 'matched');
 	assert.equal(defaulted, 'default');
+});
+
+test('executes bounded loops with deterministic visit identities', async () => {
+	const durableSteps = [];
+	const events = [];
+	const plan = graphPlan([
+		{
+			id: 'loop',
+			name: 'bounded-loop',
+			type: 'loop',
+			config: { maxIterations: 3 },
+			bodyTarget: 'body',
+			exitTarget: 'done'
+		},
+		{
+			id: 'body',
+			name: 'loop-body',
+			type: 'transform',
+			config: { mode: 'merge', mappings: { value: '$.value' } },
+			next: 'loop'
+		}
+	]);
+
+	const output = await executeCorexWorkflow(
+		{ runId: 'run-loop', ownerUserId: 'user-1', input: { value: 42 }, plan },
+		{
+			async do(name, optionsOrCallback, callback) {
+				durableSteps.push(name);
+				return (callback ?? optionsOrCallback)();
+			}
+		},
+		async (event) => events.push(event)
+	);
+
+	assert.deepEqual(output, { value: 42 });
+	assert.deepEqual(
+		durableSteps.filter((name) => name === 'bounded-loop' || name.startsWith('bounded-loop:')),
+		[
+			'bounded-loop',
+			'bounded-loop:visit-1',
+			'bounded-loop:visit-2',
+			'bounded-loop:visit-3'
+		]
+	);
+	assert.equal(events.filter((event) => event.stepName === 'loop-body').length, 6);
+});
+
+test('break exits its referenced loop immediately', async () => {
+	const visited = [];
+	const plan = graphPlan([
+		{
+			id: 'loop',
+			name: 'bounded-loop',
+			type: 'loop',
+			config: { maxIterations: 10 },
+			bodyTarget: 'break',
+			exitTarget: 'done'
+		},
+		{
+			id: 'break',
+			name: 'leave-loop',
+			type: 'break',
+			loopId: 'loop',
+			exitTarget: 'done'
+		}
+	]);
+
+	await executeCorexWorkflow(
+		{ runId: 'run-break', ownerUserId: 'user-1', input: {}, plan },
+		{
+			async do(name, optionsOrCallback, callback) {
+				visited.push(name);
+				return (callback ?? optionsOrCallback)();
+			}
+		},
+		async () => undefined
+	);
+
+	assert.ok(visited.includes('bounded-loop'));
+	assert.ok(visited.includes('leave-loop'));
+	assert.equal(visited.some((name) => name.startsWith('bounded-loop:visit-')), false);
 });
 
 test('performs an absolute durable wait and records it as waiting', async () => {
@@ -677,6 +1011,48 @@ test('records a sanitized terminal event when a process step fails', async () =>
 		error: { code: 'process_step_failed', stepId: 'forward' }
 	});
 	assert.equal(JSON.stringify(events).includes('secret response'), false);
+});
+
+test('ends a process through an explicit failure terminal without duplicate lifecycle events', async () => {
+	const events = [];
+	const plan = graphPlan([
+		{
+			id: 'failure',
+			name: 'reject-payment',
+			type: 'end-failure',
+			config: { code: 'payment_rejected', message: 'Payment policy rejected the request.' }
+		}
+	]);
+
+	await assert.rejects(
+		executeCorexWorkflow(
+			{ runId: 'run-1', ownerUserId: 'user-1', input: {}, plan },
+			durableWorkflow(),
+			async (event) => events.push(event)
+		),
+		/Payment policy rejected the request\./
+	);
+
+	assert.deepEqual(events, [
+		{
+			runId: 'run-1',
+			ownerUserId: 'user-1',
+			sequence: 0,
+			status: 'running',
+			eventType: 'run_started',
+			payload: {}
+		},
+		{
+			runId: 'run-1',
+			ownerUserId: 'user-1',
+			sequence: 1,
+			status: 'errored',
+			eventType: 'run_failed',
+			stepName: 'reject-payment',
+			payload: { message: 'Payment policy rejected the request.' },
+			error: { code: 'payment_rejected', stepId: 'failure' }
+		}
+	]);
 });
 
 test('waits for and audits a validated human approval decision', async () => {

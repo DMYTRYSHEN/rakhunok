@@ -56,6 +56,21 @@ type RunEventRow = {
 	created_at: string;
 };
 
+type StepAttemptRow = {
+	run_id: string;
+	execution_generation: number;
+	step_id: string;
+	visit: number;
+	durable_step_name: string;
+	attempt: number;
+	started_at: string;
+	finished_at: string;
+	outcome: 'complete' | 'failed';
+	retry: { limit: number; backoff: 'constant' | 'linear' | 'exponential'; timeoutMs: number };
+	output: { status: number; contentType: string | null; bytes: number } | null;
+	error: { code: 'http_action_failed' } | null;
+};
+
 type ApprovalTaskRow = {
 	id: string;
 	run_id: string;
@@ -122,6 +137,21 @@ export type CorexRunEvent = {
 	attempt: number | null;
 	payload: unknown;
 	createdAt: string;
+};
+
+export type CorexStepAttempt = {
+	runId: string;
+	executionGeneration: number;
+	stepId: string;
+	visit: number;
+	durableStepName: string;
+	attempt: number;
+	startedAt: string;
+	finishedAt: string;
+	outcome: StepAttemptRow['outcome'];
+	retry: StepAttemptRow['retry'];
+	output: StepAttemptRow['output'];
+	error: StepAttemptRow['error'];
 };
 
 export type CorexApprovalTask = {
@@ -286,6 +316,33 @@ export function createCorexProcessGateway(client: SupabaseClient) {
 				attempt: row.attempt,
 				payload: row.payload,
 				createdAt: row.created_at
+			}));
+		},
+
+		async listStepAttempts(runId: string): Promise<CorexStepAttempt[]> {
+			const { data, error } = await client
+				.from('corex_step_attempts')
+				.select(
+					'run_id, execution_generation, step_id, visit, durable_step_name, attempt, started_at, finished_at, outcome, retry, output, error'
+				)
+				.eq('run_id', runId)
+				.order('execution_generation', { ascending: true })
+				.order('started_at', { ascending: true })
+				.order('attempt', { ascending: true });
+			if (error) throw error;
+			return ((data ?? []) as StepAttemptRow[]).map((row) => ({
+				runId: row.run_id,
+				executionGeneration: row.execution_generation,
+				stepId: row.step_id,
+				visit: row.visit,
+				durableStepName: row.durable_step_name,
+				attempt: row.attempt,
+				startedAt: row.started_at,
+				finishedAt: row.finished_at,
+				outcome: row.outcome,
+				retry: row.retry,
+				output: row.output,
+				error: row.error
 			}));
 		},
 

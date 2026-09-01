@@ -1,6 +1,7 @@
 import {
 	executeCorexWorkflow,
 	recordCorexRunEvent,
+	recordCorexStepAttempt,
 	type CorexInvokeProcessStep,
 	type CorexWorkflowParams
 } from './corex-runtime.ts';
@@ -203,6 +204,7 @@ export async function runCorexProcessWorkflow(
 		fetcher,
 		startSubprocess,
 		terminateSubprocess,
-		executionGeneration
+		executionGeneration,
+		(stepAttempt) => recordCorexStepAttempt(controlPlane, stepAttempt, fetcher)
 	);
 }

@@ -177,6 +177,51 @@ describe('Corex process gateway', () => {
 		});
 	});
 
+	it('lists step attempts in deterministic execution order', async () => {
+		const builder = query({
+			data: [
+				{
+					run_id: 'run-1',
+					execution_generation: 3,
+					step_id: 'forward',
+					visit: 2,
+					durable_step_name: 'forward-payment [visit 2]',
+					attempt: 2,
+					started_at: '2026-09-01T08:00:00.000Z',
+					finished_at: '2026-09-01T08:00:01.000Z',
+					outcome: 'complete',
+					retry: { limit: 3, backoff: 'exponential', timeoutMs: 30_000 },
+					output: { status: 202, contentType: 'application/json', bytes: 17 },
+					error: null
+				}
+			],
+			error: null
+		});
+		const client = { from: vi.fn(() => builder) } as unknown as SupabaseClient;
+
+		const result = await createCorexProcessGateway(client).listStepAttempts('run-1');
+
+		expect(client.from).toHaveBeenCalledWith('corex_step_attempts');
+		expect(builder.eq).toHaveBeenCalledWith('run_id', 'run-1');
+		expect(builder.order).toHaveBeenNthCalledWith(1, 'execution_generation', { ascending: true });
+		expect(builder.order).toHaveBeenNthCalledWith(2, 'started_at', { ascending: true });
+		expect(builder.order).toHaveBeenNthCalledWith(3, 'attempt', { ascending: true });
+		expect(result[0]).toEqual({
+			runId: 'run-1',
+			executionGeneration: 3,
+			stepId: 'forward',
+			visit: 2,
+			durableStepName: 'forward-payment [visit 2]',
+			attempt: 2,
+			startedAt: '2026-09-01T08:00:00.000Z',
+			finishedAt: '2026-09-01T08:00:01.000Z',
+			outcome: 'complete',
+			retry: { limit: 3, backoff: 'exponential', timeoutMs: 30_000 },
+			output: { status: 202, contentType: 'application/json', bytes: 17 },
+			error: null
+		});
+	});
+
 	it('lists approval tasks assigned to the authenticated user', async () => {
 		const builder = query({
 			data: [

@@ -1,9 +1,13 @@
 import {
 	type ApprovalNode,
 	type ConditionNode,
+	type BreakNode,
 	type EventWaitNode,
+	type FailureNode,
 	type HttpRequestNode,
 	type InvokeProcessNode,
+	type LoopNode,
+	type ParallelNode,
 	type ProcessDefinition,
 	type SuccessNode,
 	type SwitchNode,
@@ -59,11 +63,41 @@ export type SwitchExecutionNode = {
 	targets: Record<string, string>;
 	defaultTarget: string;
 };
+export type LoopExecutionNode = {
+	id: string;
+	name: string;
+	type: 'loop';
+	config: LoopNode['config'];
+	bodyTarget: string;
+	exitTarget: string;
+};
+export type BreakExecutionNode = {
+	id: string;
+	name: string;
+	type: 'break';
+	loopId: BreakNode['config']['loopId'];
+	exitTarget: string;
+};
+export type ParallelExecutionNode = {
+	id: string;
+	name: string;
+	type: 'parallel';
+	config: ParallelNode['config'];
+	branchTargets: Record<string, string>;
+	joinTarget: string;
+	continuationTarget: string;
+};
 export type SuccessExecutionNode = {
 	id: string;
 	name: string;
 	type: 'end-success';
 	config: SuccessNode['config'];
+};
+export type FailureExecutionNode = {
+	id: string;
+	name: string;
+	type: 'end-failure';
+	config: FailureNode['config'];
 };
 export type ProcessExecutionNode =
 	| HttpExecutionNode
@@ -75,7 +109,11 @@ export type ProcessExecutionNode =
 	| TransformExecutionNode
 	| ConditionExecutionNode
 	| SwitchExecutionNode
-	| SuccessExecutionNode;
+	| LoopExecutionNode
+	| BreakExecutionNode
+	| ParallelExecutionNode
+	| SuccessExecutionNode
+	| FailureExecutionNode;
 
 export type ProcessExecutionPlan = {
 	schemaVersion: 1;
@@ -110,8 +148,12 @@ export function compileProcessDefinition(definition: ProcessDefinition): Process
 	for (const node of definition.nodes) {
 		if (
 			node.type === 'end-success' ||
+			node.type === 'end-failure' ||
 			node.type === 'condition' ||
 			node.type === 'switch' ||
+			node.type === 'loop' ||
+			node.type === 'break' ||
+			node.type === 'parallel' ||
 			node.type === 'approval'
 		)
 			continue;
@@ -128,6 +170,10 @@ export function compileProcessDefinition(definition: ProcessDefinition): Process
 	for (const node of definition.nodes) {
 		if (node.type === 'trigger-http') continue;
 		if (node.type === 'end-success') {
+			nodes.push({ id: node.id, name: node.name, type: node.type, config: { ...node.config } });
+			continue;
+		}
+		if (node.type === 'end-failure') {
 			nodes.push({ id: node.id, name: node.name, type: node.type, config: { ...node.config } });
 			continue;
 		}
@@ -160,6 +206,54 @@ export function compileProcessDefinition(definition: ProcessDefinition): Process
 			});
 			continue;
 		}
+		if (node.type === 'loop') {
+			const branches = targetsById.get(node.id) ?? [];
+			nodes.push({
+				id: node.id,
+				name: node.name,
+				type: node.type,
+				config: { ...node.config },
+				bodyTarget: branches.find((edge) => edge.loop === 'body')!.target,
+				exitTarget: branches.find((edge) => edge.loop === 'exit')!.target
+			});
+			continue;
+		}
+		if (node.type === 'break') {
+			const loopBranches = targetsById.get(node.config.loopId) ?? [];
+			nodes.push({
+				id: node.id,
+				name: node.name,
+				type: node.type,
+				loopId: node.config.loopId,
+				exitTarget: loopBranches.find((edge) => edge.loop === 'exit')!.target
+			});
+			continue;
+		}
+		if (node.type === 'parallel') {
+			const branches = targetsById.get(node.id) ?? [];
+			const join = definition.nodes.find(
+				(candidate) => candidate.type === 'parallel-join' && candidate.config.parallelId === node.id
+			)!;
+			nodes.push({
+				id: node.id,
+				name: node.name,
+				type: node.type,
+				config: {
+					branches: node.config.branches.map((branch) => ({ ...branch })),
+					resultKey: node.config.resultKey
+				},
+				branchTargets: Object.fromEntries(
+					node.config.branches.map((branch) => [
+						branch.id,
+						branches.find((edge) => edge.parallel === branch.id)!.target
+					])
+				),
+				joinTarget: join.id,
+				continuationTarget: targetsById.get(join.id)![0].target
+			});
+			continue;
+		}
+		if (node.type === 'parallel-join') continue;
 		if (node.type === 'approval') {
 			const branches = targetsById.get(node.id) ?? [];
 			nodes.push({

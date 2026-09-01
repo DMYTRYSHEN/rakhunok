@@ -29,7 +29,7 @@ The editor must represent the node types parsed by the Cloudflare Workflows visu
 - `FunctionCall`
 - `BreakNode`
 
-Nested conditions, loops, blocks, and functions need collapsed and expanded views. Parallel layout is derived from `starts` and `resolves` execution indices. A graph node ID is an editor identity; a Cloudflare step name is a deterministic runtime cache key and must be validated separately.
+Nested conditions, loops, blocks, and functions need collapsed and expanded views. Parallel layout is derived from the fork completion payload's configured `starts` and observed `resolves` execution indices. Concurrent waits, approvals, and subprocesses inside parallel branches remain invalid until branch-aware waiting and cancellation semantics are defined. A graph node ID is an editor identity; a Cloudflare step name is a deterministic runtime cache key and must be validated separately.
 
 ### No-code node catalog
 
@@ -57,9 +57,11 @@ These are editor primitives, not all native `WorkflowStep` methods. Code generat
 | DB / KV / HTTP / Transform | Granular `step.do()` callback using the configured binding or `fetch()` |
 | Invoke Sub-Flow | `step.do()` calling another Workflow binding's `create()`; child runs independently |
 | Success | Return a serializable value from `run()` |
-| Abort / Fail | Throw `NonRetryableError` for an intentional non-retryable failure, or propagate an error |
+| Abort / Fail | Emit one sanitized `run_failed` event with the configured public code/message, then terminate execution without step completion or continuation |
 
 There is no current `step.run()` or `step.doWhile()` API. The compiler must emit `step.do()` and native JavaScript loops. Retry policy is an inspector capability on durable action nodes rather than a standalone executable node.
+
+Failure terminals use `{ code, message }`: `code` is a safe public identifier and `message` is a public description limited to 200 characters. They cannot have outgoing edges. Like success terminals, failure terminals are not valid inside parallel branch regions; every parallel branch must reach its matching join.
 
 ## Node configuration contract
 

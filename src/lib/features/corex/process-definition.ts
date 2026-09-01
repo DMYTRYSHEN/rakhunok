@@ -42,6 +42,14 @@ export type SuccessNode = ProcessNodeBase & {
 	};
 };
 
+export type FailureNode = ProcessNodeBase & {
+	type: 'end-failure';
+	config: {
+		code: string;
+		message: string;
+	};
+};
+
 export type ConditionNode = ProcessNodeBase & {
 	type: 'condition';
 	config: {
@@ -59,6 +67,35 @@ export type SwitchNode = ProcessNodeBase & {
 			id: string;
 			value: string | number | boolean | null;
 		}>;
+	};
+};
+
+export type LoopNode = ProcessNodeBase & {
+	type: 'loop';
+	config: {
+		maxIterations: number;
+	};
+};
+
+export type BreakNode = ProcessNodeBase & {
+	type: 'break';
+	config: {
+		loopId: string;
+	};
+};
+
+export type ParallelNode = ProcessNodeBase & {
+	type: 'parallel';
+	config: {
+		branches: Array<{ id: string }>;
+		resultKey: string;
+	};
+};
+
+export type ParallelJoinNode = ProcessNodeBase & {
+	type: 'parallel-join';
+	config: {
+		parallelId: string;
 	};
 };
 
@@ -113,13 +150,18 @@ export type ProcessNode =
 	| HttpRequestNode
 	| ConditionNode
 	| SwitchNode
+	| LoopNode
+	| BreakNode
+	| ParallelNode
+	| ParallelJoinNode
 	| WaitNode
 	| WaitUntilNode
 	| EventWaitNode
 	| ApprovalNode
 	| TransformNode
 	| InvokeProcessNode
-	| SuccessNode;
+	| SuccessNode
+	| FailureNode;
 
 export type ProcessEdge = {
 	id: string;
@@ -127,6 +169,9 @@ export type ProcessEdge = {
 	target: string;
 	when?: boolean;
 	case?: string;
+	loop?: 'body' | 'exit';
+	loopBack?: string;
+	parallel?: string;
 };
 
 export type ProcessDefinition = {
@@ -145,11 +190,15 @@ export type ProcessValidationCode =
 	| 'duplicate-node-id'
 	| 'duplicate-node-name'
 	| 'invalid-edge'
+	| 'invalid-failure'
 	| 'invalid-http-host'
 	| 'invalid-http-path'
 	| 'invalid-http-url'
 	| 'invalid-approval'
 	| 'invalid-condition'
+	| 'invalid-loop'
+	| 'invalid-break'
+	| 'invalid-parallel'
 	| 'invalid-output-expression'
 	| 'invalid-retry-limit'
 	| 'invalid-revision'
@@ -180,13 +229,18 @@ const NODE_TYPES = new Set([
 	'http-request',
 	'condition',
 	'switch',
+	'loop',
+	'break',
+	'parallel',
+	'parallel-join',
 	'wait',
 	'wait-until',
 	'wait-event',
 	'approval',
 	'transform',
 	'invoke-process',
-	'end-success'
+	'end-success',
+	'end-failure'
 ]);
 const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 const CONDITION_OPERATORS = new Set([
@@ -251,6 +305,18 @@ function isProcessNode(value: unknown): value is ProcessNode {
 						isRecord(item) && typeof item.id === 'string' && isScalar(item.value)
 				)
 			);
+		case 'loop':
+			return typeof config.maxIterations === 'number';
+		case 'break':
+			return typeof config.loopId === 'string';
+		case 'parallel':
+			return (
+				Array.isArray(config.branches) &&
+				config.branches.every((branch) => isRecord(branch) && typeof branch.id === 'string') &&
+				typeof config.resultKey === 'string'
+			);
+		case 'parallel-join':
+			return typeof config.parallelId === 'string';
 		case 'wait':
 			return typeof config.durationMs === 'number';
 		case 'wait-until':
@@ -282,6 +348,8 @@ function isProcessNode(value: unknown): value is ProcessNode {
 			);
 		case 'end-success':
 			return config.outputExpression === undefined || typeof config.outputExpression === 'string';
+		case 'end-failure':
+			return typeof config.code === 'string' && typeof config.message === 'string';
 		default:
 			return false;
 	}
@@ -315,7 +383,10 @@ export function parseProcessDefinition(value: unknown): ProcessDefinition | unde
 				typeof edge.source === 'string' &&
 				typeof edge.target === 'string' &&
 				(edge.when === undefined || typeof edge.when === 'boolean') &&
-				(edge.case === undefined || typeof edge.case === 'string')
+				(edge.case === undefined || typeof edge.case === 'string') &&
+				(edge.loop === undefined || ['body', 'exit'].includes(String(edge.loop))) &&
+				(edge.loopBack === undefined || typeof edge.loopBack === 'string') &&
+				(edge.parallel === undefined || typeof edge.parallel === 'string')
 		)
 	)
 		return undefined;
@@ -414,10 +485,10 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			message: 'A process must have exactly one HTTP trigger.'
 		});
 	}
-	if (!definition.nodes.some((node) => node.type === 'end-success')) {
+	if (!definition.nodes.some((node) => node.type === 'end-success' || node.type === 'end-failure')) {
 		issues.push({
 			code: 'missing-terminal',
-			message: 'A process must have at least one success terminal.'
+			message: 'A process must have at least one terminal.'
 		});
 	}
 
@@ -501,6 +572,48 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			}
 		}
 		if (
+			node.type === 'loop' &&
+			(!Number.isSafeInteger(node.config.maxIterations) ||
+				node.config.maxIterations < 1 ||
+				node.config.maxIterations > 1_000)
+		) {
+			issues.push({
+				code: 'invalid-loop',
+				message: 'Loops require an iteration limit from 1 to 1000.',
+				nodeId: node.id
+			});
+		}
+		if (node.type === 'break' && !nodeIds.has(node.config.loopId)) {
+			issues.push({
+				code: 'invalid-break',
+				message: 'Break nodes must reference an existing loop.',
+				nodeId: node.id
+			});
+		}
+		if (node.type === 'parallel') {
+			const branchIds = node.config.branches.map((branch) => branch.id);
+			if (
+				branchIds.length < 2 ||
+				branchIds.length > 20 ||
+				branchIds.some((id) => !TRANSFORM_KEY.test(id)) ||
+				duplicates(branchIds).size > 0 ||
+				!TRANSFORM_KEY.test(node.config.resultKey)
+			) {
+				issues.push({
+					code: 'invalid-parallel',
+					message: 'Parallel forks require 2 to 20 uniquely named branches and a safe result key.',
+					nodeId: node.id
+				});
+			}
+		}
+		if (node.type === 'parallel-join' && !nodeIds.has(node.config.parallelId)) {
+			issues.push({
+				code: 'invalid-parallel',
+				message: 'Parallel joins must reference an existing fork.',
+				nodeId: node.id
+			});
+		}
+		if (
 			node.type === 'end-success' &&
 			node.config.outputExpression !== undefined &&
 			!JSON_PATH.test(node.config.outputExpression)
@@ -508,6 +621,18 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			issues.push({
 				code: 'invalid-output-expression',
 				message: 'Success output requires a safe JSON path.',
+				nodeId: node.id
+			});
+		}
+		if (
+			node.type === 'end-failure' &&
+			(!TRANSFORM_KEY.test(node.config.code) ||
+				node.config.message.trim().length < 1 ||
+				node.config.message.length > 200)
+		) {
+			issues.push({
+				code: 'invalid-failure',
+				message: 'Failure terminals require a safe error code and a message from 1 to 200 characters.',
 				nodeId: node.id
 			});
 		}
@@ -612,6 +737,24 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			});
 			continue;
 		}
+		const sourceNode = definition.nodes.find((node) => node.id === edge.source);
+		const targetNode = definition.nodes.find((node) => node.id === edge.target);
+		if (
+			(edge.loop !== undefined && sourceNode?.type !== 'loop') ||
+			(edge.parallel !== undefined && sourceNode?.type !== 'parallel') ||
+			(edge.loopBack !== undefined &&
+				(targetNode?.type !== 'loop' || edge.loopBack !== targetNode.id)) ||
+			[edge.when, edge.case, edge.loop, edge.loopBack, edge.parallel].filter(
+				(value) => value !== undefined
+			)
+				.length > 1
+		) {
+			issues.push({
+				code: 'invalid-edge',
+				message: `Edge "${edge.id}" has branch metadata that does not match its nodes.`,
+				edgeId: edge.id
+			});
+		}
 		outgoing.get(edge.source)?.push(edge.target);
 		incoming.set(edge.target, (incoming.get(edge.target) ?? 0) + 1);
 	}
@@ -625,7 +768,9 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			});
 		}
 	}
-	for (const terminal of definition.nodes.filter((node) => node.type === 'end-success')) {
+	for (const terminal of definition.nodes.filter(
+		(node) => node.type === 'end-success' || node.type === 'end-failure'
+	)) {
 		if ((outgoing.get(terminal.id)?.length ?? 0) > 0) {
 			issues.push({
 				code: 'terminal-has-output',
@@ -663,6 +808,132 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			});
 		}
 	}
+	for (const loopNode of definition.nodes.filter((node) => node.type === 'loop')) {
+		const branches = definition.edges.filter((edge) => edge.source === loopNode.id);
+		const backEdges = definition.edges.filter((edge) => edge.loopBack === loopNode.id);
+		const bodyTarget = branches.find((edge) => edge.loop === 'body')?.target;
+		const bodyNodes = new Set<string>();
+		const bodyQueue = bodyTarget ? [bodyTarget] : [];
+		while (bodyQueue.length > 0) {
+			const nodeId = bodyQueue.shift();
+			if (!nodeId || nodeId === loopNode.id || bodyNodes.has(nodeId)) continue;
+			bodyNodes.add(nodeId);
+			bodyQueue.push(
+				...definition.edges
+					.filter((edge) => edge.source === nodeId && edge.loopBack === undefined)
+					.map((edge) => edge.target)
+			);
+		}
+		if (
+			branches.length !== 2 ||
+			branches.filter((edge) => edge.loop === 'body').length !== 1 ||
+			branches.filter((edge) => edge.loop === 'exit').length !== 1 ||
+			backEdges.length < 1 ||
+			backEdges.some((edge) => !bodyNodes.has(edge.source))
+		) {
+			issues.push({
+				code: 'invalid-loop',
+				message: `Loop "${loopNode.name}" requires body and exit branches plus a marked back edge.`,
+				nodeId: loopNode.id
+			});
+		}
+	}
+	for (const breakNode of definition.nodes.filter((node) => node.type === 'break')) {
+		const referencedLoop = definition.nodes.find(
+			(node) => node.id === breakNode.config.loopId && node.type === 'loop'
+		);
+		if (!referencedLoop || (outgoing.get(breakNode.id)?.length ?? 0) !== 0) {
+			issues.push({
+				code: 'invalid-break',
+				message: `Break "${breakNode.name}" must reference a loop and cannot have outgoing edges.`,
+				nodeId: breakNode.id
+			});
+		}
+	}
+	for (const parallelNode of definition.nodes.filter((node) => node.type === 'parallel')) {
+		const branches = definition.edges.filter((edge) => edge.source === parallelNode.id);
+		const branchIds = parallelNode.config.branches.map((branch) => branch.id);
+		const joins = definition.nodes.filter(
+			(node) => node.type === 'parallel-join' && node.config.parallelId === parallelNode.id
+		);
+		const join = joins.length === 1 ? joins[0] : undefined;
+		const branchRegions: Set<string>[] = [];
+		let invalidTopology = !join;
+
+		for (const branchId of branchIds) {
+			const target = branches.find((edge) => edge.parallel === branchId)?.target;
+			const region = new Set<string>();
+			const visiting = new Set<string>();
+			const reachesJoin = new Map<string, boolean>();
+			const reachesOnlyJoin = (nodeId: string): boolean => {
+				if (nodeId === join?.id) return true;
+				if (reachesJoin.has(nodeId)) return reachesJoin.get(nodeId)!;
+				if (visiting.has(nodeId)) return false;
+				const node = definition.nodes.find((candidate) => candidate.id === nodeId);
+				if (
+					!node ||
+					node.type === 'end-success' ||
+					node.type === 'end-failure' ||
+					node.type === 'parallel' ||
+					node.type === 'parallel-join'
+				)
+					return false;
+				if (['wait', 'wait-until', 'wait-event', 'approval', 'invoke-process'].includes(node.type))
+					return false;
+				visiting.add(nodeId);
+				region.add(nodeId);
+				const targets = definition.edges
+					.filter((edge) => edge.source === nodeId && edge.loopBack === undefined)
+					.map((edge) => edge.target);
+				const valid = targets.length > 0 && targets.every(reachesOnlyJoin);
+				visiting.delete(nodeId);
+				reachesJoin.set(nodeId, valid);
+				return valid;
+			};
+			if (!target || !reachesOnlyJoin(target)) invalidTopology = true;
+			branchRegions.push(region);
+		}
+
+		const allBranchNodes = new Set(branchRegions.flatMap((region) => [...region]));
+		if (
+			branches.length !== branchIds.length ||
+			branchIds.some(
+				(branchId) => branches.filter((edge) => edge.parallel === branchId).length !== 1
+			) ||
+			joins.length !== 1 ||
+			branchRegions.some((region, index) =>
+				branchRegions.some(
+					(other, otherIndex) =>
+						index !== otherIndex && [...region].some((nodeId) => other.has(nodeId))
+				)
+			) ||
+			definition.edges.some(
+				(edge) =>
+					allBranchNodes.has(edge.target) &&
+					edge.source !== parallelNode.id &&
+					!allBranchNodes.has(edge.source)
+			) ||
+			invalidTopology
+		) {
+			issues.push({
+				code: 'invalid-parallel',
+				message: `Parallel fork "${parallelNode.name}" requires isolated branches that all resolve at its single join.`,
+				nodeId: parallelNode.id
+			});
+		}
+	}
+	for (const joinNode of definition.nodes.filter((node) => node.type === 'parallel-join')) {
+		const referencedFork = definition.nodes.find(
+			(node) => node.id === joinNode.config.parallelId && node.type === 'parallel'
+		);
+		if (!referencedFork || (outgoing.get(joinNode.id)?.length ?? 0) !== 1) {
+			issues.push({
+				code: 'invalid-parallel',
+				message: `Parallel join "${joinNode.name}" must reference a fork and have one continuation.`,
+				nodeId: joinNode.id
+			});
+		}
+	}
 	for (const approval of definition.nodes.filter((node) => node.type === 'approval')) {
 		const branches = definition.edges.filter((edge) => edge.source === approval.id);
 		if (
@@ -688,13 +959,19 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 		}
 		if (visited.has(nodeId)) return;
 		visiting.add(nodeId);
-		for (const target of outgoing.get(nodeId) ?? []) visit(target);
+		for (const edge of definition.edges.filter(
+			(edge) => edge.source === nodeId && edge.loopBack === undefined
+		))
+			visit(edge.target);
 		visiting.delete(nodeId);
 		visited.add(nodeId);
 	}
 	for (const node of definition.nodes) visit(node.id);
 	if (hasCycle)
-		issues.push({ code: 'cycle', message: 'Executable process graphs cannot contain cycles.' });
+		issues.push({
+			code: 'cycle',
+			message: 'Executable process graphs cannot contain unstructured cycles.'
+		});
 
 	if (triggers.length === 1) {
 		const reachable = new Set<string>();

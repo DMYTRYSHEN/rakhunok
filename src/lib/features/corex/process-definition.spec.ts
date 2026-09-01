@@ -52,6 +52,51 @@ function validDefinition(): ProcessDefinition {
 	};
 }
 
+function parallelDefinition(): ProcessDefinition {
+	const definition = validDefinition();
+	definition.nodes.splice(
+		1,
+		1,
+		{
+			id: 'parallel',
+			name: 'prepare-payment',
+			type: 'parallel',
+			position: { x: 220, y: 0 },
+			config: { branches: [{ id: 'risk' }, { id: 'receipt' }], resultKey: 'preparation' }
+		},
+		{
+			id: 'risk',
+			name: 'calculate-risk',
+			type: 'transform',
+			position: { x: 440, y: -120 },
+			config: { mode: 'replace', mappings: { score: '$.riskScore' } }
+		},
+		{
+			id: 'receipt',
+			name: 'prepare-receipt',
+			type: 'transform',
+			position: { x: 440, y: 120 },
+			config: { mode: 'replace', mappings: { id: '$.paymentId' } }
+		},
+		{
+			id: 'join',
+			name: 'payment-prepared',
+			type: 'parallel-join',
+			position: { x: 660, y: 0 },
+			config: { parallelId: 'parallel' }
+		}
+	);
+	definition.edges = [
+		{ id: 'trigger-parallel', source: 'trigger', target: 'parallel' },
+		{ id: 'parallel-risk', source: 'parallel', target: 'risk', parallel: 'risk' },
+		{ id: 'parallel-receipt', source: 'parallel', target: 'receipt', parallel: 'receipt' },
+		{ id: 'risk-join', source: 'risk', target: 'join' },
+		{ id: 'receipt-join', source: 'receipt', target: 'join' },
+		{ id: 'join-success', source: 'join', target: 'success' }
+	];
+	return definition;
+}
+
 describe('validateProcessDefinition', () => {
 	it('accepts the initial executable HTTP workflow subset', () => {
 		expect(validateProcessDefinition(validDefinition())).toEqual({ valid: true, issues: [] });
@@ -69,6 +114,37 @@ describe('validateProcessDefinition', () => {
 			code: 'invalid-output-expression',
 			message: 'Success output requires a safe JSON path.',
 			nodeId: 'success'
+		});
+	});
+
+	it('validates and compiles an explicit failure terminal', () => {
+		const definition = validDefinition();
+		definition.nodes[2] = {
+			id: 'failure',
+			name: 'reject-payment',
+			type: 'end-failure',
+			position: { x: 560, y: 0 },
+			config: { code: 'payment_rejected', message: 'Payment policy rejected the request.' }
+		};
+		definition.edges[1] = { id: 'forward-failure', source: 'forward', target: 'failure' };
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result).toMatchObject({
+			ok: true,
+			plan: {
+				nodes: expect.arrayContaining([
+					{
+						id: 'failure',
+						name: 'reject-payment',
+						type: 'end-failure',
+						config: {
+							code: 'payment_rejected',
+							message: 'Payment policy rejected the request.'
+						}
+					}
+				])
+			}
 		});
 	});
 
@@ -513,6 +589,195 @@ describe('validateProcessDefinition', () => {
 		});
 	});
 
+	it('validates and compiles a bounded structured loop with an explicit break', () => {
+		const definition = validDefinition();
+		definition.nodes.splice(
+			1,
+			1,
+			{
+				id: 'retry-loop',
+				name: 'retry-payment',
+				type: 'loop',
+				position: { x: 240, y: 0 },
+				config: { maxIterations: 3 }
+			},
+			{
+				id: 'should-break',
+				name: 'payment-complete',
+				type: 'condition',
+				position: { x: 460, y: -100 },
+				config: { path: '$.complete', operator: 'equals', value: true }
+			},
+			{
+				id: 'break-loop',
+				name: 'leave-retry-loop',
+				type: 'break',
+				position: { x: 680, y: -180 },
+				config: { loopId: 'retry-loop' }
+			},
+			{
+				id: 'increment',
+				name: 'increment-attempt',
+				type: 'transform',
+				position: { x: 680, y: 0 },
+				config: { mode: 'merge', mappings: { attempt: '$.attempt' } }
+			}
+		);
+		definition.edges = [
+			{ id: 'trigger-loop', source: 'trigger', target: 'retry-loop' },
+			{ id: 'loop-body', source: 'retry-loop', target: 'should-break', loop: 'body' },
+			{ id: 'loop-exit', source: 'retry-loop', target: 'success', loop: 'exit' },
+			{ id: 'condition-break', source: 'should-break', target: 'break-loop', when: true },
+			{ id: 'condition-increment', source: 'should-break', target: 'increment', when: false },
+			{
+				id: 'increment-loop',
+				source: 'increment',
+				target: 'retry-loop',
+				loopBack: 'retry-loop'
+			}
+		];
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes[0]).toMatchObject({
+			type: 'loop',
+			config: { maxIterations: 3 },
+			bodyTarget: 'should-break',
+			exitTarget: 'success'
+		});
+		expect(result.plan.nodes[2]).toEqual({
+			id: 'break-loop',
+			name: 'leave-retry-loop',
+			type: 'break',
+			loopId: 'retry-loop',
+			exitTarget: 'success'
+		});
+		const scenario = processDefinitionToFlowScenario(definition);
+		expect(scenario.nodes.find((node) => node.id === 'retry-loop')).toMatchObject({
+			kind: 'decision',
+			meta: 'max 3 iterations',
+			workflow: { type: 'loop', branches: ['body', 'exit'] }
+		});
+		expect(scenario.nodes.find((node) => node.id === 'break-loop')).toMatchObject({
+			kind: 'terminal',
+			meta: 'retry-loop',
+			workflow: { type: 'break' }
+		});
+		expect(scenario.edges.find((edge) => edge.id === 'loop-body')).toMatchObject({
+			label: 'body',
+			tone: 'success'
+		});
+		expect(scenario.edges.find((edge) => edge.id === 'increment-loop')).toMatchObject({
+			label: 'repeat'
+		});
+	});
+
+	it('rejects a loop back edge whose source is outside the loop body', () => {
+		const definition = validDefinition();
+		definition.nodes.splice(1, 0, {
+			id: 'retry-loop',
+			name: 'retry-payment',
+			type: 'loop',
+			position: { x: 240, y: 0 },
+			config: { maxIterations: 3 }
+		});
+		definition.edges = [
+			{ id: 'trigger-loop', source: 'trigger', target: 'retry-loop' },
+			{ id: 'loop-body', source: 'retry-loop', target: 'forward', loop: 'body' },
+			{ id: 'loop-exit', source: 'retry-loop', target: 'success', loop: 'exit' },
+			{ id: 'forward-success', source: 'forward', target: 'success' },
+			{ id: 'trigger-back', source: 'trigger', target: 'retry-loop', loopBack: 'retry-loop' }
+		];
+
+		expect(validateProcessDefinition(definition).issues).toContainEqual(
+			expect.objectContaining({ code: 'invalid-loop', nodeId: 'retry-loop' })
+		);
+	});
+
+	it('validates and compiles deterministic parallel fork and join branches', () => {
+		const definition = parallelDefinition();
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes[0]).toEqual({
+			id: 'parallel',
+			name: 'prepare-payment',
+			type: 'parallel',
+			config: { branches: [{ id: 'risk' }, { id: 'receipt' }], resultKey: 'preparation' },
+			branchTargets: { risk: 'risk', receipt: 'receipt' },
+			joinTarget: 'join',
+			continuationTarget: 'success'
+		});
+		expect(result.plan.nodes.some((node) => node.id === 'join')).toBe(false);
+		const scenario = processDefinitionToFlowScenario(definition);
+		expect(scenario.nodes.find((node) => node.id === 'parallel')).toMatchObject({
+			kind: 'decision',
+			output: 'preparation',
+			workflow: { type: 'parallel', branches: ['risk', 'receipt'] }
+		});
+		expect(scenario.nodes.find((node) => node.id === 'join')).toMatchObject({
+			eyebrow: 'Parallel join',
+			workflow: { type: 'parallel' }
+		});
+		expect(scenario.edges.find((edge) => edge.id === 'parallel-risk')).toMatchObject({
+			label: 'risk',
+			tone: 'success'
+		});
+	});
+
+	it.each([
+		['a missing branch edge', (definition: ProcessDefinition) => definition.edges.splice(2, 1)],
+		[
+			'a branch escape path',
+			(definition: ProcessDefinition) => {
+				definition.edges.find((edge) => edge.id === 'risk-join')!.target = 'success';
+			}
+		],
+		[
+			'a shared branch region',
+			(definition: ProcessDefinition) => {
+				definition.edges.find((edge) => edge.id === 'parallel-receipt')!.target = 'risk';
+			}
+		],
+		[
+			'an external branch entry',
+			(definition: ProcessDefinition) => {
+				definition.edges.push({ id: 'trigger-risk', source: 'trigger', target: 'risk' });
+			}
+		],
+		[
+			'a join without one continuation',
+			(definition: ProcessDefinition) => {
+				definition.edges = definition.edges.filter((edge) => edge.id !== 'join-success');
+			}
+		]
+	])('rejects parallel topology with %s', (_label, mutate) => {
+		const definition = parallelDefinition();
+		mutate(definition);
+		expect(validateProcessDefinition(definition).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'invalid-parallel' })])
+		);
+	});
+
+	it('rejects durable waits inside parallel branches until concurrent waiting is supported', () => {
+		const definition = parallelDefinition();
+		definition.nodes[2] = {
+			id: 'risk',
+			name: 'wait-for-risk',
+			type: 'wait',
+			position: { x: 440, y: -120 },
+			config: { durationMs: 1_000 }
+		};
+
+		expect(validateProcessDefinition(definition).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'invalid-parallel', nodeId: 'parallel' })])
+		);
+	});
+
 	it('refuses ambiguous branches until the runtime has an explicit branch node', () => {
 		const definition = validDefinition();
 		definition.nodes.push({
@@ -532,6 +797,64 @@ describe('validateProcessDefinition', () => {
 			ok: false,
 			errors: ['Step "forward-callback" must have exactly one outgoing connection.']
 		});
+	});
+
+	it('accepts a failure-only process and projects its terminal contract', () => {
+		const definition = validDefinition();
+		definition.nodes[2] = {
+			id: 'failure',
+			name: 'reject-payment',
+			type: 'end-failure',
+			position: { x: 560, y: 0 },
+			config: { code: 'payment_rejected', message: 'Payment policy rejected the request.' }
+		};
+		definition.edges[1] = { id: 'forward-failure', source: 'forward', target: 'failure' };
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		expect(processDefinitionToFlowScenario(definition).nodes[2]).toMatchObject({
+			eyebrow: 'Failure terminal',
+			status: 'failed',
+			meta: 'payment_rejected',
+			detail: 'Payment policy rejected the request.',
+			workflow: { type: 'end-failure', family: 'terminal' }
+		});
+	});
+
+	it.each([
+		[{ code: 'unsafe code', message: 'Rejected.' }],
+		[{ code: 'payment_rejected', message: '   ' }],
+		[{ code: 'payment_rejected', message: 'x'.repeat(201) }]
+	])('rejects invalid failure terminal config %#', (config) => {
+		const definition = validDefinition();
+		definition.nodes[2] = {
+			id: 'failure',
+			name: 'reject-payment',
+			type: 'end-failure',
+			position: { x: 560, y: 0 },
+			config
+		};
+		definition.edges[1] = { id: 'forward-failure', source: 'forward', target: 'failure' };
+
+		expect(validateProcessDefinition(definition).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'invalid-failure', nodeId: 'failure' })])
+		);
+	});
+
+	it('rejects outgoing edges from a failure terminal', () => {
+		const definition = validDefinition();
+		definition.nodes[2] = {
+			id: 'failure',
+			name: 'reject-payment',
+			type: 'end-failure',
+			position: { x: 560, y: 0 },
+			config: { code: 'payment_rejected', message: 'Rejected.' }
+		};
+		definition.edges[1] = { id: 'forward-failure', source: 'forward', target: 'failure' };
+		definition.edges.push({ id: 'failure-forward', source: 'failure', target: 'forward' });
+
+		expect(validateProcessDefinition(definition).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'terminal-has-output', nodeId: 'failure' })])
+		);
 	});
 
 	it('renders a starter definition through the existing canvas contract', () => {

@@ -104,6 +104,84 @@ function toFlowNode(node: ProcessNode): FlowNode {
 		};
 	}
 
+	if (node.type === 'loop') {
+		return {
+			id: node.id,
+			eyebrow: 'Bounded loop',
+			title: node.name,
+			detail: 'Repeats its body with a deterministic hard iteration limit.',
+			status: 'waiting',
+			meta: `max ${node.config.maxIterations} iterations`,
+			kind: 'decision',
+			position: node.position,
+			layer: 'worker',
+			output: 'body or exit branch',
+			workflow: {
+				name: node.name,
+				type: 'loop',
+				family: 'control',
+				branches: ['body', 'exit']
+			}
+		};
+	}
+
+	if (node.type === 'break') {
+		return {
+			id: node.id,
+			eyebrow: 'Break',
+			title: node.name,
+			detail: 'Leaves the referenced loop through its compiled exit route.',
+			status: 'waiting',
+			meta: node.config.loopId,
+			kind: 'terminal',
+			position: node.position,
+			layer: 'worker',
+			output: 'loop exit',
+			workflow: {
+				name: node.name,
+				type: 'break',
+				family: 'control'
+			}
+		};
+	}
+
+	if (node.type === 'parallel') {
+		return {
+			id: node.id,
+			eyebrow: 'Parallel fork',
+			title: node.name,
+			detail: 'Runs isolated branches concurrently and merges their results deterministically.',
+			status: 'waiting',
+			meta: `${node.config.branches.length} branches · ${node.config.resultKey}`,
+			kind: 'decision',
+			position: node.position,
+			layer: 'worker',
+			output: node.config.resultKey,
+			workflow: {
+				name: node.name,
+				type: 'parallel',
+				family: 'control',
+				branches: node.config.branches.map((branch) => branch.id)
+			}
+		};
+	}
+
+	if (node.type === 'parallel-join') {
+		return {
+			id: node.id,
+			eyebrow: 'Parallel join',
+			title: node.name,
+			detail: 'Continues once after every branch of the referenced fork resolves.',
+			status: 'waiting',
+			meta: node.config.parallelId,
+			kind: 'action',
+			position: node.position,
+			layer: 'worker',
+			output: 'merged branch results',
+			workflow: { name: node.name, type: 'parallel', family: 'control' }
+		};
+	}
+
 	if (node.type === 'wait') {
 		return {
 			id: node.id,
@@ -241,6 +319,26 @@ function toFlowNode(node: ProcessNode): FlowNode {
 		};
 	}
 
+	if (node.type === 'end-failure') {
+		return {
+			id: node.id,
+			eyebrow: 'Failure terminal',
+			title: node.name,
+			detail: node.config.message,
+			status: 'failed',
+			meta: node.config.code,
+			kind: 'terminal',
+			position: node.position,
+			layer: 'worker',
+			output: node.config.message,
+			workflow: {
+				name: node.name,
+				type: node.type,
+				family: 'terminal'
+			}
+		};
+	}
+
 	return {
 		id: node.id,
 		eyebrow: 'Success terminal',
@@ -275,7 +373,13 @@ export function processDefinitionToFlowScenario(definition: ProcessDefinition): 
 			id: edge.id,
 			source: edge.source,
 			target: edge.target,
-			...(edge.case !== undefined
+			...(edge.parallel !== undefined
+				? { label: edge.parallel, tone: 'success' as const }
+				: edge.loop !== undefined
+				? { label: edge.loop, tone: edge.loop === 'body' ? ('success' as const) : ('danger' as const) }
+				: edge.loopBack !== undefined
+					? { label: 'repeat', tone: 'default' as const }
+					: edge.case !== undefined
 				? { label: edge.case, tone: edge.case === 'default' ? ('danger' as const) : ('success' as const) }
 				: edge.when === undefined
 				? {}

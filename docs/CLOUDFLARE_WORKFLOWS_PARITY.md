@@ -29,7 +29,7 @@ The Cloudflare visualizer is a beta, read-only diagram generated from deployed J
 | StepSleepUntil               | Missing      | Add an absolute-time wait node and compiler/runtime support.                                       |
 | SwitchNode                   | Missing      | Add typed cases, default routing, and validation.                                                  |
 | LoopNode and BreakNode       | Missing      | Add bounded deterministic loops and visible iteration history.                                     |
-| ParallelNode                 | Missing      | Add deterministic fork/join semantics and starts/resolves ordering.                                |
+| ParallelNode                 | Covered      | Deterministic fork/join records configured `starts`, observed `resolves`, isolated branch results, and stable step identities. Concurrent waits, approvals, and subprocesses are rejected pending branch-aware lifecycle semantics. |
 | TryNode                      | Missing      | Add catch/finally routes and rollback inspection.                                                  |
 | BlockNode                    | Partial      | Visual grouping exists in the product direction but is not an executable graph primitive.          |
 | FunctionDef and FunctionCall | Partial      | Subprocesses provide reusable published processes, but local function definitions are not modeled. |
@@ -50,8 +50,8 @@ Cloudflare currently exposes 22 Workflows endpoints. `Covered` means Corex provi
 | List instances                   | Partial      | Run history exists; add cursor pagination, status/date filters, and full Cloudflare-compatible states.                                                  |
 | Create one instance              | Covered      | Authenticated run creation resolves the immutable published version server-side. Add location and per-run retention only if required.                   |
 | Batch-create instances           | Missing      | Add bounded, idempotent batch start with per-item results and limits.                                                                                   |
-| Get instance status and logs     | Partial      | Run events and sanitized errors exist; add attempts, durations, retry state, rollback state, and richer filtering.                                      |
-| Get full step output by attempt  | Partial      | Step payloads exist; add attempt identity, full-output retrieval, size policy, and stream/external-object handling.                                     |
+| Get instance status and logs     | Partial      | Run events, sanitized errors, rollback state, and owner-scoped serial HTTP attempt metadata exist; add other step and parallel-branch attempts plus richer filtering. |
+| Get full step output by attempt  | Partial      | Serial HTTP attempt identity and bounded metadata exist; add full-output retrieval, size policy, and stream/external-object handling.                    |
 | Subscribe to instance events     | Missing      | Add resumable server-driven streaming with cursor and event filters. Do not expose service credentials.                                                 |
 | Send event                       | Partial      | Typed authenticated events exist; add stable caller event IDs and transactional outbox delivery.                                                        |
 | Pause instance                   | Missing      | Add audited, idempotent pause with `waitingForPause` reconciliation.                                                                                    |

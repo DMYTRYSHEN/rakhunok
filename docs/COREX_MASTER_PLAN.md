@@ -55,18 +55,20 @@ Exit criteria:
 
 Covered:
 
-- HTTP, transform, condition, typed switch with a mandatory default route, relative and absolute sleep, external event wait, approval, subprocess, and success nodes.
+- HTTP, transform, condition, typed switch with a mandatory default route, relative and absolute sleep, external event wait, approval, subprocess, success, and explicit failure nodes.
+- Bounded deterministic loops with explicit structured back edges and loop-targeted `break`.
+- Deterministic parallel fork/join with isolated branch contexts, stable durable step identities, configured result ordering, and recorded `starts`/`resolves` indices.
+- Explicit failure terminals with validated public error codes/messages and one sanitized `run_failed` lifecycle event.
 - Durable lifecycle events, sanitized failures, retry configuration, and bounded subprocess depth.
+- Serial HTTP retries persist idempotent attempt identity, duration, retry policy, and bounded sanitized response or error metadata for owner-scoped inspection.
 - Correlated child completion callbacks and timeout cleanup.
 
 Critical gaps:
 
-- Bounded deterministic loops and `break`.
-- Parallel fork/join with deterministic step identities and `starts`/`resolves` ordering.
 - `try/catch/finally`, compensation routes, and rollback inspection.
-- Explicit failure terminal.
 - Executable blocks and reusable local functions where subprocesses are too coarse.
-- Complete attempt identity, duration, retry state, and output policy for every durable step.
+- Complete attempt identity, duration, retry state, and output policy for non-HTTP steps and branch-aware parallel attempts.
+- Concurrent wait, approval, and subprocess nodes inside parallel branches; validation rejects them until branch-aware waiting and cancellation semantics are defined.
 
 Exit criteria:
 
@@ -159,6 +161,7 @@ Covered:
 - Active-run cancellation is available in the inspector and exposes its in-flight operation state without hiding the selected run timeline.
 - The inspector exposes explicit rollback separately from cancellation, prevents conflicting controls and events while rollback is active, and displays sanitized rollback success or failure details from the durable read model.
 - The inspector archives eligible terminal runs without hiding them, prevents conflicting lifecycle controls while the request is active, and displays durable archive metadata after refresh.
+- The inspector shows owner-scoped serial HTTP attempts with durable identity, duration, retry policy, status, content type, byte count, or sanitized error code; raw response bodies and private upstream errors are not stored or displayed.
 
 Critical gaps:
 
@@ -166,7 +169,7 @@ Critical gaps:
 - Standalone process diagram component with two read-only projections: a definition/version topology and a selected-run sequence. Generate Mermaid source from trusted `ProcessDefinition` and ordered run events through pure deterministic projectors, render with a local dependency under strict security settings, and cover escaping, branches, waits, retries, subprocesses, terminal states, empty states, and render failures. The component must remain independent from the editable canvas and must not become a second compiler.
 - Runtime overlays for active, waiting, retrying, paused, failed, completed, and rolled-back paths.
 - Collapsed and expanded nested conditions, loops, blocks, functions, and parallel lanes.
-- Attempt list, durations, errors, and full step output retrieval with size and redaction policies.
+- Attempt inspection for non-HTTP steps and parallel branches, plus full step output retrieval with size and redaction policies.
 - External-object or streaming strategy for outputs that should not be stored inline.
 - Resumable live event subscription with cursor and event filters.
 - Workflow/version diff and run comparison.

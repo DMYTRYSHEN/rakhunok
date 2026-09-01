@@ -81,7 +81,8 @@
 		type CorexProcess,
 		type CorexProcessVersion,
 		type CorexRun,
-		type CorexRunEvent
+		type CorexRunEvent,
+		type CorexStepAttempt
 	} from './corex-process-gateway';
 	import { restoreVersionAsDraft } from './process-version-history';
 	import { formatRunDetail, summarizeRunEvents } from './run-inspector';
@@ -218,6 +219,7 @@
 	let runs = $state<CorexRun[]>([]);
 	let selectedRunId = $state('');
 	let runEvents = $state<CorexRunEvent[]>([]);
+	let stepAttempts = $state<CorexStepAttempt[]>([]);
 	let approvalTasks = $state<CorexApprovalTask[]>([]);
 	let approvalTaskComments = $state<Record<string, string>>({});
 	let approvalTaskSendingId = $state('');
@@ -277,7 +279,16 @@
 			: []
 	);
 	let selectionHasProtectedNodes = $derived(
-		selectedDefinitionNodes.some((node) => ['trigger-http', 'end-success'].includes(node.type))
+		selectedDefinitionNodes.some((node) =>
+			['trigger-http', 'loop', 'parallel', 'parallel-join', 'end-success'].includes(node.type)
+		)
+	);
+	let selectionHasNonCopyableNodes = $derived(
+		selectedDefinitionNodes.some((node) =>
+			['trigger-http', 'loop', 'break', 'parallel', 'parallel-join', 'end-success', 'end-failure'].includes(
+				node.type
+			)
+		)
 	);
 	let text = $derived(canvasText[locale]);
 	let activeCopy = $derived(localizedScenario(activeScenario, locale));
@@ -295,8 +306,8 @@
 			items: [
 				{ label: 'Умова', api: 'if / else', icon: GitBranch, nodeType: 'condition' as const },
 				{ label: 'Switch', api: 'switch', icon: Workflow, nodeType: 'switch' as const },
-				{ label: 'Цикл', api: 'for / while', icon: RefreshCcw },
-				{ label: 'Паралельно', api: 'Promise.all()', icon: Boxes },
+				{ label: 'Цикл', api: 'bounded for / while', icon: RefreshCcw, nodeType: 'loop' as const },
+				{ label: 'Паралельно', api: 'Promise.all()', icon: Boxes, nodeType: 'parallel' as const },
 				{ label: 'A/B Router', api: 'step.do() → deterministic branch', icon: Shuffle }
 			]
 		},
@@ -364,7 +375,12 @@
 			label: 'Завершення',
 			items: [
 				{ label: 'Успішне завершення', api: 'return serializable output', icon: FileOutput },
-				{ label: 'Abort / Fail', api: 'throw NonRetryableError', icon: XCircle }
+				{
+					label: 'Abort / Fail',
+					api: 'sanitized run_failed',
+					icon: XCircle,
+					nodeType: 'end-failure' as const
+				}
 			]
 		},
 		{
@@ -372,7 +388,7 @@
 			items: [
 				{ label: 'Функція', api: 'FunctionDef / Call', icon: Braces },
 				{ label: 'Група кроків', api: 'BlockNode', icon: FolderTree },
-				{ label: 'Вийти з циклу', api: 'break', icon: PanelRightClose }
+				{ label: 'Вийти з циклу', api: 'break', icon: PanelRightClose, nodeType: 'break' as const }
 			]
 		}
 	];
@@ -411,6 +427,7 @@
 		runs = [];
 		selectedRunId = '';
 		runEvents = [];
+		stepAttempts = [];
 		runHistoryError = '';
 	}
 
@@ -493,8 +510,15 @@
 					? preferredRunId
 					: (loadedRuns[0]?.id ?? '');
 			selectedRunId = nextRunId;
-			runEvents = nextRunId ? await processGateway.listRunEvents(nextRunId) : [];
+			const [loadedEvents, loadedAttempts] = nextRunId
+				? await Promise.all([
+						processGateway.listRunEvents(nextRunId),
+						processGateway.listStepAttempts(nextRunId)
+					])
+				: [[], []];
 			if (request !== runHistoryRequest || activeProcess?.id !== processId) return;
+			runEvents = loadedEvents;
+			stepAttempts = loadedAttempts;
 		} catch {
 			if (request !== runHistoryRequest) return;
 			runHistoryError =
@@ -524,8 +548,14 @@
 		runHistoryState = 'loading';
 		runHistoryError = '';
 		try {
-			const loadedEvents = await processGateway.listRunEvents(runId);
-			if (request === runHistoryRequest && selectedRunId === runId) runEvents = loadedEvents;
+			const [loadedEvents, loadedAttempts] = await Promise.all([
+				processGateway.listRunEvents(runId),
+				processGateway.listStepAttempts(runId)
+			]);
+			if (request === runHistoryRequest && selectedRunId === runId) {
+				runEvents = loadedEvents;
+				stepAttempts = loadedAttempts;
+			}
 		} catch {
 			if (request === runHistoryRequest)
 				runHistoryError =
@@ -1008,16 +1038,47 @@
 		}
 	}
 
+	function updateParallelBranch(index: number, branchId: string) {
+		if (!isExecutableDraft || selectedDefinitionNode?.type !== 'parallel') return;
+		const previousId = selectedDefinitionNode.config.branches[index]?.id;
+		if (!previousId) return;
+		commitDraft({
+			...draftDefinition,
+			nodes: draftDefinition.nodes.map((node) =>
+				node.id === selectedDefinitionNode?.id && node.type === 'parallel'
+					? {
+							...node,
+							config: {
+								...node.config,
+								branches: node.config.branches.map((branch, branchIndex) =>
+									branchIndex === index ? { id: branchId } : branch
+								)
+							}
+						}
+					: node
+			),
+			edges: draftDefinition.edges.map((edge) =>
+				edge.source === selectedDefinitionNode?.id && edge.parallel === previousId
+					? { ...edge, parallel: branchId }
+					: edge
+			)
+		});
+	}
+
 	type SupportedNodeType =
 		| 'http-request'
 		| 'condition'
 		| 'switch'
+		| 'loop'
+		| 'break'
+		| 'parallel'
 		| 'wait'
 		| 'wait-until'
 		| 'wait-event'
 		| 'approval'
 		| 'transform'
-		| 'invoke-process';
+		| 'invoke-process'
+		| 'end-failure';
 
 	function addSupportedNode(type: SupportedNodeType, droppedPosition?: { x: number; y: number }) {
 		if (!isExecutableDraft) return;
@@ -1029,6 +1090,96 @@
 		const suffix = crypto.randomUUID().slice(0, 8);
 		const id = `${type}-${suffix}`;
 		const position = droppedPosition ?? { x: terminal.position.x - 280, y: terminal.position.y };
+		if (type === 'end-failure') {
+			commitDraft({
+				...draftDefinition,
+				nodes: [
+					...draftDefinition.nodes,
+					{
+						id,
+						name: `fail-${suffix}`,
+						type,
+						position,
+						config: { code: 'process_failed', message: 'The process ended with a controlled failure.' }
+					}
+				]
+			});
+			selectedId = id;
+			return;
+		}
+		if (type === 'break') {
+			const loop =
+				selectedDefinitionNode?.type === 'loop'
+					? selectedDefinitionNode
+					: draftDefinition.nodes.find((candidate) => candidate.type === 'loop');
+			if (!loop) return;
+			commitDraft({
+				...draftDefinition,
+				nodes: [
+					...draftDefinition.nodes,
+					{
+						id,
+						name: `break-${suffix}`,
+						type,
+						position,
+						config: { loopId: loop.id }
+					}
+				]
+			});
+			selectedId = id;
+			return;
+		}
+		if (type === 'parallel') {
+			const joinId = `parallel-join-${suffix}`;
+			const riskId = `parallel-risk-${suffix}`;
+			const receiptId = `parallel-receipt-${suffix}`;
+			const incoming = draftDefinition.edges.filter((edge) => edge.target === terminal.id);
+			commitDraft({
+				...draftDefinition,
+				nodes: [
+					...draftDefinition.nodes,
+					{
+						id,
+						name: `parallel-${suffix}`,
+						type,
+						position,
+						config: { branches: [{ id: 'risk' }, { id: 'receipt' }], resultKey: 'parallelResults' }
+					},
+					{
+						id: riskId,
+						name: `risk-${suffix}`,
+						type: 'transform',
+						position: { x: position.x + 280, y: position.y - 140 },
+						config: { mode: 'merge', mappings: { value: '$.value' } }
+					},
+					{
+						id: receiptId,
+						name: `receipt-${suffix}`,
+						type: 'transform',
+						position: { x: position.x + 280, y: position.y + 140 },
+						config: { mode: 'merge', mappings: { value: '$.value' } }
+					},
+					{
+						id: joinId,
+						name: `parallel-join-${suffix}`,
+						type: 'parallel-join',
+						position: { x: position.x + 560, y: position.y },
+						config: { parallelId: id }
+					}
+				],
+				edges: [
+					...draftDefinition.edges.filter((edge) => edge.target !== terminal.id),
+					...incoming.map((edge) => ({ ...edge, target: id })),
+					{ id: `${id}-risk`, source: id, target: riskId, parallel: 'risk' },
+					{ id: `${id}-receipt`, source: id, target: receiptId, parallel: 'receipt' },
+					{ id: `${riskId}-${joinId}`, source: riskId, target: joinId },
+					{ id: `${receiptId}-${joinId}`, source: receiptId, target: joinId },
+					{ id: `${joinId}-next`, source: joinId, target: terminal.id }
+				]
+			});
+			selectedId = id;
+			return;
+		}
 		const node: ProcessNode =
 			type === 'http-request'
 				? {
@@ -1065,6 +1216,14 @@
 										{ id: 'case-b', value: 'B' }
 									]
 								}
+							}
+					: type === 'loop'
+						? {
+								id,
+								name: `loop-${suffix}`,
+								type,
+								position,
+								config: { maxIterations: 10 }
 							}
 					: type === 'wait'
 						? { id, name: `wait-${suffix}`, type, position, config: { durationMs: 1_000 } }
@@ -1125,7 +1284,30 @@
 		const incoming = draftDefinition.edges.filter((edge) => edge.target === terminal.id);
 		const retainedEdges = draftDefinition.edges.filter((edge) => edge.target !== terminal.id);
 		const insertedEdges = incoming.map((edge) => ({ ...edge, target: id }));
-		if (type === 'switch') {
+		if (type === 'loop') {
+			const bodyId = `loop-body-${suffix}`;
+			commitDraft({
+				...draftDefinition,
+				nodes: [
+					...draftDefinition.nodes,
+					node,
+					{
+						id: bodyId,
+						name: `loop-body-${suffix}`,
+						type: 'transform',
+						position: { x: position.x + 280, y: position.y - 160 },
+						config: { mode: 'merge', mappings: { value: '$.value' } }
+					}
+				],
+				edges: [
+					...retainedEdges,
+					...insertedEdges,
+					{ id: `${id}-body`, source: id, target: bodyId, loop: 'body' },
+					{ id: `${bodyId}-${id}`, source: bodyId, target: id, loopBack: id },
+					{ id: `${id}-exit`, source: id, target: terminal.id, loop: 'exit' }
+				]
+			});
+		} else if (type === 'switch') {
 			const caseATerminalId = `end-case-a-${suffix}`;
 			const caseBTerminalId = `end-case-b-${suffix}`;
 			const defaultTerminalId = `end-default-${suffix}`;
@@ -1222,12 +1404,16 @@
 				'http-request',
 				'condition',
 				'switch',
+				'loop',
+				'break',
+				'parallel',
 				'wait',
 				'wait-until',
 				'wait-event',
 				'approval',
 				'transform',
-				'invoke-process'
+				'invoke-process',
+				'end-failure'
 			].includes(type)
 		)
 			return;
@@ -1260,20 +1446,30 @@
 		if (
 			!sourceNode ||
 			!targetNode ||
-			sourceNode.type === 'end-success' ||
+			(sourceNode.type === 'end-success' || sourceNode.type === 'end-failure') ||
 			targetNode.type === 'trigger-http'
 		)
 			return;
 		const isBooleanBranch = sourceNode.type === 'condition' || sourceNode.type === 'approval';
 		const isSwitchBranch = sourceNode.type === 'switch';
-		const isBranchingNode = isBooleanBranch || isSwitchBranch;
+		const isLoopBranch = sourceNode.type === 'loop';
+		const isParallelBranch = sourceNode.type === 'parallel';
+		const isBranchingNode = isBooleanBranch || isSwitchBranch || isLoopBranch || isParallelBranch;
 		const branch = isBranchingNode
-			? isSwitchBranch
+			? isLoopBranch
+				? ['body', 'exit'].includes(connection.sourceHandle ?? '')
+					? connection.sourceHandle
+					: null
+				: isSwitchBranch
 				? [...sourceNode.config.cases.map((item) => item.id), 'default'].includes(
 						connection.sourceHandle ?? ''
 					)
 					? connection.sourceHandle
 					: null
+				: isParallelBranch
+					? sourceNode.config.branches.some((item) => item.id === connection.sourceHandle)
+						? connection.sourceHandle
+						: null
 				: connection.sourceHandle === 'true'
 				? true
 				: connection.sourceHandle === 'false'
@@ -1281,11 +1477,32 @@
 					: null
 			: undefined;
 		if (branch === null) return;
+		let isLoopBack = false;
+		if (targetNode.type === 'loop' && sourceNode.type !== 'trigger-http') {
+			const bodyTarget = draftDefinition.edges.find(
+				(edge) => edge.source === targetNode.id && edge.loop === 'body'
+			)?.target;
+			const reachable: string[] = [];
+			const queue = bodyTarget ? [bodyTarget] : [];
+			while (queue.length > 0) {
+				const nodeId = queue.shift();
+				if (!nodeId || nodeId === targetNode.id || reachable.includes(nodeId)) continue;
+				reachable.push(nodeId);
+				queue.push(
+					...draftDefinition.edges
+						.filter((edge) => edge.source === nodeId && edge.loopBack === undefined)
+						.map((edge) => edge.target)
+				);
+			}
+			isLoopBack = reachable.includes(sourceNode.id);
+		}
 		const retainedEdges = draftDefinition.edges.filter(
 			(edge) =>
 				edge.source !== sourceNode.id ||
 				(isBooleanBranch && edge.when !== branch) ||
-				(isSwitchBranch && edge.case !== branch)
+				(isSwitchBranch && edge.case !== branch) ||
+				(isLoopBranch && edge.loop !== branch) ||
+				(isParallelBranch && edge.parallel !== branch)
 		);
 		commitDraft({
 			...draftDefinition,
@@ -1296,9 +1513,15 @@
 					source: sourceNode.id,
 					target: targetNode.id,
 					...(branch === undefined
-						? {}
+						? isLoopBack
+							? { loopBack: targetNode.id }
+							: {}
+						: isLoopBranch
+							? { loop: branch as 'body' | 'exit' }
 						: isSwitchBranch
 							? { case: branch as string }
+						: isParallelBranch
+							? { parallel: branch as string }
 							: { when: branch as boolean })
 				}
 			]
@@ -1310,7 +1533,8 @@
 			isExecutableDraft &&
 			deletedNodes.every((node) => {
 				const definitionNode = draftDefinition.nodes.find((candidate) => candidate.id === node.id);
-				return definitionNode && !['trigger-http', 'end-success'].includes(definitionNode.type);
+				return definitionNode &&
+					!['trigger-http', 'loop', 'parallel', 'parallel-join', 'end-success'].includes(definitionNode.type);
 			})
 		);
 	}
@@ -1357,7 +1581,7 @@
 		if (
 			!isExecutableDraft ||
 			!selectedDefinitionNode ||
-			['trigger-http', 'condition', 'switch', 'approval', 'end-success'].includes(
+			['trigger-http', 'condition', 'switch', 'loop', 'parallel', 'parallel-join', 'approval', 'end-success'].includes(
 				selectedDefinitionNode.type
 			)
 		)
@@ -1381,7 +1605,12 @@
 	}
 
 	function canCopyNode(node: ProcessNode | undefined): node is ProcessNode {
-		return Boolean(node && !['trigger-http', 'end-success'].includes(node.type));
+		return Boolean(
+			node &&
+				!['trigger-http', 'loop', 'break', 'parallel', 'parallel-join', 'end-success', 'end-failure'].includes(
+					node.type
+				)
+		);
 	}
 
 	function copySelectedNode() {
@@ -1410,7 +1639,7 @@
 	}
 
 	function duplicateSelectedNodes() {
-		if (!isExecutableDraft || selectedDefinitionNodes.length < 2 || selectionHasProtectedNodes)
+		if (!isExecutableDraft || selectedDefinitionNodes.length < 2 || selectionHasNonCopyableNodes)
 			return;
 		const selectedIds = new Set(selectedDefinitionNodes.map((node) => node.id));
 		const idMap = new Map(
@@ -1812,7 +2041,7 @@
 					>
 					<button
 						type="button"
-						disabled={selectionHasProtectedNodes}
+						disabled={selectionHasNonCopyableNodes}
 						onclick={duplicateSelectedNodes}
 						aria-label={locale === 'uk' ? 'Дублювати вибрані вузли' : 'Duplicate selected nodes'}
 						title={locale === 'uk' ? 'Дублювати вибрані' : 'Duplicate selected'}
@@ -2168,6 +2397,30 @@
 						{#if runEvents.length === 0}<div class="run-empty">
 								{locale === 'uk' ? 'Подій ще немає.' : 'No events yet.'}
 							</div>{/if}
+						<div class="attempts-head">
+							<span>{locale === 'uk' ? 'HTTP спроби' : 'HTTP attempts'}</span>
+							<strong>{stepAttempts.length}</strong>
+						</div>
+						<div class="step-attempts">
+							{#each stepAttempts as attempt (`${attempt.executionGeneration}:${attempt.stepId}:${attempt.visit}:${attempt.attempt}`)}
+								<div class:failed={attempt.outcome === 'failed'}>
+									<header>
+										<b>{attempt.stepId} · visit {attempt.visit}</b>
+										<span>{attempt.outcome}</span>
+									</header>
+									<small>generation {attempt.executionGeneration} · attempt {attempt.attempt} · {Math.max(
+										0,
+										new Date(attempt.finishedAt).getTime() - new Date(attempt.startedAt).getTime()
+									)} ms</small>
+									<small>{attempt.retry.limit} retries · {attempt.retry.backoff} · {attempt.retry.timeoutMs} ms timeout</small>
+									{#if attempt.output}<small>HTTP {attempt.output.status} · {attempt.output.contentType ?? 'unknown'} · {attempt.output.bytes} bytes</small>{/if}
+									{#if attempt.error}<small>{attempt.error.code}</small>{/if}
+								</div>
+							{/each}
+						</div>
+						{#if stepAttempts.length === 0}<div class="run-empty">
+								{locale === 'uk' ? 'HTTP спроб ще немає.' : 'No HTTP attempts yet.'}
+							</div>{/if}
 					{:else}<div class="run-empty">
 							{locale === 'uk' ? 'Запусків ще немає.' : 'No runs yet.'}
 						</div>{/if}
@@ -2377,6 +2630,66 @@
 													}
 												: node
 										)}
+								/></label
+							>
+						{/each}
+					</div>
+				{:else if inspectorTab === 'details' && selectedDefinitionNode?.type === 'loop'}
+					<div class="node-config">
+						<label
+							><span>Max iterations</span><input
+								type="number"
+								min="1"
+								max="1000"
+								step="1"
+								value={selectedDefinitionNode.config.maxIterations}
+								onchange={(event) =>
+									updateSelectedDefinitionNode((node) =>
+										node.type === 'loop'
+											? {
+													...node,
+													config: { maxIterations: Number(event.currentTarget.value) }
+												}
+											: node
+									)}
+							/></label
+						>
+					</div>
+				{:else if inspectorTab === 'details' && selectedDefinitionNode?.type === 'break'}
+					<div class="node-config">
+						<label
+							><span>Loop</span><select
+								value={selectedDefinitionNode.config.loopId}
+								onchange={(event) =>
+									updateSelectedDefinitionNode((node) =>
+										node.type === 'break'
+											? { ...node, config: { loopId: event.currentTarget.value } }
+											: node
+									)}
+								>{#each draftDefinition.nodes.filter((node) => node.type === 'loop') as loop (loop.id)}<option
+										value={loop.id}>{loop.name}</option
+									>{/each}</select
+							></label
+						>
+					</div>
+				{:else if inspectorTab === 'details' && selectedDefinitionNode?.type === 'parallel'}
+					<div class="node-config">
+						<label
+							><span>Result key</span><input
+								value={selectedDefinitionNode.config.resultKey}
+								onchange={(event) =>
+									updateSelectedDefinitionNode((node) =>
+										node.type === 'parallel'
+											? { ...node, config: { ...node.config, resultKey: event.currentTarget.value } }
+											: node
+									)}
+							/></label
+						>
+						{#each selectedDefinitionNode.config.branches as branch, index (index)}
+							<label
+								><span>Branch {index + 1}</span><input
+									value={branch.id}
+									onchange={(event) => updateParallelBranch(index, event.currentTarget.value)}
 								/></label
 							>
 						{/each}
@@ -2611,6 +2924,35 @@
 											: node
 									)}
 							/></label
+						>
+					</div>
+				{/if}
+				{#if inspectorTab === 'details' && selectedDefinitionNode?.type === 'end-failure'}
+					<div class="node-config">
+						<label
+							><span>Error code</span><input
+								pattern="[A-Za-z_][A-Za-z0-9_.-]*"
+								value={selectedDefinitionNode.config.code}
+								onchange={(event) =>
+									updateSelectedDefinitionNode((node) =>
+										node.type === 'end-failure'
+											? { ...node, config: { ...node.config, code: event.currentTarget.value } }
+											: node
+									)}
+							/></label
+						>
+						<label
+							><span>Public message</span><textarea
+								maxlength="200"
+								rows="4"
+								value={selectedDefinitionNode.config.message}
+								onchange={(event) =>
+									updateSelectedDefinitionNode((node) =>
+										node.type === 'end-failure'
+											? { ...node, config: { ...node.config, message: event.currentTarget.value } }
+											: node
+									)}
+							></textarea></label
 						>
 					</div>
 				{/if}
@@ -3807,6 +4149,50 @@
 		color: #1e293b;
 		background: #f8fafd;
 		font: 650 10px/1.3 monospace;
+	}
+	.attempts-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin: 14px 0 7px;
+		color: #475569;
+		font: 750 9.5px/1.3 'Manrope', sans-serif;
+		text-transform: uppercase;
+	}
+	.attempts-head strong {
+		color: #1a73e8;
+		font: 750 10px/1 monospace;
+	}
+	.step-attempts {
+		display: grid;
+		gap: 6px;
+	}
+	.step-attempts > div {
+		display: grid;
+		gap: 3px;
+		border-left: 3px solid #34a853;
+		padding: 7px 8px;
+		background: #f8fafc;
+	}
+	.step-attempts > div.failed {
+		border-left-color: #d93025;
+		background: #fff8f7;
+	}
+	.step-attempts header {
+		display: flex;
+		justify-content: space-between;
+		gap: 8px;
+		color: #1e293b;
+		font: 700 9.5px/1.3 'Manrope', sans-serif;
+	}
+	.step-attempts header span {
+		color: #64748b;
+		text-transform: uppercase;
+	}
+	.step-attempts small {
+		overflow-wrap: anywhere;
+		color: #64748b;
+		font: 600 9px/1.4 monospace;
 	}
 	.execution-timeline {
 		display: grid;
