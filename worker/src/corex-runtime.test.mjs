@@ -40,10 +40,14 @@ function durableWorkflow() {
 
 test('executes an HTTP action with JSON input and an idempotency key', async () => {
 	let captured;
-	const result = await executeHttpAction(action(), { paymentId: 42, amount: 100 }, async (url, init) => {
-		captured = { url, init };
-		return Response.json({ accepted: true }, { status: 202 });
-	});
+	const result = await executeHttpAction(
+		action(),
+		{ paymentId: 42, amount: 100 },
+		async (url, init) => {
+			captured = { url, init };
+			return Response.json({ accepted: true }, { status: 202 });
+		}
+	);
 
 	assert.equal(captured.url, 'https://api.example.com/payments');
 	assert.equal(captured.init.headers.get('Idempotency-Key'), '42');
@@ -161,12 +165,15 @@ test('executes a plan with deterministic durable lifecycle events', async () => 
 		'corex:step-completed:0',
 		'corex:run-completed'
 	]);
-	assert.deepEqual(events.map((event) => [event.sequence, event.status, event.eventType]), [
-		[0, 'running', 'run_started'],
-		[1, 'running', 'step_started'],
-		[2, 'running', 'step_completed'],
-		[3, 'complete', 'run_completed']
-	]);
+	assert.deepEqual(
+		events.map((event) => [event.sequence, event.status, event.eventType]),
+		[
+			[0, 'running', 'run_started'],
+			[1, 'running', 'step_started'],
+			[2, 'running', 'step_completed'],
+			[3, 'complete', 'run_completed']
+		]
+	);
 	assert.deepEqual(result, { accepted: true });
 });
 
@@ -174,14 +181,22 @@ test('projects the completed run output through the success terminal expression'
 	const events = [];
 	const plan = graphPlan([
 		{
-			id: 'shape', name: 'shape-input', type: 'transform', next: 'done',
+			id: 'shape',
+			name: 'shape-input',
+			type: 'transform',
+			next: 'done',
 			config: { mode: 'merge', mappings: { result: '$.payment' } }
 		}
 	]);
 	plan.nodes.at(-1).config.outputExpression = '$.result';
 
 	const output = await executeCorexWorkflow(
-		{ runId: 'run-1', ownerUserId: 'user-1', input: { payment: { id: 'pay-42' }, internal: true }, plan },
+		{
+			runId: 'run-1',
+			ownerUserId: 'user-1',
+			input: { payment: { id: 'pay-42' }, internal: true },
+			plan
+		},
 		durableWorkflow(),
 		async (event) => events.push(event)
 	);
@@ -193,7 +208,7 @@ test('projects the completed run output through the success terminal expression'
 test('returns the complete context when the success terminal has no output expression', async () => {
 	const input = { payment: { id: 'pay-42' } };
 	const output = await executeCorexWorkflow(
-		{ runId: 'run-1', ownerUserId: 'user-1', input, plan: graphPlan([] , 'done') },
+		{ runId: 'run-1', ownerUserId: 'user-1', input, plan: graphPlan([], 'done') },
 		durableWorkflow(),
 		async () => undefined
 	);
@@ -207,22 +222,44 @@ test('transforms context, selects a condition branch, and performs a durable wai
 	const events = [];
 	const plan = graphPlan([
 		{
-			id: 'shape', name: 'shape-input', type: 'transform', next: 'large',
+			id: 'shape',
+			name: 'shape-input',
+			type: 'transform',
+			next: 'large',
 			config: { mode: 'merge', mappings: { normalizedId: '$.payment.id' } }
 		},
 		{
-			id: 'large', name: 'is-large', type: 'condition', whenTrue: 'wait', whenFalse: 'send',
+			id: 'large',
+			name: 'is-large',
+			type: 'condition',
+			whenTrue: 'wait',
+			whenFalse: 'send',
 			config: { path: '$.amount', operator: 'greater-than', value: 100 }
 		},
-		{ id: 'wait', name: 'settlement-delay', type: 'wait', config: { durationMs: 5_000 }, next: 'send' },
+		{
+			id: 'wait',
+			name: 'settlement-delay',
+			type: 'wait',
+			config: { durationMs: 5_000 },
+			next: 'send'
+		},
 		{ ...action(), id: 'send', name: 'send-payment' }
 	]);
 
 	const result = await executeCorexWorkflow(
-		{ runId: 'run-1', ownerUserId: 'user-1', input: { payment: { id: 'pay-42' }, amount: 125 }, plan },
 		{
-			async do(_name, optionsOrCallback, callback) { return (callback ?? optionsOrCallback)(); },
-			async sleep(name, duration) { durableSleeps.push([name, duration]); }
+			runId: 'run-1',
+			ownerUserId: 'user-1',
+			input: { payment: { id: 'pay-42' }, amount: 125 },
+			plan
+		},
+		{
+			async do(_name, optionsOrCallback, callback) {
+				return (callback ?? optionsOrCallback)();
+			},
+			async sleep(name, duration) {
+				durableSleeps.push([name, duration]);
+			}
 		},
 		async (event) => events.push(event),
 		async (_url, init) => {
@@ -233,26 +270,136 @@ test('transforms context, selects a condition branch, and performs a durable wai
 
 	assert.deepEqual(durableSleeps, [['settlement-delay', '5000 milliseconds']]);
 	assert.deepEqual(requests, [{ payment: { id: 'pay-42' }, amount: 125, normalizedId: 'pay-42' }]);
-	assert.deepEqual(events.map((event) => event.sequence), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+	assert.deepEqual(
+		events.map((event) => event.sequence),
+		[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+	);
 	assert.deepEqual(result, { accepted: true });
+});
+
+test('selects typed switch cases and falls back to the default route', async () => {
+	const switchStep = {
+		id: 'currency-switch',
+		name: 'route-by-currency',
+		type: 'switch',
+		config: {
+			path: '$.currency',
+			cases: [
+				{ id: 'uah', value: 'UAH' },
+				{ id: 'numeric', value: 980 }
+			]
+		},
+		targets: { uah: 'uah-result', numeric: 'numeric-result' },
+		defaultTarget: 'default-result'
+	};
+	const terminal = (id, outputExpression) => ({
+		id,
+		name: id,
+		type: 'end-success',
+		config: { outputExpression }
+	});
+	const plan = {
+		schemaVersion: 1,
+		processId: 'process-1',
+		revision: 1,
+		entryNodeId: switchStep.id,
+		nodes: [
+			switchStep,
+			terminal('uah-result', '$.uah'),
+			terminal('numeric-result', '$.numeric'),
+			terminal('default-result', '$.fallback')
+		]
+	};
+
+	const matched = await executeCorexWorkflow(
+		{
+			runId: 'run-uah',
+			ownerUserId: 'user-1',
+			input: { currency: 'UAH', uah: 'matched', fallback: 'default' },
+			plan
+		},
+		durableWorkflow(),
+		async () => undefined
+	);
+	const defaulted = await executeCorexWorkflow(
+		{
+			runId: 'run-default',
+			ownerUserId: 'user-1',
+			input: { currency: '980', numeric: 'wrong-type', fallback: 'default' },
+			plan
+		},
+		durableWorkflow(),
+		async () => undefined
+	);
+
+	assert.equal(matched, 'matched');
+	assert.equal(defaulted, 'default');
+});
+
+test('performs an absolute durable wait and records it as waiting', async () => {
+	const durableSleeps = [];
+	const events = [];
+	const timestamp = '2026-09-02T08:30:00.000Z';
+	const plan = graphPlan([
+		{
+			id: 'deadline',
+			name: 'settlement-window',
+			type: 'wait-until',
+			config: { timestamp },
+			next: 'done'
+		}
+	]);
+
+	await executeCorexWorkflow(
+		{ runId: 'run-1', ownerUserId: 'user-1', input: {}, plan },
+		{
+			async do(_name, optionsOrCallback, callback) {
+				return (callback ?? optionsOrCallback)();
+			},
+			async sleepUntil(name, deadline) {
+				durableSleeps.push([name, deadline]);
+			}
+		},
+		async (event) => events.push(event)
+	);
+
+	assert.equal(durableSleeps.length, 1);
+	assert.equal(durableSleeps[0][0], 'settlement-window');
+	assert.ok(durableSleeps[0][1] instanceof Date);
+	assert.equal(durableSleeps[0][1].toISOString(), timestamp);
+	assert.equal(events.find((event) => event.stepName === 'settlement-window').status, 'waiting');
 });
 
 test('takes the false condition branch without sleeping', async () => {
 	const durableSleeps = [];
 	const plan = graphPlan([
 		{
-			id: 'large', name: 'is-large', type: 'condition', whenTrue: 'wait', whenFalse: 'send',
+			id: 'large',
+			name: 'is-large',
+			type: 'condition',
+			whenTrue: 'wait',
+			whenFalse: 'send',
 			config: { path: '$.amount', operator: 'greater-than', value: 100 }
 		},
-		{ id: 'wait', name: 'settlement-delay', type: 'wait', config: { durationMs: 5_000 }, next: 'send' },
+		{
+			id: 'wait',
+			name: 'settlement-delay',
+			type: 'wait',
+			config: { durationMs: 5_000 },
+			next: 'send'
+		},
 		{ ...action(), id: 'send', name: 'send-payment' }
 	]);
 
 	await executeCorexWorkflow(
 		{ runId: 'run-1', ownerUserId: 'user-1', input: { amount: 25 }, plan },
 		{
-			async do(_name, optionsOrCallback, callback) { return (callback ?? optionsOrCallback)(); },
-			async sleep(name, duration) { durableSleeps.push([name, duration]); }
+			async do(_name, optionsOrCallback, callback) {
+				return (callback ?? optionsOrCallback)();
+			},
+			async sleep(name, duration) {
+				durableSleeps.push([name, duration]);
+			}
 		},
 		async () => undefined,
 		async () => Response.json({ accepted: true })
@@ -263,10 +410,14 @@ test('takes the false condition branch without sleeping', async () => {
 
 test('waits for an external event and adds its payload to process context', async () => {
 	const eventWaits = [];
+	const events = [];
 	const requests = [];
 	const plan = graphPlan([
 		{
-			id: 'approval', name: 'wait-for-approval', type: 'wait-event', next: 'send',
+			id: 'approval',
+			name: 'wait-for-approval',
+			type: 'wait-event',
+			next: 'send',
 			config: { eventType: 'payment-approved', timeoutMs: 86_400_000, resultKey: 'approval' }
 		},
 		{ ...action(), id: 'send', name: 'send-payment' }
@@ -275,29 +426,224 @@ test('waits for an external event and adds its payload to process context', asyn
 	const result = await executeCorexWorkflow(
 		{ runId: 'run-1', ownerUserId: 'user-1', input: { paymentId: 'pay-42' }, plan },
 		{
-			async do(_name, optionsOrCallback, callback) { return (callback ?? optionsOrCallback)(); },
+			async do(_name, optionsOrCallback, callback) {
+				return (callback ?? optionsOrCallback)();
+			},
 			async sleep() {},
 			async waitForEvent(name, options) {
 				eventWaits.push([name, options]);
 				return { payload: { approved: true, approvedBy: 'owner-1' } };
 			}
 		},
-		async () => undefined,
+		async (event) => events.push(event),
 		async (_url, init) => {
 			requests.push(JSON.parse(init.body));
 			return Response.json({ accepted: true });
 		}
 	);
 
-	assert.deepEqual(eventWaits, [[
-		'wait-for-approval',
-		{ type: 'payment-approved', timeout: '86400000 milliseconds' }
-	]]);
-	assert.deepEqual(requests, [{
-		paymentId: 'pay-42',
-		approval: { approved: true, approvedBy: 'owner-1' }
-	}]);
+	assert.deepEqual(eventWaits, [
+		['wait-for-approval', { type: 'corex-wait-run-1-1-1', timeout: '86400000 milliseconds' }]
+	]);
+	assert.deepEqual(events[1].payload, {
+		stepId: 'approval',
+		stepType: 'wait-event',
+		eventType: 'payment-approved',
+		waitEventType: 'corex-wait-run-1-1-1'
+	});
+	assert.deepEqual(requests, [
+		{
+			paymentId: 'pay-42',
+			approval: { approved: true, approvedBy: 'owner-1' }
+		}
+	]);
 	assert.deepEqual(result, { accepted: true });
+});
+
+test('starts a subprocess and waits durably for its correlated result', async () => {
+	const starts = [];
+	const waits = [];
+	const plan = graphPlan([
+		{
+			id: 'invoice',
+			name: 'create-invoice',
+			type: 'invoke-process',
+			next: 'done',
+			config: {
+				processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				inputPath: '$.payment',
+				resultKey: 'invoice',
+				timeoutMs: 2_592_000_000
+			}
+		}
+	]);
+	plan.nodes.at(-1).config.outputExpression = '$.invoice';
+
+	const output = await executeCorexWorkflow(
+		{ runId: 'parent-run', ownerUserId: 'user-1', input: { payment: { id: 'pay-42' } }, plan },
+		{
+			async do(_name, optionsOrCallback, callback) {
+				return (callback ?? optionsOrCallback)();
+			},
+			async waitForEvent(name, options) {
+				waits.push([name, options]);
+				return {
+					payload: { childRunId: 'child-run', status: 'complete', output: { id: 'inv-1' } }
+				};
+			}
+		},
+		async () => undefined,
+		fetch,
+		async (step, input, parent) => {
+			starts.push({ step, input, parent });
+			return { childRunId: 'child-run', workflowInstanceId: 'child-workflow' };
+		}
+	);
+
+	assert.deepEqual(starts[0].input, { id: 'pay-42' });
+	assert.deepEqual(starts[0].parent, { runId: 'parent-run', ownerUserId: 'user-1' });
+	assert.deepEqual(waits, [
+		[
+			'create-invoice:result',
+			{ type: 'corex-subprocess-result:child-run', timeout: '2592000000 milliseconds' }
+		]
+	]);
+	assert.deepEqual(output, { id: 'inv-1' });
+});
+
+test('terminates a child durably when waiting for its result fails', async () => {
+	const durableSteps = [];
+	const terminations = [];
+	const events = [];
+	const plan = graphPlan([
+		{
+			id: 'invoice',
+			name: 'create-invoice',
+			type: 'invoke-process',
+			next: 'done',
+			config: {
+				processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				inputPath: '$',
+				resultKey: 'invoice',
+				timeoutMs: 60_000
+			}
+		}
+	]);
+
+	await assert.rejects(
+		executeCorexWorkflow(
+			{ runId: 'parent-run', ownerUserId: 'user-1', input: {}, plan },
+			{
+				async do(name, optionsOrCallback, callback) {
+					durableSteps.push(name);
+					return (callback ?? optionsOrCallback)();
+				},
+				async waitForEvent() {
+					throw new Error('private timeout details');
+				}
+			},
+			async (event) => events.push(event),
+			fetch,
+			async () => ({ childRunId: 'child-run', workflowInstanceId: 'child-workflow' }),
+			async (step, child, parent) => terminations.push({ stepId: step.id, child, parent })
+		),
+		/private timeout details/
+	);
+
+	assert.deepEqual(terminations, [
+		{
+			stepId: 'invoice',
+			child: { childRunId: 'child-run', workflowInstanceId: 'child-workflow' },
+			parent: { runId: 'parent-run', ownerUserId: 'user-1' }
+		}
+	]);
+	assert.equal(durableSteps.includes('create-invoice:terminate-child'), true);
+	assert.deepEqual(events.at(-1).error, { code: 'process_step_failed', stepId: 'invoice' });
+	assert.equal(JSON.stringify(events).includes('private timeout details'), false);
+});
+
+test('fails the parent without exposing subprocess error details', async () => {
+	const events = [];
+	let terminationCount = 0;
+	const plan = graphPlan([
+		{
+			id: 'invoice',
+			name: 'create-invoice',
+			type: 'invoke-process',
+			next: 'done',
+			config: {
+				processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				inputPath: '$',
+				resultKey: 'invoice',
+				timeoutMs: 86_400_000
+			}
+		}
+	]);
+
+	await assert.rejects(
+		executeCorexWorkflow(
+			{ runId: 'parent-run', ownerUserId: 'user-1', input: {}, plan },
+			{
+				async do(_name, optionsOrCallback, callback) {
+					return (callback ?? optionsOrCallback)();
+				},
+				async waitForEvent() {
+					return {
+						payload: { childRunId: 'child-run', status: 'errored', error: 'secret child error' }
+					};
+				}
+			},
+			async (event) => events.push(event),
+			fetch,
+			async () => ({ childRunId: 'child-run', workflowInstanceId: 'child-workflow' }),
+			async () => {
+				terminationCount += 1;
+			}
+		),
+		/Subprocess failed\./
+	);
+
+	assert.equal(JSON.stringify(events).includes('secret child error'), false);
+	assert.deepEqual(events.at(-1).error, { code: 'process_step_failed', stepId: 'invoice' });
+	assert.equal(terminationCount, 0);
+});
+
+test('preserves the original wait failure when child cleanup fails', async () => {
+	const plan = graphPlan([
+		{
+			id: 'invoice',
+			name: 'create-invoice',
+			type: 'invoke-process',
+			next: 'done',
+			config: {
+				processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				inputPath: '$',
+				resultKey: 'invoice',
+				timeoutMs: 60_000
+			}
+		}
+	]);
+
+	await assert.rejects(
+		executeCorexWorkflow(
+			{ runId: 'parent-run', ownerUserId: 'user-1', input: {}, plan },
+			{
+				async do(_name, optionsOrCallback, callback) {
+					return (callback ?? optionsOrCallback)();
+				},
+				async waitForEvent() {
+					throw new Error('original wait timeout');
+				}
+			},
+			async () => undefined,
+			fetch,
+			async () => ({ childRunId: 'child-run', workflowInstanceId: 'child-workflow' }),
+			async () => {
+				throw new Error('private cleanup failure');
+			}
+		),
+		/original wait timeout/
+	);
 });
 
 test('records a sanitized terminal event when a process step fails', async () => {
@@ -336,29 +682,119 @@ test('records a sanitized terminal event when a process step fails', async () =>
 test('waits for and audits a validated human approval decision', async () => {
 	const events = [];
 	const calls = [];
-	const output = await executeCorexWorkflow({
-		runId: 'run-approval', ownerUserId: 'user-1', input: { amount: 900 },
-		plan: {
-			schemaVersion: 1, processId: 'process-1', revision: 1, entryNodeId: 'approval',
-			nodes: [
-				{ id: 'approval', name: 'review-payment', type: 'approval', config: { assigneeUserId: 'user-1', timeoutMs: 86400000, resultKey: 'approval' }, next: 'success' },
-				{ id: 'success', name: 'return-success', type: 'end-success', config: {} }
-			]
-		}
-	}, {
-		async do(name, optionsOrCallback, maybeCallback) {
-			const callback = maybeCallback ?? optionsOrCallback;
-			return callback();
+	const output = await executeCorexWorkflow(
+		{
+			runId: 'run-approval',
+			ownerUserId: 'user-1',
+			input: { amount: 900 },
+			plan: {
+				schemaVersion: 1,
+				processId: 'process-1',
+				revision: 1,
+				entryNodeId: 'approval',
+				nodes: [
+					{
+						id: 'approval',
+						name: 'review-payment',
+						type: 'approval',
+						config: { assigneeUserId: 'user-1', timeoutMs: 86400000, resultKey: 'approval' },
+						whenApproved: 'success',
+						whenRejected: 'rejected'
+					},
+					{
+						id: 'success',
+						name: 'return-success',
+						type: 'end-success',
+						config: { outputExpression: '$.approval.decision' }
+					},
+					{ id: 'rejected', name: 'return-rejected', type: 'end-success', config: {} }
+				]
+			}
 		},
-		async sleep() {},
-		async waitForEvent(name, options) {
-			calls.push([name, options]);
-			return { payload: { decision: 'approved', comment: 'Verified', actorUserId: 'user-1' } };
-		}
-	}, async (event) => events.push(event));
+		{
+			async do(name, optionsOrCallback, maybeCallback) {
+				const callback = maybeCallback ?? optionsOrCallback;
+				return callback();
+			},
+			async sleep() {},
+			async waitForEvent(name, options) {
+				calls.push([name, options]);
+				return { payload: { decision: 'approved', comment: 'Verified', actorUserId: 'user-1' } };
+			}
+		},
+		async (event) => events.push(event)
+	);
 
-	assert.deepEqual(calls, [['review-payment', { type: 'corex-approval', timeout: '86400000 milliseconds' }]]);
-	assert.deepEqual(events[1].payload, { stepId: 'approval', stepType: 'approval', assigneeUserId: 'user-1', timeoutMs: 86400000 });
-	assert.deepEqual(output, { amount: 900, approval: { decision: 'approved', comment: 'Verified', actorUserId: 'user-1' } });
-	assert.deepEqual(events[2].payload.decision, { decision: 'approved', comment: 'Verified', actorUserId: 'user-1' });
+	assert.deepEqual(calls, [
+		['review-payment', { type: 'corex-wait-run-approval-1-1', timeout: '86400000 milliseconds' }]
+	]);
+	assert.deepEqual(events[1].payload, {
+		stepId: 'approval',
+		stepType: 'approval',
+		assigneeUserId: 'user-1',
+		timeoutMs: 86400000,
+		waitEventType: 'corex-wait-run-approval-1-1'
+	});
+	assert.equal(output, 'approved');
+	assert.deepEqual(events[2].payload.decision, {
+		decision: 'approved',
+		comment: 'Verified',
+		actorUserId: 'user-1'
+	});
+	assert.equal(events[2].payload.nextNodeId, 'success');
+});
+
+test('routes a rejected human approval through the rejected transition', async () => {
+	const events = [];
+	const output = await executeCorexWorkflow(
+		{
+			runId: 'run-rejected',
+			ownerUserId: 'user-1',
+			input: { amount: 900 },
+			plan: {
+				schemaVersion: 1,
+				processId: 'process-1',
+				revision: 1,
+				entryNodeId: 'approval',
+				nodes: [
+					{
+						id: 'approval',
+						name: 'review-payment',
+						type: 'approval',
+						config: { assigneeUserId: 'user-1', timeoutMs: 86400000, resultKey: 'approval' },
+						whenApproved: 'approved',
+						whenRejected: 'rejected'
+					},
+					{ id: 'approved', name: 'return-approved', type: 'end-success', config: {} },
+					{
+						id: 'rejected',
+						name: 'return-rejected',
+						type: 'end-success',
+						config: { outputExpression: '$.approval.decision' }
+					}
+				]
+			}
+		},
+		{
+			async do(name, optionsOrCallback, maybeCallback) {
+				const callback = maybeCallback ?? optionsOrCallback;
+				return callback();
+			},
+			async sleep() {},
+			async waitForEvent() {
+				return {
+					payload: { decision: 'rejected', comment: 'Missing invoice', actorUserId: 'user-1' }
+				};
+			}
+		},
+		async (event) => events.push(event)
+	);
+
+	assert.equal(output, 'rejected');
+	assert.equal(events[2].payload.nextNodeId, 'rejected');
+	assert.deepEqual(events[2].payload.decision, {
+		decision: 'rejected',
+		comment: 'Missing invoice',
+		actorUserId: 'user-1'
+	});
 });

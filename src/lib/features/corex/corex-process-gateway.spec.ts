@@ -66,12 +66,21 @@ describe('Corex process gateway', () => {
 		const from = vi.fn().mockReturnValueOnce(savedBuilder).mockReturnValueOnce(conflictBuilder);
 		const gateway = createCorexProcessGateway({ from } as unknown as SupabaseClient);
 		const process = {
-			id: 'process-1', ownerUserId: 'user-1', slug: 'payment-callback', name: 'Draft', description: '',
-			lifecycle: 'draft' as const, revision: 1, draftDefinition: createStarterProcessDefinition(),
-			publishedVersion: null, updatedAt: '2026-08-30T12:00:00.000Z'
+			id: 'process-1',
+			ownerUserId: 'user-1',
+			slug: 'payment-callback',
+			name: 'Draft',
+			description: '',
+			lifecycle: 'draft' as const,
+			revision: 1,
+			draftDefinition: createStarterProcessDefinition(),
+			publishedVersion: null,
+			updatedAt: '2026-08-30T12:00:00.000Z'
 		};
 
-		await expect(gateway.saveDraft(process, process.draftDefinition)).resolves.toMatchObject({ revision: 2 });
+		await expect(gateway.saveDraft(process, process.draftDefinition)).resolves.toMatchObject({
+			revision: 2
+		});
 		expect(savedBuilder.update).toHaveBeenCalledWith({
 			name: process.draftDefinition.name,
 			description: process.draftDefinition.description,
@@ -80,17 +89,35 @@ describe('Corex process gateway', () => {
 		expect(savedBuilder.eq).toHaveBeenNthCalledWith(1, 'id', 'process-1');
 		expect(savedBuilder.eq).toHaveBeenNthCalledWith(2, 'owner_user_id', 'user-1');
 		expect(savedBuilder.eq).toHaveBeenNthCalledWith(3, 'revision', 1);
-		await expect(gateway.saveDraft(process, process.draftDefinition)).rejects.toBeInstanceOf(CorexDraftConflictError);
+		await expect(gateway.saveDraft(process, process.draftDefinition)).rejects.toBeInstanceOf(
+			CorexDraftConflictError
+		);
 	});
 
 	it('lists process runs newest first through the owner-scoped table', async () => {
 		const builder = query({
-			data: [{
-				id: 'run-1', process_id: 'process-1', process_version_id: 'version-1',
-				workflow_instance_id: 'workflow-1', status: 'running', input: { paymentId: 'pay-42' },
-				output: null, error: null, started_at: '2026-08-30T12:01:00.000Z',
-				finished_at: null, created_at: '2026-08-30T12:00:00.000Z'
-			}],
+			data: [
+				{
+					id: 'run-1',
+					process_id: 'process-1',
+					process_version_id: 'version-1',
+					workflow_instance_id: 'workflow-1',
+					parent_run_id: 'parent-run',
+					parent_step_id: 'charge',
+					depth: 2,
+					execution_generation: 3,
+					status: 'running',
+					input: { paymentId: 'pay-42' },
+					output: null,
+					error: null,
+					rollback_outcome: null,
+					rollback_error: null,
+					archived_at: '2026-09-01T05:00:00.000Z',
+					started_at: '2026-08-30T12:01:00.000Z',
+					finished_at: null,
+					created_at: '2026-08-30T12:00:00.000Z'
+				}
+			],
 			error: null
 		});
 		const client = { from: vi.fn(() => builder) } as unknown as SupabaseClient;
@@ -100,15 +127,36 @@ describe('Corex process gateway', () => {
 		expect(client.from).toHaveBeenCalledWith('corex_runs');
 		expect(builder.eq).toHaveBeenCalledWith('process_id', 'process-1');
 		expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: false });
-		expect(result[0]).toMatchObject({ id: 'run-1', processId: 'process-1', workflowInstanceId: 'workflow-1', status: 'running' });
+		expect(result[0]).toMatchObject({
+			id: 'run-1',
+			processId: 'process-1',
+			workflowInstanceId: 'workflow-1',
+			parentRunId: 'parent-run',
+			parentStepId: 'charge',
+			depth: 2,
+			executionGeneration: 3,
+			status: 'running',
+			rollbackOutcome: null,
+			rollbackError: null,
+			archivedAt: '2026-09-01T05:00:00.000Z'
+		});
 	});
 
-	it('lists run events in deterministic sequence order', async () => {
+	it('lists run events in deterministic generation and sequence order', async () => {
 		const builder = query({
-			data: [{
-				id: 9, run_id: 'run-1', sequence: 2, event_type: 'step_completed', step_name: 'resolve',
-				attempt: 1, payload: { status: 200 }, created_at: '2026-08-30T12:02:00.000Z'
-			}],
+			data: [
+				{
+					id: 9,
+					run_id: 'run-1',
+					execution_generation: 3,
+					sequence: 2,
+					event_type: 'step_completed',
+					step_name: 'resolve',
+					attempt: 1,
+					payload: { status: 200 },
+					created_at: '2026-08-30T12:02:00.000Z'
+				}
+			],
 			error: null
 		});
 		const client = { from: vi.fn(() => builder) } as unknown as SupabaseClient;
@@ -117,17 +165,35 @@ describe('Corex process gateway', () => {
 
 		expect(client.from).toHaveBeenCalledWith('corex_run_events');
 		expect(builder.eq).toHaveBeenCalledWith('run_id', 'run-1');
-		expect(builder.order).toHaveBeenCalledWith('sequence', { ascending: true });
-		expect(result[0]).toMatchObject({ id: 9, runId: 'run-1', sequence: 2, eventType: 'step_completed', stepName: 'resolve' });
+		expect(builder.order).toHaveBeenNthCalledWith(1, 'execution_generation', { ascending: true });
+		expect(builder.order).toHaveBeenNthCalledWith(2, 'sequence', { ascending: true });
+		expect(result[0]).toMatchObject({
+			id: 9,
+			runId: 'run-1',
+			executionGeneration: 3,
+			sequence: 2,
+			eventType: 'step_completed',
+			stepName: 'resolve'
+		});
 	});
 
 	it('lists approval tasks assigned to the authenticated user', async () => {
 		const builder = query({
-			data: [{
-				id: 'task-1', run_id: 'run-1', process_id: 'process-1', step_name: 'review-payment',
-				status: 'pending', deadline_at: '2026-09-01T12:00:00.000Z', decision_comment: null,
-				decided_at: null, created_at: '2026-08-31T12:00:00.000Z'
-			}], error: null
+			data: [
+				{
+					id: 'task-1',
+					run_id: 'run-1',
+					process_id: 'process-1',
+					execution_generation: 3,
+					step_name: 'review-payment',
+					status: 'pending',
+					deadline_at: '2026-09-01T12:00:00.000Z',
+					decision_comment: null,
+					decided_at: null,
+					created_at: '2026-08-31T12:00:00.000Z'
+				}
+			],
+			error: null
 		});
 		const client = { from: vi.fn(() => builder) } as unknown as SupabaseClient;
 
@@ -135,6 +201,11 @@ describe('Corex process gateway', () => {
 
 		expect(client.from).toHaveBeenCalledWith('corex_approval_tasks');
 		expect(builder.eq).toHaveBeenCalledWith('assignee_user_id', 'user-1');
-		expect(result[0]).toMatchObject({ id: 'task-1', runId: 'run-1', status: 'pending' });
+		expect(result[0]).toMatchObject({
+			id: 'task-1',
+			runId: 'run-1',
+			executionGeneration: 3,
+			status: 'pending'
+		});
 	});
 });

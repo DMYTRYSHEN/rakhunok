@@ -5,6 +5,7 @@
 	"compatibility_date": "2026-08-28",
 	"workers_dev": true,
 	"preview_urls": true,
+	"triggers": { "crons": ["* * * * *"] },
 	"workflows": [
 		{
 			"name": "corex-process-preview",
@@ -34,6 +35,7 @@
 			"name": "letsrealtalk-corex",
 			"workers_dev": false,
 			"preview_urls": false,
+			"triggers": { "crons": ["* * * * *"] },
 			"workflows": [
 				{
 					"name": "corex-process-production",

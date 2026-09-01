@@ -1,0 +1,352 @@
+# Corex master implementation plan
+
+Updated: 2026-09-01
+
+This is the canonical delivery plan for Corex. The detailed Cloudflare comparison lives in [CLOUDFLARE_WORKFLOWS_PARITY.md](./CLOUDFLARE_WORKFLOWS_PARITY.md); this document controls implementation priority and completion.
+
+## Goal
+
+Corex becomes the primary control plane for building and operating processes, domains, redirects, database effects, Workers, triggers, and durable executions. Product users work through Corex rather than composing raw Cloudflare or database operations.
+
+Corex must cover the useful capabilities of Cloudflare Workflows, its visualizer, and its management API while adding the domain controls expected from Temporal and Corezoid:
+
+- visual no-code process authoring;
+- trusted validation and compilation;
+- immutable versions and controlled publication;
+- durable execution, retries, waits, events, approvals, and subprocesses;
+- domains, routes, redirects, schedules, and public triggers;
+- database and Worker orchestration;
+- authenticated operations, audit, observability, and reconciliation;
+- recovery from partial failure across the active database adapter, Cloudflare, and external systems.
+
+The required lifecycle is:
+
+`draft -> validate -> persist/version -> publish -> execute -> inspect`
+
+Browser commands express narrow intent. Account IDs, credentials, Workflow instance IDs, script/class names, resolved versions, protected routes, descendant runs, and infrastructure decisions remain server-controlled.
+
+## Status legend
+
+- `Done`: implemented and covered by executable tests.
+- `In progress`: a production path exists, but a required reliability, UI, or integration part remains.
+- `Planned`: not yet implemented.
+- `Blocked`: requires an explicit external decision or unavailable environment.
+
+## P0: mandatory production foundation
+
+All ten P0 epics are required before Corex is treated as the production control plane. Work proceeds in dependency order, with focused executable validation after every slice.
+
+### P0.1 Trusted process definition lifecycle - Done
+
+- Canonical editable `draftDefinition`.
+- Structural and security validation in the browser and trusted server path.
+- Optimistic draft revision checks.
+- Server reload and compile before publication.
+- Immutable published versions and restore-to-new-draft behavior.
+- Server-resolved immutable version when a run or subprocess starts.
+
+Exit criteria:
+
+- Invalid, stale, or browser-authored executable definitions cannot publish or run.
+- Published definitions cannot be mutated in place.
+- Validation, compilation, version, and restore tests remain green.
+
+### P0.2 Durable execution engine - In progress
+
+Covered:
+
+- HTTP, transform, condition, typed switch with a mandatory default route, relative and absolute sleep, external event wait, approval, subprocess, and success nodes.
+- Durable lifecycle events, sanitized failures, retry configuration, and bounded subprocess depth.
+- Correlated child completion callbacks and timeout cleanup.
+
+Critical gaps:
+
+- Bounded deterministic loops and `break`.
+- Parallel fork/join with deterministic step identities and `starts`/`resolves` ordering.
+- `try/catch/finally`, compensation routes, and rollback inspection.
+- Explicit failure terminal.
+- Executable blocks and reusable local functions where subprocesses are too coarse.
+- Complete attempt identity, duration, retry state, and output policy for every durable step.
+
+Exit criteria:
+
+- Every supported graph construct compiles deterministically and survives replay.
+- The runtime and visual graph preserve step, branch, attempt, and subprocess identity.
+- Cloudflare visualizer constructs are covered or have a documented safer Corex equivalent.
+
+### P0.3 Reliable command and event delivery - In progress
+
+Covered:
+
+- Transactional outbox schema, leasing, claim tokens, `SKIP LOCKED`, bounded retries, sanitized failures, and scheduled draining.
+- Durable recursive Workflow termination intents.
+- Approval decisions commit their task transition and Workflow event atomically through the outbox.
+- Generic external events use caller UUIDs, exact replay equality, conflict detection, owner-scoped run locking, reserved namespace protection, and transactional outbox enqueue.
+- Child terminal transitions enqueue parent callbacks atomically with stable semantic keys.
+- Dispatcher support for `workflow_event` and `parent_callback` delivery.
+- Delivery attempts dead-letter after a bounded eighth failure, operator retry is owner-scoped and service-role-only, and aggregate outbox health is available through a trusted RPC.
+- Stale queued runs are leased with claim tokens and bounded retries, then repaired only when their stable Cloudflare Workflow instance ID reports `unknown`; reconciliation health is exposed through a trusted RPC.
+- Generic events and approvals resolve the exact active durable wait before enqueue and deliver through a replay-stable internal type derived from the run ID and lifecycle sequence, so delayed duplicates cannot satisfy a later wait.
+
+Critical gaps:
+
+- No remaining critical gaps are known for the current command and event subset; real PostgreSQL race coverage remains tracked in P0.8.
+
+Exit criteria:
+
+- No accepted command or event is lost when a Worker fails after the database commit.
+- Delivery is at-least-once while process effects remain idempotent.
+- Direct best-effort `sendEvent()` is not the only delivery path anywhere.
+
+### P0.4 Published triggers, domains, routes, and redirects - Planned
+
+Critical gaps:
+
+- Registry for HTTP, webhook, schedule, internal event, and queue triggers pinned to an immutable published version.
+- Controlled public namespace and environment ownership.
+- Method, path, hostname, and route uniqueness.
+- Protected route/domain checks, including the permanent exclusion of `rakhunok.com`.
+- Activation, deactivation, rollback, drift detection, and reconciliation.
+- Cloudflare route, custom-domain, DNS, Worker, and schedule adapter behind the Corex control plane.
+- Redirect creation, ordering, loop detection, collision checks, preview, rollback, and audit.
+- Request authentication/signatures, schema validation, rate limits, body limits, replay protection, and trigger idempotency.
+- Safe handling of custom hostnames and certificates when that later capability is authorized.
+
+Exit criteria:
+
+- Publishing can activate a collision-free trigger without browser access to Cloudflare credentials.
+- Deactivate and rollback restore the previous known-good route state.
+- A reconciliation job detects and repairs or reports Cloudflare drift.
+- No Corex operation can claim or mutate protected domains or neighboring application routes.
+
+### P0.5 Run operations and Cloudflare management parity - In progress
+
+Covered:
+
+- Authenticated single-run start and typed event commands.
+- Recursive idempotent cancellation with descendant locking and durable termination.
+- Owner-scoped run history and lifecycle events.
+- Run inspector cancellation for active runs with pending and accepted/error feedback followed by durable state refresh.
+- Idempotent pause and resume requests persist audited outbox intents; the dispatcher reconciles Cloudflare `waitingForPause`, `paused`, and `running` states before committing the visible run state.
+- Run inspector pause/resume controls expose mutually exclusive pending states, refresh durable history after acceptance, and preserve cancellation while pause convergence is pending.
+- Idempotent same-instance restart from the beginning or an exact Cloudflare `{ name, count, type }` step persists an audited outbox intent while retaining the immutable published process version.
+- Restarted executions use a monotonically increasing generation across events, waits, approvals, callbacks, read models, and inspector history so stale execution data cannot satisfy the new generation.
+- Explicit rollback is separate from cancellation: an idempotent service-role command persists `rolling_back`, dispatches Cloudflare rollback once, polls ambiguous platform state without consuming retry budget, and records the terminal rollback outcome.
+- Rollback request replay returns the current durable run state and outcome rather than reopening or redispatching a completed rollback.
+- Archive is separate from cancellation, rollback, retention purge, and destructive deletion: an idempotent service-role command marks only terminal runs as archived, preserves their execution status and history, emits an audited lifecycle event, and never calls Workflow or enqueues delivery work.
+- Archived runs remain visible in owner-scoped history and cannot re-enter an active execution status.
+
+Critical gaps:
+
+- Define retire, retention purge, and destructive delete as distinct operations from the completed terminate, rollback, and archive semantics.
+- Batch create, batch terminate, and batch delete with bounds, idempotency, partial results, and asynchronous operation status.
+- Workflow list/search and instance cursor pagination with status/date/direction filters.
+- Full Cloudflare-compatible states: queued, running, waiting, waiting-for-pause, paused, rolling-back, complete, errored, and terminated.
+- Per-instance location hints and caller-defined IDs where explicitly needed.
+
+Exit criteria:
+
+- Every mutating operation is authenticated, authorized, idempotent, audited, redacted, and reconciled.
+- Long-running batch operations expose progress and per-item failures.
+- Destructive deletion requires elevated authorization and cannot be confused with cancellation.
+
+### P0.6 Inspection, live state, and visual parity - In progress
+
+Covered:
+
+- Editable graph, validation markers, run selection, ordered lifecycle timeline, inputs, outputs, and sanitized errors.
+- Immutable version history.
+- Active-run cancellation is available in the inspector and exposes its in-flight operation state without hiding the selected run timeline.
+- The inspector exposes explicit rollback separately from cancellation, prevents conflicting controls and events while rollback is active, and displays sanitized rollback success or failure details from the durable read model.
+- The inspector archives eligible terminal runs without hiding them, prevents conflicting lifecycle controls while the request is active, and displays durable archive metadata after refresh.
+
+Critical gaps:
+
+- Stable read-only DAG and graph projection for each published version.
+- Standalone process diagram component with two read-only projections: a definition/version topology and a selected-run sequence. Generate Mermaid source from trusted `ProcessDefinition` and ordered run events through pure deterministic projectors, render with a local dependency under strict security settings, and cover escaping, branches, waits, retries, subprocesses, terminal states, empty states, and render failures. The component must remain independent from the editable canvas and must not become a second compiler.
+- Runtime overlays for active, waiting, retrying, paused, failed, completed, and rolled-back paths.
+- Collapsed and expanded nested conditions, loops, blocks, functions, and parallel lanes.
+- Attempt list, durations, errors, and full step output retrieval with size and redaction policies.
+- External-object or streaming strategy for outputs that should not be stored inline.
+- Resumable live event subscription with cursor and event filters.
+- Workflow/version diff and run comparison.
+- Search and filters across processes, runs, events, and operation jobs.
+
+Exit criteria:
+
+- An operator can explain the current and historical execution path without opening Cloudflare Dashboard.
+- Operators can open the standalone diagram for the active draft, an immutable published version, or a selected run without loading executable code from a CDN or accepting arbitrary Mermaid source.
+- Refresh or reconnect does not lose live events.
+- Graph, timeline, and full step details share stable identities.
+
+### P0.7 Connector and data-plane safety - In progress
+
+Covered:
+
+- HTTPS-only HTTP actions, public-target checks, timeout/retry bounds, idempotency key support, response-size limits, and sanitized upstream errors.
+
+Critical gaps:
+
+- DNS rebinding-resistant egress validation at connection time.
+- Redirect revalidation and redirect-count limits.
+- Explicit allow/deny policy for hosts, ports, methods, and content types.
+- Credential references from a server-side secret store, never raw browser values.
+- Per-connector rate limits, concurrency, circuit breaking, and budgets.
+- Typed database, D1, KV, R2, Queue, Hyperdrive, Worker service, email, bank, and custom-function connectors.
+- Transaction and idempotency rules for database mutations.
+- Input/output schemas, mapping previews, fixtures, redaction, and bounded persistence.
+
+Exit criteria:
+
+- Connectors cannot reach private or metadata networks through redirects or DNS changes.
+- Secrets do not enter definitions, logs, events, or browser responses.
+- Every side-effecting connector documents and tests its idempotency behavior.
+
+### P0.8 Database, lifecycle, and reconciliation - In progress
+
+Covered:
+
+- Local migrations for process control, approvals, subprocesses, cancellation, and outbox delivery.
+- RLS-oriented browser access and service-role-only mutation RPCs.
+- Observable, repeatable DB-to-Workflow reconciliation for stale queued root and subprocess runs, with lease protection and create-only-on-`unknown` duplicate prevention.
+- Pause/resume lifecycle intents use leased outbox delivery and atomic platform-state reconciliation; `waitingForPause` releases its lease without consuming retry budget, and cancellation/child cleanup treat pause convergence as active.
+- Restart persistence, generation rollover, and stale-generation isolation have static SQL contract coverage; transactional race behavior still requires execution against a real PostgreSQL runtime.
+- Rollback persistence uses a leased outbox intent with a durable platform-accepted marker, terminal outcome validation, current-state idempotent replay, and static SQL contract coverage; transactional race behavior still requires execution against a real PostgreSQL runtime.
+- Archive persistence uses a direct transactional service-role RPC with owner/request replay equality, row locking, durable audit events, status preservation, and a database constraint that keeps archived runs terminal; it has static SQL contract coverage and no Workflow/outbox side effects.
+
+Critical gaps:
+
+- Execute all migrations against local Supabase/PostgreSQL, not only static SQL contracts.
+- Concurrency tests for cancellation, subprocess creation, repeated commands, leases, stale claims, and event replay.
+- Detect and report or repair Workflow instances without valid DB runs when a safe enumerable Workflow inventory is available.
+- Retention policy for successful and errored instances, events, step outputs, outbox records, and operation jobs.
+- Account and per-workflow concurrency limits, maximum step limits, quotas, and backpressure.
+- Safe retention purge jobs, destructive-delete authorization, legal-hold handling, and referential-integrity checks.
+- Schema/API compatibility and forward-only migration policy.
+
+Exit criteria:
+
+- Local integration tests prove owner isolation, RLS, atomicity, idempotency, and race behavior on real PostgreSQL.
+- Reconciliation is repeatable, observable, and cannot create duplicate execution.
+- Retention and purge preserve required audit records.
+
+### P0.9 Security, testing, and operations - In progress
+
+Covered:
+
+- Focused Worker and unit suites, Wrangler dry-runs, sanitized errors, narrow browser commands, and Cloudflare observability configuration.
+
+Critical gaps:
+
+- Authenticated browser E2E for author, save, validate, publish, run, event, approval, cancellation, and inspection.
+- Failure injection across database commit, Workflow creation, event send, callback, timeout, cancellation, and outbox acknowledgement.
+- Structured logs, correlation IDs, metrics, traces, dashboards, alerts, and operator runbooks.
+- Rate limits, payload limits, per-owner quotas, abuse controls, and cost guards.
+- Roles and permissions for author, publisher, operator, approver, infrastructure admin, and destructive-operation admin.
+- Secret rotation and Cloudflare token-scope verification.
+- Backup, restore, incident recovery, and data export.
+- Compatibility contracts against the current Cloudflare OpenAPI surface.
+
+Exit criteria:
+
+- P0 workflows pass local database, Worker integration, browser E2E, and failure-injection suites.
+- Alerts cover stuck runs, outbox backlog, reconciliation drift, error-rate spikes, and quota pressure.
+- No deployment or remote migration occurs without explicit authorization and a recorded release gate.
+
+### P0.10 Persistence portability and database adapters - Planned
+
+The current Supabase/PostgreSQL implementation remains the reference production adapter. This epic introduces an explicit persistence boundary so Corex can add Turso/libSQL and other databases without changing process, command, inspector, or Worker contracts.
+
+Deliverables:
+
+- A vendor-neutral persistence port for process definitions, immutable versions, runs, lifecycle events, waits, approvals, subprocesses, command/event outboxes, leases, reconciliation, audit, and retention operations.
+- A Supabase/PostgreSQL adapter behind that port, preserving the existing RPC, RLS, transaction, locking, and service-role behavior rather than replacing it.
+- Adapter capability profiles for transactions, row locking, compare-and-swap, isolation, server-side authorization, change feeds, JSON, generated values, and migration behavior.
+- A Turso/libSQL compatibility adapter whose application-layer transactions, tenant authorization, optimistic concurrency, leases, and idempotency provide the same externally observable Corex guarantees.
+- Backend selection through trusted server configuration and dependency injection; process definitions and browser payloads cannot select credentials or bypass the configured adapter.
+- Backend-specific forward-only migrations and schema-version compatibility checks, with no runtime attempt to execute PostgreSQL SQL against libSQL or vice versa.
+- A shared persistence contract suite covering owner isolation, atomic command acceptance, replay equality, generation isolation, outbox claiming, lease expiry, stale claims, rollback reconciliation, and retention integrity for every supported adapter.
+- Failure-injection and concurrency suites per adapter; an adapter remains experimental until its capability gaps and degraded guarantees are explicit and accepted.
+- ADRs for the persistence port, capability negotiation, tenancy enforcement outside PostgreSQL RLS, and consistency requirements that adapters may not weaken.
+
+Exit criteria:
+
+- Corex business logic, API contracts, Workflow orchestration, and inspector read models do not import a Supabase or database-specific client directly.
+- Supabase remains fully supported and passes the shared adapter suite without behavioral regression.
+- Turso/libSQL passes the shared contract suite for its declared production capability profile before it can be enabled outside local or preview environments.
+- Unsupported database capabilities fail closed during startup or publication; Corex never silently downgrades atomicity, authorization, idempotency, or audit guarantees.
+- Adding another database requires a new adapter, migrations, capability declaration, and contract-suite implementation rather than changes throughout Corex domain code.
+
+## P1: complete platform capability
+
+P1 begins after all P0 exit criteria pass.
+
+### P1.1 System best-practices and ADR catalog for AI flow design - Planned
+
+Deliverables:
+
+- Versioned ADRs recording context, decisions, rejected alternatives, invariants, risks, and implementation evidence.
+- Curated flow patterns for durable commands, idempotency, retries, waits, approvals, subprocesses, compensation, rollback, reconciliation, and connector safety.
+- Explicit anti-patterns with failure modes and approved alternatives; raw chat transcripts are supporting evidence, not authoritative guidance.
+- Machine-readable pattern metadata with applicability, constraints, Cloudflare and database-adapter compatibility, verification date, and lifecycle status.
+- Executable flow examples and eval fixtures that test generated graphs against compiler, policy, replay, security, and recovery invariants.
+- Retrieval rules that prefer current verified guidance, preserve provenance, and exclude deprecated or unverified advice from generation context.
+- Human review and promotion workflow for moving guidance through `proposed`, `verified`, and `deprecated` states.
+
+Exit criteria:
+
+- AI flow generation and review consume the versioned catalog rather than relying on conversation history or undocumented assumptions.
+- Every verified pattern links to implementation evidence and executable tests; stale platform assumptions carry a review date or are excluded.
+- Generated flows are evaluated against deterministic compilation, safety, idempotency, and rollback/recovery rules before publication.
+- Conflicting guidance is resolved through an ADR and cannot silently coexist as active generation policy.
+
+### Remaining P1 epics
+
+1. Full node catalog: database, D1, KV, R2, Queue, Hyperdrive, email, Worker service, bank, storage, and custom functions.
+2. Environment promotion across local, preview, staging, and production with definition, route, binding, and secret diffs.
+3. Process templates, reusable modules, organization libraries, imports, exports, and generated TypeScript.
+4. OpenAPI and documentation ingestion into a typed intermediate process graph with explicit assumptions.
+5. AI-assisted generation, repair, test generation, and visual diff with mandatory human review, grounded in the P1.1 catalog.
+6. Advanced schedules, calendars, time zones, missed-run policy, and backfill.
+7. Advanced operations: retry from failure, replay, fork from history, compensating runs, and bulk remediation.
+8. Multi-user collaboration, comments, review requests, approvals, ownership transfer, and audit export.
+9. Operational analytics for throughput, duration, queue time, retries, failures, connector health, and cost.
+10. Cloudflare account settings, workflow configuration, deployed-version metadata, DAG, graph, and live event adapters available through trusted Corex APIs.
+
+## P2: differentiated orchestration platform
+
+1. Multi-tenant organizations, projects, environments, policy inheritance, and delegated administration.
+2. Domain purchase and broad DNS/certificate lifecycle after a separate security and billing review.
+3. Cross-region and provider-independent execution adapters where Cloudflare alone is insufficient.
+4. Long-running business calendars, SLAs, escalations, and human work queues.
+5. Process simulation, deterministic dry-run, fixtures, time travel, and capacity planning.
+6. Marketplace for connectors, process templates, policies, and organization modules.
+7. Governance: separation of duties, compliance retention, legal hold, signed releases, and provenance.
+8. Compatibility adapters for Temporal/Corezoid concepts and migration tooling without weakening Corex guarantees.
+
+## Cross-cutting rules
+
+- Work only inside `D:\svetle\corex`; never modify `D:\svetle\core`.
+- Preserve exact 5px horizontal page margins.
+- Use `http://localhost:5173/corex` for local browser verification.
+- Never deploy or apply remote Supabase migrations without explicit authorization.
+- Do not expose Cloudflare, Supabase, Turso, or other database service credentials to the browser.
+- Prefer local bindings and trusted adapters over direct browser access to management APIs.
+- Keep database-specific clients, SQL, authorization mechanisms, and migration code inside their persistence adapters; shared domain code depends only on the persistence port.
+- Treat Supabase/PostgreSQL as the reference adapter, not as the only supported database contract.
+- Do not claim adapter parity from API shape alone; prove transaction, tenancy, idempotency, lease, reconciliation, and failure semantics with the shared contract suite.
+- Keep accepted commands durable and idempotent across retries and partial failures.
+- Preserve user changes in a dirty worktree and avoid unrelated refactors.
+- Re-read user-modified Svelte files before editing and validate Svelte changes with the official Svelte tools.
+
+## Definition of complete
+
+Corex is complete for the stated product goal when:
+
+- all ten P0 epics satisfy their exit criteria;
+- every Cloudflare Workflows parity row is covered or has an approved safer Corex equivalent;
+- process authors can build, validate, publish, trigger, operate, and inspect without leaving Corex;
+- infrastructure administrators can manage authorized domains, routes, redirects, schedules, Workers, and retention through audited Corex controls;
+- database and connector effects are typed, idempotent, observable, and recoverable;
+- local integration, browser E2E, failure-injection, security, and compatibility suites pass;
+- production activation remains an explicit separately authorized action.

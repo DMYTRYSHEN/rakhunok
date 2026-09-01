@@ -11,6 +11,28 @@ export type CorexStartedRun = {
 	status: string;
 };
 
+export type CorexCancelledRun = {
+	id: string;
+	status: string;
+	accepted: true;
+};
+
+export type CorexLifecycleRun = CorexCancelledRun;
+
+export type CorexArchivedRun = CorexLifecycleRun & {
+	archivedAt: string;
+};
+
+export type CorexRestartFrom = {
+	name: string;
+	count?: number;
+	type?: 'do' | 'sleep' | 'waitForEvent';
+};
+
+export type CorexRestartedRun = CorexLifecycleRun & {
+	executionGeneration: number;
+};
+
 export type CorexCommandErrorCode =
 	| 'authentication_required'
 	| 'revision_conflict'
@@ -42,7 +64,8 @@ function errorCode(status: number): CorexCommandErrorCode {
 
 export function createCorexCommandGateway(
 	client: SupabaseClient,
-	fetcher: typeof fetch = fetch
+	fetcher: typeof fetch = fetch,
+	createEventId: () => string = () => crypto.randomUUID()
 ) {
 	async function command<T>(
 		path: string,
@@ -61,7 +84,11 @@ export function createCorexCommandGateway(
 			},
 			body: JSON.stringify(body)
 		});
-		if (!response.ok) throw new CorexCommandError(statusCodes[response.status] ?? errorCode(response.status), response.status);
+		if (!response.ok)
+			throw new CorexCommandError(
+				statusCodes[response.status] ?? errorCode(response.status),
+				response.status
+			);
 		return response.json() as Promise<T>;
 	}
 
@@ -76,11 +103,78 @@ export function createCorexCommandGateway(
 			return command(`/corex/api/processes/${encodeURIComponent(processId)}/runs`, { input });
 		},
 
-		signal(runId: string, type: string, payload: unknown): Promise<{ accepted: true }> {
-			return command(`/corex/api/runs/${encodeURIComponent(runId)}/events`, { type, payload }, {
-				404: 'run_not_found',
-				409: 'run_not_accepting_event'
-			});
+		cancel(runId: string, requestId: string): Promise<CorexCancelledRun> {
+			return command(
+				`/corex/api/runs/${encodeURIComponent(runId)}/cancel`,
+				{ requestId },
+				{
+					404: 'run_not_found',
+					409: 'command_failed'
+				}
+			);
+		},
+
+		pause(runId: string, requestId: string): Promise<CorexLifecycleRun> {
+			return command(
+				`/corex/api/runs/${encodeURIComponent(runId)}/pause`,
+				{ requestId },
+				{ 404: 'run_not_found', 409: 'command_failed' }
+			);
+		},
+
+		resume(runId: string, requestId: string): Promise<CorexLifecycleRun> {
+			return command(
+				`/corex/api/runs/${encodeURIComponent(runId)}/resume`,
+				{ requestId },
+				{ 404: 'run_not_found', 409: 'command_failed' }
+			);
+		},
+
+		restart(runId: string, requestId: string, from?: CorexRestartFrom): Promise<CorexRestartedRun> {
+			return command(
+				`/corex/api/runs/${encodeURIComponent(runId)}/restart`,
+				{ requestId, ...(from ? { from } : {}) },
+				{ 404: 'run_not_found', 409: 'command_failed' }
+			);
+		},
+
+		rollback(runId: string, requestId: string): Promise<CorexLifecycleRun> {
+			return command(
+				`/corex/api/runs/${encodeURIComponent(runId)}/rollback`,
+				{ requestId },
+				{ 404: 'run_not_found', 409: 'command_failed' }
+			);
+		},
+
+		archive(runId: string, requestId: string): Promise<CorexArchivedRun> {
+			return command(
+				`/corex/api/runs/${encodeURIComponent(runId)}/archive`,
+				{ requestId },
+				{ 404: 'run_not_found', 409: 'command_failed' }
+			);
+		},
+
+		signalExternal(runId: string, type: string, payload: unknown): Promise<{ accepted: true }> {
+			const eventId = createEventId();
+			return command(
+				`/corex/api/runs/${encodeURIComponent(runId)}/events`,
+				{ eventId, type, payload },
+				{
+					404: 'run_not_found',
+					409: 'run_not_accepting_event'
+				}
+			);
+		},
+
+		decideApproval(runId: string, payload: unknown): Promise<{ accepted: true }> {
+			return command(
+				`/corex/api/runs/${encodeURIComponent(runId)}/events`,
+				{ type: 'corex-approval', payload },
+				{
+					404: 'run_not_found',
+					409: 'run_not_accepting_event'
+				}
+			);
 		}
 	};
 }

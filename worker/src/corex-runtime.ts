@@ -28,7 +28,32 @@ type CorexConditionStep = {
 	whenFalse: string;
 };
 
-type CorexWaitStep = { id: string; name: string; type: 'wait'; config: { durationMs: number }; next: string };
+type CorexSwitchStep = {
+	id: string;
+	name: string;
+	type: 'switch';
+	config: {
+		path: string;
+		cases: Array<{ id: string; value: string | number | boolean | null }>;
+	};
+	targets: Record<string, string>;
+	defaultTarget: string;
+};
+
+type CorexWaitStep = {
+	id: string;
+	name: string;
+	type: 'wait';
+	config: { durationMs: number };
+	next: string;
+};
+type CorexWaitUntilStep = {
+	id: string;
+	name: string;
+	type: 'wait-until';
+	config: { timestamp: string };
+	next: string;
+};
 type CorexEventWaitStep = {
 	id: string;
 	name: string;
@@ -41,7 +66,9 @@ type CorexApprovalStep = {
 	name: string;
 	type: 'approval';
 	config: { assigneeUserId: string; timeoutMs: number; resultKey: string };
-	next: string;
+	next?: string;
+	whenApproved?: string;
+	whenRejected?: string;
 };
 type CorexTransformStep = {
 	id: string;
@@ -50,8 +77,30 @@ type CorexTransformStep = {
 	config: { mode: 'merge' | 'replace'; mappings: Record<string, string> };
 	next: string;
 };
-type CorexSuccessStep = { id: string; name: string; type: 'end-success'; config: { outputExpression?: string } };
-type CorexExecutionStep = CorexHttpStep | CorexConditionStep | CorexWaitStep | CorexEventWaitStep | CorexApprovalStep | CorexTransformStep | CorexSuccessStep;
+export type CorexInvokeProcessStep = {
+	id: string;
+	name: string;
+	type: 'invoke-process';
+	config: { processId: string; inputPath: string; resultKey: string; timeoutMs: number };
+	next: string;
+};
+type CorexSuccessStep = {
+	id: string;
+	name: string;
+	type: 'end-success';
+	config: { outputExpression?: string };
+};
+type CorexExecutionStep =
+	| CorexHttpStep
+	| CorexConditionStep
+	| CorexSwitchStep
+	| CorexWaitStep
+	| CorexWaitUntilStep
+	| CorexEventWaitStep
+	| CorexApprovalStep
+	| CorexTransformStep
+	| CorexInvokeProcessStep
+	| CorexSuccessStep;
 
 export type CorexExecutionPlan = {
 	schemaVersion: 1;
@@ -63,9 +112,15 @@ export type CorexExecutionPlan = {
 
 export type CorexWorkflowParams = {
 	runId: string;
+	workflowInstanceId: string;
 	ownerUserId: string;
 	plan: CorexExecutionPlan;
 	input: unknown;
+	parent?: {
+		runId: string;
+		workflowInstanceId: string;
+		stepId: string;
+	};
 };
 
 type CorexRunStatus = 'running' | 'waiting' | 'paused' | 'complete' | 'errored' | 'terminated';
@@ -86,7 +141,11 @@ type CorexDurableStep = {
 	do<T>(name: string, callback: () => Promise<T>): Promise<T>;
 	do<T>(name: string, options: unknown, callback: () => Promise<T>): Promise<T>;
 	sleep(name: string, duration: string): Promise<void>;
-	waitForEvent<T>(name: string, options: { type: string; timeout: string }): Promise<{ payload: T }>;
+	sleepUntil(name: string, timestamp: Date | number): Promise<void>;
+	waitForEvent<T>(
+		name: string,
+		options: { type: string; timeout: string }
+	): Promise<{ payload: T }>;
 };
 
 export type CorexHttpResult = {
@@ -94,6 +153,30 @@ export type CorexHttpResult = {
 	contentType: string | null;
 	body: unknown;
 };
+
+export type CorexSubprocessStarter = (
+	step: CorexInvokeProcessStep,
+	input: unknown,
+	parent: Pick<CorexWorkflowParams, 'runId' | 'ownerUserId'>
+) => Promise<{ childRunId: string; workflowInstanceId: string }>;
+
+export type CorexSubprocessTerminator = (
+	step: CorexInvokeProcessStep,
+	child: { childRunId: string; workflowInstanceId: string },
+	parent: Pick<CorexWorkflowParams, 'runId' | 'ownerUserId'>
+) => Promise<void>;
+
+export function corexSubprocessResultEventType(childRunId: string): string {
+	return `corex-subprocess-result:${childRunId}`;
+}
+
+export function corexWaitEventType(
+	runId: string,
+	executionGeneration: number,
+	startedSequence: number
+): string {
+	return `corex-wait-${runId}-${executionGeneration}-${startedSequence}`;
+}
 
 const MAX_RESPONSE_BYTES = 64 * 1024;
 const SIMPLE_JSON_PATH = /^\$(?:\.([A-Za-z_][A-Za-z0-9_-]*))*$/;
@@ -145,16 +228,36 @@ function resolveIdempotencyKey(expression: string | undefined, input: unknown): 
 function evaluateCondition(step: CorexConditionStep, context: unknown): boolean {
 	const actual = resolveJsonPath(step.config.path, context);
 	switch (step.config.operator) {
-		case 'exists': return actual !== undefined;
-		case 'equals': return actual === step.config.value;
-		case 'not-equals': return actual !== step.config.value;
-		case 'greater-than': return typeof actual === 'number' && typeof step.config.value === 'number' && actual > step.config.value;
-		case 'less-than': return typeof actual === 'number' && typeof step.config.value === 'number' && actual < step.config.value;
+		case 'exists':
+			return actual !== undefined;
+		case 'equals':
+			return actual === step.config.value;
+		case 'not-equals':
+			return actual !== step.config.value;
+		case 'greater-than':
+			return (
+				typeof actual === 'number' &&
+				typeof step.config.value === 'number' &&
+				actual > step.config.value
+			);
+		case 'less-than':
+			return (
+				typeof actual === 'number' &&
+				typeof step.config.value === 'number' &&
+				actual < step.config.value
+			);
 	}
 }
 
+function selectSwitchCase(step: CorexSwitchStep, context: unknown): string | undefined {
+	const actual = resolveJsonPath(step.config.path, context);
+	return step.config.cases.find((item) => item.value === actual)?.id;
+}
+
 function applyTransform(step: CorexTransformStep, context: unknown): Record<string, unknown> {
-	const mapped = Object.fromEntries(Object.entries(step.config.mappings).map(([key, path]) => [key, resolveJsonPath(path, context)]));
+	const mapped = Object.fromEntries(
+		Object.entries(step.config.mappings).map(([key, path]) => [key, resolveJsonPath(path, context)])
+	);
 	if (step.config.mode === 'replace') return mapped;
 	return { ...(typeof context === 'object' && context !== null ? context : {}), ...mapped };
 }
@@ -212,7 +315,10 @@ export async function executeCorexWorkflow(
 	params: CorexWorkflowParams,
 	workflow: CorexDurableStep,
 	recordEvent: (event: CorexRunEvent) => Promise<unknown>,
-	fetcher: typeof fetch = fetch
+	fetcher: typeof fetch = fetch,
+	startSubprocess?: CorexSubprocessStarter,
+	terminateSubprocess?: CorexSubprocessTerminator,
+	executionGeneration = 1
 ): Promise<unknown> {
 	const event = (details: Omit<CorexRunEvent, 'runId' | 'ownerUserId'>): CorexRunEvent => ({
 		runId: params.runId,
@@ -240,25 +346,45 @@ export async function executeCorexWorkflow(
 					: context;
 				break;
 			}
-			if (traversalIndex >= params.plan.nodes.length) throw new Error('Execution traversal exceeded the compiled graph.');
+			if (traversalIndex >= params.plan.nodes.length)
+				throw new Error('Execution traversal exceeded the compiled graph.');
 
 			const step = currentStep;
 			const startedSequence = sequence++;
+			const waitEventType =
+				step.type === 'wait-event' || step.type === 'approval'
+					? corexWaitEventType(params.runId, executionGeneration, startedSequence)
+					: undefined;
 			await workflow.do(`corex:step-started:${traversalIndex}`, async () =>
-				recordEvent(event({
-					sequence: startedSequence,
-					status: step.type === 'wait' || step.type === 'wait-event' || step.type === 'approval' ? 'waiting' : 'running',
-					eventType: 'step_started',
-					stepName: step.name,
-					payload: {
-						stepId: step.id,
-						stepType: step.type,
-						...(step.type === 'approval' ? {
-							assigneeUserId: step.config.assigneeUserId,
-							timeoutMs: step.config.timeoutMs
-						} : {})
-					}
-				}))
+				recordEvent(
+					event({
+						sequence: startedSequence,
+						status:
+							step.type === 'wait' ||
+							step.type === 'wait-until' ||
+							step.type === 'wait-event' ||
+							step.type === 'approval' ||
+							step.type === 'invoke-process'
+								? 'waiting'
+								: 'running',
+						eventType: 'step_started',
+						stepName: step.name,
+						payload: {
+							stepId: step.id,
+							stepType: step.type,
+							...(step.type === 'wait-event'
+								? { eventType: step.config.eventType, waitEventType }
+								: {}),
+							...(step.type === 'approval'
+								? {
+										assigneeUserId: step.config.assigneeUserId,
+										timeoutMs: step.config.timeoutMs,
+										waitEventType
+									}
+								: {})
+						}
+					})
+				)
 			);
 
 			let nextNodeId: string;
@@ -267,9 +393,9 @@ export async function executeCorexWorkflow(
 					step.name,
 					{
 						retries: {
-						limit: step.config.retry.limit,
-						delay: 1_000,
-						backoff: step.config.retry.backoff
+							limit: step.config.retry.limit,
+							delay: 1_000,
+							backoff: step.config.retry.backoff
 						},
 						timeout: step.config.timeoutMs
 					},
@@ -283,12 +409,20 @@ export async function executeCorexWorkflow(
 			} else if (step.type === 'condition') {
 				const matched = await workflow.do(step.name, async () => evaluateCondition(step, context));
 				nextNodeId = matched ? step.whenTrue : step.whenFalse;
+			} else if (step.type === 'switch') {
+				const selectedCase = await workflow.do(step.name, async () =>
+					selectSwitchCase(step, context)
+				);
+				nextNodeId = selectedCase ? step.targets[selectedCase] : step.defaultTarget;
 			} else if (step.type === 'wait') {
 				await workflow.sleep(step.name, `${step.config.durationMs} milliseconds`);
 				nextNodeId = step.next;
+			} else if (step.type === 'wait-until') {
+				await workflow.sleepUntil(step.name, new Date(step.config.timestamp));
+				nextNodeId = step.next;
 			} else if (step.type === 'wait-event') {
 				const received = await workflow.waitForEvent<unknown>(step.name, {
-					type: step.config.eventType,
+					type: waitEventType!,
 					timeout: `${step.config.timeoutMs} milliseconds`
 				});
 				context = {
@@ -296,63 +430,130 @@ export async function executeCorexWorkflow(
 					[step.config.resultKey]: received.payload
 				};
 				nextNodeId = step.next;
+			} else if (step.type === 'invoke-process') {
+				if (!startSubprocess) throw new Error('Subprocess execution is unavailable.');
+				const childInput = resolveJsonPath(step.config.inputPath, context);
+				const child = await workflow.do(step.name, async () =>
+					startSubprocess(step, childInput, {
+						runId: params.runId,
+						ownerUserId: params.ownerUserId
+					})
+				);
+				let received: { payload: unknown };
+				try {
+					received = await workflow.waitForEvent<unknown>(`${step.name}:result`, {
+						type: corexSubprocessResultEventType(child.childRunId),
+						timeout: `${step.config.timeoutMs} milliseconds`
+					});
+				} catch (error) {
+					if (terminateSubprocess) {
+						try {
+							await workflow.do(`${step.name}:terminate-child`, async () =>
+								terminateSubprocess(step, child, {
+									runId: params.runId,
+									ownerUserId: params.ownerUserId
+								})
+							);
+						} catch {
+							// Preserve the original wait failure after durable cleanup retries are exhausted.
+						}
+					}
+					throw error;
+				}
+				const result = received.payload;
+				if (
+					typeof result !== 'object' ||
+					result === null ||
+					(result as Record<string, unknown>).childRunId !== child.childRunId
+				)
+					throw new Error('Subprocess result payload is invalid.');
+				if ((result as Record<string, unknown>).status === 'errored') {
+					throw new Error('Subprocess failed.');
+				}
+				if ((result as Record<string, unknown>).status !== 'complete') {
+					throw new Error('Subprocess result payload is invalid.');
+				}
+				context = {
+					...(typeof context === 'object' && context !== null ? context : {}),
+					[step.config.resultKey]: (result as Record<string, unknown>).output
+				};
+				nextNodeId = step.next;
 			} else {
 				const received = await workflow.waitForEvent<unknown>(step.name, {
-					type: 'corex-approval',
+					type: waitEventType!,
 					timeout: `${step.config.timeoutMs} milliseconds`
 				});
 				const approval = received.payload;
 				if (
-					typeof approval !== 'object' || approval === null ||
-					!['approved', 'rejected'].includes(String((approval as Record<string, unknown>).decision)) ||
+					typeof approval !== 'object' ||
+					approval === null ||
+					!['approved', 'rejected'].includes(
+						String((approval as Record<string, unknown>).decision)
+					) ||
 					typeof (approval as Record<string, unknown>).actorUserId !== 'string' ||
-					(typeof (approval as Record<string, unknown>).comment !== 'undefined' && typeof (approval as Record<string, unknown>).comment !== 'string')
-				) throw new Error('Approval event payload is invalid.');
+					(typeof (approval as Record<string, unknown>).comment !== 'undefined' &&
+						typeof (approval as Record<string, unknown>).comment !== 'string')
+				)
+					throw new Error('Approval event payload is invalid.');
 				context = {
 					...(typeof context === 'object' && context !== null ? context : {}),
 					[step.config.resultKey]: approval
 				};
-				nextNodeId = step.next;
+				const decision = (approval as Record<string, unknown>).decision;
+				nextNodeId =
+					decision === 'approved'
+						? (step.whenApproved ?? step.next ?? '')
+						: (step.whenRejected ?? step.next ?? '');
+				if (!nextNodeId)
+					throw new Error(`Approval step "${step.id}" has no ${decision} transition.`);
 			}
 
 			const completedSequence = sequence++;
 			await workflow.do(`corex:step-completed:${traversalIndex}`, async () =>
-				recordEvent(event({
-					sequence: completedSequence,
-					status: 'running',
-					eventType: 'step_completed',
-					stepName: step.name,
-					payload: {
-						stepId: step.id,
-						nextNodeId,
-						...(step.type === 'approval' ? { decision: (context as Record<string, unknown>)[step.config.resultKey] } : {})
-					}
-				}))
+				recordEvent(
+					event({
+						sequence: completedSequence,
+						status: 'running',
+						eventType: 'step_completed',
+						stepName: step.name,
+						payload: {
+							stepId: step.id,
+							nextNodeId,
+							...(step.type === 'approval'
+								? { decision: (context as Record<string, unknown>)[step.config.resultKey] }
+								: {})
+						}
+					})
+				)
 			);
 			currentNodeId = nextNodeId;
 			traversalIndex += 1;
 		}
 	} catch (error) {
 		await workflow.do('corex:run-failed', async () =>
-			recordEvent(event({
-				sequence,
-				status: 'errored',
-				eventType: 'run_failed',
-				payload: {},
-				error: { code: 'process_step_failed', stepId: currentStep?.id }
-			}))
+			recordEvent(
+				event({
+					sequence,
+					status: 'errored',
+					eventType: 'run_failed',
+					payload: {},
+					error: { code: 'process_step_failed', stepId: currentStep?.id }
+				})
+			)
 		);
 		throw error;
 	}
 
 	await workflow.do('corex:run-completed', async () =>
-		recordEvent(event({
-			sequence,
-			status: 'complete',
-			eventType: 'run_completed',
-			payload: {},
-			output
-		}))
+		recordEvent(
+			event({
+				sequence,
+				status: 'complete',
+				eventType: 'run_completed',
+				payload: {},
+				output
+			})
+		)
 	);
 	return output;
 }

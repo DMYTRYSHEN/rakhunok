@@ -56,11 +56,14 @@ test('requires authentication before publishing a process', async () => {
 	const { env } = createEnv();
 	let publishCalls = 0;
 	const response = await routeCorexRequest(
-		new Request('https://example.com/corex/api/processes/018f47a2-8391-7b1c-8f7a-f1d27670f061/publish', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ expectedRevision: 4 })
-		}),
+		new Request(
+			'https://example.com/corex/api/processes/018f47a2-8391-7b1c-8f7a-f1d27670f061/publish',
+			{
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ expectedRevision: 4 })
+			}
+		),
 		env,
 		{
 			async publish() {
@@ -83,7 +86,8 @@ test('publishes only a persisted draft revision', async () => {
 			return { id: 'version-1', version: 1 };
 		}
 	};
-	const url = 'https://example.com/corex/api/processes/018f47a2-8391-7b1c-8f7a-f1d27670f061/publish';
+	const url =
+		'https://example.com/corex/api/processes/018f47a2-8391-7b1c-8f7a-f1d27670f061/publish';
 
 	const rejected = await routeCorexRequest(
 		new Request(url, {
@@ -107,21 +111,26 @@ test('publishes only a persisted draft revision', async () => {
 		api
 	);
 	assert.equal(accepted.status, 201);
-	assert.deepEqual(calls, [{
-		accessToken: 'user-token',
-		processId: '018f47a2-8391-7b1c-8f7a-f1d27670f061',
-		expectedRevision: 4
-	}]);
+	assert.deepEqual(calls, [
+		{
+			accessToken: 'user-token',
+			processId: '018f47a2-8391-7b1c-8f7a-f1d27670f061',
+			expectedRevision: 4
+		}
+	]);
 });
 
 test('returns sanitized control-plane failures', async () => {
 	const { env } = createEnv();
 	const response = await routeCorexRequest(
-		new Request('https://example.com/corex/api/processes/018f47a2-8391-7b1c-8f7a-f1d27670f061/publish', {
-			method: 'POST',
-			headers: { Authorization: 'Bearer expired-token', 'Content-Type': 'application/json' },
-			body: JSON.stringify({ expectedRevision: 4 })
-		}),
+		new Request(
+			'https://example.com/corex/api/processes/018f47a2-8391-7b1c-8f7a-f1d27670f061/publish',
+			{
+				method: 'POST',
+				headers: { Authorization: 'Bearer expired-token', 'Content-Type': 'application/json' },
+				body: JSON.stringify({ expectedRevision: 4 })
+			}
+		),
 		env,
 		{
 			async publish() {
@@ -155,29 +164,39 @@ test('starts a run with input only and rejects browser-authored execution data',
 		{ input: {}, version: 7 },
 		{ input: {}, workflowInstanceId: 'chosen-by-browser' }
 	]) {
-		const rejected = await routeCorexRequest(new Request(url, {
-			method: 'POST',
-			headers,
-			body: JSON.stringify(forbidden)
-		}), env, api);
+		const rejected = await routeCorexRequest(
+			new Request(url, {
+				method: 'POST',
+				headers,
+				body: JSON.stringify(forbidden)
+			}),
+			env,
+			api
+		);
 		assert.equal(rejected.status, 400);
 	}
 	assert.equal(calls.length, 0);
 
-	const accepted = await routeCorexRequest(new Request(url, {
-		method: 'POST',
-		headers,
-		body: JSON.stringify({ input: { paymentId: 'pay-42' } })
-	}), env, api);
+	const accepted = await routeCorexRequest(
+		new Request(url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({ input: { paymentId: 'pay-42' } })
+		}),
+		env,
+		api
+	);
 	assert.equal(accepted.status, 202);
-	assert.deepEqual(calls, [{
-		accessToken: 'user-token',
-		processId: '018f47a2-8391-7b1c-8f7a-f1d27670f061',
-		input: { paymentId: 'pay-42' }
-	}]);
+	assert.deepEqual(calls, [
+		{
+			accessToken: 'user-token',
+			processId: '018f47a2-8391-7b1c-8f7a-f1d27670f061',
+			input: { paymentId: 'pay-42' }
+		}
+	]);
 });
 
-test('sends only a typed payload event to an authenticated run', async () => {
+test('sends only an idempotent typed payload event to an authenticated run', async () => {
 	const { env } = createEnv();
 	const calls = [];
 	const api = {
@@ -189,22 +208,298 @@ test('sends only a typed payload event to an authenticated run', async () => {
 	const url = 'https://example.com/corex/api/runs/018f47a2-8391-7b1c-8f7a-f1d27670f062/events';
 	const headers = { Authorization: 'Bearer user-token', 'Content-Type': 'application/json' };
 
-	const rejected = await routeCorexRequest(new Request(url, {
-		method: 'POST', headers,
-		body: JSON.stringify({ type: 'payment-approved', payload: {}, workflowInstanceId: 'browser-choice' })
-	}), env, api);
+	const rejected = await routeCorexRequest(
+		new Request(url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({
+				type: 'payment-approved',
+				payload: {},
+				workflowInstanceId: 'browser-choice'
+			})
+		}),
+		env,
+		api
+	);
 	assert.equal(rejected.status, 400);
 	assert.equal(calls.length, 0);
 
-	const accepted = await routeCorexRequest(new Request(url, {
-		method: 'POST', headers,
-		body: JSON.stringify({ type: 'payment-approved', payload: { approved: true } })
-	}), env, api);
+	const missingEventId = await routeCorexRequest(
+		new Request(url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({ type: 'payment-approved', payload: {} })
+		}),
+		env,
+		api
+	);
+	assert.equal(missingEventId.status, 400);
+	assert.equal(calls.length, 0);
+
+	const reservedEvent = await routeCorexRequest(
+		new Request(url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({
+				eventId: '018f47a2-8391-7b1c-8f7a-f1d27670f064',
+				type: 'Corex-subprocess-result:step-1',
+				payload: {}
+			})
+		}),
+		env,
+		api
+	);
+	assert.equal(reservedEvent.status, 400);
+	assert.equal(calls.length, 0);
+
+	const accepted = await routeCorexRequest(
+		new Request(url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({
+				eventId: '018f47a2-8391-7b1c-8f7a-f1d27670f064',
+				type: 'payment-approved',
+				payload: { approved: true }
+			})
+		}),
+		env,
+		api
+	);
 	assert.equal(accepted.status, 202);
-	assert.deepEqual(calls, [{
-		accessToken: 'user-token',
-		runId: '018f47a2-8391-7b1c-8f7a-f1d27670f062',
-		type: 'payment-approved',
-		payload: { approved: true }
-	}]);
+	assert.deepEqual(calls, [
+		{
+			accessToken: 'user-token',
+			runId: '018f47a2-8391-7b1c-8f7a-f1d27670f062',
+			eventId: '018f47a2-8391-7b1c-8f7a-f1d27670f064',
+			type: 'payment-approved',
+			payload: { approved: true }
+		}
+	]);
+});
+
+test('cancels an authenticated run with only an idempotency request ID', async () => {
+	const { env } = createEnv();
+	const calls = [];
+	const api = {
+		async cancel(command) {
+			calls.push(command);
+			return { id: command.runId, status: 'terminated', accepted: true };
+		}
+	};
+	const url = 'https://example.com/corex/api/runs/018f47a2-8391-7b1c-8f7a-f1d27670f062/cancel';
+	const headers = { Authorization: 'Bearer user-token', 'Content-Type': 'application/json' };
+
+	const rejected = await routeCorexRequest(
+		new Request(url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({
+				requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063',
+				workflowInstanceId: 'browser-choice'
+			})
+		}),
+		env,
+		api
+	);
+	assert.equal(rejected.status, 400);
+	assert.equal(calls.length, 0);
+
+	const accepted = await routeCorexRequest(
+		new Request(url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({ requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063' })
+		}),
+		env,
+		api
+	);
+	assert.equal(accepted.status, 202);
+	assert.deepEqual(calls, [
+		{
+			accessToken: 'user-token',
+			runId: '018f47a2-8391-7b1c-8f7a-f1d27670f062',
+			requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063'
+		}
+	]);
+});
+
+test('requests authenticated pause and resume with only an idempotency request ID', async () => {
+	for (const action of ['pause', 'resume']) {
+		const { env } = createEnv();
+		const calls = [];
+		const api = {
+			async lifecycle(command) {
+				calls.push(command);
+				return {
+					id: command.runId,
+					status: action === 'pause' ? 'waiting_for_pause' : 'paused',
+					accepted: true
+				};
+			}
+		};
+		const url = `https://example.com/corex/api/runs/018f47a2-8391-7b1c-8f7a-f1d27670f062/${action}`;
+		const response = await routeCorexRequest(
+			new Request(url, {
+				method: 'POST',
+				headers: { Authorization: 'Bearer user-token', 'Content-Type': 'application/json' },
+				body: JSON.stringify({ requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063' })
+			}),
+			env,
+			api
+		);
+
+		assert.equal(response.status, 202);
+		assert.deepEqual(calls, [
+			{
+				accessToken: 'user-token',
+				runId: '018f47a2-8391-7b1c-8f7a-f1d27670f062',
+				requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063',
+				action
+			}
+		]);
+	}
+});
+
+test('requests an authenticated restart with an optional exact durable step', async () => {
+	const { env } = createEnv();
+	const calls = [];
+	const api = {
+		async restart(command) {
+			calls.push(command);
+			return { id: command.runId, status: 'queued', executionGeneration: 2, accepted: true };
+		}
+	};
+	const url = 'https://example.com/corex/api/runs/018f47a2-8391-7b1c-8f7a-f1d27670f062/restart';
+	const headers = { Authorization: 'Bearer user-token', 'Content-Type': 'application/json' };
+
+	const rejected = await routeCorexRequest(
+		new Request(url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({
+				requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063',
+				from: { name: 'charge-card', type: 'step' }
+			})
+		}),
+		env,
+		api
+	);
+	assert.equal(rejected.status, 400);
+
+	const accepted = await routeCorexRequest(
+		new Request(url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({
+				requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063',
+				from: { name: 'charge-card', count: 2, type: 'do' }
+			})
+		}),
+		env,
+		api
+	);
+	assert.equal(accepted.status, 202);
+	assert.deepEqual(calls, [
+		{
+			accessToken: 'user-token',
+			runId: '018f47a2-8391-7b1c-8f7a-f1d27670f062',
+			requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063',
+			from: { name: 'charge-card', count: 2, type: 'do' }
+		}
+	]);
+});
+
+test('requests authenticated rollback with only an idempotency request ID', async () => {
+	const { env } = createEnv();
+	const calls = [];
+	const api = {
+		async rollback(command) {
+			calls.push(command);
+			return { id: command.runId, status: 'rolling_back', accepted: true };
+		}
+	};
+	const url = 'https://example.com/corex/api/runs/018f47a2-8391-7b1c-8f7a-f1d27670f062/rollback';
+	const headers = { Authorization: 'Bearer user-token', 'Content-Type': 'application/json' };
+
+	const rejected = await routeCorexRequest(
+		new Request(url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({
+				requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063',
+				workflowInstanceId: 'browser-choice'
+			})
+		}),
+		env,
+		api
+	);
+	assert.equal(rejected.status, 400);
+
+	const accepted = await routeCorexRequest(
+		new Request(url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({ requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063' })
+		}),
+		env,
+		api
+	);
+	assert.equal(accepted.status, 202);
+	assert.deepEqual(calls, [
+		{
+			accessToken: 'user-token',
+			runId: '018f47a2-8391-7b1c-8f7a-f1d27670f062',
+			requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063'
+		}
+	]);
+});
+
+test('requests authenticated archive with only an idempotency request ID', async () => {
+	const { env } = createEnv();
+	const calls = [];
+	const api = {
+		async archive(command) {
+			calls.push(command);
+			return {
+				id: command.runId,
+				status: 'complete',
+				archivedAt: '2026-09-01T05:00:00.000Z',
+				accepted: true
+			};
+		}
+	};
+	const url = 'https://example.com/corex/api/runs/018f47a2-8391-7b1c-8f7a-f1d27670f062/archive';
+	const headers = { Authorization: 'Bearer user-token', 'Content-Type': 'application/json' };
+
+	const rejected = await routeCorexRequest(
+		new Request(url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({
+				requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063',
+				deleteHistory: true
+			})
+		}),
+		env,
+		api
+	);
+	assert.equal(rejected.status, 400);
+
+	const accepted = await routeCorexRequest(
+		new Request(url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({ requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063' })
+		}),
+		env,
+		api
+	);
+	assert.equal(accepted.status, 202);
+	assert.deepEqual(calls, [
+		{
+			accessToken: 'user-token',
+			runId: '018f47a2-8391-7b1c-8f7a-f1d27670f062',
+			requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063'
+		}
+	]);
 });

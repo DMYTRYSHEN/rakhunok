@@ -1,0 +1,1 @@
+alter type public.corex_run_status add value if not exists 'rolling_back' after 'paused';

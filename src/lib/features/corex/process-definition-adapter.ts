@@ -81,6 +81,29 @@ function toFlowNode(node: ProcessNode): FlowNode {
 		};
 	}
 
+	if (node.type === 'switch') {
+		return {
+			id: node.id,
+			eyebrow: 'Switch',
+			title: node.name,
+			detail: 'Selects one typed scalar case or the required default route.',
+			status: 'waiting',
+			meta: `${node.config.path} · ${node.config.cases.length} cases`,
+			kind: 'decision',
+			position: node.position,
+			layer: 'worker',
+			input: node.config.path,
+			output: 'matched case or default branch',
+			workflow: {
+				name: node.name,
+				type: 'switch',
+				family: 'control',
+				expression: node.config.path,
+				branches: [...node.config.cases.map((item) => item.id), 'default']
+			}
+		};
+	}
+
 	if (node.type === 'wait') {
 		return {
 			id: node.id,
@@ -98,6 +121,27 @@ function toFlowNode(node: ProcessNode): FlowNode {
 				type: 'step-sleep',
 				family: 'wait',
 				duration: `${node.config.durationMs} milliseconds`
+			}
+		};
+	}
+
+	if (node.type === 'wait-until') {
+		return {
+			id: node.id,
+			eyebrow: 'Durable wait',
+			title: node.name,
+			detail: 'Suspends execution durably until an absolute UTC timestamp.',
+			status: 'waiting',
+			meta: node.config.timestamp,
+			kind: 'action',
+			position: node.position,
+			layer: 'worker',
+			output: 'unchanged context',
+			workflow: {
+				name: node.name,
+				type: 'step-sleep-until',
+				family: 'wait',
+				timestamp: node.config.timestamp
 			}
 		};
 	}
@@ -170,6 +214,33 @@ function toFlowNode(node: ProcessNode): FlowNode {
 		};
 	}
 
+	if (node.type === 'invoke-process') {
+		return {
+			id: node.id,
+			eyebrow: 'Subprocess',
+			title: node.name,
+			detail: 'Starts an owned published process and waits durably for its correlated result.',
+			status: 'waiting',
+			meta: `${node.config.resultKey} · ${node.config.timeoutMs} ms`,
+			kind: 'action',
+			position: node.position,
+			layer: 'worker',
+			input: node.config.inputPath,
+			output: node.config.resultKey,
+			workflow: {
+				name: node.name,
+				type: 'invoke-workflow',
+				family: 'integration',
+				timeout: `${node.config.timeoutMs} milliseconds`,
+				connector: {
+					kind: 'workflow',
+					operation: 'invoke',
+					resource: node.config.processId
+				}
+			}
+		};
+	}
+
 	return {
 		id: node.id,
 		eyebrow: 'Success terminal',
@@ -204,10 +275,14 @@ export function processDefinitionToFlowScenario(definition: ProcessDefinition): 
 			id: edge.id,
 			source: edge.source,
 			target: edge.target,
-			...(edge.when === undefined ? {} : {
-				label: edge.when ? 'true' : 'false',
-				tone: edge.when ? 'success' as const : 'danger' as const
-			})
+			...(edge.case !== undefined
+				? { label: edge.case, tone: edge.case === 'default' ? ('danger' as const) : ('success' as const) }
+				: edge.when === undefined
+				? {}
+				: {
+						label: edge.when ? 'true' : 'false',
+						tone: edge.when ? ('success' as const) : ('danger' as const)
+					})
 		}))
 	};
 }

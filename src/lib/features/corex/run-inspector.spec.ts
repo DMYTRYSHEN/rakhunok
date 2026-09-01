@@ -6,6 +6,7 @@ function runEvent(sequence: number, eventType: string, stepName: string | null =
 	return {
 		id: sequence,
 		runId: 'run-1',
+		executionGeneration: 1,
 		sequence,
 		eventType,
 		stepName,

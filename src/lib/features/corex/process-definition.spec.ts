@@ -123,10 +123,30 @@ describe('validateProcessDefinition', () => {
 
 	it('validates condition branches, durable waits, and safe transforms', () => {
 		const definition = validDefinition();
-		definition.nodes.splice(1, 1,
-			{ id: 'transform', name: 'shape-payment', type: 'transform', position: { x: 220, y: 0 }, config: { mode: 'merge', mappings: { paymentId: '$.paymentId' } } },
-			{ id: 'condition', name: 'is-large-payment', type: 'condition', position: { x: 440, y: 0 }, config: { path: '$.amount', operator: 'greater-than', value: 100 } },
-			{ id: 'wait', name: 'brief-delay', type: 'wait', position: { x: 660, y: -100 }, config: { durationMs: 5_000 } }
+		definition.nodes.splice(
+			1,
+			1,
+			{
+				id: 'transform',
+				name: 'shape-payment',
+				type: 'transform',
+				position: { x: 220, y: 0 },
+				config: { mode: 'merge', mappings: { paymentId: '$.paymentId' } }
+			},
+			{
+				id: 'condition',
+				name: 'is-large-payment',
+				type: 'condition',
+				position: { x: 440, y: 0 },
+				config: { path: '$.amount', operator: 'greater-than', value: 100 }
+			},
+			{
+				id: 'wait',
+				name: 'brief-delay',
+				type: 'wait',
+				position: { x: 660, y: -100 },
+				config: { durationMs: 5_000 }
+			}
 		);
 		definition.edges = [
 			{ id: 'trigger-transform', source: 'trigger', target: 'transform' },
@@ -139,17 +159,96 @@ describe('validateProcessDefinition', () => {
 		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
 		const scenario = processDefinitionToFlowScenario(definition);
 		expect(scenario.nodes.map((node) => node.workflow?.type)).toEqual([
-			'trigger-http', 'data-transform', 'if', 'step-sleep', 'end-success'
+			'trigger-http',
+			'data-transform',
+			'if',
+			'step-sleep',
+			'end-success'
 		]);
-		expect(scenario.edges.find((edge) => edge.id === 'condition-wait')).toMatchObject({ label: 'true', tone: 'success' });
+		expect(scenario.edges.find((edge) => edge.id === 'condition-wait')).toMatchObject({
+			label: 'true',
+			tone: 'success'
+		});
+	});
+
+	it('validates, renders, and compiles an absolute durable wait', () => {
+		const definition = validDefinition();
+		definition.nodes.splice(1, 1, {
+			id: 'deadline',
+			name: 'wait-for-settlement-window',
+			type: 'wait-until',
+			position: { x: 280, y: 0 },
+			config: { timestamp: '2026-09-02T08:30:00.000Z' }
+		});
+		definition.edges = [
+			{ id: 'trigger-deadline', source: 'trigger', target: 'deadline' },
+			{ id: 'deadline-success', source: 'deadline', target: 'success' }
+		];
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		expect(processDefinitionToFlowScenario(definition).nodes[1]).toMatchObject({
+			meta: '2026-09-02T08:30:00.000Z',
+			workflow: { type: 'step-sleep-until', timestamp: '2026-09-02T08:30:00.000Z' }
+		});
+		const compiled = compileProcessDefinition(definition);
+		expect(compiled.ok).toBe(true);
+		if (!compiled.ok) return;
+		expect(compiled.plan.nodes[0]).toEqual({
+			id: 'deadline',
+			name: 'wait-for-settlement-window',
+			type: 'wait-until',
+			config: { timestamp: '2026-09-02T08:30:00.000Z' },
+			next: 'success'
+		});
+	});
+
+	it('rejects malformed or non-canonical absolute wait timestamps', () => {
+		const definition = validDefinition();
+		definition.nodes.splice(1, 1, {
+			id: 'deadline',
+			name: 'invalid-deadline',
+			type: 'wait-until',
+			position: { x: 280, y: 0 },
+			config: { timestamp: '2026-09-02 08:30' }
+		});
+		definition.edges = [
+			{ id: 'trigger-deadline', source: 'trigger', target: 'deadline' },
+			{ id: 'deadline-success', source: 'deadline', target: 'success' }
+		];
+
+		expect(validateProcessDefinition(definition).issues).toContainEqual({
+			code: 'invalid-wait',
+			message: 'Absolute waits require a canonical UTC ISO timestamp.',
+			nodeId: 'deadline'
+		});
 	});
 
 	it('rejects malformed conditions, waits, and transforms', () => {
 		const definition = validDefinition();
-		definition.nodes.splice(1, 1,
-			{ id: 'condition', name: 'invalid-condition', type: 'condition', position: { x: 220, y: 0 }, config: { path: 'input.amount', operator: 'equals' } },
-			{ id: 'wait', name: 'invalid-wait', type: 'wait', position: { x: 440, y: 0 }, config: { durationMs: 0 } },
-			{ id: 'transform', name: 'invalid-transform', type: 'transform', position: { x: 660, y: 0 }, config: { mode: 'merge', mappings: { 'bad key': 'input.value' } } }
+		definition.nodes.splice(
+			1,
+			1,
+			{
+				id: 'condition',
+				name: 'invalid-condition',
+				type: 'condition',
+				position: { x: 220, y: 0 },
+				config: { path: 'input.amount', operator: 'equals' }
+			},
+			{
+				id: 'wait',
+				name: 'invalid-wait',
+				type: 'wait',
+				position: { x: 440, y: 0 },
+				config: { durationMs: 0 }
+			},
+			{
+				id: 'transform',
+				name: 'invalid-transform',
+				type: 'transform',
+				position: { x: 660, y: 0 },
+				config: { mode: 'merge', mappings: { 'bad key': 'input.value' } }
+			}
 		);
 		definition.edges = [
 			{ id: 'trigger-condition', source: 'trigger', target: 'condition' },
@@ -160,13 +259,18 @@ describe('validateProcessDefinition', () => {
 
 		const result = validateProcessDefinition(definition);
 		expect(result.valid).toBe(false);
-		expect(result.issues.map((issue) => issue.code)).toEqual(expect.arrayContaining(['invalid-condition', 'invalid-wait', 'invalid-transform']));
+		expect(result.issues.map((issue) => issue.code)).toEqual(
+			expect.arrayContaining(['invalid-condition', 'invalid-wait', 'invalid-transform'])
+		);
 	});
 
 	it('validates, renders, and compiles durable event waits', () => {
 		const definition = validDefinition();
 		definition.nodes.splice(1, 1, {
-			id: 'approval', name: 'wait-for-approval', type: 'wait-event', position: { x: 280, y: 0 },
+			id: 'approval',
+			name: 'wait-for-approval',
+			type: 'wait-event',
+			position: { x: 280, y: 0 },
 			config: { eventType: 'payment-approved', timeoutMs: 86_400_000, resultKey: 'approval' }
 		});
 		definition.edges = [
@@ -192,18 +296,35 @@ describe('validateProcessDefinition', () => {
 		if (wait.type !== 'wait-event') throw new Error('Expected event wait fixture.');
 		wait.config.eventType = 'unsafe event type';
 		wait.config.timeoutMs = 0;
-		expect(validateProcessDefinition(definition).issues.map((issue) => issue.code)).toContain('invalid-wait');
+		expect(validateProcessDefinition(definition).issues.map((issue) => issue.code)).toContain(
+			'invalid-wait'
+		);
 	});
 
 	it('validates, renders, and compiles human approvals', () => {
 		const definition = validDefinition();
 		definition.nodes.splice(1, 1, {
-			id: 'approval', name: 'review-payment', type: 'approval', position: { x: 280, y: 0 },
-			config: { assigneeUserId: '018f47a2-8391-7b1c-8f7a-f1d27670f099', timeoutMs: 86_400_000, resultKey: 'approval' }
+			id: 'approval',
+			name: 'review-payment',
+			type: 'approval',
+			position: { x: 280, y: 0 },
+			config: {
+				assigneeUserId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				timeoutMs: 86_400_000,
+				resultKey: 'approval'
+			}
+		});
+		definition.nodes.push({
+			id: 'rejected',
+			name: 'return-rejected',
+			type: 'end-success',
+			position: { x: 560, y: 180 },
+			config: {}
 		});
 		definition.edges = [
 			{ id: 'trigger-approval', source: 'trigger', target: 'approval' },
-			{ id: 'approval-success', source: 'approval', target: 'success' }
+			{ id: 'approval-success', source: 'approval', target: 'success', when: true },
+			{ id: 'approval-rejected', source: 'approval', target: 'rejected', when: false }
 		];
 
 		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
@@ -215,8 +336,82 @@ describe('validateProcessDefinition', () => {
 		expect(compiled.ok).toBe(true);
 		if (!compiled.ok) return;
 		expect(compiled.plan.nodes[0]).toMatchObject({
-			type: 'approval', config: { assigneeUserId: '018f47a2-8391-7b1c-8f7a-f1d27670f099', timeoutMs: 86_400_000, resultKey: 'approval' }, next: 'success'
+			type: 'approval',
+			config: {
+				assigneeUserId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				timeoutMs: 86_400_000,
+				resultKey: 'approval'
+			},
+			whenApproved: 'success',
+			whenRejected: 'rejected'
 		});
+	});
+
+	it('rejects approvals without explicit approved and rejected branches', () => {
+		const definition = validDefinition();
+		definition.nodes.splice(1, 1, {
+			id: 'approval',
+			name: 'review-payment',
+			type: 'approval',
+			position: { x: 280, y: 0 },
+			config: {
+				assigneeUserId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				timeoutMs: 86_400_000,
+				resultKey: 'approval'
+			}
+		});
+		definition.edges = [
+			{ id: 'trigger-approval', source: 'trigger', target: 'approval' },
+			{ id: 'approval-success', source: 'approval', target: 'success' }
+		];
+
+		expect(validateProcessDefinition(definition).issues).toContainEqual(
+			expect.objectContaining({ code: 'invalid-approval', nodeId: 'approval' })
+		);
+	});
+
+	it('validates and compiles subprocess invocation references', () => {
+		const definition = validDefinition();
+		definition.nodes.splice(1, 1, {
+			id: 'subprocess',
+			name: 'create-invoice',
+			type: 'invoke-process',
+			position: { x: 280, y: 0 },
+			config: {
+				processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				inputPath: '$.payment',
+				resultKey: 'invoice',
+				timeoutMs: 2_592_000_000
+			}
+		});
+		definition.edges = [
+			{ id: 'trigger-subprocess', source: 'trigger', target: 'subprocess' },
+			{ id: 'subprocess-success', source: 'subprocess', target: 'success' }
+		];
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const compiled = compileProcessDefinition(definition);
+		expect(compiled.ok).toBe(true);
+		if (!compiled.ok) return;
+		expect(compiled.plan.nodes[0]).toEqual({
+			id: 'subprocess',
+			name: 'create-invoice',
+			type: 'invoke-process',
+			config: {
+				processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				inputPath: '$.payment',
+				resultKey: 'invoice',
+				timeoutMs: 2_592_000_000
+			},
+			next: 'success'
+		});
+
+		const subprocess = definition.nodes[1];
+		if (subprocess.type !== 'invoke-process') throw new Error('Expected subprocess fixture.');
+		subprocess.config.processId = 'not-a-process-id';
+		expect(validateProcessDefinition(definition).issues).toContainEqual(
+			expect.objectContaining({ code: 'invalid-subprocess', nodeId: 'subprocess' })
+		);
 	});
 
 	it('compiles a validated linear definition into a deterministic execution plan', () => {
@@ -225,17 +420,29 @@ describe('validateProcessDefinition', () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.plan.entryNodeId).toBe('forward');
-		expect(result.plan.nodes.map((node) => node.name)).toEqual(['forward-callback', 'return-success']);
+		expect(result.plan.nodes.map((node) => node.name)).toEqual([
+			'forward-callback',
+			'return-success'
+		]);
 		expect(result.plan.nodes[0]).toMatchObject({ type: 'http-request', next: 'success' });
 	});
 
 	it('compiles explicit true and false condition transitions', () => {
 		const definition = validDefinition();
 		definition.nodes.splice(1, 1, {
-			id: 'condition', name: 'is-large-payment', type: 'condition', position: { x: 280, y: 0 },
+			id: 'condition',
+			name: 'is-large-payment',
+			type: 'condition',
+			position: { x: 280, y: 0 },
 			config: { path: '$.amount', operator: 'greater-than', value: 100 }
 		});
-		definition.nodes.push({ id: 'alternate-success', name: 'return-alternate', type: 'end-success', position: { x: 560, y: 180 }, config: {} });
+		definition.nodes.push({
+			id: 'alternate-success',
+			name: 'return-alternate',
+			type: 'end-success',
+			position: { x: 560, y: 180 },
+			config: {}
+		});
 		definition.edges = [
 			{ id: 'trigger-condition', source: 'trigger', target: 'condition' },
 			{ id: 'condition-success', source: 'condition', target: 'success', when: true },
@@ -245,7 +452,65 @@ describe('validateProcessDefinition', () => {
 		const result = compileProcessDefinition(definition);
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
-		expect(result.plan.nodes[0]).toMatchObject({ type: 'condition', whenTrue: 'success', whenFalse: 'alternate-success' });
+		expect(result.plan.nodes[0]).toMatchObject({
+			type: 'condition',
+			whenTrue: 'success',
+			whenFalse: 'alternate-success'
+		});
+	});
+
+	it('validates and compiles typed switch cases with a default route', () => {
+		const definition = validDefinition();
+		definition.nodes.splice(1, 1, {
+			id: 'currency-switch',
+			name: 'route-by-currency',
+			type: 'switch',
+			position: { x: 280, y: 0 },
+			config: {
+				path: '$.currency',
+				cases: [
+					{ id: 'uah', value: 'UAH' },
+					{ id: 'usd', value: 'USD' }
+				]
+			}
+		});
+		definition.nodes.push(
+			{
+				id: 'usd-success',
+				name: 'return-usd',
+				type: 'end-success',
+				position: { x: 560, y: 180 },
+				config: {}
+			},
+			{
+				id: 'default-success',
+				name: 'return-default',
+				type: 'end-success',
+				position: { x: 560, y: 360 },
+				config: {}
+			}
+		);
+		definition.edges = [
+			{ id: 'trigger-switch', source: 'trigger', target: 'currency-switch' },
+			{ id: 'switch-uah', source: 'currency-switch', target: 'success', case: 'uah' },
+			{ id: 'switch-usd', source: 'currency-switch', target: 'usd-success', case: 'usd' },
+			{
+				id: 'switch-default',
+				source: 'currency-switch',
+				target: 'default-success',
+				case: 'default'
+			}
+		];
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes[0]).toMatchObject({
+			type: 'switch',
+			targets: { uah: 'success', usd: 'usd-success' },
+			defaultTarget: 'default-success'
+		});
 	});
 
 	it('refuses ambiguous branches until the runtime has an explicit branch node', () => {
@@ -257,7 +522,11 @@ describe('validateProcessDefinition', () => {
 			position: { x: 560, y: 180 },
 			config: {}
 		});
-		definition.edges.push({ id: 'forward-alternate', source: 'forward', target: 'alternate-success' });
+		definition.edges.push({
+			id: 'forward-alternate',
+			source: 'forward',
+			target: 'alternate-success'
+		});
 
 		expect(compileProcessDefinition(definition)).toEqual({
 			ok: false,

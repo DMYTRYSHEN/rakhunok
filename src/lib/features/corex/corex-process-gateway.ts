@@ -28,10 +28,17 @@ type RunRow = {
 	process_id: string;
 	process_version_id: string;
 	workflow_instance_id: string;
+	parent_run_id: string | null;
+	parent_step_id: string | null;
+	depth: number;
+	execution_generation: number;
 	status: string;
 	input: unknown;
 	output: unknown | null;
 	error: unknown | null;
+	rollback_outcome: 'complete' | 'failed' | null;
+	rollback_error: unknown | null;
+	archived_at: string | null;
 	started_at: string | null;
 	finished_at: string | null;
 	created_at: string;
@@ -40,6 +47,7 @@ type RunRow = {
 type RunEventRow = {
 	id: number;
 	run_id: string;
+	execution_generation: number;
 	sequence: number;
 	event_type: string;
 	step_name: string | null;
@@ -52,6 +60,7 @@ type ApprovalTaskRow = {
 	id: string;
 	run_id: string;
 	process_id: string;
+	execution_generation: number;
 	step_name: string;
 	status: 'pending' | 'approved' | 'rejected' | 'expired';
 	deadline_at: string;
@@ -87,10 +96,17 @@ export type CorexRun = {
 	processId: string;
 	processVersionId: string;
 	workflowInstanceId: string;
+	parentRunId: string | null;
+	parentStepId: string | null;
+	depth: number;
+	executionGeneration: number;
 	status: string;
 	input: unknown;
 	output: unknown | null;
 	error: unknown | null;
+	rollbackOutcome: 'complete' | 'failed' | null;
+	rollbackError: unknown | null;
+	archivedAt: string | null;
 	startedAt: string | null;
 	finishedAt: string | null;
 	createdAt: string;
@@ -99,6 +115,7 @@ export type CorexRun = {
 export type CorexRunEvent = {
 	id: number;
 	runId: string;
+	executionGeneration: number;
 	sequence: number;
 	eventType: string;
 	stepName: string | null;
@@ -111,6 +128,7 @@ export type CorexApprovalTask = {
 	id: string;
 	runId: string;
 	processId: string;
+	executionGeneration: number;
 	stepName: string;
 	status: ApprovalTaskRow['status'];
 	deadlineAt: string;
@@ -146,14 +164,20 @@ export function createCorexProcessGateway(client: SupabaseClient) {
 		async listProcesses(ownerUserId: string): Promise<CorexProcess[]> {
 			const { data, error } = await client
 				.from('corex_processes')
-				.select('id, owner_user_id, slug, name, description, lifecycle, revision, draft_definition, published_version, updated_at')
+				.select(
+					'id, owner_user_id, slug, name, description, lifecycle, revision, draft_definition, published_version, updated_at'
+				)
 				.eq('owner_user_id', ownerUserId)
 				.order('updated_at', { ascending: false });
 			if (error) throw error;
 			return ((data ?? []) as ProcessRow[]).map(mapProcess);
 		},
 
-		async createProcess(ownerUserId: string, slug: string, definition: ProcessDefinition): Promise<CorexProcess> {
+		async createProcess(
+			ownerUserId: string,
+			slug: string,
+			definition: ProcessDefinition
+		): Promise<CorexProcess> {
 			const { data, error } = await client
 				.from('corex_processes')
 				.insert({
@@ -163,7 +187,9 @@ export function createCorexProcessGateway(client: SupabaseClient) {
 					description: definition.description,
 					draft_definition: definition
 				})
-				.select('id, owner_user_id, slug, name, description, lifecycle, revision, draft_definition, published_version, updated_at')
+				.select(
+					'id, owner_user_id, slug, name, description, lifecycle, revision, draft_definition, published_version, updated_at'
+				)
 				.single();
 			if (error) throw error;
 			return mapProcess(data as ProcessRow);
@@ -180,7 +206,9 @@ export function createCorexProcessGateway(client: SupabaseClient) {
 				.eq('id', process.id)
 				.eq('owner_user_id', process.ownerUserId)
 				.eq('revision', process.revision)
-				.select('id, owner_user_id, slug, name, description, lifecycle, revision, draft_definition, published_version, updated_at')
+				.select(
+					'id, owner_user_id, slug, name, description, lifecycle, revision, draft_definition, published_version, updated_at'
+				)
 				.maybeSingle();
 			if (error) {
 				throw error;
@@ -210,7 +238,9 @@ export function createCorexProcessGateway(client: SupabaseClient) {
 		async listRuns(processId: string): Promise<CorexRun[]> {
 			const { data, error } = await client
 				.from('corex_runs')
-				.select('id, process_id, process_version_id, workflow_instance_id, status, input, output, error, started_at, finished_at, created_at')
+				.select(
+					'id, process_id, process_version_id, workflow_instance_id, parent_run_id, parent_step_id, depth, execution_generation, status, input, output, error, rollback_outcome, rollback_error, archived_at, started_at, finished_at, created_at'
+				)
 				.eq('process_id', processId)
 				.order('created_at', { ascending: false });
 			if (error) throw error;
@@ -219,10 +249,17 @@ export function createCorexProcessGateway(client: SupabaseClient) {
 				processId: row.process_id,
 				processVersionId: row.process_version_id,
 				workflowInstanceId: row.workflow_instance_id,
+				parentRunId: row.parent_run_id,
+				parentStepId: row.parent_step_id,
+				depth: row.depth,
+				executionGeneration: row.execution_generation,
 				status: row.status,
 				input: row.input,
 				output: row.output,
 				error: row.error,
+				rollbackOutcome: row.rollback_outcome,
+				rollbackError: row.rollback_error,
+				archivedAt: row.archived_at,
 				startedAt: row.started_at,
 				finishedAt: row.finished_at,
 				createdAt: row.created_at
@@ -232,13 +269,17 @@ export function createCorexProcessGateway(client: SupabaseClient) {
 		async listRunEvents(runId: string): Promise<CorexRunEvent[]> {
 			const { data, error } = await client
 				.from('corex_run_events')
-				.select('id, run_id, sequence, event_type, step_name, attempt, payload, created_at')
+				.select(
+					'id, run_id, execution_generation, sequence, event_type, step_name, attempt, payload, created_at'
+				)
 				.eq('run_id', runId)
+				.order('execution_generation', { ascending: true })
 				.order('sequence', { ascending: true });
 			if (error) throw error;
 			return ((data ?? []) as RunEventRow[]).map((row) => ({
 				id: row.id,
 				runId: row.run_id,
+				executionGeneration: row.execution_generation,
 				sequence: row.sequence,
 				eventType: row.event_type,
 				stepName: row.step_name,
@@ -251,7 +292,9 @@ export function createCorexProcessGateway(client: SupabaseClient) {
 		async listApprovalTasks(assigneeUserId: string): Promise<CorexApprovalTask[]> {
 			const { data, error } = await client
 				.from('corex_approval_tasks')
-				.select('id, run_id, process_id, step_name, status, deadline_at, decision_comment, decided_at, created_at')
+				.select(
+					'id, run_id, process_id, execution_generation, step_name, status, deadline_at, decision_comment, decided_at, created_at'
+				)
 				.eq('assignee_user_id', assigneeUserId)
 				.order('created_at', { ascending: false });
 			if (error) throw error;
@@ -259,6 +302,7 @@ export function createCorexProcessGateway(client: SupabaseClient) {
 				id: row.id,
 				runId: row.run_id,
 				processId: row.process_id,
+				executionGeneration: row.execution_generation,
 				stepName: row.step_name,
 				status: row.status,
 				deadlineAt: row.deadline_at,
