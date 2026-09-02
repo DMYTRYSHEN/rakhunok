@@ -433,8 +433,11 @@ export function createSupabaseCorexControlPlane(
 				}
 				const decision = (command.payload as Record<string, unknown>).decision;
 				const comment = (command.payload as Record<string, unknown>).comment;
+				const taskId = (command.payload as Record<string, unknown>).taskId;
 				if (
 					!['approved', 'rejected'].includes(String(decision)) ||
+					typeof taskId !== 'string' ||
+					!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(taskId) ||
 					(comment !== undefined && typeof comment !== 'string')
 				) {
 					throw new CorexControlPlaneError('Approval decision is invalid.', 400);
@@ -450,6 +453,7 @@ export function createSupabaseCorexControlPlane(
 						},
 						body: JSON.stringify({
 							p_run_id: command.runId,
+							p_task_id: taskId,
 							p_actor_user_id: ownerUserId,
 							p_decision: decision,
 							p_comment: typeof comment === 'string' ? comment : ''
@@ -486,6 +490,7 @@ export function createSupabaseCorexControlPlane(
 					p_run_id: command.runId,
 					p_owner_user_id: ownerUserId,
 					p_event_id: command.eventId,
+					p_step_id: command.stepId ?? null,
 					p_event_type: command.type,
 					p_payload: command.payload
 				})

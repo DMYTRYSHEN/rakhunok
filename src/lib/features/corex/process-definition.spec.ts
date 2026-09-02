@@ -34,7 +34,12 @@ function validDefinition(): ProcessDefinition {
 					url: 'https://api.example.com/payments',
 					timeoutMs: 30_000,
 					retry: { limit: 3, backoff: 'exponential' },
-					idempotencyKey: '$.paymentId'
+					idempotencyKey: '$.paymentId',
+					outputPolicy: {
+						mode: 'inline',
+						maxBytes: 16_384,
+						redactPaths: ['$.customer.email']
+					}
 				}
 			},
 			{
@@ -100,6 +105,250 @@ function parallelDefinition(): ProcessDefinition {
 describe('validateProcessDefinition', () => {
 	it('accepts the initial executable HTTP workflow subset', () => {
 		expect(validateProcessDefinition(validDefinition())).toEqual({ valid: true, issues: [] });
+	});
+
+	it('validates and compiles an HTTP compensation handler outside normal traversal', () => {
+		const definition = validDefinition();
+		definition.nodes.push({
+			id: 'refund',
+			name: 'refund-payment',
+			type: 'http-request',
+			position: { x: 280, y: 180 },
+			config: {
+				method: 'POST',
+				url: 'https://api.example.com/refunds',
+				timeoutMs: 10_000,
+				retry: { limit: 5, backoff: 'linear' },
+				idempotencyKey: '$.paymentId'
+			}
+		});
+		definition.edges.push({
+			id: 'forward-refund',
+			source: 'forward',
+			target: 'refund',
+			compensation: true
+		});
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes).not.toContainEqual(expect.objectContaining({ id: 'refund' }));
+		expect(result.plan.nodes.find((node) => node.id === 'forward')).toMatchObject({
+			next: 'success',
+			compensation: {
+				id: 'refund',
+				name: 'refund-payment',
+				config: {
+					url: 'https://api.example.com/refunds',
+					timeoutMs: 10_000,
+					retry: { limit: 5, backoff: 'linear' }
+				}
+			}
+		});
+	});
+
+	it('validates and compiles a transform compensation handler outside normal traversal', () => {
+		const definition = validDefinition();
+		definition.nodes.push({
+			id: 'restore-context',
+			name: 'restore-payment-context',
+			type: 'transform',
+			position: { x: 280, y: 180 },
+			config: {
+				mode: 'merge',
+				mappings: { rollbackStatus: '$.error.name' }
+			}
+		});
+		definition.edges.push({
+			id: 'forward-restore-context',
+			source: 'forward',
+			target: 'restore-context',
+			compensation: true
+		});
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes).not.toContainEqual(expect.objectContaining({ id: 'restore-context' }));
+		expect(result.plan.nodes.find((node) => node.id === 'forward')).toMatchObject({
+			compensation: {
+				id: 'restore-context',
+				name: 'restore-payment-context',
+				type: 'transform',
+				config: {
+					mode: 'merge',
+					mappings: { rollbackStatus: '$.error.name' }
+				}
+			}
+		});
+	});
+
+	it('validates and compiles transform compensation for a transform action', () => {
+		const definition = validDefinition();
+		const forwardIndex = definition.nodes.findIndex((node) => node.id === 'forward');
+		definition.nodes.splice(forwardIndex, 1, {
+			id: 'forward',
+			name: 'shape-payment',
+			type: 'transform',
+			position: { x: 280, y: 0 },
+			config: { mode: 'merge', mappings: { normalizedId: '$.paymentId' } }
+		});
+		definition.nodes.push({
+			id: 'restore-context',
+			name: 'restore-payment-context',
+			type: 'transform',
+			position: { x: 280, y: 180 },
+			config: { mode: 'replace', mappings: { paymentId: '$.input.paymentId' } }
+		});
+		definition.edges.push({
+			id: 'forward-restore-context',
+			source: 'forward',
+			target: 'restore-context',
+			compensation: true
+		});
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes).not.toContainEqual(expect.objectContaining({ id: 'restore-context' }));
+		expect(result.plan.nodes.find((node) => node.id === 'forward')).toMatchObject({
+			type: 'transform',
+			compensation: {
+				id: 'restore-context',
+				name: 'restore-payment-context',
+				type: 'transform',
+				config: { mode: 'replace', mappings: { paymentId: '$.input.paymentId' } }
+			}
+		});
+	});
+
+	it('validates and compiles transform compensation for a subprocess action', () => {
+		const definition = validDefinition();
+		const forwardIndex = definition.nodes.findIndex((node) => node.id === 'forward');
+		definition.nodes.splice(forwardIndex, 1, {
+			id: 'forward',
+			name: 'create-invoice',
+			type: 'invoke-process',
+			position: { x: 280, y: 0 },
+			config: {
+				processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				inputPath: '$',
+				resultKey: 'invoice',
+				timeoutMs: 60_000
+			}
+		});
+		definition.nodes.push({
+			id: 'restore-context',
+			name: 'restore-invoice-context',
+			type: 'transform',
+			position: { x: 280, y: 180 },
+			config: { mode: 'replace', mappings: { paymentId: '$.input.paymentId' } }
+		});
+		definition.edges.push({
+			id: 'forward-restore-context',
+			source: 'forward',
+			target: 'restore-context',
+			compensation: true
+		});
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes).not.toContainEqual(expect.objectContaining({ id: 'restore-context' }));
+		expect(result.plan.nodes.find((node) => node.id === 'forward')).toMatchObject({
+			type: 'invoke-process',
+			compensation: {
+				id: 'restore-context',
+				name: 'restore-invoice-context',
+				type: 'transform',
+				config: { mode: 'replace', mappings: { paymentId: '$.input.paymentId' } }
+			}
+		});
+	});
+
+	it('validates and compiles HTTP compensation for a subprocess action', () => {
+		const definition = validDefinition();
+		const forwardIndex = definition.nodes.findIndex((node) => node.id === 'forward');
+		definition.nodes.splice(forwardIndex, 1, {
+			id: 'forward',
+			name: 'create-invoice',
+			type: 'invoke-process',
+			position: { x: 280, y: 0 },
+			config: {
+				processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				inputPath: '$',
+				resultKey: 'invoice',
+				timeoutMs: 60_000
+			}
+		});
+		definition.nodes.push({
+			id: 'cancel-invoice',
+			name: 'cancel-invoice',
+			type: 'http-request',
+			position: { x: 280, y: 180 },
+			config: {
+				method: 'POST',
+				url: 'https://api.example.com/invoices/cancel',
+				timeoutMs: 8_000,
+				retry: { limit: 3, backoff: 'exponential' },
+				idempotencyKey: '$.output.childRunId'
+			}
+		});
+		definition.edges.push({
+			id: 'forward-cancel-invoice',
+			source: 'forward',
+			target: 'cancel-invoice',
+			compensation: true
+		});
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes).not.toContainEqual(expect.objectContaining({ id: 'cancel-invoice' }));
+		expect(result.plan.nodes.find((node) => node.id === 'forward')).toMatchObject({
+			type: 'invoke-process',
+			compensation: {
+				id: 'cancel-invoice',
+				name: 'cancel-invoice',
+				type: 'http-request',
+				config: {
+					url: 'https://api.example.com/invoices/cancel',
+					timeoutMs: 8_000,
+					retry: { limit: 3, backoff: 'exponential' }
+				}
+			}
+		});
+	});
+
+	it('rejects a compensation handler that is also part of normal traversal', () => {
+		const definition = validDefinition();
+		definition.nodes.push({
+			id: 'refund',
+			name: 'refund-payment',
+			type: 'http-request',
+			position: { x: 420, y: 180 },
+			config: {
+				method: 'POST',
+				url: 'https://api.example.com/refunds',
+				timeoutMs: 10_000,
+				retry: { limit: 1, backoff: 'constant' }
+			}
+		});
+		definition.edges.push(
+			{ id: 'forward-refund', source: 'forward', target: 'refund', compensation: true },
+			{ id: 'refund-success', source: 'refund', target: 'success' }
+		);
+
+		expect(validateProcessDefinition(definition).issues).toContainEqual({
+			code: 'invalid-compensation',
+			message: 'HTTP step "refund-payment" has an invalid compensation route.',
+			nodeId: 'refund'
+		});
 	});
 
 	it('rejects unsafe success output expressions', () => {
@@ -207,7 +456,15 @@ describe('validateProcessDefinition', () => {
 				name: 'shape-payment',
 				type: 'transform',
 				position: { x: 220, y: 0 },
-				config: { mode: 'merge', mappings: { paymentId: '$.paymentId' } }
+				config: {
+					mode: 'merge',
+					mappings: { paymentId: '$.paymentId' },
+					outputPolicy: {
+						mode: 'inline',
+						maxBytes: 16_384,
+						redactPaths: ['$.customer.email']
+					}
+				}
 			},
 			{
 				id: 'condition',
@@ -245,6 +502,68 @@ describe('validateProcessDefinition', () => {
 			label: 'true',
 			tone: 'success'
 		});
+		const compiled = compileProcessDefinition(definition);
+		expect(compiled.ok).toBe(true);
+		if (!compiled.ok) return;
+		expect(compiled.plan.nodes[0]).toMatchObject({
+			type: 'transform',
+			config: {
+				outputPolicy: {
+					mode: 'inline',
+					maxBytes: 16_384,
+					redactPaths: ['$.customer.email']
+				}
+			}
+		});
+	});
+
+	it('rejects transform inline output limits above 16 KiB', () => {
+		const definition = validDefinition();
+		definition.nodes.splice(1, 1, {
+			id: 'transform',
+			name: 'oversized-inline-output',
+			type: 'transform',
+			position: { x: 280, y: 0 },
+			config: {
+				mode: 'merge',
+				mappings: { paymentId: '$.paymentId' },
+				outputPolicy: { mode: 'inline', maxBytes: 16_385 }
+			}
+		});
+		definition.edges = [
+			{ id: 'trigger-transform', source: 'trigger', target: 'transform' },
+			{ id: 'transform-success', source: 'transform', target: 'success' }
+		];
+
+		expect(validateProcessDefinition(definition).issues).toContainEqual({
+			code: 'invalid-transform',
+			message:
+				'Transforms require safe mappings, a 1 to 16384 byte output limit, and up to 20 unique child JSON paths for redaction.',
+			nodeId: 'transform'
+		});
+	});
+
+	it('rejects duplicate and root transform output redaction paths', () => {
+		const definition = validDefinition();
+		definition.nodes.splice(1, 1, {
+			id: 'transform',
+			name: 'unsafe-redaction-profile',
+			type: 'transform',
+			position: { x: 280, y: 0 },
+			config: {
+				mode: 'merge',
+				mappings: { paymentId: '$.paymentId' },
+				outputPolicy: { mode: 'inline', maxBytes: 1024, redactPaths: ['$', '$'] }
+			}
+		});
+		definition.edges = [
+			{ id: 'trigger-transform', source: 'trigger', target: 'transform' },
+			{ id: 'transform-success', source: 'transform', target: 'success' }
+		];
+
+		expect(validateProcessDefinition(definition).issues.map((issue) => issue.code)).toContain(
+			'invalid-transform'
+		);
 	});
 
 	it('validates, renders, and compiles an absolute durable wait', () => {
@@ -500,7 +819,22 @@ describe('validateProcessDefinition', () => {
 			'forward-callback',
 			'return-success'
 		]);
-		expect(result.plan.nodes[0]).toMatchObject({ type: 'http-request', next: 'success' });
+		expect(result.plan.nodes[0]).toMatchObject({
+			type: 'http-request',
+			next: 'success',
+			config: { outputPolicy: { mode: 'inline', maxBytes: 16_384 } }
+		});
+	});
+
+	it('rejects HTTP inline output limits above 16 KiB', () => {
+		const definition = validDefinition();
+		const action = definition.nodes[1];
+		if (action.type !== 'http-request') throw new Error('Expected HTTP action fixture.');
+		action.config.outputPolicy = { mode: 'inline', maxBytes: 16_385 };
+
+		expect(validateProcessDefinition(definition).issues).toContainEqual(
+			expect.objectContaining({ code: 'invalid-http-output', nodeId: 'forward' })
+		);
 	});
 
 	it('compiles explicit true and false condition transitions', () => {
@@ -729,6 +1063,183 @@ describe('validateProcessDefinition', () => {
 		});
 	});
 
+	it('compiles transform compensation for an HTTP action inside a parallel branch', () => {
+		const definition = parallelDefinition();
+		const riskIndex = definition.nodes.findIndex((node) => node.id === 'risk');
+		definition.nodes.splice(riskIndex, 1, {
+			id: 'risk',
+			name: 'calculate-risk',
+			type: 'http-request',
+			position: { x: 440, y: -120 },
+			config: {
+				method: 'POST',
+				url: 'https://api.example.com/risk',
+				timeoutMs: 10_000,
+				retry: { limit: 2, backoff: 'constant' }
+			}
+		});
+		definition.nodes.push({
+			id: 'restore-risk-context',
+			name: 'restore-risk-context',
+			type: 'transform',
+			position: { x: 440, y: -240 },
+			config: { mode: 'replace', mappings: { paymentId: '$.input.paymentId' } }
+		});
+		definition.edges.push({
+			id: 'risk-restore-context',
+			source: 'risk',
+			target: 'restore-risk-context',
+			compensation: true
+		});
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes).not.toContainEqual(
+			expect.objectContaining({ id: 'restore-risk-context' })
+		);
+		expect(result.plan.nodes.find((node) => node.id === 'risk')).toMatchObject({
+			compensation: {
+				id: 'restore-risk-context',
+				name: 'restore-risk-context',
+				type: 'transform',
+				config: { mode: 'replace', mappings: { paymentId: '$.input.paymentId' } }
+			}
+		});
+	});
+
+	it('compiles transform compensation for a transform action inside a parallel branch', () => {
+		const definition = parallelDefinition();
+		definition.nodes.push({
+			id: 'restore-risk-context',
+			name: 'restore-risk-context',
+			type: 'transform',
+			position: { x: 440, y: -240 },
+			config: { mode: 'replace', mappings: { paymentId: '$.input.paymentId' } }
+		});
+		definition.edges.push({
+			id: 'risk-restore-context',
+			source: 'risk',
+			target: 'restore-risk-context',
+			compensation: true
+		});
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes).not.toContainEqual(
+			expect.objectContaining({ id: 'restore-risk-context' })
+		);
+		expect(result.plan.nodes.find((node) => node.id === 'risk')).toMatchObject({
+			type: 'transform',
+			compensation: {
+				id: 'restore-risk-context',
+				name: 'restore-risk-context',
+				type: 'transform',
+				config: { mode: 'replace', mappings: { paymentId: '$.input.paymentId' } }
+			}
+		});
+	});
+
+	it('validates and compiles explicit try, catch, finally, and continuation targets', () => {
+		const definition = validDefinition();
+		definition.nodes.splice(
+			1,
+			1,
+			{
+				id: 'try-payment',
+				name: 'protect-payment',
+				type: 'try',
+				position: { x: 220, y: 0 },
+				config: {}
+			},
+			{
+				id: 'try-body-payment',
+				name: 'attempt-payment',
+				type: 'transform',
+				position: { x: 440, y: -120 },
+				config: { mode: 'merge', mappings: { paymentId: '$.paymentId' } }
+			},
+			{
+				id: 'catch-payment',
+				name: 'record-payment-error',
+				type: 'transform',
+				position: { x: 440, y: 120 },
+				config: { mode: 'merge', mappings: { errorCode: '$.error.code' } }
+			},
+			{
+				id: 'finally-payment',
+				name: 'record-payment-finish',
+				type: 'transform',
+				position: { x: 660, y: 120 },
+				config: { mode: 'merge', mappings: { finished: '$.finished' } }
+			},
+			{
+				id: 'continue-payment',
+				name: 'continue-payment',
+				type: 'transform',
+				position: { x: 880, y: 0 },
+				config: { mode: 'merge', mappings: { continued: '$.continued' } }
+			}
+		);
+		definition.edges = [
+			{ id: 'trigger-try', source: 'trigger', target: 'try-payment' },
+			{ id: 'try-body', source: 'try-payment', target: 'try-body-payment', try: 'body' },
+			{ id: 'try-catch', source: 'try-payment', target: 'catch-payment', try: 'catch' },
+			{ id: 'try-finally', source: 'try-payment', target: 'finally-payment', try: 'finally' },
+			{
+				id: 'try-continuation',
+				source: 'try-payment',
+				target: 'continue-payment',
+				try: 'continuation'
+			},
+			{ id: 'body-finally', source: 'try-body-payment', target: 'finally-payment' },
+			{ id: 'catch-finally', source: 'catch-payment', target: 'finally-payment' },
+			{ id: 'finally-continuation', source: 'finally-payment', target: 'continue-payment' },
+			{ id: 'continuation-success', source: 'continue-payment', target: 'success' }
+		];
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes[0]).toEqual({
+			id: 'try-payment',
+			name: 'protect-payment',
+			type: 'try',
+			config: {},
+			bodyTarget: 'try-body-payment',
+			catchTarget: 'catch-payment',
+			finallyTarget: 'finally-payment',
+			continuationTarget: 'continue-payment'
+		});
+	});
+
+	it('rejects a try block without catch or finally', () => {
+		const definition = validDefinition();
+		definition.nodes.splice(1, 1, {
+			id: 'try-payment',
+			name: 'protect-payment',
+			type: 'try',
+			position: { x: 220, y: 0 },
+			config: {}
+		});
+		definition.edges = [
+			{ id: 'trigger-try', source: 'trigger', target: 'try-payment' },
+			{ id: 'try-body', source: 'try-payment', target: 'success', try: 'body' },
+			{ id: 'try-continuation', source: 'try-payment', target: 'success', try: 'continuation' }
+		];
+
+		expect(validateProcessDefinition(definition).issues).toContainEqual({
+			code: 'invalid-try',
+			message:
+				'Try block "protect-payment" requires distinct body and continuation branches plus catch or finally.',
+			nodeId: 'try-payment'
+		});
+	});
+
 	it.each([
 		['a missing branch edge', (definition: ProcessDefinition) => definition.edges.splice(2, 1)],
 		[
@@ -763,7 +1274,7 @@ describe('validateProcessDefinition', () => {
 		);
 	});
 
-	it('rejects durable waits inside parallel branches until concurrent waiting is supported', () => {
+	it('validates and compiles relative waits inside parallel branches', () => {
 		const definition = parallelDefinition();
 		definition.nodes[2] = {
 			id: 'risk',
@@ -773,9 +1284,133 @@ describe('validateProcessDefinition', () => {
 			config: { durationMs: 1_000 }
 		};
 
-		expect(validateProcessDefinition(definition).issues).toEqual(
-			expect.arrayContaining([expect.objectContaining({ code: 'invalid-parallel', nodeId: 'parallel' })])
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes.find((node) => node.id === 'risk')).toEqual({
+			id: 'risk',
+			name: 'wait-for-risk',
+			type: 'wait',
+			config: { durationMs: 1_000 },
+			next: 'join'
+		});
+	});
+
+	it('validates and compiles absolute waits inside parallel branches', () => {
+		const definition = parallelDefinition();
+		definition.nodes[2] = {
+			id: 'risk',
+			name: 'wait-until-risk-window',
+			type: 'wait-until',
+			position: { x: 440, y: -120 },
+			config: { timestamp: '2030-01-01T00:00:00.000Z' }
+		};
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes.find((node) => node.id === 'risk')).toEqual({
+			id: 'risk',
+			name: 'wait-until-risk-window',
+			type: 'wait-until',
+			config: { timestamp: '2030-01-01T00:00:00.000Z' },
+			next: 'join'
+		});
+	});
+
+	it('validates and compiles external event waits inside parallel branches', () => {
+		const definition = parallelDefinition();
+		definition.nodes[2] = {
+			id: 'risk',
+			name: 'wait-for-risk-review',
+			type: 'wait-event',
+			position: { x: 440, y: -120 },
+			config: { eventType: 'risk_reviewed', timeoutMs: 86_400_000, resultKey: 'review' }
+		};
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes.find((node) => node.id === 'risk')).toEqual({
+			id: 'risk',
+			name: 'wait-for-risk-review',
+			type: 'wait-event',
+			config: { eventType: 'risk_reviewed', timeoutMs: 86_400_000, resultKey: 'review' },
+			next: 'join'
+		});
+	});
+
+	it('validates and compiles approvals inside parallel branches', () => {
+		const definition = parallelDefinition();
+		definition.nodes[2] = {
+			id: 'risk',
+			name: 'approve-risk',
+			type: 'approval',
+			position: { x: 440, y: -120 },
+			config: {
+				assigneeUserId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				timeoutMs: 86_400_000,
+				resultKey: 'review'
+			}
+		};
+		definition.edges = definition.edges.filter((edge) => edge.id !== 'risk-join');
+		definition.edges.push(
+			{ id: 'risk-approved', source: 'risk', target: 'join', when: true },
+			{ id: 'risk-rejected', source: 'risk', target: 'join', when: false }
 		);
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes.find((node) => node.id === 'risk')).toEqual({
+			id: 'risk',
+			name: 'approve-risk',
+			type: 'approval',
+			config: {
+				assigneeUserId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				timeoutMs: 86_400_000,
+				resultKey: 'review'
+			},
+			whenApproved: 'join',
+			whenRejected: 'join'
+		});
+	});
+
+	it('validates and compiles subprocess invocation inside parallel branches', () => {
+		const definition = parallelDefinition();
+		definition.nodes[2] = {
+			id: 'risk',
+			name: 'invoke-risk-process',
+			type: 'invoke-process',
+			position: { x: 440, y: -120 },
+			config: {
+				processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				inputPath: '$',
+				resultKey: 'risk',
+				timeoutMs: 86_400_000
+			}
+		};
+
+		expect(validateProcessDefinition(definition)).toEqual({ valid: true, issues: [] });
+		const result = compileProcessDefinition(definition);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.plan.nodes.find((node) => node.id === 'risk')).toEqual({
+			id: 'risk',
+			name: 'invoke-risk-process',
+			type: 'invoke-process',
+			config: {
+				processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				inputPath: '$',
+				resultKey: 'risk',
+				timeoutMs: 86_400_000
+			},
+			next: 'join'
+		});
 	});
 
 	it('refuses ambiguous branches until the runtime has an explicit branch node', () => {
@@ -836,7 +1471,9 @@ describe('validateProcessDefinition', () => {
 		definition.edges[1] = { id: 'forward-failure', source: 'forward', target: 'failure' };
 
 		expect(validateProcessDefinition(definition).issues).toEqual(
-			expect.arrayContaining([expect.objectContaining({ code: 'invalid-failure', nodeId: 'failure' })])
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'invalid-failure', nodeId: 'failure' })
+			])
 		);
 	});
 
@@ -853,7 +1490,9 @@ describe('validateProcessDefinition', () => {
 		definition.edges.push({ id: 'failure-forward', source: 'failure', target: 'forward' });
 
 		expect(validateProcessDefinition(definition).issues).toEqual(
-			expect.arrayContaining([expect.objectContaining({ code: 'terminal-has-output', nodeId: 'failure' })])
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'terminal-has-output', nodeId: 'failure' })
+			])
 		);
 	});
 

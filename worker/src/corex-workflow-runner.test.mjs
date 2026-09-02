@@ -109,7 +109,7 @@ test('creates a child from its server-compiled immutable definition', async () =
 		p_process_id: childProcessId,
 		p_owner_user_id: 'owner-1',
 		p_parent_run_id: 'parent-run',
-		p_parent_step_id: 'invoice',
+		p_parent_step_id: '7b4adc74642d8c4dcfcaa3c85b65bbb751bbb6a2466928f11da4ecfd8ff233aa',
 		p_workflow_instance_id: 'proposed-workflow',
 		p_input: { id: 'pay-42' }
 	});
@@ -205,9 +205,123 @@ test('terminates and reconciles a child when the parent wait times out', async (
 		p_run_id: 'child-run',
 		p_owner_user_id: 'owner-1',
 		p_parent_run_id: 'parent-run',
-		p_parent_step_id: 'invoice',
+		p_parent_step_id: '7b4adc74642d8c4dcfcaa3c85b65bbb751bbb6a2466928f11da4ecfd8ff233aa',
 		p_workflow_instance_id: 'child-workflow'
 	});
 	assert.equal(stepNames.includes('create-invoice:terminate-child'), true);
 	assert.equal(JSON.stringify(harness.requests).includes('private timeout details'), false);
+});
+
+test('persists branch-qualified active wait registration and completion', async () => {
+	const harness = createHarness();
+	const payload = subprocessPayload({
+		runId: 'parallel-run',
+		workflowInstanceId: 'parallel-workflow',
+		plan: {
+			schemaVersion: 1,
+			processId: 'parallel-process',
+			revision: 1,
+			entryNodeId: 'parallel',
+			nodes: [
+				{
+					id: 'parallel', name: 'collect', type: 'parallel',
+					config: { branches: [{ id: 'buyer' }], resultKey: 'results' },
+					branchTargets: { buyer: 'confirmed' }, joinTarget: 'join', continuationTarget: 'done'
+				},
+				{
+					id: 'confirmed', name: 'wait-confirmation', type: 'wait-event', next: 'join',
+					config: { eventType: 'buyer_confirmed', timeoutMs: 60_000, resultKey: 'confirmation' }
+				},
+				{ id: 'done', name: 'done', type: 'end-success', config: {} }
+			]
+		}
+	});
+	const workflow = {
+		async do(name, optionsOrCallback, callback) {
+			return (callback ?? optionsOrCallback)({ step: { name, count: 1 }, attempt: 1, config: {} });
+		},
+		async waitForEvent() { return { payload: { accepted: true } }; }
+	};
+
+	await runCorexProcessWorkflow(harness.env, payload, workflow, { fetcher: harness.fetcher });
+
+	const registration = harness.requests.find((request) =>
+		request.url.endsWith('/corex_register_active_wait')
+	);
+	assert.deepEqual(registration.body, {
+		p_run_id: 'parallel-run',
+		p_owner_user_id: 'owner-1',
+		p_execution_generation: 1,
+		p_step_id: 'confirmed',
+		p_visit: 0,
+		p_event_type: 'buyer_confirmed',
+		p_wait_event_type: 'corex-wait-parallel-run-1-confirmed-0',
+		p_durable_step_name: 'collect:parallel-buyer:wait-confirmation'
+	});
+	const completion = harness.requests.find((request) =>
+		request.url.endsWith('/corex_complete_active_wait')
+	);
+	assert.deepEqual(completion.body, {
+		p_run_id: 'parallel-run',
+		p_owner_user_id: 'owner-1',
+		p_execution_generation: 1,
+		p_step_id: 'confirmed',
+		p_visit: 0
+	});
+});
+
+test('persists branch-qualified approval registration and completion', async () => {
+	const harness = createHarness();
+	const payload = subprocessPayload({
+		runId: 'approval-run',
+		workflowInstanceId: 'approval-workflow',
+		plan: {
+			schemaVersion: 1,
+			processId: 'approval-process',
+			revision: 1,
+			entryNodeId: 'parallel',
+			nodes: [
+				{
+					id: 'parallel', name: 'collect', type: 'parallel',
+					config: { branches: [{ id: 'finance' }], resultKey: 'results' },
+					branchTargets: { finance: 'review' }, joinTarget: 'join', continuationTarget: 'done'
+				},
+				{
+					id: 'review', name: 'review-finance', type: 'approval',
+					config: { assigneeUserId: 'reviewer-1', timeoutMs: 60_000, resultKey: 'decision' },
+					whenApproved: 'join', whenRejected: 'join'
+				},
+				{ id: 'done', name: 'done', type: 'end-success', config: {} }
+			]
+		}
+	});
+	const workflow = {
+		async do(name, optionsOrCallback, callback) {
+			return (callback ?? optionsOrCallback)({ step: { name, count: 1 }, attempt: 1, config: {} });
+		},
+		async waitForEvent() {
+			return { payload: { decision: 'approved', actorUserId: 'reviewer-1' } };
+		}
+	};
+
+	await runCorexProcessWorkflow(harness.env, payload, workflow, { fetcher: harness.fetcher });
+
+	const registration = harness.requests.find((request) =>
+		request.url.endsWith('/corex_register_active_approval')
+	);
+	assert.deepEqual(registration.body, {
+		p_run_id: 'approval-run',
+		p_owner_user_id: 'owner-1',
+		p_execution_generation: 1,
+		p_step_id: 'review',
+		p_visit: 0,
+		p_wait_event_type: 'corex-wait-approval-run-1-review-0',
+		p_durable_step_name: 'collect:parallel-finance:review-finance',
+		p_assignee_user_id: 'reviewer-1',
+		p_timeout_ms: 60_000
+	});
+	const completion = harness.requests.find((request) =>
+		request.url.endsWith('/corex_complete_active_wait')
+	);
+	assert.equal(completion.body.p_step_id, 'review');
 });

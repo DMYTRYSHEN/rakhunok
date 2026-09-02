@@ -283,6 +283,7 @@ test('enqueues an owned external event through the durable RPC without direct de
 		accessToken: 'user-token',
 		runId: '018f47a2-8391-7b1c-8f7a-f1d27670f062',
 		eventId: '018f47a2-8391-7b1c-8f7a-f1d27670f064',
+		stepId: 'await-payment-approval',
 		type: 'payment-approved',
 		payload: { approved: true }
 	});
@@ -293,6 +294,7 @@ test('enqueues an owned external event through the durable RPC without direct de
 		p_run_id: '018f47a2-8391-7b1c-8f7a-f1d27670f062',
 		p_owner_user_id: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
 		p_event_id: '018f47a2-8391-7b1c-8f7a-f1d27670f064',
+		p_step_id: 'await-payment-approval',
 		p_event_type: 'payment-approved',
 		p_payload: { approved: true }
 	});
@@ -350,11 +352,17 @@ test('accepts canonical approval decisions through the durable RPC without direc
 		accessToken: 'token',
 		runId: 'run-1',
 		type: 'corex-approval',
-		payload: { decision: 'rejected', comment: 'Missing invoice', actorUserId: 'forged' }
+		payload: {
+			taskId: '11111111-1111-4111-8111-111111111111',
+			decision: 'rejected',
+			comment: 'Missing invoice',
+			actorUserId: 'forged'
+		}
 	});
 	assert.match(requests[1].url, /\/rest\/v1\/rpc\/corex_decide_approval_task$/);
 	assert.deepEqual(JSON.parse(requests[1].init.body), {
 		p_run_id: 'run-1',
+		p_task_id: '11111111-1111-4111-8111-111111111111',
 		p_actor_user_id: 'user-1',
 		p_decision: 'rejected',
 		p_comment: 'Missing invoice'
@@ -364,7 +372,16 @@ test('accepts canonical approval decisions through the durable RPC without direc
 			accessToken: 'token',
 			runId: 'run-1',
 			type: 'corex-approval',
-			payload: { decision: 'maybe' }
+			payload: { taskId: '11111111-1111-4111-8111-111111111111', decision: 'maybe' }
+		}),
+		(error) => error.status === 400
+	);
+	await assert.rejects(
+		controlPlane.signal({
+			accessToken: 'token',
+			runId: 'run-1',
+			type: 'corex-approval',
+			payload: { decision: 'approved' }
 		}),
 		(error) => error.status === 400
 	);

@@ -7,6 +7,12 @@ export type ProcessPosition = {
 	y: number;
 };
 
+export type ProcessOutputPolicy = {
+	mode: 'metadata' | 'inline';
+	maxBytes: number;
+	redactPaths?: string[];
+};
+
 type ProcessNodeBase = {
 	id: string;
 	name: string;
@@ -32,6 +38,7 @@ export type HttpRequestNode = ProcessNodeBase & {
 			backoff: 'constant' | 'linear' | 'exponential';
 		};
 		idempotencyKey?: string;
+		outputPolicy?: ProcessOutputPolicy;
 	};
 };
 
@@ -99,6 +106,11 @@ export type ParallelJoinNode = ProcessNodeBase & {
 	};
 };
 
+export type TryNode = ProcessNodeBase & {
+	type: 'try';
+	config: Record<string, never>;
+};
+
 export type WaitNode = ProcessNodeBase & {
 	type: 'wait';
 	config: { durationMs: number };
@@ -132,6 +144,7 @@ export type TransformNode = ProcessNodeBase & {
 	config: {
 		mode: 'merge' | 'replace';
 		mappings: Record<string, string>;
+		outputPolicy?: ProcessOutputPolicy;
 	};
 };
 
@@ -154,6 +167,7 @@ export type ProcessNode =
 	| BreakNode
 	| ParallelNode
 	| ParallelJoinNode
+	| TryNode
 	| WaitNode
 	| WaitUntilNode
 	| EventWaitNode
@@ -167,11 +181,13 @@ export type ProcessEdge = {
 	id: string;
 	source: string;
 	target: string;
+	compensation?: true;
 	when?: boolean;
 	case?: string;
 	loop?: 'body' | 'exit';
 	loopBack?: string;
 	parallel?: string;
+	try?: 'body' | 'catch' | 'finally' | 'continuation';
 };
 
 export type ProcessDefinition = {
@@ -192,13 +208,16 @@ export type ProcessValidationCode =
 	| 'invalid-edge'
 	| 'invalid-failure'
 	| 'invalid-http-host'
+	| 'invalid-http-output'
 	| 'invalid-http-path'
 	| 'invalid-http-url'
 	| 'invalid-approval'
 	| 'invalid-condition'
+	| 'invalid-compensation'
 	| 'invalid-loop'
 	| 'invalid-break'
 	| 'invalid-parallel'
+	| 'invalid-try'
 	| 'invalid-output-expression'
 	| 'invalid-retry-limit'
 	| 'invalid-revision'
@@ -233,6 +252,7 @@ const NODE_TYPES = new Set([
 	'break',
 	'parallel',
 	'parallel-join',
+	'try',
 	'wait',
 	'wait-until',
 	'wait-event',
@@ -252,6 +272,9 @@ const CONDITION_OPERATORS = new Set([
 ]);
 const RETRY_BACKOFFS = new Set(['constant', 'linear', 'exponential']);
 const TRANSFORM_MODES = new Set(['merge', 'replace']);
+const OUTPUT_MODES = new Set(['metadata', 'inline']);
+const MAX_INLINE_OUTPUT_BYTES = 16_384;
+const MAX_OUTPUT_REDACT_PATHS = 20;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -259,6 +282,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isScalar(value: unknown): value is string | number | boolean | null {
 	return value === null || ['string', 'number', 'boolean'].includes(typeof value);
+}
+
+function isOutputPolicy(value: unknown): value is ProcessOutputPolicy {
+	return (
+		isRecord(value) &&
+		OUTPUT_MODES.has(String(value.mode)) &&
+		typeof value.maxBytes === 'number' &&
+		(value.redactPaths === undefined ||
+			(Array.isArray(value.redactPaths) &&
+				value.redactPaths.every((path) => typeof path === 'string')))
+	);
 }
 
 function isProcessNode(value: unknown): value is ProcessNode {
@@ -288,7 +322,8 @@ function isProcessNode(value: unknown): value is ProcessNode {
 				isRecord(config.retry) &&
 				typeof config.retry.limit === 'number' &&
 				RETRY_BACKOFFS.has(String(config.retry.backoff)) &&
-				(config.idempotencyKey === undefined || typeof config.idempotencyKey === 'string')
+				(config.idempotencyKey === undefined || typeof config.idempotencyKey === 'string') &&
+				(config.outputPolicy === undefined || isOutputPolicy(config.outputPolicy))
 			);
 		case 'condition':
 			return (
@@ -301,8 +336,7 @@ function isProcessNode(value: unknown): value is ProcessNode {
 				typeof config.path === 'string' &&
 				Array.isArray(config.cases) &&
 				config.cases.every(
-					(item) =>
-						isRecord(item) && typeof item.id === 'string' && isScalar(item.value)
+					(item) => isRecord(item) && typeof item.id === 'string' && isScalar(item.value)
 				)
 			);
 		case 'loop':
@@ -317,6 +351,8 @@ function isProcessNode(value: unknown): value is ProcessNode {
 			);
 		case 'parallel-join':
 			return typeof config.parallelId === 'string';
+		case 'try':
+			return Object.keys(config).length === 0;
 		case 'wait':
 			return typeof config.durationMs === 'number';
 		case 'wait-until':
@@ -337,7 +373,8 @@ function isProcessNode(value: unknown): value is ProcessNode {
 			return (
 				TRANSFORM_MODES.has(String(config.mode)) &&
 				isRecord(config.mappings) &&
-				Object.values(config.mappings).every((path) => typeof path === 'string')
+				Object.values(config.mappings).every((path) => typeof path === 'string') &&
+				(config.outputPolicy === undefined || isOutputPolicy(config.outputPolicy))
 			);
 		case 'invoke-process':
 			return (
@@ -382,11 +419,14 @@ export function parseProcessDefinition(value: unknown): ProcessDefinition | unde
 				typeof edge.id === 'string' &&
 				typeof edge.source === 'string' &&
 				typeof edge.target === 'string' &&
+				(edge.compensation === undefined || edge.compensation === true) &&
 				(edge.when === undefined || typeof edge.when === 'boolean') &&
 				(edge.case === undefined || typeof edge.case === 'string') &&
 				(edge.loop === undefined || ['body', 'exit'].includes(String(edge.loop))) &&
 				(edge.loopBack === undefined || typeof edge.loopBack === 'string') &&
-				(edge.parallel === undefined || typeof edge.parallel === 'string')
+				(edge.parallel === undefined || typeof edge.parallel === 'string') &&
+				(edge.try === undefined ||
+					['body', 'catch', 'finally', 'continuation'].includes(String(edge.try)))
 		)
 	)
 		return undefined;
@@ -449,7 +489,21 @@ function isClearlyNonPublicHost(hostname: string): boolean {
 }
 
 const JSON_PATH = /^\$(?:\.[A-Za-z_][A-Za-z0-9_-]*)*$/;
+const REDACT_PATH = /^\$\.[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*$/;
 const TRANSFORM_KEY = /^[A-Za-z_][A-Za-z0-9_-]*$/;
+
+function hasInvalidOutputPolicy(policy: ProcessOutputPolicy | undefined): boolean {
+	if (policy === undefined) return false;
+	const redactPaths = policy.redactPaths ?? [];
+	return (
+		!Number.isInteger(policy.maxBytes) ||
+		policy.maxBytes < 1 ||
+		policy.maxBytes > MAX_INLINE_OUTPUT_BYTES ||
+		redactPaths.length > MAX_OUTPUT_REDACT_PATHS ||
+		new Set(redactPaths).size !== redactPaths.length ||
+		redactPaths.some((path) => !REDACT_PATH.test(path))
+	);
+}
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function validateProcessDefinition(definition: ProcessDefinition): ProcessValidationResult {
@@ -485,7 +539,9 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			message: 'A process must have exactly one HTTP trigger.'
 		});
 	}
-	if (!definition.nodes.some((node) => node.type === 'end-success' || node.type === 'end-failure')) {
+	if (
+		!definition.nodes.some((node) => node.type === 'end-success' || node.type === 'end-failure')
+	) {
 		issues.push({
 			code: 'missing-terminal',
 			message: 'A process must have at least one terminal.'
@@ -540,6 +596,14 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 					nodeId: node.id
 				});
 			}
+			if (hasInvalidOutputPolicy(node.config.outputPolicy)) {
+				issues.push({
+					code: 'invalid-http-output',
+					message:
+						'HTTP inline output requires a 1 to 16384 byte limit and up to 20 unique child JSON paths for redaction.',
+					nodeId: node.id
+				});
+			}
 		}
 		if (node.type === 'condition') {
 			if (
@@ -555,7 +619,9 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 		}
 		if (node.type === 'switch') {
 			const caseIds = node.config.cases.map((item) => item.id);
-			const caseValues = node.config.cases.map((item) => `${typeof item.value}:${String(item.value)}`);
+			const caseValues = node.config.cases.map(
+				(item) => `${typeof item.value}:${String(item.value)}`
+			);
 			if (
 				!JSON_PATH.test(node.config.path) ||
 				node.config.cases.length < 1 ||
@@ -632,7 +698,8 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 		) {
 			issues.push({
 				code: 'invalid-failure',
-				message: 'Failure terminals require a safe error code and a message from 1 to 200 characters.',
+				message:
+					'Failure terminals require a safe error code and a message from 1 to 200 characters.',
 				nodeId: node.id
 			});
 		}
@@ -695,11 +762,13 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			const mappings = Object.entries(node.config.mappings);
 			if (
 				mappings.length === 0 ||
-				mappings.some(([key, path]) => !TRANSFORM_KEY.test(key) || !JSON_PATH.test(path))
+				mappings.some(([key, path]) => !TRANSFORM_KEY.test(key) || !JSON_PATH.test(path)) ||
+				hasInvalidOutputPolicy(node.config.outputPolicy)
 			) {
 				issues.push({
 					code: 'invalid-transform',
-					message: 'Transforms require safe output keys and JSON path mappings.',
+					message:
+						'Transforms require safe mappings, a 1 to 16384 byte output limit, and up to 20 unique child JSON paths for redaction.',
 					nodeId: node.id
 				});
 			}
@@ -740,14 +809,28 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 		const sourceNode = definition.nodes.find((node) => node.id === edge.source);
 		const targetNode = definition.nodes.find((node) => node.id === edge.target);
 		if (
+			(edge.compensation !== undefined &&
+				!((sourceNode?.type === 'http-request' &&
+					(targetNode?.type === 'http-request' || targetNode?.type === 'transform')) ||
+					(sourceNode?.type === 'transform' && targetNode?.type === 'transform') ||
+					(sourceNode?.type === 'invoke-process' &&
+						(targetNode?.type === 'http-request' || targetNode?.type === 'transform')))) ||
 			(edge.loop !== undefined && sourceNode?.type !== 'loop') ||
 			(edge.parallel !== undefined && sourceNode?.type !== 'parallel') ||
+			(edge.try !== undefined && sourceNode?.type !== 'try') ||
 			(edge.loopBack !== undefined &&
 				(targetNode?.type !== 'loop' || edge.loopBack !== targetNode.id)) ||
-			[edge.when, edge.case, edge.loop, edge.loopBack, edge.parallel].filter(
+			[
+				edge.compensation,
+				edge.when,
+				edge.case,
+				edge.loop,
+				edge.loopBack,
+				edge.parallel,
+				edge.try
+			].filter(
 				(value) => value !== undefined
-			)
-				.length > 1
+			).length > 1
 		) {
 			issues.push({
 				code: 'invalid-edge',
@@ -755,8 +838,37 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 				edgeId: edge.id
 			});
 		}
-		outgoing.get(edge.source)?.push(edge.target);
+		if (edge.compensation === undefined) outgoing.get(edge.source)?.push(edge.target);
 		incoming.set(edge.target, (incoming.get(edge.target) ?? 0) + 1);
+	}
+	const compensationEdges = definition.edges.filter((edge) => edge.compensation === true);
+	const compensationTargetIds = new Set(compensationEdges.map((edge) => edge.target));
+	for (const node of definition.nodes.filter(
+		(candidate) =>
+			candidate.type === 'http-request' ||
+			candidate.type === 'transform' ||
+			candidate.type === 'invoke-process'
+	)) {
+		const handlers = compensationEdges.filter((edge) => edge.source === node.id);
+		const incomingCompensations = compensationEdges.filter((edge) => edge.target === node.id);
+		const normalIncoming = definition.edges.filter(
+			(edge) => edge.target === node.id && edge.compensation === undefined
+		);
+		const normalOutgoing = definition.edges.filter(
+			(edge) => edge.source === node.id && edge.compensation === undefined
+		);
+		if (
+			handlers.length > 1 ||
+			incomingCompensations.length > 1 ||
+			(incomingCompensations.length === 1 &&
+				(normalIncoming.length > 0 || normalOutgoing.length > 0 || handlers.length > 0))
+		) {
+			issues.push({
+				code: 'invalid-compensation',
+				message: `${node.type === 'http-request' ? 'HTTP' : node.type === 'transform' ? 'Transform' : 'Subprocess'} step "${node.name}" has an invalid compensation route.`,
+				nodeId: node.id
+			});
+		}
 	}
 
 	for (const trigger of triggers) {
@@ -798,7 +910,9 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 		const expectedCases = [...switchNode.config.cases.map((item) => item.id), 'default'];
 		if (
 			branches.length !== expectedCases.length ||
-			expectedCases.some((caseId) => branches.filter((edge) => edge.case === caseId).length !== 1) ||
+			expectedCases.some(
+				(caseId) => branches.filter((edge) => edge.case === caseId).length !== 1
+			) ||
 			branches.some((edge) => edge.when !== undefined)
 		) {
 			issues.push({
@@ -878,12 +992,15 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 					node.type === 'parallel-join'
 				)
 					return false;
-				if (['wait', 'wait-until', 'wait-event', 'approval', 'invoke-process'].includes(node.type))
-					return false;
 				visiting.add(nodeId);
 				region.add(nodeId);
 				const targets = definition.edges
-					.filter((edge) => edge.source === nodeId && edge.loopBack === undefined)
+					.filter(
+						(edge) =>
+							edge.source === nodeId &&
+							edge.loopBack === undefined &&
+							edge.compensation !== true
+					)
 					.map((edge) => edge.target);
 				const valid = targets.length > 0 && targets.every(reachesOnlyJoin);
 				visiting.delete(nodeId);
@@ -934,6 +1051,26 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			});
 		}
 	}
+	for (const tryNode of definition.nodes.filter((node) => node.type === 'try')) {
+		const branches = definition.edges.filter((edge) => edge.source === tryNode.id);
+		const targets = branches.map((edge) => edge.target);
+		const hasCatch = branches.some((edge) => edge.try === 'catch');
+		const hasFinally = branches.some((edge) => edge.try === 'finally');
+		if (
+			branches.filter((edge) => edge.try === 'body').length !== 1 ||
+			branches.filter((edge) => edge.try === 'continuation').length !== 1 ||
+			branches.filter((edge) => edge.try === 'catch').length > 1 ||
+			branches.filter((edge) => edge.try === 'finally').length > 1 ||
+			(!hasCatch && !hasFinally) ||
+			new Set(targets).size !== targets.length
+		) {
+			issues.push({
+				code: 'invalid-try',
+				message: `Try block "${tryNode.name}" requires distinct body and continuation branches plus catch or finally.`,
+				nodeId: tryNode.id
+			});
+		}
+	}
 	for (const approval of definition.nodes.filter((node) => node.type === 'approval')) {
 		const branches = definition.edges.filter((edge) => edge.source === approval.id);
 		if (
@@ -960,7 +1097,8 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 		if (visited.has(nodeId)) return;
 		visiting.add(nodeId);
 		for (const edge of definition.edges.filter(
-			(edge) => edge.source === nodeId && edge.loopBack === undefined
+			(edge) =>
+				edge.source === nodeId && edge.loopBack === undefined && edge.compensation === undefined
 		))
 			visit(edge.target);
 		visiting.delete(nodeId);
@@ -982,6 +1120,7 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			reachable.add(nodeId);
 			queue.push(...(outgoing.get(nodeId) ?? []));
 		}
+		for (const targetId of compensationTargetIds) reachable.add(targetId);
 		for (const node of definition.nodes) {
 			if (!reachable.has(node.id)) {
 				issues.push({

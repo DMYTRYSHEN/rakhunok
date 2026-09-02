@@ -60,15 +60,28 @@ Covered:
 - Deterministic parallel fork/join with isolated branch contexts, stable durable step identities, configured result ordering, and recorded `starts`/`resolves` indices.
 - Explicit failure terminals with validated public error codes/messages and one sanitized `run_failed` lifecycle event.
 - Durable lifecycle events, sanitized failures, retry configuration, and bounded subprocess depth.
-- Serial HTTP retries persist idempotent attempt identity, duration, retry policy, and bounded sanitized response or error metadata for owner-scoped inspection.
+- Serial and parallel-branch HTTP retries persist idempotent attempt identity, duration, retry policy, branch-qualified durable names, and bounded sanitized response or error metadata for owner-scoped inspection.
+- Successful serial, parallel, and compensation HTTP actions remain metadata-only by default. Definitions may opt into owner-scoped inline JSON response output up to 16 KiB with up to 20 validated child JSON paths redacted before persistence; oversized JSON and non-JSON responses remain metadata-only without failing or replaying the action, and the run inspector renders captured values.
+- Transform, condition, switch, loop, break, serial relative/absolute waits, external event waits, approvals, and subprocesses persist deterministic attempt identity, visit, duration, and outcome without storing process context; transform, event-wait, approval, and subprocess failures are sanitized.
+- Transform, condition, switch, loop, and break nodes inside supported parallel branches persist branch-qualified attempt identity and visit; parallel transform failures are sanitized.
+- Successful serial, parallel, and compensation transforms default to a structural output descriptor and UTF-8 serialized byte count. Definitions may opt into owner-scoped inline output up to 16 KiB with up to 20 validated child JSON paths redacted before persistence; oversized values fall back to metadata without failing execution, and the run inspector renders captured values.
+- Successful control-flow and timer attempts persist an explicit no-output descriptor, while event, approval, and subprocess results persist a redacted descriptor. Every complete attempt therefore satisfies the database output invariant without exposing process data.
+- Relative and absolute durable waits execute in serial and parallel branches with stable branch-qualified identities and explicit no-output attempt descriptors.
+- External-event waits execute in serial and parallel branches with replay-stable internal event types, branch-qualified attempt telemetry, deterministic configured result ordering, and active-wait cleanup on success or timeout.
+- External-event delivery accepts an optional validated step identity and atomically resolves exactly one active registry entry for the current execution generation. Registry identity includes step and visit, so concurrent waits do not depend on lifecycle insertion order. The untargeted serial contract remains backward compatible; the targeted migration is local and not yet applied remotely.
+- Approvals execute in serial and parallel branches. Parallel approvals atomically register exact task and active-wait identities by execution generation, step, and visit; decisions target an explicit task ID, route through the registered internal event type, and expire pending tasks during wait cleanup. The migration is local and not yet applied remotely.
+- Subprocesses execute in serial and parallel branches with generation/step/visit invocation identity, child-run callback correlation, configured branch result ordering, and branch-local durable termination on timeout. The bounded persistence key is a SHA-256 digest of the invocation identity.
 - Correlated child completion callbacks and timeout cleanup.
+- HTTP actions support deterministic compensation routes in serial and parallel execution. Compiled handlers register as Cloudflare rollback callbacks with isolated action input, bounded output/error context, independent retry and timeout policy, and owner-scoped per-handler attempt inspection.
+- Serial and parallel HTTP actions may also register an isolated transform compensation handler. Its rollback envelope is limited to the captured action input, bounded action output, and normalized error; telemetry stores only structural output metadata or a sanitized transform failure code with branch-qualified identity where applicable.
+- Serial and parallel deterministic transform actions may register isolated transform compensation with the same bounded rollback envelope, sanitized telemetry, and branch-qualified identity.
+- Serial and parallel subprocess actions may register isolated HTTP or transform compensation after correlated child completion. Timed-out or errored children never register the rollback checkpoint; HTTP handlers retain independent retry, timeout, and idempotency policy, while compensation telemetry preserves generation, step, visit, and branch-qualified durable identity.
 
 Critical gaps:
 
-- `try/catch/finally`, compensation routes, and rollback inspection.
+- Compensation handlers beyond HTTP and transform handlers, and compensation sources beyond HTTP, deterministic transforms, and completed subprocesses.
 - Executable blocks and reusable local functions where subprocesses are too coarse.
-- Complete attempt identity, duration, retry state, and output policy for non-HTTP steps and branch-aware parallel attempts.
-- Concurrent wait, approval, and subprocess nodes inside parallel branches; validation rejects them until branch-aware waiting and cancellation semantics are defined.
+- Full step output retrieval beyond the bounded, path-redacted transform and HTTP JSON slices: policies for other step kinds and external-object or streaming storage for larger values.
 
 Exit criteria:
 
@@ -88,7 +101,7 @@ Covered:
 - Dispatcher support for `workflow_event` and `parent_callback` delivery.
 - Delivery attempts dead-letter after a bounded eighth failure, operator retry is owner-scoped and service-role-only, and aggregate outbox health is available through a trusted RPC.
 - Stale queued runs are leased with claim tokens and bounded retries, then repaired only when their stable Cloudflare Workflow instance ID reports `unknown`; reconciliation health is exposed through a trusted RPC.
-- Generic events and approvals resolve the exact active durable wait before enqueue and deliver through a replay-stable internal type derived from the run ID and lifecycle sequence, so delayed duplicates cannot satisfy a later wait.
+- Generic events resolve exactly one active durable-wait registry entry before enqueue and deliver through its replay-stable internal type; approvals retain exact active-wait resolution through their task lifecycle. Delayed duplicates therefore cannot satisfy a later wait.
 
 Critical gaps:
 
@@ -161,7 +174,7 @@ Covered:
 - Active-run cancellation is available in the inspector and exposes its in-flight operation state without hiding the selected run timeline.
 - The inspector exposes explicit rollback separately from cancellation, prevents conflicting controls and events while rollback is active, and displays sanitized rollback success or failure details from the durable read model.
 - The inspector archives eligible terminal runs without hiding them, prevents conflicting lifecycle controls while the request is active, and displays durable archive metadata after refresh.
-- The inspector shows owner-scoped serial HTTP attempts with durable identity, duration, retry policy, status, content type, byte count, or sanitized error code; raw response bodies and private upstream errors are not stored or displayed.
+- The inspector shows owner-scoped HTTP attempts with durable identity, duration, retry policy, status, content type, byte count, or sanitized error code. Raw response bodies remain hidden by default; opt-in JSON responses up to 16 KiB are rendered inline, while oversized or non-JSON responses stay metadata-only.
 
 Critical gaps:
 
@@ -169,7 +182,7 @@ Critical gaps:
 - Standalone process diagram component with two read-only projections: a definition/version topology and a selected-run sequence. Generate Mermaid source from trusted `ProcessDefinition` and ordered run events through pure deterministic projectors, render with a local dependency under strict security settings, and cover escaping, branches, waits, retries, subprocesses, terminal states, empty states, and render failures. The component must remain independent from the editable canvas and must not become a second compiler.
 - Runtime overlays for active, waiting, retrying, paused, failed, completed, and rolled-back paths.
 - Collapsed and expanded nested conditions, loops, blocks, functions, and parallel lanes.
-- Attempt inspection for non-HTTP steps and parallel branches, plus full step output retrieval with size and redaction policies.
+- Full step output retrieval beyond bounded transform and HTTP JSON values, including redaction profiles and policies for other step kinds.
 - External-object or streaming strategy for outputs that should not be stored inline.
 - Resumable live event subscription with cursor and event filters.
 - Workflow/version diff and run comparison.

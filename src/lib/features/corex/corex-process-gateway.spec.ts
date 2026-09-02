@@ -186,12 +186,48 @@ describe('Corex process gateway', () => {
 					step_id: 'forward',
 					visit: 2,
 					durable_step_name: 'forward-payment [visit 2]',
+					kind: 'compensation',
 					attempt: 2,
 					started_at: '2026-09-01T08:00:00.000Z',
 					finished_at: '2026-09-01T08:00:01.000Z',
 					outcome: 'complete',
 					retry: { limit: 3, backoff: 'exponential', timeoutMs: 30_000 },
-					output: { status: 202, contentType: 'application/json', bytes: 17 },
+					output: {
+						status: 202,
+						contentType: 'application/json',
+						bytes: 17,
+						value: { accepted: true }
+					},
+					error: null
+				},
+				{
+					run_id: 'run-1',
+					execution_generation: 3,
+					step_id: 'shape',
+					visit: 0,
+					durable_step_name: 'shape-result',
+					kind: 'forward',
+					attempt: 1,
+					started_at: '2026-09-01T08:00:02.000Z',
+					finished_at: '2026-09-01T08:00:02.010Z',
+					outcome: 'complete',
+					retry: { limit: 0, backoff: 'constant', timeoutMs: 0 },
+					output: { type: 'object', bytes: 42, value: { normalizedId: 'pay-42' } },
+					error: null
+				},
+				{
+					run_id: 'run-1',
+					execution_generation: 3,
+					step_id: 'approval',
+					visit: 0,
+					durable_step_name: 'review-payment',
+					kind: 'forward',
+					attempt: 1,
+					started_at: '2026-09-01T08:00:03.000Z',
+					finished_at: '2026-09-01T08:00:04.000Z',
+					outcome: 'complete',
+					retry: { limit: 0, backoff: 'constant', timeoutMs: 86_400_000 },
+					output: { type: 'redacted' },
 					error: null
 				}
 			],
@@ -212,14 +248,26 @@ describe('Corex process gateway', () => {
 			stepId: 'forward',
 			visit: 2,
 			durableStepName: 'forward-payment [visit 2]',
+			kind: 'compensation',
 			attempt: 2,
 			startedAt: '2026-09-01T08:00:00.000Z',
 			finishedAt: '2026-09-01T08:00:01.000Z',
 			outcome: 'complete',
 			retry: { limit: 3, backoff: 'exponential', timeoutMs: 30_000 },
-			output: { status: 202, contentType: 'application/json', bytes: 17 },
+			output: {
+				status: 202,
+				contentType: 'application/json',
+				bytes: 17,
+				value: { accepted: true }
+			},
 			error: null
 		});
+		expect(result[1]?.output).toEqual({
+			type: 'object',
+			bytes: 42,
+			value: { normalizedId: 'pay-42' }
+		});
+		expect(result[2]?.output).toEqual({ type: 'redacted' });
 	});
 
 	it('lists approval tasks assigned to the authenticated user', async () => {

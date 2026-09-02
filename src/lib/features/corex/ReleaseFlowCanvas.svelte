@@ -250,6 +250,16 @@
 			? latest
 			: null;
 	});
+	let activeApprovalTask = $derived.by(() => {
+		if (!selectedRun || !activeApproval) return null;
+		return approvalTasks.find(
+			(task) =>
+				task.runId === selectedRun.id &&
+				task.executionGeneration === selectedRun.executionGeneration &&
+				task.stepName === activeApproval.stepName &&
+				task.status === 'pending'
+		) ?? null;
+	});
 	let publishEnabled = $derived(
 		canPublishProcess({
 			hasGateway: Boolean(commandGateway),
@@ -740,6 +750,7 @@
 			!activeProcess ||
 			!selectedRun ||
 			!activeApproval ||
+			!activeApprovalTask ||
 			eventSending ||
 			runCancelling ||
 			runRestarting ||
@@ -751,6 +762,7 @@
 		commandNotice = '';
 		try {
 			await commandGateway.decideApproval(selectedRun.id, {
+				taskId: activeApprovalTask.id,
 				decision,
 				...(approvalComment.trim() ? { comment: approvalComment.trim() } : {})
 			});
@@ -933,6 +945,7 @@
 		try {
 			const comment = approvalTaskComments[task.id]?.trim();
 			await commandGateway.decideApproval(task.runId, {
+				taskId: task.id,
 				decision,
 				...(comment ? { comment } : {})
 			});
@@ -1036,6 +1049,94 @@
 		} catch {
 			// Keep malformed JSON local to the input until it becomes a valid mapping object.
 		}
+	}
+
+	function updateSelectedOutputMode(mode: 'metadata' | 'inline') {
+		updateSelectedDefinitionNode((node) => {
+			if (node.type === 'http-request') {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy:
+							mode === 'inline'
+								? { mode, maxBytes: node.config.outputPolicy?.maxBytes ?? 16_384 }
+								: undefined
+					}
+				};
+			}
+			if (node.type === 'transform') {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy:
+							mode === 'inline'
+								? { mode, maxBytes: node.config.outputPolicy?.maxBytes ?? 16_384 }
+								: undefined
+					}
+				};
+			}
+			return node;
+		});
+	}
+
+	function updateSelectedOutputLimit(maxBytes: number) {
+		updateSelectedDefinitionNode((node) => {
+			if (node.type === 'http-request' && node.config.outputPolicy?.mode === 'inline') {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy: { ...node.config.outputPolicy, maxBytes }
+					}
+				};
+			}
+			if (node.type === 'transform' && node.config.outputPolicy?.mode === 'inline') {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy: { ...node.config.outputPolicy, maxBytes }
+					}
+				};
+			}
+			return node;
+		});
+	}
+
+	function updateSelectedOutputRedactPaths(value: string) {
+		const redactPaths = value
+			.split(/\r?\n/)
+			.map((path) => path.trim())
+			.filter(Boolean);
+		updateSelectedDefinitionNode((node) => {
+			if (node.type === 'http-request' && node.config.outputPolicy?.mode === 'inline') {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy: {
+							...node.config.outputPolicy,
+							redactPaths: redactPaths.length ? redactPaths : undefined
+						}
+					}
+				};
+			}
+			if (node.type === 'transform' && node.config.outputPolicy?.mode === 'inline') {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy: {
+							...node.config.outputPolicy,
+							redactPaths: redactPaths.length ? redactPaths : undefined
+						}
+					}
+				};
+			}
+			return node;
+		});
 	}
 
 	function updateParallelBranch(index: number, branchId: string) {
@@ -2398,28 +2499,64 @@
 								{locale === 'uk' ? 'Подій ще немає.' : 'No events yet.'}
 							</div>{/if}
 						<div class="attempts-head">
-							<span>{locale === 'uk' ? 'HTTP спроби' : 'HTTP attempts'}</span>
+							<span>{locale === 'uk' ? 'Спроби дій' : 'Action attempts'}</span>
 							<strong>{stepAttempts.length}</strong>
 						</div>
 						<div class="step-attempts">
-							{#each stepAttempts as attempt (`${attempt.executionGeneration}:${attempt.stepId}:${attempt.visit}:${attempt.attempt}`)}
+							{#each stepAttempts as attempt (`${attempt.executionGeneration}:${attempt.stepId}:${attempt.visit}:${attempt.kind}:${attempt.attempt}`)}
 								<div class:failed={attempt.outcome === 'failed'}>
 									<header>
 										<b>{attempt.stepId} · visit {attempt.visit}</b>
-										<span>{attempt.outcome}</span>
+										<span>{attempt.kind === 'compensation'
+												? locale === 'uk'
+													? 'компенсація'
+													: 'compensation'
+												: attempt.outcome}</span>
 									</header>
 									<small>generation {attempt.executionGeneration} · attempt {attempt.attempt} · {Math.max(
 										0,
 										new Date(attempt.finishedAt).getTime() - new Date(attempt.startedAt).getTime()
 									)} ms</small>
 									<small>{attempt.retry.limit} retries · {attempt.retry.backoff} · {attempt.retry.timeoutMs} ms timeout</small>
-									{#if attempt.output}<small>HTTP {attempt.output.status} · {attempt.output.contentType ?? 'unknown'} · {attempt.output.bytes} bytes</small>{/if}
+									{#if attempt.output && 'status' in attempt.output}
+										<small
+											>HTTP {attempt.output.status} · {attempt.output.contentType ?? 'unknown'} · {attempt.output.bytes} bytes{attempt.output.truncated
+												? locale === 'uk'
+													? ' · завеликий для inline перегляду'
+													: ' · too large for inline viewing'
+												: ''}</small
+										>
+										{#if 'value' in attempt.output}
+											<JsonTreeViewer
+												data={attempt.output.value}
+												label={locale === 'uk' ? 'HTTP-відповідь' : 'HTTP response'}
+												defaultExpanded={false}
+											/>
+										{/if}
+									{:else if attempt.output && 'bytes' in attempt.output}
+										<small
+											>{attempt.output.type} · {attempt.output.bytes} bytes{attempt.output.truncated
+												? locale === 'uk'
+													? ' · завеликий для inline перегляду'
+													: ' · too large for inline viewing'
+												: ''}</small
+										>
+										{#if 'value' in attempt.output}
+											<JsonTreeViewer
+												data={attempt.output.value}
+												label={locale === 'uk' ? 'Результат кроку' : 'Step output'}
+												defaultExpanded={false}
+											/>
+										{/if}
+									{:else if attempt.output?.type === 'redacted'}
+										<small>{locale === 'uk' ? 'output приховано' : 'output redacted'}</small>
+									{/if}
 									{#if attempt.error}<small>{attempt.error.code}</small>{/if}
 								</div>
 							{/each}
 						</div>
 						{#if stepAttempts.length === 0}<div class="run-empty">
-								{locale === 'uk' ? 'HTTP спроб ще немає.' : 'No HTTP attempts yet.'}
+								{locale === 'uk' ? 'Спроб дій ще немає.' : 'No action attempts yet.'}
 							</div>{/if}
 					{:else}<div class="run-empty">
 							{locale === 'uk' ? 'Запусків ще немає.' : 'No runs yet.'}
@@ -2544,6 +2681,34 @@
 									)}
 							/></label
 						>
+						<label
+							><span>{locale === 'uk' ? 'Збереження відповіді' : 'Response storage'}</span><select
+								value={selectedDefinitionNode.config.outputPolicy?.mode ?? 'metadata'}
+								onchange={(event) =>
+									updateSelectedOutputMode(event.currentTarget.value as 'metadata' | 'inline')}
+								><option value="metadata">metadata</option><option value="inline">inline JSON</option></select
+							></label
+						>
+						{#if selectedDefinitionNode.config.outputPolicy?.mode === 'inline'}
+							<label
+								><span>{locale === 'uk' ? 'Ліміт відповіді (байти)' : 'Response limit (bytes)'}</span><input
+									type="number"
+									min="1"
+									max="16384"
+									step="1"
+									value={selectedDefinitionNode.config.outputPolicy.maxBytes}
+									onchange={(event) => updateSelectedOutputLimit(Number(event.currentTarget.value))}
+								/></label
+							>
+							<label
+								><span>{locale === 'uk' ? 'Приховати JSON paths' : 'Redact JSON paths'}</span><textarea
+									spellcheck="false"
+									placeholder="$.customer.email"
+									onchange={(event) => updateSelectedOutputRedactPaths(event.currentTarget.value)}
+									>{selectedDefinitionNode.config.outputPolicy.redactPaths?.join('\n') ?? ''}</textarea
+								></label
+							>
+						{/if}
 					</div>
 				{:else if inspectorTab === 'details' && selectedDefinitionNode?.type === 'condition'}
 					<div class="node-config">
@@ -2856,6 +3021,34 @@
 								>{JSON.stringify(selectedDefinitionNode.config.mappings, null, 2)}</textarea
 							></label
 						>
+						<label
+							><span>{locale === 'uk' ? 'Збереження результату' : 'Result storage'}</span><select
+								value={selectedDefinitionNode.config.outputPolicy?.mode ?? 'metadata'}
+								onchange={(event) =>
+									updateSelectedOutputMode(event.currentTarget.value as 'metadata' | 'inline')}
+								><option value="metadata">metadata</option><option value="inline">inline JSON</option></select
+							></label
+						>
+						{#if selectedDefinitionNode.config.outputPolicy?.mode === 'inline'}
+							<label
+								><span>{locale === 'uk' ? 'Ліміт результату (байти)' : 'Result limit (bytes)'}</span><input
+									type="number"
+									min="1"
+									max="16384"
+									step="1"
+									value={selectedDefinitionNode.config.outputPolicy.maxBytes}
+									onchange={(event) => updateSelectedOutputLimit(Number(event.currentTarget.value))}
+								/></label
+							>
+							<label
+								><span>{locale === 'uk' ? 'Приховати JSON paths' : 'Redact JSON paths'}</span><textarea
+									spellcheck="false"
+									placeholder="$.customer.email"
+									onchange={(event) => updateSelectedOutputRedactPaths(event.currentTarget.value)}
+									>{selectedDefinitionNode.config.outputPolicy.redactPaths?.join('\n') ?? ''}</textarea
+								></label
+							>
+						{/if}
 					</div>
 				{:else if inspectorTab === 'details' && selectedDefinitionNode?.type === 'invoke-process'}
 					<div class="node-config">

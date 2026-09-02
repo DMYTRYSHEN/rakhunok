@@ -28,6 +28,7 @@ export interface CorexSignalCommand {
 	accessToken: string;
 	runId: string;
 	eventId?: string;
+	stepId?: string;
 	type: string;
 	payload: unknown;
 }
@@ -85,6 +86,7 @@ const RUN_ARCHIVE_PATH = /^\/corex\/api\/runs\/([0-9a-f-]+)\/archive$/i;
 const MAX_COMMAND_BYTES = 4 * 1024;
 const MAX_RUN_COMMAND_BYTES = 64 * 1024;
 const EVENT_TYPE = /^[A-Za-z_][A-Za-z0-9_-]{0,99}$/;
+const STEP_ID = /^[A-Za-z_][A-Za-z0-9_-]{0,99}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function jsonResponse(body: unknown, status: number): Response {
@@ -252,7 +254,11 @@ async function routeCorexRunEvent(
 		typeof body !== 'object' ||
 		body === null ||
 		Array.isArray(body) ||
-		Object.keys(body).some((key) => key !== 'eventId' && key !== 'type' && key !== 'payload') ||
+		Object.keys(body).some(
+			(key) => key !== 'eventId' && key !== 'stepId' && key !== 'type' && key !== 'payload'
+		) ||
+		(Object.hasOwn(body, 'stepId') &&
+			!STEP_ID.test(String((body as { stepId?: unknown }).stepId ?? ''))) ||
 		!EVENT_TYPE.test(String((body as { type?: unknown }).type ?? '')) ||
 		(String((body as { type?: unknown }).type ?? '')
 			.toLowerCase()
@@ -271,7 +277,12 @@ async function routeCorexRunEvent(
 			runId,
 			...((body as { type: string }).type === 'corex-approval'
 				? {}
-				: { eventId: (body as { eventId: string }).eventId }),
+				: {
+						eventId: (body as { eventId: string }).eventId,
+						...(Object.hasOwn(body, 'stepId')
+							? { stepId: (body as { stepId: string }).stepId }
+							: {})
+					}),
 			type: (body as { type: string }).type,
 			payload: (body as { payload: unknown }).payload
 		});

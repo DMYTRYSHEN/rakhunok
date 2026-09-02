@@ -62,13 +62,31 @@ type StepAttemptRow = {
 	step_id: string;
 	visit: number;
 	durable_step_name: string;
+	kind: 'forward' | 'compensation';
 	attempt: number;
 	started_at: string;
 	finished_at: string;
 	outcome: 'complete' | 'failed';
 	retry: { limit: number; backoff: 'constant' | 'linear' | 'exponential'; timeoutMs: number };
-	output: { status: number; contentType: string | null; bytes: number } | null;
-	error: { code: 'http_action_failed' } | null;
+	output:
+		| {
+				status: number;
+				contentType: string | null;
+				bytes: number;
+				value?: unknown;
+				truncated?: true;
+			}
+		| { type: 'object'; bytes: number; value?: unknown; truncated?: true }
+		| { type: 'none' | 'redacted' }
+		| null;
+	error: {
+		code:
+			| 'http_action_failed'
+			| 'transform_step_failed'
+			| 'wait_event_failed'
+			| 'approval_failed'
+			| 'subprocess_failed';
+	} | null;
 };
 
 type ApprovalTaskRow = {
@@ -145,6 +163,7 @@ export type CorexStepAttempt = {
 	stepId: string;
 	visit: number;
 	durableStepName: string;
+	kind: StepAttemptRow['kind'];
 	attempt: number;
 	startedAt: string;
 	finishedAt: string;
@@ -323,7 +342,7 @@ export function createCorexProcessGateway(client: SupabaseClient) {
 			const { data, error } = await client
 				.from('corex_step_attempts')
 				.select(
-					'run_id, execution_generation, step_id, visit, durable_step_name, attempt, started_at, finished_at, outcome, retry, output, error'
+					'run_id, execution_generation, step_id, visit, durable_step_name, kind, attempt, started_at, finished_at, outcome, retry, output, error'
 				)
 				.eq('run_id', runId)
 				.order('execution_generation', { ascending: true })
@@ -336,6 +355,7 @@ export function createCorexProcessGateway(client: SupabaseClient) {
 				stepId: row.step_id,
 				visit: row.visit,
 				durableStepName: row.durable_step_name,
+				kind: row.kind,
 				attempt: row.attempt,
 				startedAt: row.started_at,
 				finishedAt: row.finished_at,

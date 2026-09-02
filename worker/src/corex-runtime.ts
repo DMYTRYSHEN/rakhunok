@@ -11,7 +11,21 @@ export type CorexHttpStep = {
 			backoff: 'constant' | 'linear' | 'exponential';
 		};
 		idempotencyKey?: string;
+		outputPolicy?: { mode: 'metadata' | 'inline'; maxBytes: number; redactPaths?: string[] };
 	};
+	compensation?:
+		| {
+				id: string;
+				name: string;
+				type?: 'http-request';
+				config: CorexHttpStep['config'];
+			}
+		| {
+				id: string;
+				name: string;
+				type: 'transform';
+				config: CorexTransformStep['config'];
+			};
 	next: string;
 };
 
@@ -101,7 +115,22 @@ type CorexTransformStep = {
 	id: string;
 	name: string;
 	type: 'transform';
-	config: { mode: 'merge' | 'replace'; mappings: Record<string, string> };
+	config: {
+		mode: 'merge' | 'replace';
+		mappings: Record<string, string>;
+		outputPolicy?: { mode: 'metadata' | 'inline'; maxBytes: number; redactPaths?: string[] };
+	};
+	compensation?: {
+		id: string;
+		name: string;
+		config: CorexHttpStep['config'];
+		type: 'http-request';
+	} | {
+		id: string;
+		name: string;
+		type: 'transform';
+		config: CorexTransformStep['config'];
+	};
 	next: string;
 };
 export type CorexInvokeProcessStep = {
@@ -109,6 +138,12 @@ export type CorexInvokeProcessStep = {
 	name: string;
 	type: 'invoke-process';
 	config: { processId: string; inputPath: string; resultKey: string; timeoutMs: number };
+	compensation?: {
+		id: string;
+		name: string;
+		type: 'transform';
+		config: CorexTransformStep['config'];
+	};
 	next: string;
 };
 type CorexSuccessStep = {
@@ -123,6 +158,16 @@ type CorexFailureStep = {
 	type: 'end-failure';
 	config: { code: string; message: string };
 };
+type CorexTryStep = {
+	id: string;
+	name: string;
+	type: 'try';
+	config: Record<string, never>;
+	bodyTarget: string;
+	catchTarget?: string;
+	finallyTarget?: string;
+	continuationTarget: string;
+};
 type CorexExecutionStep =
 	| CorexHttpStep
 	| CorexConditionStep
@@ -136,6 +181,7 @@ type CorexExecutionStep =
 	| CorexApprovalStep
 	| CorexTransformStep
 	| CorexInvokeProcessStep
+	| CorexTryStep
 	| CorexSuccessStep
 	| CorexFailureStep;
 
@@ -179,7 +225,15 @@ type CorexDurableStep = {
 	do<T>(
 		name: string,
 		options: unknown,
-		callback: (context: CorexDurableStepContext) => Promise<T>
+		callback: (context: CorexDurableStepContext) => Promise<T>,
+		rollbackOptions?: {
+			rollback: (context: {
+				ctx: CorexDurableStepContext;
+				error: Error;
+				output: T | undefined;
+			}) => Promise<void>;
+			rollbackConfig?: unknown;
+		}
 	): Promise<T>;
 	sleep(name: string, duration: string): Promise<void>;
 	sleepUntil(name: string, timestamp: Date | number): Promise<void>;
@@ -193,6 +247,22 @@ type CorexDurableStepContext = {
 	step: { name: string; count: number };
 	attempt: number;
 	config: unknown;
+};
+
+type CorexRollbackOptions<T> = {
+	rollback: (context: {
+		ctx: CorexDurableStepContext;
+		error: Error;
+		output: T | undefined;
+	}) => Promise<void>;
+	rollbackConfig?: {
+		retries: {
+			limit: number;
+			delay: number;
+			backoff: 'constant' | 'linear' | 'exponential';
+		};
+		timeout: number;
+	};
 };
 
 class CorexTerminalFailure extends Error {}
@@ -211,28 +281,463 @@ export type CorexStepAttempt = {
 	stepId: string;
 	visit: number;
 	durableStepName: string;
+	kind: 'forward' | 'compensation';
 	attempt: number;
 	startedAt: string;
 	finishedAt: string;
 	outcome: 'complete' | 'failed';
 	retry: { limit: number; backoff: 'constant' | 'linear' | 'exponential'; timeoutMs: number };
-	output?: { status: number; contentType: string | null; bytes: number };
-	error?: { code: 'http_action_failed' };
+	output?:
+		| {
+				status: number;
+				contentType: string | null;
+				bytes: number;
+				value?: unknown;
+				truncated?: true;
+			}
+		| { type: 'object'; bytes: number; value?: unknown; truncated?: true }
+		| { type: 'none' | 'redacted' };
+	error?: {
+		code:
+			| 'http_action_failed'
+			| 'transform_step_failed'
+			| 'wait_event_failed'
+			| 'approval_failed'
+			| 'subprocess_failed';
+	};
 };
 
 export type CorexStepAttemptRecorder = (attempt: CorexStepAttempt) => Promise<unknown>;
 
+export type CorexActiveWait = {
+	runId: string;
+	ownerUserId: string;
+	executionGeneration: number;
+	stepId: string;
+	visit: number;
+	eventType: string;
+	waitEventType: string;
+	durableStepName: string;
+};
+
+export type CorexActiveApproval = CorexActiveWait & {
+	assigneeUserId: string;
+	timeoutMs: number;
+};
+
+export type CorexActiveWaitRegistrar = (wait: CorexActiveWait) => Promise<unknown>;
+export type CorexActiveApprovalRegistrar = (approval: CorexActiveApproval) => Promise<unknown>;
+export type CorexActiveWaitCompleter = (
+	wait: Pick<CorexActiveWait, 'runId' | 'ownerUserId' | 'executionGeneration' | 'stepId' | 'visit'>
+) => Promise<unknown>;
+
+const MAX_INLINE_OUTPUT_BYTES = 16_384;
+const REDACTED_OUTPUT_VALUE = '[REDACTED]';
+
+function redactOutput(value: unknown, paths: string[] | undefined): unknown {
+	if (!paths?.length || value === null || typeof value !== 'object') return value;
+	const copy = JSON.parse(JSON.stringify(value)) as unknown;
+	for (const path of paths) {
+		const properties = path.slice(2).split('.');
+		let parent: unknown = copy;
+		for (const property of properties.slice(0, -1)) {
+			if (parent === null || typeof parent !== 'object' || !Object.hasOwn(parent, property)) {
+				parent = undefined;
+				break;
+			}
+			parent = (parent as Record<string, unknown>)[property];
+		}
+		const property = properties.at(-1);
+		if (
+			property &&
+			parent !== null &&
+			typeof parent === 'object' &&
+			Object.hasOwn(parent, property)
+		) {
+			Object.defineProperty(parent, property, {
+				value: REDACTED_OUTPUT_VALUE,
+				enumerable: true,
+				configurable: true,
+				writable: true
+			});
+		}
+	}
+	return copy;
+}
+
+function describeHttpOutput(
+	result: CorexHttpResult,
+	policy?: CorexHttpStep['config']['outputPolicy']
+): Extract<NonNullable<CorexStepAttempt['output']>, { status: number }> {
+	const descriptor = {
+		status: result.status,
+		contentType: result.contentType,
+		bytes: result.bytes
+	};
+	if (policy?.mode !== 'inline' || !result.contentType?.toLowerCase().includes('application/json')) {
+		return descriptor;
+	}
+	const value = redactOutput(result.body, policy.redactPaths);
+	const bytes = new TextEncoder().encode(JSON.stringify(value)).byteLength;
+	if (bytes > Math.min(policy.maxBytes, MAX_INLINE_OUTPUT_BYTES)) {
+		return { ...descriptor, truncated: true };
+	}
+	return { ...descriptor, value };
+}
+
+function describeTransformOutput(
+	result: Record<string, unknown>,
+	policy?: CorexTransformStep['config']['outputPolicy']
+): Extract<NonNullable<CorexStepAttempt['output']>, { type: 'object' }> {
+	const sourceBytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
+	if (policy?.mode !== 'inline') return { type: 'object', bytes: sourceBytes };
+	const value = redactOutput(result, policy.redactPaths);
+	const storedBytes = new TextEncoder().encode(JSON.stringify(value)).byteLength;
+	if (storedBytes > Math.min(policy.maxBytes, MAX_INLINE_OUTPUT_BYTES)) {
+		return { type: 'object', bytes: sourceBytes, truncated: true };
+	}
+	return { type: 'object', bytes: sourceBytes, value };
+}
+
+async function executeRecordedHttpAction(
+	operation: () => Promise<CorexHttpResult>,
+	identity: {
+		runId: string;
+		ownerUserId: string;
+		executionGeneration: number;
+		stepId: string;
+		visit: number;
+		durableStepName: string;
+	},
+	stepContext: CorexDurableStepContext,
+	retry: CorexStepAttempt['retry'],
+	recordAttempt?: CorexStepAttemptRecorder,
+	outputPolicy?: CorexHttpStep['config']['outputPolicy']
+): Promise<CorexHttpResult> {
+	const startedAt = new Date().toISOString();
+	try {
+		const result = await operation();
+		if (recordAttempt) {
+			try {
+				await recordAttempt({
+					...identity,
+					kind: 'forward',
+					attempt: stepContext.attempt,
+					startedAt,
+					finishedAt: new Date().toISOString(),
+					outcome: 'complete',
+					retry,
+					output: describeHttpOutput(result, outputPolicy)
+				});
+			} catch {
+				// Observability failures must not replay a completed external side effect.
+			}
+		}
+		return result;
+	} catch (error) {
+		if (recordAttempt) {
+			try {
+				await recordAttempt({
+					...identity,
+					kind: 'forward',
+					attempt: stepContext.attempt,
+					startedAt,
+					finishedAt: new Date().toISOString(),
+					outcome: 'failed',
+					retry,
+					error: { code: 'http_action_failed' }
+				});
+			} catch {
+				// Preserve the action failure when attempt telemetry is unavailable.
+			}
+		}
+		throw error;
+	}
+}
+
+async function executeRecordedTransform(
+	operation: () => Record<string, unknown>,
+	identity: {
+		runId: string;
+		ownerUserId: string;
+		executionGeneration: number;
+		stepId: string;
+		visit: number;
+		durableStepName: string;
+	},
+	stepContext: CorexDurableStepContext,
+	recordAttempt?: CorexStepAttemptRecorder,
+	kind: CorexStepAttempt['kind'] = 'forward',
+	outputPolicy?: CorexTransformStep['config']['outputPolicy']
+): Promise<Record<string, unknown>> {
+	const startedAt = new Date().toISOString();
+	try {
+		const result = operation();
+		if (recordAttempt) {
+			try {
+				await recordAttempt({
+					...identity,
+					kind,
+					attempt: stepContext.attempt,
+					startedAt,
+					finishedAt: new Date().toISOString(),
+					outcome: 'complete',
+					retry: { limit: 0, backoff: 'constant', timeoutMs: 0 },
+					output: describeTransformOutput(result, outputPolicy)
+				});
+			} catch {
+				// Observability failures must not fail a completed transform.
+			}
+		}
+		return result;
+	} catch (error) {
+		if (recordAttempt) {
+			try {
+				await recordAttempt({
+					...identity,
+					kind,
+					attempt: stepContext.attempt,
+					startedAt,
+					finishedAt: new Date().toISOString(),
+					outcome: 'failed',
+					retry: { limit: 0, backoff: 'constant', timeoutMs: 0 },
+					error: { code: 'transform_step_failed' }
+				});
+			} catch {
+				// Preserve the transform failure when attempt telemetry is unavailable.
+			}
+		}
+		throw error;
+	}
+}
+
+async function executeRecordedDeterministicStep<T>(
+	operation: () => T,
+	identity: {
+		runId: string;
+		ownerUserId: string;
+		executionGeneration: number;
+		stepId: string;
+		visit: number;
+		durableStepName: string;
+	},
+	stepContext: CorexDurableStepContext,
+	recordAttempt?: CorexStepAttemptRecorder
+): Promise<T> {
+	const startedAt = new Date().toISOString();
+	const result = operation();
+	if (recordAttempt) {
+		try {
+			await recordAttempt({
+				...identity,
+				kind: 'forward',
+				attempt: stepContext.attempt,
+				startedAt,
+				finishedAt: new Date().toISOString(),
+				outcome: 'complete',
+				retry: { limit: 0, backoff: 'constant', timeoutMs: 0 },
+				output: { type: 'none' }
+			});
+		} catch {
+			// Observability failures must not alter a completed decision.
+		}
+	}
+	return result;
+}
+
+async function executeRecordedDurableWait(
+	operation: () => Promise<void>,
+	identity: {
+		runId: string;
+		ownerUserId: string;
+		executionGeneration: number;
+		stepId: string;
+		visit: number;
+		durableStepName: string;
+	},
+	recordAttempt?: CorexStepAttemptRecorder
+): Promise<void> {
+	const startedAt = new Date().toISOString();
+	await operation();
+	if (recordAttempt) {
+		try {
+			await recordAttempt({
+				...identity,
+				kind: 'forward',
+				attempt: 1,
+				startedAt,
+				finishedAt: new Date().toISOString(),
+				outcome: 'complete',
+				retry: { limit: 0, backoff: 'constant', timeoutMs: 0 },
+				output: { type: 'none' }
+			});
+		} catch {
+			// Observability failures must not alter a completed wait.
+		}
+	}
+}
+
+async function executeRecordedEventWait<T>(
+	operation: () => Promise<T>,
+	identity: {
+		runId: string;
+		ownerUserId: string;
+		executionGeneration: number;
+		stepId: string;
+		visit: number;
+		durableStepName: string;
+	},
+	timeoutMs: number,
+	errorCode: 'wait_event_failed' | 'approval_failed' | 'subprocess_failed',
+	recordAttempt?: CorexStepAttemptRecorder
+): Promise<T> {
+	const startedAt = new Date().toISOString();
+	try {
+		const result = await operation();
+		if (recordAttempt) {
+			try {
+				await recordAttempt({
+					...identity,
+					kind: 'forward',
+					attempt: 1,
+					startedAt,
+					finishedAt: new Date().toISOString(),
+					outcome: 'complete',
+					retry: { limit: 0, backoff: 'constant', timeoutMs },
+					output: { type: 'redacted' }
+				});
+			} catch {
+				// Observability failures must not alter a completed event wait.
+			}
+		}
+		return result;
+	} catch (error) {
+		if (recordAttempt) {
+			try {
+				await recordAttempt({
+					...identity,
+					kind: 'forward',
+					attempt: 1,
+					startedAt,
+					finishedAt: new Date().toISOString(),
+					outcome: 'failed',
+					retry: { limit: 0, backoff: 'constant', timeoutMs },
+					error: { code: errorCode }
+				});
+			} catch {
+				// Preserve the event wait failure when attempt telemetry is unavailable.
+			}
+		}
+		throw error;
+	}
+}
+
 export type CorexSubprocessStarter = (
 	step: CorexInvokeProcessStep,
 	input: unknown,
-	parent: Pick<CorexWorkflowParams, 'runId' | 'ownerUserId'>
+	parent: Pick<CorexWorkflowParams, 'runId' | 'ownerUserId'> & { invocationKey: string }
 ) => Promise<{ childRunId: string; workflowInstanceId: string }>;
 
 export type CorexSubprocessTerminator = (
 	step: CorexInvokeProcessStep,
 	child: { childRunId: string; workflowInstanceId: string },
-	parent: Pick<CorexWorkflowParams, 'runId' | 'ownerUserId'>
+	parent: Pick<CorexWorkflowParams, 'runId' | 'ownerUserId'> & { invocationKey: string }
 ) => Promise<void>;
+
+function corexSubprocessInvocationKey(
+	executionGeneration: number,
+	stepId: string,
+	visit: number
+): string {
+	return `${executionGeneration}:${stepId}:${visit}`;
+}
+
+async function executeSubprocess(
+	step: CorexInvokeProcessStep,
+	context: unknown,
+	identity: CorexAttemptIdentity,
+	params: Pick<CorexWorkflowParams, 'runId' | 'ownerUserId'>,
+	workflow: CorexDurableStep,
+	startSubprocess: CorexSubprocessStarter,
+	terminateSubprocess: CorexSubprocessTerminator | undefined,
+	fetcher: typeof fetch,
+	recordAttempt: CorexStepAttemptRecorder | undefined
+): Promise<Record<string, unknown>> {
+	const childInput = resolveJsonPath(step.config.inputPath, context);
+	return executeRecordedEventWait(
+		async () => {
+			const parent = {
+				...params,
+				invocationKey: corexSubprocessInvocationKey(
+					identity.executionGeneration,
+					step.id,
+					identity.visit
+				)
+			};
+			const child = await workflow.do(identity.durableStepName, async () =>
+				startSubprocess(step, childInput, parent)
+			);
+			let received: { payload: unknown };
+			try {
+				received = await workflow.waitForEvent<unknown>(`${identity.durableStepName}:result`, {
+					type: corexSubprocessResultEventType(child.childRunId),
+					timeout: `${step.config.timeoutMs} milliseconds`
+				});
+			} catch (error) {
+				if (terminateSubprocess) {
+					try {
+						await workflow.do(`${identity.durableStepName}:terminate-child`, async () =>
+							terminateSubprocess(step, child, parent)
+						);
+					} catch {
+						// Preserve the original wait failure after durable cleanup retries are exhausted.
+					}
+				}
+				throw error;
+			}
+			const result = received.payload;
+			if (
+				typeof result !== 'object' ||
+				result === null ||
+				(result as Record<string, unknown>).childRunId !== child.childRunId
+			) throw new Error('Subprocess result payload is invalid.');
+			if ((result as Record<string, unknown>).status === 'errored') {
+				throw new Error('Subprocess failed.');
+			}
+			if ((result as Record<string, unknown>).status !== 'complete') {
+				throw new Error('Subprocess result payload is invalid.');
+			}
+			const completedResult = result as Record<string, unknown>;
+			if (!step.compensation) return completedResult;
+			return workflow.do(
+				`${identity.durableStepName}:completed`,
+				{},
+				async () => completedResult,
+				step.compensation.type === 'http-request'
+					? createHttpRollbackOptions<Record<string, unknown>>(step, context, fetcher, {
+							runId: identity.runId,
+							ownerUserId: identity.ownerUserId,
+							executionGeneration: identity.executionGeneration,
+							visit: identity.visit,
+							durableStepName: identity.durableStepName,
+							recordAttempt
+						})
+					: createTransformRollbackOptions(step, context, {
+							runId: identity.runId,
+							ownerUserId: identity.ownerUserId,
+							executionGeneration: identity.executionGeneration,
+							visit: identity.visit,
+							durableStepName: identity.durableStepName,
+							recordAttempt
+						})
+			);
+		},
+		identity,
+		step.config.timeoutMs,
+		'subprocess_failed',
+		recordAttempt
+	);
+}
 
 export function corexSubprocessResultEventType(childRunId: string): string {
 	return `corex-subprocess-result:${childRunId}`;
@@ -244,6 +749,15 @@ export function corexWaitEventType(
 	startedSequence: number
 ): string {
 	return `corex-wait-${runId}-${executionGeneration}-${startedSequence}`;
+}
+
+export function corexBranchWaitEventType(
+	runId: string,
+	executionGeneration: number,
+	stepId: string,
+	visit: number
+): string {
+	return `corex-wait-${runId}-${executionGeneration}-${stepId}-${visit}`;
 }
 
 const MAX_RESPONSE_BYTES = 64 * 1024;
@@ -309,6 +823,7 @@ export async function recordCorexStepAttempt(
 				p_step_id: attempt.stepId,
 				p_visit: attempt.visit,
 				p_durable_step_name: attempt.durableStepName,
+				p_kind: attempt.kind,
 				p_attempt: attempt.attempt,
 				p_started_at: attempt.startedAt,
 				p_finished_at: attempt.finishedAt,
@@ -414,6 +929,171 @@ export async function executeHttpAction(
 	return { status: response.status, contentType, bytes, body };
 }
 
+function createHttpRollbackOptions<T = CorexHttpResult>(
+	step: CorexHttpStep | CorexInvokeProcessStep,
+	input: unknown,
+	fetcher: typeof fetch,
+	attemptIdentity: {
+		runId: string;
+		ownerUserId: string;
+		executionGeneration: number;
+		visit: number;
+		durableStepName: string;
+		recordAttempt?: CorexStepAttemptRecorder;
+	}
+): CorexRollbackOptions<T> | undefined {
+	if (!step.compensation) return undefined;
+	const compensation = step.compensation;
+	if (compensation.type === 'transform') {
+		return {
+			rollback: async ({ ctx, error, output }) => {
+				await executeRecordedTransform(
+					() =>
+						applyTransform(
+							{ ...compensation, next: step.next },
+							{
+								input,
+								output,
+								error: { name: error.name, message: error.message }
+							}
+						),
+					{
+						runId: attemptIdentity.runId,
+						ownerUserId: attemptIdentity.ownerUserId,
+						executionGeneration: attemptIdentity.executionGeneration,
+						stepId: compensation.id,
+						visit: attemptIdentity.visit,
+						durableStepName: `${attemptIdentity.durableStepName}:rollback:${compensation.name}`
+					},
+					ctx,
+					attemptIdentity.recordAttempt,
+					'compensation',
+					compensation.config.outputPolicy
+				);
+			}
+		};
+	}
+	return {
+		rollback: async ({ ctx, error, output }) => {
+			const startedAt = new Date().toISOString();
+			try {
+				const result = await executeHttpAction(
+					{ ...compensation, type: 'http-request', next: step.next },
+					{
+						input,
+						output,
+						error: { name: error.name, message: error.message }
+					},
+					fetcher
+				);
+				if (attemptIdentity.recordAttempt) {
+					try {
+						await attemptIdentity.recordAttempt({
+							runId: attemptIdentity.runId,
+							ownerUserId: attemptIdentity.ownerUserId,
+							executionGeneration: attemptIdentity.executionGeneration,
+							stepId: compensation.id,
+							visit: attemptIdentity.visit,
+							durableStepName: `${attemptIdentity.durableStepName}:rollback:${compensation.name}`,
+							kind: 'compensation',
+							attempt: ctx.attempt,
+							startedAt,
+							finishedAt: new Date().toISOString(),
+							outcome: 'complete',
+							retry: {
+								limit: compensation.config.retry.limit,
+								backoff: compensation.config.retry.backoff,
+								timeoutMs: compensation.config.timeoutMs
+							},
+							output: describeHttpOutput(result, compensation.config.outputPolicy)
+						});
+					} catch {
+						// Observability failures must not fail completed compensation.
+					}
+				}
+			} catch (compensationError) {
+				if (attemptIdentity.recordAttempt) {
+					try {
+						await attemptIdentity.recordAttempt({
+							runId: attemptIdentity.runId,
+							ownerUserId: attemptIdentity.ownerUserId,
+							executionGeneration: attemptIdentity.executionGeneration,
+							stepId: compensation.id,
+							visit: attemptIdentity.visit,
+							durableStepName: `${attemptIdentity.durableStepName}:rollback:${compensation.name}`,
+							kind: 'compensation',
+							attempt: ctx.attempt,
+							startedAt,
+							finishedAt: new Date().toISOString(),
+							outcome: 'failed',
+							retry: {
+								limit: compensation.config.retry.limit,
+								backoff: compensation.config.retry.backoff,
+								timeoutMs: compensation.config.timeoutMs
+							},
+							error: { code: 'http_action_failed' }
+						});
+					} catch {
+						// Preserve the compensation failure when attempt telemetry is unavailable.
+					}
+				}
+				throw compensationError;
+			}
+		},
+		rollbackConfig: {
+			retries: {
+				limit: compensation.config.retry.limit,
+				delay: 1_000,
+				backoff: compensation.config.retry.backoff
+			},
+			timeout: compensation.config.timeoutMs
+		}
+	};
+}
+
+function createTransformRollbackOptions(
+	step: CorexTransformStep | CorexInvokeProcessStep,
+	input: unknown,
+	attemptIdentity: {
+		runId: string;
+		ownerUserId: string;
+		executionGeneration: number;
+		visit: number;
+		durableStepName: string;
+		recordAttempt?: CorexStepAttemptRecorder;
+	}
+): CorexRollbackOptions<Record<string, unknown>> | undefined {
+	if (!step.compensation) return undefined;
+	const compensation = step.compensation;
+	return {
+		rollback: async ({ ctx, error, output }) => {
+			await executeRecordedTransform(
+				() =>
+					applyTransform(
+						{ ...compensation, next: step.next },
+						{
+							input,
+							output,
+							error: { name: error.name, message: error.message }
+						}
+					),
+				{
+					runId: attemptIdentity.runId,
+					ownerUserId: attemptIdentity.ownerUserId,
+					executionGeneration: attemptIdentity.executionGeneration,
+					stepId: compensation.id,
+					visit: attemptIdentity.visit,
+					durableStepName: `${attemptIdentity.durableStepName}:rollback:${compensation.name}`
+				},
+				ctx,
+				attemptIdentity.recordAttempt,
+				'compensation',
+				compensation.config.outputPolicy
+			);
+		}
+	};
+}
+
 export async function executeCorexWorkflow(
 	params: CorexWorkflowParams,
 	workflow: CorexDurableStep,
@@ -422,7 +1102,10 @@ export async function executeCorexWorkflow(
 	startSubprocess?: CorexSubprocessStarter,
 	terminateSubprocess?: CorexSubprocessTerminator,
 	executionGeneration = 1,
-	recordAttempt?: CorexStepAttemptRecorder
+	recordAttempt?: CorexStepAttemptRecorder,
+	registerActiveWait?: CorexActiveWaitRegistrar,
+	completeActiveWait?: CorexActiveWaitCompleter,
+	registerActiveApproval?: CorexActiveApprovalRegistrar
 ): Promise<unknown> {
 	const event = (details: Omit<CorexRunEvent, 'runId' | 'ownerUserId'>): CorexRunEvent => ({
 		runId: params.runId,
@@ -442,6 +1125,14 @@ export async function executeCorexWorkflow(
 	let traversalIndex = 0;
 	const loopIterations = new Map<string, number>();
 	const nodeVisits = new Map<string, number>();
+	const tryFrames: Array<{
+		step: CorexTryStep;
+		phase: 'body' | 'catch' | 'finally';
+		pendingError?: unknown;
+		pendingErrorStepId?: string;
+	}> = [];
+	let failedStepId: string | undefined;
+	execution: while (currentNodeId) {
 	try {
 		while (currentNodeId) {
 			currentStep = nodesById.get(currentNodeId);
@@ -515,7 +1206,10 @@ export async function executeCorexWorkflow(
 			let parallelBranches: string[] | undefined;
 			let parallelStarts: Array<{ id: string; index: number }> | undefined;
 			let parallelResolves: Array<{ id: string; index: number }> | undefined;
-			if (step.type === 'parallel') {
+				if (step.type === 'try') {
+					tryFrames.push({ step, phase: 'body' });
+					nextNodeId = step.bodyTarget;
+				} else if (step.type === 'parallel') {
 				const inputContext = context;
 				parallelStarts = step.config.branches.map((branch, index) => ({ id: branch.id, index }));
 				parallelResolves = [];
@@ -541,8 +1235,17 @@ export async function executeCorexWorkflow(
 						const branchStepName = `${step.name}:parallel-${branch.id}:${branchStep.name}${
 							branchVisit === 0 ? '' : `:visit-${branchVisit}`
 						}`;
+						const branchAttemptIdentity = {
+							runId: params.runId,
+							ownerUserId: params.ownerUserId,
+							executionGeneration,
+							stepId: branchStep.id,
+							visit: branchVisit,
+							durableStepName: branchStepName
+						};
 
 						if (branchStep.type === 'http-request') {
+							const actionInput = structuredClone(branchContext);
 							const result = await workflow.do(
 								branchStepName,
 								{
@@ -553,36 +1256,205 @@ export async function executeCorexWorkflow(
 									},
 									timeout: branchStep.config.timeoutMs
 								},
-								async () => executeHttpAction(branchStep, branchContext, fetcher)
+								async (stepContext) =>
+									executeRecordedHttpAction(
+										() => executeHttpAction(branchStep, branchContext, fetcher),
+										{
+											runId: params.runId,
+											ownerUserId: params.ownerUserId,
+											executionGeneration,
+											stepId: branchStep.id,
+											visit: branchVisit,
+											durableStepName: branchStepName
+										},
+										stepContext,
+										{
+											limit: branchStep.config.retry.limit,
+											backoff: branchStep.config.retry.backoff,
+											timeoutMs: branchStep.config.timeoutMs
+										},
+										recordAttempt,
+										branchStep.config.outputPolicy
+									),
+								createHttpRollbackOptions(branchStep, actionInput, fetcher, {
+									runId: params.runId,
+									ownerUserId: params.ownerUserId,
+									executionGeneration,
+									visit: branchVisit,
+									durableStepName: branchStepName,
+									recordAttempt
+								})
 							);
 							branchContext = result.body;
 							branchNodeId = branchStep.next;
 						} else if (branchStep.type === 'transform') {
-							branchContext = await workflow.do(branchStepName, async () =>
-								applyTransform(branchStep, branchContext)
+							const actionInput = structuredClone(branchContext);
+							branchContext = await workflow.do(
+								branchStepName,
+								{},
+								async (stepContext) => executeRecordedTransform(
+									() => applyTransform(branchStep, branchContext),
+									branchAttemptIdentity,
+									stepContext,
+									recordAttempt,
+									'forward',
+									branchStep.config.outputPolicy
+								),
+								createTransformRollbackOptions(branchStep, actionInput, {
+									...branchAttemptIdentity,
+									recordAttempt
+								})
 							);
 							branchNodeId = branchStep.next;
+						} else if (branchStep.type === 'wait') {
+							await executeRecordedDurableWait(
+								() =>
+									workflow.sleep(
+										branchStepName,
+										`${branchStep.config.durationMs} milliseconds`
+									),
+								branchAttemptIdentity,
+								recordAttempt
+							);
+							branchNodeId = branchStep.next;
+						} else if (branchStep.type === 'wait-until') {
+							await executeRecordedDurableWait(
+								() =>
+									workflow.sleepUntil(
+										branchStepName,
+										new Date(branchStep.config.timestamp)
+									),
+								branchAttemptIdentity,
+								recordAttempt
+							);
+							branchNodeId = branchStep.next;
+						} else if (branchStep.type === 'invoke-process') {
+							if (!startSubprocess) throw new Error('Subprocess execution is unavailable.');
+							const result = await executeSubprocess(
+								branchStep,
+								branchContext,
+								branchAttemptIdentity,
+								{ runId: params.runId, ownerUserId: params.ownerUserId },
+								workflow,
+								startSubprocess,
+								terminateSubprocess,
+								fetcher,
+								recordAttempt
+							);
+							branchContext = {
+								...(typeof branchContext === 'object' && branchContext !== null
+									? branchContext
+									: {}),
+								[branchStep.config.resultKey]: result.output
+							};
+							branchNodeId = branchStep.next;
+						} else if (branchStep.type === 'wait-event' || branchStep.type === 'approval') {
+							if (!registerActiveWait || !completeActiveWait)
+								throw new Error('Parallel durable wait registration is unavailable.');
+							if (branchStep.type === 'approval' && !registerActiveApproval)
+								throw new Error('Parallel approval registration is unavailable.');
+							const branchWaitEventType = corexBranchWaitEventType(
+								params.runId,
+								executionGeneration,
+								branchStep.id,
+								branchVisit
+							);
+							const activeWait = {
+								...branchAttemptIdentity,
+								eventType: branchStep.type === 'wait-event' ? branchStep.config.eventType : 'approval',
+								waitEventType: branchWaitEventType
+							};
+							await workflow.do(`${branchStepName}:register-wait`, async () =>
+								await (branchStep.type === 'approval'
+									? registerActiveApproval!({
+										...activeWait,
+										assigneeUserId: branchStep.config.assigneeUserId,
+										timeoutMs: branchStep.config.timeoutMs
+									})
+									: registerActiveWait(activeWait))
+							);
+							let received: { payload: unknown };
+							try {
+								received = await executeRecordedEventWait(
+									() =>
+										workflow.waitForEvent<unknown>(branchStepName, {
+											type: branchWaitEventType,
+											timeout: `${branchStep.config.timeoutMs} milliseconds`
+										}),
+									branchAttemptIdentity,
+									branchStep.config.timeoutMs,
+									branchStep.type === 'approval' ? 'approval_failed' : 'wait_event_failed',
+									recordAttempt
+								);
+							} finally {
+								await workflow.do(`${branchStepName}:complete-wait`, async () =>
+									await completeActiveWait(activeWait)
+								);
+							}
+							const payload = received.payload;
+							if (branchStep.type === 'approval') {
+								if (
+									typeof payload !== 'object' || payload === null ||
+									!['approved', 'rejected'].includes(String((payload as Record<string, unknown>).decision)) ||
+									typeof (payload as Record<string, unknown>).actorUserId !== 'string' ||
+									(typeof (payload as Record<string, unknown>).comment !== 'undefined' &&
+										typeof (payload as Record<string, unknown>).comment !== 'string')
+								) throw new Error('Approval event payload is invalid.');
+							}
+							branchContext = {
+								...(typeof branchContext === 'object' && branchContext !== null
+									? branchContext
+									: {}),
+								[branchStep.config.resultKey]: payload
+							};
+							branchNodeId = branchStep.type === 'approval'
+								? ((payload as Record<string, unknown>).decision === 'approved'
+									? branchStep.whenApproved ?? branchStep.next!
+									: branchStep.whenRejected ?? branchStep.next!)
+								: branchStep.next;
 						} else if (branchStep.type === 'condition') {
-							const matched = await workflow.do(branchStepName, async () =>
-								evaluateCondition(branchStep, branchContext)
+							const matched = await workflow.do(branchStepName, async (stepContext) =>
+								executeRecordedDeterministicStep(
+									() => evaluateCondition(branchStep, branchContext),
+									branchAttemptIdentity,
+									stepContext,
+									recordAttempt
+								)
 							);
 							branchNodeId = matched ? branchStep.whenTrue : branchStep.whenFalse;
 						} else if (branchStep.type === 'switch') {
-							const selectedCase = await workflow.do(branchStepName, async () =>
-								selectSwitchCase(branchStep, branchContext)
+							const selectedCase = await workflow.do(branchStepName, async (stepContext) =>
+								executeRecordedDeterministicStep(
+									() => selectSwitchCase(branchStep, branchContext),
+									branchAttemptIdentity,
+									stepContext,
+									recordAttempt
+								)
 							);
 							branchNodeId = selectedCase
 								? branchStep.targets[selectedCase]
 								: branchStep.defaultTarget;
 						} else if (branchStep.type === 'loop') {
 							const iteration = branchLoopIterations.get(branchStep.id) ?? 0;
-							const enterBody = await workflow.do(branchStepName, async () =>
-								Promise.resolve(iteration < branchStep.config.maxIterations)
+							const enterBody = await workflow.do(branchStepName, async (stepContext) =>
+								executeRecordedDeterministicStep(
+									() => iteration < branchStep.config.maxIterations,
+									branchAttemptIdentity,
+									stepContext,
+									recordAttempt
+								)
 							);
 							if (enterBody) branchLoopIterations.set(branchStep.id, iteration + 1);
 							branchNodeId = enterBody ? branchStep.bodyTarget : branchStep.exitTarget;
 						} else if (branchStep.type === 'break') {
-							await workflow.do(branchStepName, async () => Promise.resolve());
+							await workflow.do(branchStepName, async (stepContext) =>
+								executeRecordedDeterministicStep(
+									() => undefined,
+									branchAttemptIdentity,
+									stepContext,
+									recordAttempt
+								)
+							);
 							branchNodeId = branchStep.exitTarget;
 						} else {
 							throw new Error(
@@ -610,6 +1482,7 @@ export async function executeCorexWorkflow(
 				};
 				nextNodeId = step.continuationTarget;
 			} else if (step.type === 'http-request') {
+				const actionInput = structuredClone(context);
 				const result = await workflow.do(
 					durableStepName,
 					{
@@ -620,104 +1493,184 @@ export async function executeCorexWorkflow(
 						},
 						timeout: step.config.timeoutMs
 					},
-					async (stepContext) => {
-						const startedAt = new Date().toISOString();
-						try {
-							const httpResult = await executeHttpAction(step, context, fetcher);
-							if (recordAttempt) {
-								try {
-									await recordAttempt({
-										runId: params.runId,
-										ownerUserId: params.ownerUserId,
-										executionGeneration,
-										stepId: step.id,
-										visit,
-										durableStepName,
-										attempt: stepContext.attempt,
-										startedAt,
-										finishedAt: new Date().toISOString(),
-										outcome: 'complete',
-										retry: {
-											limit: step.config.retry.limit,
-											backoff: step.config.retry.backoff,
-											timeoutMs: step.config.timeoutMs
-										},
-										output: {
-											status: httpResult.status,
-											contentType: httpResult.contentType,
-											bytes: httpResult.bytes
-										}
-									});
-								} catch {
-									// Observability failures must not replay a completed external side effect.
-								}
-							}
-							return httpResult;
-						} catch (error) {
-							if (recordAttempt) {
-								try {
-									await recordAttempt({
-										runId: params.runId,
-										ownerUserId: params.ownerUserId,
-										executionGeneration,
-										stepId: step.id,
-										visit,
-										durableStepName,
-										attempt: stepContext.attempt,
-										startedAt,
-										finishedAt: new Date().toISOString(),
-										outcome: 'failed',
-										retry: {
-											limit: step.config.retry.limit,
-											backoff: step.config.retry.backoff,
-											timeoutMs: step.config.timeoutMs
-										},
-										error: { code: 'http_action_failed' }
-									});
-								} catch {
-									// Preserve the action failure when attempt telemetry is unavailable.
-								}
-							}
-							throw error;
-						}
-					}
+					async (stepContext) =>
+						executeRecordedHttpAction(
+							() => executeHttpAction(step, context, fetcher),
+							{
+								runId: params.runId,
+								ownerUserId: params.ownerUserId,
+								executionGeneration,
+								stepId: step.id,
+								visit,
+								durableStepName
+							},
+							stepContext,
+							{
+								limit: step.config.retry.limit,
+								backoff: step.config.retry.backoff,
+								timeoutMs: step.config.timeoutMs
+							},
+							recordAttempt,
+							step.config.outputPolicy
+						),
+					createHttpRollbackOptions(step, actionInput, fetcher, {
+						runId: params.runId,
+						ownerUserId: params.ownerUserId,
+						executionGeneration,
+						visit,
+						durableStepName,
+						recordAttempt
+					})
 				);
 				context = result.body;
 				nextNodeId = step.next;
 			} else if (step.type === 'transform') {
-				context = await workflow.do(durableStepName, async () => applyTransform(step, context));
+				const actionInput = structuredClone(context);
+				context = await workflow.do(
+					durableStepName,
+					{},
+					async (stepContext) => executeRecordedTransform(
+						() => applyTransform(step, context),
+						{
+							runId: params.runId,
+							ownerUserId: params.ownerUserId,
+							executionGeneration,
+							stepId: step.id,
+							visit,
+							durableStepName
+						},
+						stepContext,
+						recordAttempt,
+						'forward',
+						step.config.outputPolicy
+					),
+					createTransformRollbackOptions(step, actionInput, {
+						runId: params.runId,
+						ownerUserId: params.ownerUserId,
+						executionGeneration,
+						visit,
+						durableStepName,
+						recordAttempt
+					})
+				);
 				nextNodeId = step.next;
 			} else if (step.type === 'condition') {
-				const matched = await workflow.do(durableStepName, async () =>
-					evaluateCondition(step, context)
+				const matched = await workflow.do(durableStepName, async (stepContext) =>
+					executeRecordedDeterministicStep(
+						() => evaluateCondition(step, context),
+						{
+							runId: params.runId,
+							ownerUserId: params.ownerUserId,
+							executionGeneration,
+							stepId: step.id,
+							visit,
+							durableStepName
+						},
+						stepContext,
+						recordAttempt
+					)
 				);
 				nextNodeId = matched ? step.whenTrue : step.whenFalse;
 			} else if (step.type === 'switch') {
-				const selectedCase = await workflow.do(durableStepName, async () =>
-					selectSwitchCase(step, context)
+				const selectedCase = await workflow.do(durableStepName, async (stepContext) =>
+					executeRecordedDeterministicStep(
+						() => selectSwitchCase(step, context),
+						{
+							runId: params.runId,
+							ownerUserId: params.ownerUserId,
+							executionGeneration,
+							stepId: step.id,
+							visit,
+							durableStepName
+						},
+						stepContext,
+						recordAttempt
+					)
 				);
 				nextNodeId = selectedCase ? step.targets[selectedCase] : step.defaultTarget;
 			} else if (step.type === 'loop') {
 				const iteration = loopIterations.get(step.id) ?? 0;
-				const enterBody = await workflow.do(durableStepName, async () =>
-					Promise.resolve(iteration < step.config.maxIterations)
+				const enterBody = await workflow.do(durableStepName, async (stepContext) =>
+					executeRecordedDeterministicStep(
+						() => iteration < step.config.maxIterations,
+						{
+							runId: params.runId,
+							ownerUserId: params.ownerUserId,
+							executionGeneration,
+							stepId: step.id,
+							visit,
+							durableStepName
+						},
+						stepContext,
+						recordAttempt
+					)
 				);
 				if (enterBody) loopIterations.set(step.id, iteration + 1);
 				nextNodeId = enterBody ? step.bodyTarget : step.exitTarget;
 			} else if (step.type === 'break') {
-				await workflow.do(durableStepName, async () => Promise.resolve());
+				await workflow.do(durableStepName, async (stepContext) =>
+					executeRecordedDeterministicStep(
+						() => undefined,
+						{
+							runId: params.runId,
+							ownerUserId: params.ownerUserId,
+							executionGeneration,
+							stepId: step.id,
+							visit,
+							durableStepName
+						},
+						stepContext,
+						recordAttempt
+					)
+				);
 				nextNodeId = step.exitTarget;
 			} else if (step.type === 'wait') {
-				await workflow.sleep(durableStepName, `${step.config.durationMs} milliseconds`);
+				await executeRecordedDurableWait(
+					() => workflow.sleep(durableStepName, `${step.config.durationMs} milliseconds`),
+					{
+						runId: params.runId,
+						ownerUserId: params.ownerUserId,
+						executionGeneration,
+						stepId: step.id,
+						visit,
+						durableStepName
+					},
+					recordAttempt
+				);
 				nextNodeId = step.next;
 			} else if (step.type === 'wait-until') {
-				await workflow.sleepUntil(durableStepName, new Date(step.config.timestamp));
+				await executeRecordedDurableWait(
+					() => workflow.sleepUntil(durableStepName, new Date(step.config.timestamp)),
+					{
+						runId: params.runId,
+						ownerUserId: params.ownerUserId,
+						executionGeneration,
+						stepId: step.id,
+						visit,
+						durableStepName
+					},
+					recordAttempt
+				);
 				nextNodeId = step.next;
 			} else if (step.type === 'wait-event') {
-				const received = await workflow.waitForEvent<unknown>(durableStepName, {
-					type: waitEventType!,
-					timeout: `${step.config.timeoutMs} milliseconds`
-				});
+				const received = await executeRecordedEventWait(
+					() =>
+						workflow.waitForEvent<unknown>(durableStepName, {
+							type: waitEventType!,
+							timeout: `${step.config.timeoutMs} milliseconds`
+						}),
+					{
+						runId: params.runId,
+						ownerUserId: params.ownerUserId,
+						executionGeneration,
+						stepId: step.id,
+						visit,
+						durableStepName
+					},
+					step.config.timeoutMs,
+					'wait_event_failed',
+					recordAttempt
+				);
 				context = {
 					...(typeof context === 'object' && context !== null ? context : {}),
 					[step.config.resultKey]: received.payload
@@ -725,80 +1678,74 @@ export async function executeCorexWorkflow(
 				nextNodeId = step.next;
 			} else if (step.type === 'invoke-process') {
 				if (!startSubprocess) throw new Error('Subprocess execution is unavailable.');
-				const childInput = resolveJsonPath(step.config.inputPath, context);
-				const child = await workflow.do(durableStepName, async () =>
-					startSubprocess(step, childInput, {
+				const result = await executeSubprocess(
+					step,
+					context,
+					{
 						runId: params.runId,
-						ownerUserId: params.ownerUserId
-					})
+						ownerUserId: params.ownerUserId,
+						executionGeneration,
+						stepId: step.id,
+						visit,
+						durableStepName
+					},
+					{ runId: params.runId, ownerUserId: params.ownerUserId },
+					workflow,
+					startSubprocess,
+					terminateSubprocess,
+					fetcher,
+					recordAttempt
 				);
-				let received: { payload: unknown };
-				try {
-					received = await workflow.waitForEvent<unknown>(`${durableStepName}:result`, {
-						type: corexSubprocessResultEventType(child.childRunId),
-						timeout: `${step.config.timeoutMs} milliseconds`
-					});
-				} catch (error) {
-					if (terminateSubprocess) {
-						try {
-							await workflow.do(`${durableStepName}:terminate-child`, async () =>
-								terminateSubprocess(step, child, {
-									runId: params.runId,
-									ownerUserId: params.ownerUserId
-								})
-							);
-						} catch {
-							// Preserve the original wait failure after durable cleanup retries are exhausted.
-						}
-					}
-					throw error;
-				}
-				const result = received.payload;
-				if (
-					typeof result !== 'object' ||
-					result === null ||
-					(result as Record<string, unknown>).childRunId !== child.childRunId
-				)
-					throw new Error('Subprocess result payload is invalid.');
-				if ((result as Record<string, unknown>).status === 'errored') {
-					throw new Error('Subprocess failed.');
-				}
-				if ((result as Record<string, unknown>).status !== 'complete') {
-					throw new Error('Subprocess result payload is invalid.');
-				}
 				context = {
 					...(typeof context === 'object' && context !== null ? context : {}),
-					[step.config.resultKey]: (result as Record<string, unknown>).output
+					[step.config.resultKey]: result.output
 				};
 				nextNodeId = step.next;
 			} else {
-				const received = await workflow.waitForEvent<unknown>(durableStepName, {
-					type: waitEventType!,
-					timeout: `${step.config.timeoutMs} milliseconds`
-				});
-				const approval = received.payload;
-				if (
-					typeof approval !== 'object' ||
-					approval === null ||
-					!['approved', 'rejected'].includes(
-						String((approval as Record<string, unknown>).decision)
-					) ||
-					typeof (approval as Record<string, unknown>).actorUserId !== 'string' ||
-					(typeof (approval as Record<string, unknown>).comment !== 'undefined' &&
-						typeof (approval as Record<string, unknown>).comment !== 'string')
-				)
-					throw new Error('Approval event payload is invalid.');
+				const { approval, approvalNextNodeId } = await executeRecordedEventWait(
+					async () => {
+						const received = await workflow.waitForEvent<unknown>(durableStepName, {
+							type: waitEventType!,
+							timeout: `${step.config.timeoutMs} milliseconds`
+						});
+						const approval = received.payload;
+						if (
+							typeof approval !== 'object' ||
+							approval === null ||
+							!['approved', 'rejected'].includes(
+								String((approval as Record<string, unknown>).decision)
+							) ||
+							typeof (approval as Record<string, unknown>).actorUserId !== 'string' ||
+							(typeof (approval as Record<string, unknown>).comment !== 'undefined' &&
+								typeof (approval as Record<string, unknown>).comment !== 'string')
+						)
+							throw new Error('Approval event payload is invalid.');
+						const decision = (approval as Record<string, unknown>).decision;
+						const approvalNextNodeId =
+							decision === 'approved'
+								? (step.whenApproved ?? step.next ?? '')
+								: (step.whenRejected ?? step.next ?? '');
+						if (!approvalNextNodeId)
+							throw new Error(`Approval step "${step.id}" has no ${decision} transition.`);
+						return { approval, approvalNextNodeId };
+					},
+					{
+						runId: params.runId,
+						ownerUserId: params.ownerUserId,
+						executionGeneration,
+						stepId: step.id,
+						visit,
+						durableStepName
+					},
+					step.config.timeoutMs,
+					'approval_failed',
+					recordAttempt
+				);
 				context = {
 					...(typeof context === 'object' && context !== null ? context : {}),
 					[step.config.resultKey]: approval
 				};
-				const decision = (approval as Record<string, unknown>).decision;
-				nextNodeId =
-					decision === 'approved'
-						? (step.whenApproved ?? step.next ?? '')
-						: (step.whenRejected ?? step.next ?? '');
-				if (!nextNodeId)
-					throw new Error(`Approval step "${step.id}" has no ${decision} transition.`);
+				nextNodeId = approvalNextNodeId;
 			}
 
 			const completedSequence = sequence++;
@@ -826,11 +1773,45 @@ export async function executeCorexWorkflow(
 					})
 				)
 			);
+				const tryFrame = tryFrames.at(-1);
+				if (tryFrame && nextNodeId === tryFrame.step.continuationTarget) {
+					if (tryFrame.phase !== 'finally' && tryFrame.step.finallyTarget) {
+						tryFrame.phase = 'finally';
+						nextNodeId = tryFrame.step.finallyTarget;
+					} else {
+						tryFrames.pop();
+						if (tryFrame.pendingError !== undefined) {
+							failedStepId = tryFrame.pendingErrorStepId;
+							throw tryFrame.pendingError;
+						}
+					}
+				} else if (tryFrame?.step.finallyTarget === nextNodeId) {
+					tryFrame.phase = 'finally';
+				}
 			currentNodeId = nextNodeId;
 			traversalIndex += 1;
 		}
+			break execution;
 	} catch (error) {
 		if (error instanceof CorexTerminalFailure) throw error;
+			const errorStepId = failedStepId ?? currentStep?.id;
+			while (tryFrames.length > 0) {
+				const tryFrame = tryFrames.at(-1)!;
+				if (tryFrame.phase === 'body' && tryFrame.step.catchTarget) {
+					tryFrame.phase = 'catch';
+					failedStepId = undefined;
+					currentNodeId = tryFrame.step.catchTarget;
+					continue execution;
+				}
+				if (tryFrame.phase !== 'finally' && tryFrame.step.finallyTarget) {
+					tryFrame.phase = 'finally';
+					tryFrame.pendingError = error;
+					tryFrame.pendingErrorStepId = errorStepId;
+					currentNodeId = tryFrame.step.finallyTarget;
+					continue execution;
+				}
+				tryFrames.pop();
+			}
 		await workflow.do('corex:run-failed', async () =>
 			recordEvent(
 				event({
@@ -838,11 +1819,12 @@ export async function executeCorexWorkflow(
 					status: 'errored',
 					eventType: 'run_failed',
 					payload: {},
-					error: { code: 'process_step_failed', stepId: currentStep?.id }
+						error: { code: 'process_step_failed', stepId: errorStepId }
 				})
 			)
 		);
 		throw error;
+	}
 	}
 
 	await workflow.do('corex:run-completed', async () =>

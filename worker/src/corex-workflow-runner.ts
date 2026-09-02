@@ -2,6 +2,8 @@ import {
 	executeCorexWorkflow,
 	recordCorexRunEvent,
 	recordCorexStepAttempt,
+	type CorexActiveApproval,
+	type CorexActiveWait,
 	type CorexInvokeProcessStep,
 	type CorexWorkflowParams
 } from './corex-runtime.ts';
@@ -108,9 +110,13 @@ export async function runCorexProcessWorkflow(
 	const startSubprocess = async (
 		step: CorexInvokeProcessStep,
 		input: unknown,
-		parent: Pick<CorexWorkflowParams, 'runId' | 'ownerUserId'>
+		parent: Pick<CorexWorkflowParams, 'runId' | 'ownerUserId'> & { invocationKey: string }
 	): Promise<{ childRunId: string; workflowInstanceId: string }> => {
 		const workflowInstanceId = createId();
+		const invocationKey = Array.from(
+			new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(parent.invocationKey))),
+			(byte) => byte.toString(16).padStart(2, '0')
+		).join('');
 		const response = await fetcher(`${controlPlane.url.replace(/\/+$/, '')}/rest/v1/rpc/corex_start_subprocess_run`, {
 			method: 'POST',
 			headers: {
@@ -122,7 +128,7 @@ export async function runCorexProcessWorkflow(
 				p_process_id: step.config.processId,
 				p_owner_user_id: parent.ownerUserId,
 				p_parent_run_id: parent.runId,
-				p_parent_step_id: step.id,
+				p_parent_step_id: invocationKey,
 				p_workflow_instance_id: workflowInstanceId,
 				p_input: input
 			})
@@ -167,8 +173,12 @@ export async function runCorexProcessWorkflow(
 	const terminateSubprocess = async (
 		step: CorexInvokeProcessStep,
 		child: { childRunId: string; workflowInstanceId: string },
-		parent: Pick<CorexWorkflowParams, 'runId' | 'ownerUserId'>
+		parent: Pick<CorexWorkflowParams, 'runId' | 'ownerUserId'> & { invocationKey: string }
 	): Promise<void> => {
+		const invocationKey = Array.from(
+			new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(parent.invocationKey))),
+			(byte) => byte.toString(16).padStart(2, '0')
+		).join('');
 		const instance = await env.COREX_PROCESS_WORKFLOW.get(child.workflowInstanceId);
 		const terminalStatuses = new Set(['complete', 'errored', 'terminated', 'unknown']);
 		const initialStatus = (await instance.status()).status;
@@ -190,11 +200,83 @@ export async function runCorexProcessWorkflow(
 				p_run_id: child.childRunId,
 				p_owner_user_id: parent.ownerUserId,
 				p_parent_run_id: parent.runId,
-				p_parent_step_id: step.id,
+				p_parent_step_id: invocationKey,
 				p_workflow_instance_id: child.workflowInstanceId
 			})
 		});
 		if (!response.ok) throw new Error('Could not terminate the subprocess run.');
+	};
+	const registerActiveWait = async (wait: CorexActiveWait): Promise<void> => {
+		const response = await fetcher(
+			`${controlPlane.url.replace(/\/+$/, '')}/rest/v1/rpc/corex_register_active_wait`,
+			{
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${controlPlane.serviceRoleKey}`,
+					apikey: controlPlane.serviceRoleKey,
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					p_run_id: wait.runId,
+					p_owner_user_id: wait.ownerUserId,
+					p_execution_generation: wait.executionGeneration,
+					p_step_id: wait.stepId,
+					p_visit: wait.visit,
+					p_event_type: wait.eventType,
+					p_wait_event_type: wait.waitEventType,
+					p_durable_step_name: wait.durableStepName
+				})
+			}
+		);
+		if (!response.ok) throw new Error('Could not register the active wait.');
+	};
+	const completeActiveWait = async (
+		wait: Pick<CorexActiveWait, 'runId' | 'ownerUserId' | 'executionGeneration' | 'stepId' | 'visit'>
+	): Promise<void> => {
+		const response = await fetcher(
+			`${controlPlane.url.replace(/\/+$/, '')}/rest/v1/rpc/corex_complete_active_wait`,
+			{
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${controlPlane.serviceRoleKey}`,
+					apikey: controlPlane.serviceRoleKey,
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					p_run_id: wait.runId,
+					p_owner_user_id: wait.ownerUserId,
+					p_execution_generation: wait.executionGeneration,
+					p_step_id: wait.stepId,
+					p_visit: wait.visit
+				})
+			}
+		);
+		if (!response.ok) throw new Error('Could not complete the active wait.');
+	};
+	const registerActiveApproval = async (approval: CorexActiveApproval): Promise<void> => {
+		const response = await fetcher(
+			`${controlPlane.url.replace(/\/+$/, '')}/rest/v1/rpc/corex_register_active_approval`,
+			{
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${controlPlane.serviceRoleKey}`,
+					apikey: controlPlane.serviceRoleKey,
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					p_run_id: approval.runId,
+					p_owner_user_id: approval.ownerUserId,
+					p_execution_generation: approval.executionGeneration,
+					p_step_id: approval.stepId,
+					p_visit: approval.visit,
+					p_wait_event_type: approval.waitEventType,
+					p_durable_step_name: approval.durableStepName,
+					p_assignee_user_id: approval.assigneeUserId,
+					p_timeout_ms: approval.timeoutMs
+				})
+			}
+		);
+		if (!response.ok) throw new Error('Could not register the active approval.');
 	};
 
 	return executeCorexWorkflow(
@@ -205,6 +287,9 @@ export async function runCorexProcessWorkflow(
 		startSubprocess,
 		terminateSubprocess,
 		executionGeneration,
-		(stepAttempt) => recordCorexStepAttempt(controlPlane, stepAttempt, fetcher)
+		(stepAttempt) => recordCorexStepAttempt(controlPlane, stepAttempt, fetcher),
+		registerActiveWait,
+		completeActiveWait,
+		registerActiveApproval
 	);
 }

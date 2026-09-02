@@ -258,6 +258,7 @@ test('sends only an idempotent typed payload event to an authenticated run', asy
 			headers,
 			body: JSON.stringify({
 				eventId: '018f47a2-8391-7b1c-8f7a-f1d27670f064',
+				stepId: 'await-payment-approval',
 				type: 'payment-approved',
 				payload: { approved: true }
 			})
@@ -271,6 +272,7 @@ test('sends only an idempotent typed payload event to an authenticated run', asy
 			accessToken: 'user-token',
 			runId: '018f47a2-8391-7b1c-8f7a-f1d27670f062',
 			eventId: '018f47a2-8391-7b1c-8f7a-f1d27670f064',
+			stepId: 'await-payment-approval',
 			type: 'payment-approved',
 			payload: { approved: true }
 		}

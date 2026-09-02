@@ -80,6 +80,15 @@ const stepAttemptsMigration = readFileSync(
 	),
 	'utf8'
 ).toLowerCase();
+const stepAttemptKindMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/20260902092723_corex_step_attempt_kind.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
 const outboxDeadLettersMigration = readFileSync(
 	fileURLToPath(
 		new URL(
@@ -137,6 +146,15 @@ const cancelWaitingForPauseMigration = readFileSync(
 const runRestartMigration = readFileSync(
 	fileURLToPath(
 		new URL('../../../../supabase/migrations/202609010009_corex_run_restart.sql', import.meta.url)
+	),
+	'utf8'
+).toLowerCase();
+const targetedWaitEventsMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/20260902100000_corex_targeted_wait_events.sql',
+			import.meta.url
+		)
 	),
 	'utf8'
 ).toLowerCase();
@@ -400,6 +418,57 @@ describe('Corex control-plane migration', () => {
 			'grant execute on function public.corex_decide_approval_task(uuid, uuid, text, text) to service_role'
 		);
 		expect(waitEventCorrelationMigration).not.toContain('security definer');
+	});
+
+	it('targets an external event to one active wait step', () => {
+		expect(targetedWaitEventsMigration).toContain('create table public.corex_active_waits');
+		expect(targetedWaitEventsMigration).toContain(
+			'primary key (run_id, execution_generation, step_id, visit)'
+		);
+		expect(targetedWaitEventsMigration).toContain(
+			'create function public.corex_register_active_wait('
+		);
+		expect(targetedWaitEventsMigration).toContain(
+			'create function public.corex_complete_active_wait('
+		);
+		expect(targetedWaitEventsMigration).toContain("status = 'active'");
+		expect(targetedWaitEventsMigration).toContain('add column step_id text');
+		expect(targetedWaitEventsMigration).toContain(
+			'create function public.corex_enqueue_workflow_event('
+		);
+		expect(targetedWaitEventsMigration).toContain('p_step_id text');
+		expect(targetedWaitEventsMigration).toContain(
+			"existing_request.step_id is distinct from p_step_id"
+		);
+		expect(targetedWaitEventsMigration).toContain(
+			'from public.corex_active_waits wait'
+		);
+		expect(targetedWaitEventsMigration).toContain('wait.step_id = p_step_id');
+		expect(targetedWaitEventsMigration).toContain("active_wait.status <> 'active'");
+		expect(targetedWaitEventsMigration).toContain(
+			'grant execute on function public.corex_enqueue_workflow_event(uuid, uuid, uuid, text, text, jsonb)'
+		);
+		expect(targetedWaitEventsMigration).toContain(
+			'drop function public.corex_decide_approval_task(uuid, uuid, text, text)'
+		);
+		expect(targetedWaitEventsMigration).toContain('p_task_id uuid');
+		expect(targetedWaitEventsMigration).toContain('where id = p_task_id');
+		expect(targetedWaitEventsMigration).toContain(
+			'create function public.corex_register_active_approval('
+		);
+		expect(targetedWaitEventsMigration).toContain(
+			'perform public.corex_register_active_wait('
+		);
+		expect(targetedWaitEventsMigration).toContain(
+			'on conflict (run_id, execution_generation, step_id, visit)'
+		);
+		expect(targetedWaitEventsMigration).toContain("and wait.event_type = 'approval'");
+		expect(targetedWaitEventsMigration).toContain('wait.visit = target_task.visit');
+		expect(targetedWaitEventsMigration).toContain("set status = 'expired'");
+		expect(targetedWaitEventsMigration).toContain(
+			'grant execute on function public.corex_decide_approval_task(uuid, uuid, uuid, text, text)'
+		);
+		expect(targetedWaitEventsMigration).not.toContain('security definer');
 	});
 
 	it('records pause and resume as idempotent durable lifecycle intents', () => {
@@ -741,6 +810,9 @@ describe('Corex control-plane migration', () => {
 	it('stores owner-readable HTTP attempts through an idempotent service-only RPC', () => {
 		expect(stepAttemptsMigration).toContain('create table public.corex_step_attempts');
 		expect(stepAttemptsMigration).toContain(
+			"check ((outcome = 'complete' and output is not null and error is null)"
+		);
+		expect(stepAttemptsMigration).toContain(
 			'primary key (run_id, execution_generation, step_id, visit, attempt)'
 		);
 		expect(stepAttemptsMigration).toContain('alter table public.corex_step_attempts enable row level security');
@@ -751,5 +823,16 @@ describe('Corex control-plane migration', () => {
 			/grant execute on function public\.corex_record_step_attempt\(\s*uuid, uuid, integer, text, integer, text, integer, timestamptz, timestamptz,\s*text, jsonb, jsonb, jsonb\s*\) to service_role/
 		);
 		expect(stepAttemptsMigration).not.toContain('security definer');
+	});
+
+	it('distinguishes compensation attempts without breaking existing RPC callers', () => {
+		expect(stepAttemptKindMigration).toContain("add column kind text not null default 'forward'");
+		expect(stepAttemptKindMigration).toContain("check (kind in ('forward', 'compensation'))");
+		expect(stepAttemptKindMigration).toContain("p_kind text default 'forward'");
+		expect(stepAttemptKindMigration).toContain('or existing_attempt.kind <> p_kind');
+		expect(stepAttemptKindMigration).toMatch(
+			/grant execute on function public\.corex_record_step_attempt\(\s*uuid, uuid, integer, text, integer, text, integer, timestamptz, timestamptz,\s*text, jsonb, jsonb, jsonb, text\s*\) to service_role/
+		);
+		expect(stepAttemptKindMigration).not.toContain('security definer');
 	});
 });
