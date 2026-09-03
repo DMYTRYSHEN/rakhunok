@@ -81,11 +81,29 @@ type BusinessEntityRow = {
 	is_active: boolean;
 };
 
+type MerchantApiKeyRow = {
+	id: string;
+	name: string;
+	key_prefix: string;
+	scopes: string[];
+	created_at: string;
+	expires_at: string | null;
+	last_used_at: string | null;
+	revoked_at: string | null;
+};
+
 const INVOICE_FIELDS =
 	'id, short_id, order_number, title, description, base_amount, discount_amount, delivery_fee, total_amount, currency, status, created_at, type, table_number, terminal_id, paid_at, paid_bank_code, expires_at';
 
 export type DashboardGateway = {
 	restore(): Promise<DashboardSessionState>;
+	getDeveloperSession(): Promise<DeveloperSession>;
+	listMerchantApiKeys(merchantId: string): Promise<MerchantApiKey[]>;
+	createMerchantApiKey(
+		merchantId: string,
+		input: MerchantApiKeyInput
+	): Promise<{ apiKey: string; record: MerchantApiKey }>;
+	revokeMerchantApiKey(merchantId: string, apiKeyId: string): Promise<void>;
 	getOverview(userId: string, merchant: DashboardMerchant): Promise<OverviewSnapshot>;
 	onboardMerchant(input: MerchantOnboardingInput): Promise<void>;
 	createInvoice(input: InvoiceCreateInput): Promise<{ id: string }>;
@@ -111,6 +129,27 @@ export type DashboardGateway = {
 	): () => void;
 	signInWithGoogleIdToken(token: string, nonce: string): Promise<void>;
 	signOut(): Promise<void>;
+};
+
+export type DeveloperSession = {
+	accessToken: string;
+	expiresAt: number | null;
+};
+
+export type MerchantApiKey = {
+	id: string;
+	name: string;
+	keyPrefix: string;
+	scopes: string[];
+	createdAt: string;
+	expiresAt: string | null;
+	lastUsedAt: string | null;
+	revokedAt: string | null;
+};
+
+export type MerchantApiKeyInput = {
+	name: string;
+	expiresAt: string | null;
 };
 
 export type DashboardRealtimeResource =
@@ -303,6 +342,28 @@ function createSnapshot(
 	};
 }
 
+function mapMerchantApiKey(row: MerchantApiKeyRow): MerchantApiKey {
+	return {
+		id: row.id,
+		name: row.name,
+		keyPrefix: row.key_prefix,
+		scopes: row.scopes,
+		createdAt: row.created_at,
+		expiresAt: row.expires_at,
+		lastUsedAt: row.last_used_at,
+		revokedAt: row.revoked_at
+	};
+}
+
+function encodeHex(bytes: Uint8Array): string {
+	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashApiKey(apiKey: string): Promise<string> {
+	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(apiKey));
+	return encodeHex(new Uint8Array(digest));
+}
+
 export function createDashboardGateway(
 	client: SupabaseClient,
 	options: GatewayOptions = {}
@@ -400,6 +461,56 @@ export function createDashboardGateway(
 				merchant,
 				snapshot: createSnapshot(merchant, [], 0, [])
 			};
+		},
+
+		async getDeveloperSession() {
+			const result = await client.auth.getSession();
+			const session = result.data.session;
+			if (result.error || !session?.access_token) {
+				throw new Error('Сесію втрачено. Увійдіть через Google ще раз.');
+			}
+			return {
+				accessToken: session.access_token,
+				expiresAt: session.expires_at ?? null
+			};
+		},
+
+		async listMerchantApiKeys(merchantId) {
+			const result = await client
+				.from('merchant_api_keys')
+				.select('id, name, key_prefix, scopes, created_at, expires_at, last_used_at, revoked_at')
+				.eq('merchant_id', merchantId)
+				.order('created_at', { ascending: false });
+			if (result.error) throw new Error('Не вдалося завантажити API keys.');
+			return ((result.data ?? []) as MerchantApiKeyRow[]).map(mapMerchantApiKey);
+		},
+
+		async createMerchantApiKey(merchantId, input) {
+			const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+			const secret = encodeHex(randomBytes);
+			const apiKey = `rhk_live_${secret}`;
+			const result = await client
+				.from('merchant_api_keys')
+				.insert({
+					merchant_id: merchantId,
+					name: input.name.trim(),
+					key_prefix: `rhk_live_${secret.slice(0, 8)}`,
+					secret_hash: await hashApiKey(apiKey),
+					expires_at: input.expiresAt
+				})
+				.select('id, name, key_prefix, scopes, created_at, expires_at, last_used_at, revoked_at')
+				.single<MerchantApiKeyRow>();
+			if (result.error || !result.data) throw new Error('Не вдалося створити API key.');
+			return { apiKey, record: mapMerchantApiKey(result.data) };
+		},
+
+		async revokeMerchantApiKey(merchantId, apiKeyId) {
+			const result = await client
+				.from('merchant_api_keys')
+				.update({ revoked_at: new Date().toISOString() })
+				.eq('id', apiKeyId)
+				.eq('merchant_id', merchantId);
+			if (result.error) throw new Error('Не вдалося відкликати API key.');
 		},
 
 		async getOverview(userId, merchant) {

@@ -1,14 +1,27 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import {
 		BarChart3,
 		Check,
+		Clock3,
 		Copy,
+		Eye,
+		EyeOff,
 		ExternalLink,
 		KeyRound,
+		Plus,
 		ReceiptText,
-		TerminalSquare
+		TerminalSquare,
+		Trash2
 	} from '@lucide/svelte';
 	import { resolve } from '$app/paths';
+	import type {
+		DashboardGateway,
+		DeveloperSession,
+		MerchantApiKey
+	} from '../api/dashboard-gateway';
+
+	let { gateway, merchantId }: { gateway: DashboardGateway; merchantId: string } = $props();
 
 	type Endpoint = {
 		id: 'list' | 'create' | 'get' | 'update' | 'stats';
@@ -90,16 +103,122 @@
 
 	let selectedId = $state<Endpoint['id']>('create');
 	let copied = $state(false);
+	let tokenCopied = $state(false);
+	let keyCopied = $state(false);
+	let revealToken = $state(false);
+	let loadingCredentials = $state(true);
+	let credentialsError = $state('');
+	let developerSession = $state<DeveloperSession | null>(null);
+	let apiKeys = $state<MerchantApiKey[]>([]);
+	let keyName = $state('Production integration');
+	let expiry = $state<'30' | '90' | 'never'>('90');
+	let creatingKey = $state(false);
+	let revokingKeyId = $state<string | null>(null);
+	let createdApiKey = $state<string | null>(null);
 	let apiBase = $derived(
 		typeof window === 'undefined' ? apiPath : `${window.location.origin}${apiPath}`
 	);
 	let selected = $derived(endpoints.find((endpoint) => endpoint.id === selectedId) ?? endpoints[1]);
 	let selectedExample = $derived(selected.example(apiBase));
+	let maskedToken = $derived(
+		developerSession
+			? `${developerSession.accessToken.slice(0, 18)}${'•'.repeat(24)}`
+			: 'Недоступний'
+	);
+	let tokenExpiry = $derived(
+		developerSession?.expiresAt
+			? new Intl.DateTimeFormat('uk-UA', { dateStyle: 'medium', timeStyle: 'short' }).format(
+					developerSession.expiresAt * 1000
+				)
+			: 'Невідомо'
+	);
+
+	onMount(async () => {
+		const [sessionResult, apiKeysResult] = await Promise.allSettled([
+			gateway.getDeveloperSession(),
+			gateway.listMerchantApiKeys(merchantId)
+		]);
+
+		if (sessionResult.status === 'fulfilled') developerSession = sessionResult.value;
+		if (apiKeysResult.status === 'fulfilled') apiKeys = apiKeysResult.value;
+
+		const errorResult = sessionResult.status === 'rejected' ? sessionResult : apiKeysResult;
+		if (errorResult.status === 'rejected') {
+			credentialsError =
+				errorResult.reason instanceof Error
+					? errorResult.reason.message
+					: 'Не вдалося завантажити доступи.';
+		}
+
+		loadingCredentials = false;
+	});
 
 	async function copyExample() {
-		await navigator.clipboard.writeText(selectedExample);
+		const example = developerSession
+			? selectedExample.replace('YOUR_ACCESS_TOKEN', developerSession.accessToken)
+			: selectedExample;
+		await navigator.clipboard.writeText(example);
 		copied = true;
 		window.setTimeout(() => (copied = false), 1500);
+	}
+
+	async function copyToken() {
+		if (!developerSession) return;
+		await navigator.clipboard.writeText(developerSession.accessToken);
+		tokenCopied = true;
+		window.setTimeout(() => (tokenCopied = false), 1500);
+	}
+
+	async function copyCreatedKey() {
+		if (!createdApiKey) return;
+		await navigator.clipboard.writeText(createdApiKey);
+		keyCopied = true;
+		window.setTimeout(() => (keyCopied = false), 1500);
+	}
+
+	async function createApiKey() {
+		if (!keyName.trim()) return;
+		creatingKey = true;
+		credentialsError = '';
+		try {
+			const expiresAt =
+				expiry === 'never'
+					? null
+					: new Date(Date.now() + Number(expiry) * 24 * 60 * 60 * 1000).toISOString();
+			const result = await gateway.createMerchantApiKey(merchantId, {
+				name: keyName,
+				expiresAt
+			});
+			createdApiKey = result.apiKey;
+			apiKeys = [result.record, ...apiKeys];
+			keyName = '';
+		} catch (error) {
+			credentialsError = error instanceof Error ? error.message : 'Не вдалося створити API key.';
+		} finally {
+			creatingKey = false;
+		}
+	}
+
+	async function revokeApiKey(apiKey: MerchantApiKey) {
+		if (!confirm(`Відкликати ключ “${apiKey.name}”? Цю дію не можна скасувати.`)) return;
+		revokingKeyId = apiKey.id;
+		credentialsError = '';
+		try {
+			await gateway.revokeMerchantApiKey(merchantId, apiKey.id);
+			apiKeys = apiKeys.map((item) =>
+				item.id === apiKey.id ? { ...item, revokedAt: new Date().toISOString() } : item
+			);
+		} catch (error) {
+			credentialsError = error instanceof Error ? error.message : 'Не вдалося відкликати API key.';
+		} finally {
+			revokingKeyId = null;
+		}
+	}
+
+	function formatDate(value: string | null) {
+		return value
+			? new Intl.DateTimeFormat('uk-UA', { dateStyle: 'medium' }).format(new Date(value))
+			: 'Без строку';
 	}
 </script>
 
@@ -127,13 +246,45 @@
 						><KeyRound size={18} /></span
 					>
 					<div>
-						<h2 class="text-base font-extrabold">Bearer-авторизація</h2>
+						<h2 class="text-base font-extrabold">Короткостроковий JWT</h2>
 						<p class="mt-1 text-sm leading-6 text-zinc-500">
-							Захищені merchant endpoints приймають JWT, отриманий під час входу, у заголовку
-							Authorization. Не передавайте токен у query-параметрах або клієнтських логах.
+							Поточний Supabase access token для швидкої перевірки API від імені вашого користувача.
+							Не передавайте його в query-параметрах або логах.
 						</p>
 					</div>
 				</div>
+				{#if loadingCredentials}
+					<p class="mt-5 text-sm text-zinc-500">Завантажуємо доступи…</p>
+				{:else}
+					<div class="mt-5 flex min-w-0 items-center gap-2 rounded-md bg-zinc-950 p-2 pl-3">
+						<code class="min-w-0 flex-1 truncate text-xs text-zinc-100">
+							{revealToken && developerSession ? developerSession.accessToken : maskedToken}
+						</code>
+						<button
+							type="button"
+							onclick={() => (revealToken = !revealToken)}
+							class="grid size-8 shrink-0 place-items-center rounded text-zinc-300 hover:bg-zinc-800 hover:text-white"
+							aria-label={revealToken ? 'Приховати JWT' : 'Показати JWT'}
+							title={revealToken ? 'Приховати JWT' : 'Показати JWT'}
+							disabled={!developerSession}
+						>
+							{#if revealToken}<EyeOff size={16} />{:else}<Eye size={16} />{/if}
+						</button>
+						<button
+							type="button"
+							onclick={copyToken}
+							class="grid size-8 shrink-0 place-items-center rounded text-zinc-300 hover:bg-zinc-800 hover:text-white"
+							aria-label="Скопіювати JWT"
+							title="Скопіювати JWT"
+							disabled={!developerSession}
+						>
+							{#if tokenCopied}<Check size={16} />{:else}<Copy size={16} />{/if}
+						</button>
+					</div>
+					<p class="mt-2 flex items-center gap-1.5 text-xs text-zinc-500">
+						<Clock3 size={13} /> Діє до {tokenExpiry}
+					</p>
+				{/if}
 				<div class="mt-5 grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center">
 					<span class="text-xs font-bold tracking-wide text-zinc-500 uppercase">Base URL</span>
 					<code class="overflow-x-auto rounded-md bg-zinc-100 px-3 py-2 text-xs text-zinc-800"
@@ -143,6 +294,129 @@
 					<code class="overflow-x-auto rounded-md bg-zinc-950 px-3 py-2 text-xs text-zinc-100"
 						>Authorization: Bearer YOUR_ACCESS_TOKEN</code
 					>
+				</div>
+			</div>
+
+			<div class="rounded-lg border border-zinc-200 bg-white p-5 sm:p-6">
+				<div class="flex flex-wrap items-start justify-between gap-4">
+					<div>
+						<h2 class="text-base font-extrabold">Merchant API keys</h2>
+						<p class="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">
+							Ключ зберігається лише як SHA-256 hash. Повне значення доступне один раз після
+							створення.
+						</p>
+					</div>
+				</div>
+
+				{#if credentialsError}
+					<p class="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+						{credentialsError}
+					</p>
+				{/if}
+
+				{#if createdApiKey}
+					<div class="mt-4 border-l-4 border-emerald-500 bg-emerald-50 p-4">
+						<p class="text-sm font-extrabold text-emerald-900">Збережіть ключ зараз</p>
+						<p class="mt-1 text-xs leading-5 text-emerald-800">
+							Після закриття цього повідомлення повне значення відновити неможливо.
+						</p>
+						<div class="mt-3 flex min-w-0 items-center gap-2">
+							<code
+								class="min-w-0 flex-1 overflow-x-auto rounded bg-white px-3 py-2 text-xs text-zinc-900"
+							>
+								{createdApiKey}
+							</code>
+							<button
+								type="button"
+								onclick={copyCreatedKey}
+								class="grid size-9 shrink-0 place-items-center rounded-md border border-emerald-300 bg-white text-emerald-800"
+								aria-label="Скопіювати API key"
+								title="Скопіювати API key"
+							>
+								{#if keyCopied}<Check size={16} />{:else}<Copy size={16} />{/if}
+							</button>
+						</div>
+						<button
+							type="button"
+							onclick={() => (createdApiKey = null)}
+							class="mt-3 text-xs font-bold text-emerald-900 underline underline-offset-2"
+						>
+							Я зберіг ключ
+						</button>
+					</div>
+				{/if}
+
+				<form
+					class="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_9rem_auto]"
+					onsubmit={(event) => {
+						event.preventDefault();
+						void createApiKey();
+					}}
+				>
+					<label class="grid gap-1.5 text-xs font-bold text-zinc-600">
+						Назва
+						<input
+							bind:value={keyName}
+							maxlength="80"
+							placeholder="Production integration"
+							class="h-10 rounded-md border border-zinc-300 px-3 text-sm font-normal text-zinc-900"
+						/>
+					</label>
+					<label class="grid gap-1.5 text-xs font-bold text-zinc-600">
+						Строк дії
+						<select
+							bind:value={expiry}
+							class="h-10 rounded-md border border-zinc-300 px-3 text-sm font-normal text-zinc-900"
+						>
+							<option value="30">30 днів</option>
+							<option value="90">90 днів</option>
+							<option value="never">Без строку</option>
+						</select>
+					</label>
+					<button
+						type="submit"
+						disabled={creatingKey || !keyName.trim()}
+						class="mt-auto inline-flex h-10 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+					>
+						<Plus size={16} />
+						{creatingKey ? 'Створюємо…' : 'Створити'}
+					</button>
+				</form>
+
+				<div class="mt-5 divide-y divide-zinc-200 border-t border-zinc-200">
+					{#if !loadingCredentials && apiKeys.length === 0}
+						<p class="py-5 text-sm text-zinc-500">Merchant API keys ще не створені.</p>
+					{/if}
+					{#each apiKeys as apiKey (apiKey.id)}
+						<div class="flex flex-wrap items-center gap-3 py-4">
+							<div class="min-w-0 flex-1">
+								<div class="flex flex-wrap items-center gap-2">
+									<p class="truncate text-sm font-bold text-zinc-900">{apiKey.name}</p>
+									<span class="rounded bg-zinc-100 px-2 py-0.5 font-mono text-xs text-zinc-600">
+										{apiKey.keyPrefix}…
+									</span>
+									{#if apiKey.revokedAt}
+										<span class="text-xs font-bold text-red-600">Відкликано</span>
+									{/if}
+								</div>
+								<p class="mt-1 text-xs text-zinc-500">
+									Створено {formatDate(apiKey.createdAt)} · Діє до {formatDate(apiKey.expiresAt)}
+								</p>
+							</div>
+							{#if !apiKey.revokedAt}
+								<button
+									type="button"
+									onclick={() => revokeApiKey(apiKey)}
+									disabled={revokingKeyId === apiKey.id}
+									class="grid size-9 shrink-0 place-items-center rounded-md border border-zinc-200 text-zinc-500 hover:border-red-300 hover:text-red-700 disabled:opacity-50"
+									aria-label={`Відкликати ${apiKey.name}`}
+									title="Відкликати API key"
+								>
+									<Trash2 size={16} />
+								</button>
+							{/if}
+						</div>
+					{/each}
 				</div>
 			</div>
 

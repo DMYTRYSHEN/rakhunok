@@ -1,11 +1,11 @@
 openapi: 3.1.0
 info:
   title: Rahunok Edge API & Mobile SDK Specification
-  version: 1.1.0
+  version: 1.2.0
   description: |
     # Rahunok Mobile & Edge Payment API
     Повна OpenAPI / Swagger специфікація для розробників мобільних застосунків (iOS / Android / Apple App Clip / Web).
-    
+
     ## Основні можливості:
     * **4 бізнес-сценарії оплати:**
       1. `fixed` — Фіксована сума (товари/послуги)
@@ -16,6 +16,15 @@ info:
     * **OS-Aware маршрутизація банківських Deep Links** (Monobank, Приват24, Sense Bank, ПУМБ, NovaPay, izibank, Абанк тощо)
     * **Високошвидкісний Cloudflare KV кеш банків та логотипів** (`/banks`, `/logos`)
     * **Симуляція та Webhook-інтеграція**
+
+    ## Авторизація merchant API
+    Захищені merchant endpoints приймають короткостроковий JWT або довгостроковий
+    merchant API key у заголовку `Authorization: Bearer <credential>`.
+
+    Merchant API keys створюються в Dashboard у розділі **Developer API**. Повне
+    значення формату `rhk_live_<64 hex characters>` показується лише один раз;
+    надалі сервіс зберігає тільки SHA-256 hash. Ключ може мати строк дії та може
+    бути незворотно відкликаний власником merchant account.
 
 servers:
   - url: https://rakhunok.com/api/v1
@@ -42,10 +51,10 @@ paths:
               schema:
                 type: object
                 properties:
-                  status: { type: string, example: "ok" }
-                  service: { type: string, example: "Rahunok Edge API" }
-                  version: { type: string, example: "1.1.0" }
-                  nbu_standard: { type: string, example: "v003_ICT_Sandbox" }
+                  status: { type: string, example: 'ok' }
+                  service: { type: string, example: 'Rahunok Edge API' }
+                  version: { type: string, example: '1.0.0' }
+                  nbu_standard: { type: string, example: 'v003_ICT_Sandbox' }
                   timestamp: { type: string, format: date-time }
 
   # =========================================================================
@@ -100,6 +109,7 @@ paths:
       tags: [Merchant]
       security:
         - BearerAuth: []
+        - MerchantApiKey: []
       responses:
         '200':
           content:
@@ -116,6 +126,7 @@ paths:
       tags: [Merchant]
       security:
         - BearerAuth: []
+        - MerchantApiKey: []
       requestBody:
         required: true
         content:
@@ -123,9 +134,9 @@ paths:
             schema:
               type: object
               properties:
-                display_name: { type: string, example: "Ресторан Смак" }
-                business_name: { type: string, example: "ТОВ СМАК РЕСТО" }
-                iban: { type: string, example: "UA673005280000026500504354077" }
+                display_name: { type: string, example: 'Ресторан Смак' }
+                business_name: { type: string, example: 'ТОВ СМАК РЕСТО' }
+                iban: { type: string, example: 'UA673005280000026500504354077' }
                 avatar_url: { type: string, format: uri }
       responses:
         '200':
@@ -145,6 +156,7 @@ paths:
       tags: [Merchant]
       security:
         - BearerAuth: []
+        - MerchantApiKey: []
       requestBody:
         required: true
         content:
@@ -175,6 +187,7 @@ paths:
       tags: [Orders]
       security:
         - BearerAuth: []
+        - MerchantApiKey: []
       parameters:
         - name: status
           in: query
@@ -210,6 +223,7 @@ paths:
       tags: [Orders]
       security:
         - BearerAuth: []
+        - MerchantApiKey: []
       requestBody:
         required: true
         content:
@@ -222,15 +236,20 @@ paths:
                   type: string
                   enum: [fixed, open_amount, table, delivery]
                   default: fixed
-                order_number: { type: string, example: "№4812-A" }
-                title: { type: string, example: "Оплата замовлення №4812-A" }
-                description: { type: string, example: "Капучино та десерт" }
-                amount: { type: number, example: 180.00, description: "Сума рахунку, яку надсилають Dashboard та Merchant App" }
-                base_amount: { type: number, example: 180.00, description: "0.00 для open_amount" }
+                order_number: { type: string, example: '№4812-A' }
+                title: { type: string, example: 'Оплата замовлення №4812-A' }
+                description: { type: string, example: 'Капучино та десерт' }
+                amount:
+                  {
+                    type: number,
+                    example: 180.00,
+                    description: 'Сума рахунку, яку надсилають Dashboard та Merchant App'
+                  }
+                base_amount: { type: number, example: 180.00, description: '0.00 для open_amount' }
                 total_amount: { type: number, example: 180.00 }
                 delivery_fee: { type: number, example: 0.00 }
                 discount_amount: { type: number, example: 0.00 }
-                table_number: { type: integer, example: 12, description: "Тільки для type=table" }
+                table_number: { type: integer, example: 12, description: 'Тільки для type=table' }
                 items:
                   type: array
                   items:
@@ -269,7 +288,7 @@ paths:
         - name: id
           in: path
           required: true
-          schema: { type: string, example: "a90b0c3f-1ca5-4991-b3d8-eb7a136dfd92" }
+          schema: { type: string, example: 'a90b0c3f-1ca5-4991-b3d8-eb7a136dfd92' }
       responses:
         '200':
           content:
@@ -285,6 +304,7 @@ paths:
       tags: [Orders]
       security:
         - BearerAuth: []
+        - MerchantApiKey: []
       parameters:
         - name: id
           in: path
@@ -322,7 +342,7 @@ paths:
         - name: id
           in: path
           required: true
-          schema: { type: string, example: "a90b0c3f-1ca5-4991-b3d8-eb7a136dfd92" }
+          schema: { type: string, example: 'a90b0c3f-1ca5-4991-b3d8-eb7a136dfd92' }
       responses:
         '200':
           description: Деталі замовлення та реквізити мерчанта
@@ -352,11 +372,16 @@ paths:
               type: object
               required: [bank]
               properties:
-                bank: { type: string, example: "MONO", description: "Код банку (MONO, PBAN, SENS, FUIB, NOVA, TASB тощо)" }
-                bank_code: { type: string, example: "MONO" }
+                bank:
+                  {
+                    type: string,
+                    example: 'MONO',
+                    description: 'Код банку (MONO, PBAN, SENS, FUIB, NOVA, TASB тощо)'
+                  }
+                bank_code: { type: string, example: 'MONO' }
                 amount: { type: number, example: 150.00 }
                 os: { type: string, enum: [ios, android, desktop], default: desktop }
-                recaptcha_token: { type: string, example: "token_from_google" }
+                recaptcha_token: { type: string, example: 'token_from_google' }
       responses:
         '200':
           description: Сформований прямий лінк на застосунок банку
@@ -367,14 +392,16 @@ paths:
                 properties:
                   success: { type: boolean, example: true }
                   order_id: { type: string }
-                  bank_code: { type: string, example: "MONO" }
+                  bank_code: { type: string, example: 'MONO' }
                   amount: { type: number, example: 150.00 }
-                  currency: { type: string, example: "UAH" }
-                  redirect_url: { type: string, format: uri, example: "https://mbnk.app/qr/QkNECjAwMwox..." }
+                  currency: { type: string, example: 'UAH' }
+                  redirect_url:
+                    { type: string, format: uri, example: 'https://mbnk.app/qr/QkNECjAwMwox...' }
                   fallback_url: { type: string, format: uri }
-                  strategy: { type: string, example: "url_template" }
+                  strategy: { type: string, example: 'url_template' }
                   nbu_payload_base64: { type: string }
-                  nbu_qr_url: { type: string, format: uri, example: "https://qr.bank.gov.ua/QkNECjAwMwox..." }
+                  nbu_qr_url:
+                    { type: string, format: uri, example: 'https://qr.bank.gov.ua/QkNECjAwMwox...' }
 
   /checkout/{id}/status:
     get:
@@ -478,7 +505,7 @@ paths:
               type: object
               required: [promo_code]
               properties:
-                promo_code: { type: string, example: "SALE4" }
+                promo_code: { type: string, example: 'SALE4' }
       responses:
         '200':
           description: Знижку розраховано
@@ -549,7 +576,7 @@ paths:
         - name: idOrCode
           in: path
           required: true
-          schema: { type: string, example: "mono" }
+          schema: { type: string, example: 'mono' }
       responses:
         '200':
           content:
@@ -572,61 +599,117 @@ paths:
                 additionalProperties:
                   type: object
                   properties:
-                    code: { type: string, example: "MONO" }
-                    color: { type: string, example: "#000000" }
+                    code: { type: string, example: 'MONO' }
+                    color: { type: string, example: '#000000' }
                     logo: { type: string, format: uri }
                     active: { type: boolean, example: true }
                     verified: { type: boolean, example: true }
-                    url_template: { type: string, example: "https://mbnk.app/qr/{payload}" }
-                    universal_link: { type: string, example: "https://mbnk.app/qr/{payload}" }
-                    ios_scheme: { type: string, example: "mono" }
-                    android_package: { type: string, example: "com.ftband.mono" }
+                    url_template: { type: string, example: 'https://mbnk.app/qr/{payload}' }
+                    universal_link: { type: string, example: 'https://mbnk.app/qr/{payload}' }
+                    ios_scheme: { type: string, example: 'mono' }
+                    android_package: { type: string, example: 'com.ftband.mono' }
 
   # =========================================================================
-  # 7. ВЕБХУКИ ТА СИМУЛЯТОР ОПЛАТИ
+  # 7. ІНТЕГРАЦІЯ КСО
   # =========================================================================
-  /webhooks/simulate:
+  /kso/checkout-requests:
     post:
-      operationId: simulatePaymentWebhook
-      summary: Симуляція банківської оплати (Sandbox)
-      tags: [Webhooks]
+      operationId: createKsoCheckoutRequest
+      summary: Створення платіжного запиту з касового термінала
+      description: |
+        Створює ідемпотентний checkout request для інтегрованої касової системи.
+        Підпис `X-Rahunok-Signature` має формат `v1=<base64url HMAC-SHA256>` і
+        обчислюється над рядком `METHOD\nPATH_AND_SORTED_QUERY\nTIMESTAMP\nNONCE\nIDEMPOTENCY_KEY\nSHA256_BODY_HEX`.
+        Timestamp приймається у межах п'яти хвилин, nonce не можна використовувати повторно,
+        а тіло запиту не може перевищувати 1 MiB.
+      tags: [KSO]
+      security:
+        - KsoHmac: []
+      parameters:
+        - $ref: '#/components/parameters/KsoPartnerId'
+        - $ref: '#/components/parameters/KsoKeyId'
+        - $ref: '#/components/parameters/KsoTimestamp'
+        - $ref: '#/components/parameters/KsoNonce'
+        - $ref: '#/components/parameters/KsoIdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [order_id]
-              properties:
-                order_id: { type: string }
-                bank_code: { type: string, default: "UNJS", example: "MONO" }
-                amount: { type: number, example: 180.00 }
-                status: { type: string, enum: [success, failed], default: success }
+              $ref: '#/components/schemas/KsoCheckoutRequest'
       responses:
-        '200':
-          description: Статус переведено в «Сплачено»
+        '201':
+          description: Checkout request створено
+          headers:
+            X-Correlation-ID:
+              schema: { type: string, format: uuid }
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success: { type: boolean, example: true }
-                  simulation: { type: boolean, example: true }
-                  order_id: { type: string }
-                  status: { type: string, example: "paid" }
-                  paid_at: { type: string, format: date-time }
-                  bank_code: { type: string, example: "MONO" }
+                $ref: '#/components/schemas/KsoCheckoutCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/KsoUnauthorized'
+        '409':
+          description: Idempotency key вже використаний для іншого запиту
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
+  /kso/checkout-requests/{id}:
+    get:
+      operationId: getKsoCheckoutRequest
+      summary: Отримання стану платіжного запиту КСО
+      tags: [KSO]
+      security:
+        - KsoHmac: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/KsoPartnerId'
+        - $ref: '#/components/parameters/KsoKeyId'
+        - $ref: '#/components/parameters/KsoTimestamp'
+        - $ref: '#/components/parameters/KsoNonce'
+      responses:
+        '200':
+          description: Поточний стан checkout request
+          headers:
+            X-Correlation-ID:
+              schema: { type: string, format: uuid }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KsoCheckoutStatus'
+        '401':
+          $ref: '#/components/responses/KsoUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # =========================================================================
+  # 8. PRODUCTION ВЕБХУКИ
+  # =========================================================================
   /webhooks/{bankCode}:
     post:
       operationId: receiveBankWebhook
       summary: Прийом вебхуків від банків (Monobank, PrivatBank тощо)
+      description: |
+        Підпис має формат `v1=<base64url HMAC-SHA256>` і обчислюється над рядком
+        `POST\nPATH\nTIMESTAMP\nSHA256_BODY_HEX`. Timestamp приймається у межах п'яти хвилин,
+        максимальний розмір тіла становить 256 KiB.
       tags: [Webhooks]
+      security:
+        - BankWebhookHmac: []
       parameters:
         - name: bankCode
           in: path
           required: true
-          schema: { type: string, example: "monobank" }
+          schema: { type: string, example: 'monobank' }
+        - $ref: '#/components/parameters/BankWebhookKeyId'
+        - $ref: '#/components/parameters/BankWebhookTimestamp'
       requestBody:
         required: true
         content:
@@ -638,7 +721,7 @@ paths:
           description: Вебхук успішно прийнято та оброблено
 
   # =========================================================================
-  # 8. АНАЛІТИКА ТА СТАТИСТИКА
+  # 9. АНАЛІТИКА ТА СТАТИСТИКА
   # =========================================================================
   /stats/summary:
     get:
@@ -647,6 +730,7 @@ paths:
       tags: [Analytics]
       security:
         - BearerAuth: []
+        - MerchantApiKey: []
       responses:
         '200':
           content:
@@ -670,14 +754,141 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: "JWT токен мерчанта, отриманий при логіні"
+      description: Короткостроковий JWT токен мерчанта, отриманий при логіні.
+    MerchantApiKey:
+      type: http
+      scheme: bearer
+      bearerFormat: RHK_API_KEY
+      description: |
+        Merchant API key формату `rhk_live_<64 hex characters>`, створений у
+        Dashboard → Developer API. Повне значення показується лише один раз.
+        Передавайте ключ як `Authorization: Bearer rhk_live_...`. Відкликані
+        ключі та ключі зі строком дії, що минув, не авторизують запити.
+    KsoHmac:
+      type: apiKey
+      in: header
+      name: X-Rahunok-Signature
+      description: HMAC-SHA256 підпис у форматі `v1=<base64url>`; алгоритм канонізації описано в KSO operations.
+    BankWebhookHmac:
+      type: apiKey
+      in: header
+      name: X-Bank-Webhook-Signature
+      description: HMAC-SHA256 підпис банківського webhook у форматі `v1=<base64url>`.
+
+  parameters:
+    KsoPartnerId:
+      name: X-Partner-ID
+      in: header
+      required: true
+      schema: { type: string }
+    KsoKeyId:
+      name: X-Rahunok-Key-ID
+      in: header
+      required: true
+      schema: { type: string }
+    KsoTimestamp:
+      name: X-Rahunok-Timestamp
+      in: header
+      required: true
+      description: ISO 8601 timestamp у межах п'яти хвилин від часу сервера.
+      schema: { type: string, format: date-time }
+    KsoNonce:
+      name: X-Rahunok-Nonce
+      in: header
+      required: true
+      description: Одноразове значення довжиною щонайменше 16 символів.
+      schema: { type: string, minLength: 16 }
+    KsoIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Стабільний ключ запиту довжиною щонайменше 16 символів.
+      schema: { type: string, minLength: 16 }
+    BankWebhookKeyId:
+      name: X-Bank-Webhook-Key-ID
+      in: header
+      required: true
+      schema: { type: string }
+    BankWebhookTimestamp:
+      name: X-Bank-Webhook-Timestamp
+      in: header
+      required: true
+      description: ISO 8601 timestamp у межах п'яти хвилин від часу сервера.
+      schema: { type: string, format: date-time }
 
   schemas:
+    KsoCheckoutRequest:
+      type: object
+      required:
+        [
+          network_id,
+          location_id,
+          terminal_id,
+          kso_session_id,
+          order_reference,
+          amount_minor,
+          currency,
+          presentation_mode
+        ]
+      properties:
+        network_id: { type: string }
+        location_id: { type: string }
+        terminal_id: { type: string }
+        kso_session_id: { type: string }
+        order_reference: { type: string }
+        amount_minor: { type: integer, minimum: 1, example: 18000 }
+        currency: { type: string, enum: [UAH] }
+        presentation_mode: { type: string, enum: [qr, nfc, mobile_push] }
+        callback_payload_mode: { type: string, enum: [compact, full], default: compact }
+
+    KsoCheckoutCreated:
+      type: object
+      required:
+        [
+          checkout_request_id,
+          payment_id,
+          payment_status,
+          loyalty_status,
+          link_status,
+          expires_at,
+          checkout_url,
+          presentation
+        ]
+      properties:
+        checkout_request_id: { type: string, format: uuid }
+        payment_id: { type: string, format: uuid }
+        payment_status: { type: string }
+        loyalty_status: { type: string }
+        link_status: { type: string }
+        expires_at: { type: string, format: date-time }
+        checkout_url: { type: string, format: uri }
+        presentation:
+          type: object
+          required: [mode]
+          properties:
+            mode: { type: string, enum: [qr, nfc, mobile_push] }
+            qr_payload: { type: string, nullable: true }
+            nfc_url: { type: string, format: uri, nullable: true }
+            payment_request_id: { type: string, nullable: true }
+
+    KsoCheckoutStatus:
+      type: object
+      required:
+        [checkout_request_id, payment_id, payment_status, loyalty_status, link_status, expires_at]
+      properties:
+        checkout_request_id: { type: string, format: uuid }
+        payment_id: { type: string, format: uuid }
+        payment_status: { type: string }
+        loyalty_status: { type: string }
+        link_status: { type: string }
+        paid_at: { type: string, format: date-time, nullable: true }
+        expires_at: { type: string, format: date-time }
+
     AuthResponse:
       type: object
       properties:
-        access_token: { type: string, example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
-        token_type: { type: string, example: "Bearer" }
+        access_token: { type: string, example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' }
+        token_type: { type: string, example: 'Bearer' }
         expires_in: { type: integer, example: 604800 }
         merchant:
           $ref: '#/components/schemas/Merchant'
@@ -687,13 +898,13 @@ components:
       properties:
         id: { type: string, format: uuid }
         user_id: { type: string, format: uuid }
-        business_name: { type: string, example: "ФОП Шевченко Т.Г." }
+        business_name: { type: string, example: 'ФОП Шевченко Т.Г.' }
         business_type: { type: string, enum: [fop, tov, ngo] }
-        tax_id: { type: string, example: "3124567890" }
-        iban: { type: string, example: "UA673005280000026500504354077" }
+        tax_id: { type: string, example: '3124567890' }
+        iban: { type: string, example: 'UA673005280000026500504354077' }
         display_name: { type: string, example: "Кав'ярня «Крапка»" }
         avatar_url: { type: string, nullable: true }
-        currency: { type: string, example: "UAH" }
+        currency: { type: string, example: 'UAH' }
         onboarding_completed: { type: boolean, example: true }
         created_at: { type: string, format: date-time }
 
@@ -701,15 +912,15 @@ components:
       type: object
       properties:
         display_name: { type: string, example: "Кав'ярня «Крапка»" }
-        business_name: { type: string, example: "ФОП Шевченко Т.Г." }
-        tax_id: { type: string, example: "3124567890" }
-        iban: { type: string, example: "UA673005280000026500504354077" }
+        business_name: { type: string, example: 'ФОП Шевченко Т.Г.' }
+        tax_id: { type: string, example: '3124567890' }
+        iban: { type: string, example: 'UA673005280000026500504354077' }
         avatar_url: { type: string, nullable: true }
 
     OrderItem:
       type: object
       properties:
-        name: { type: string, example: "Капучино з вівсяним молоком" }
+        name: { type: string, example: 'Капучино з вівсяним молоком' }
         quantity: { type: number, example: 2 }
         unit_price: { type: number, example: 75.00 }
         total_price: { type: number, example: 150.00 }
@@ -718,28 +929,28 @@ components:
       type: object
       required: [recipient_name, recipient_phone, method, city, branch_info]
       properties:
-        recipient_name: { type: string, example: "Олександр Петренко" }
-        recipient_phone: { type: string, example: "+380501234567" }
-        method: { type: string, enum: [branch, locker, courier], example: "branch" }
-        city: { type: string, example: "Київ" }
-        branch_info: { type: string, example: "Відділення №42 (вул. Хрещатик, 15)" }
+        recipient_name: { type: string, example: 'Олександр Петренко' }
+        recipient_phone: { type: string, example: '+380501234567' }
+        method: { type: string, enum: [branch, locker, courier], example: 'branch' }
+        city: { type: string, example: 'Київ' }
+        branch_info: { type: string, example: 'Відділення №42 (вул. Хрещатик, 15)' }
         delivery_fee: { type: number, example: 80.00 }
 
     Order:
       type: object
       properties:
-        id: { type: string, format: uuid, example: "a90b0c3f-1ca5-4991-b3d8-eb7a136dfd92" }
-        short_code: { type: string, example: "a90b0c" }
+        id: { type: string, format: uuid, example: 'a90b0c3f-1ca5-4991-b3d8-eb7a136dfd92' }
+        short_code: { type: string, example: 'a90b0c' }
         merchant_id: { type: string, format: uuid }
         type: { type: string, enum: [fixed, open_amount, table, delivery] }
-        order_number: { type: string, example: "№4812-A" }
-        title: { type: string, example: "Оплата замовлення №4812-A" }
+        order_number: { type: string, example: '№4812-A' }
+        title: { type: string, example: 'Оплата замовлення №4812-A' }
         description: { type: string, nullable: true }
         base_amount: { type: number, example: 180.00 }
         discount_amount: { type: number, example: 0.00 }
         delivery_fee: { type: number, example: 0.00 }
         total_amount: { type: number, example: 180.00 }
-        currency: { type: string, example: "UAH" }
+        currency: { type: string, example: 'UAH' }
         table_number: { type: integer, nullable: true, example: 12 }
         status: { type: string, enum: [draft, pending, preparing, ready, paid, expired, cancelled] }
         paid_at: { type: string, format: date-time, nullable: true }
@@ -747,7 +958,7 @@ components:
         paid_amount: { type: number, nullable: true }
         nbu_payload_base64: { type: string }
         nbu_qr_url: { type: string, format: uri }
-        share_url: { type: string, format: uri, example: "https://rakhunok.com/pay/a90b0c" }
+        share_url: { type: string, format: uri, example: 'https://rakhunok.com/pay/a90b0c' }
         created_at: { type: string, format: date-time }
         items:
           type: array
@@ -759,10 +970,10 @@ components:
     Bank:
       type: object
       properties:
-        id: { type: string, example: "mono" }
-        code: { type: string, example: "MONO" }
-        name: { type: string, example: "Monobank" }
-        color: { type: string, example: "#000000" }
+        id: { type: string, example: 'mono' }
+        code: { type: string, example: 'MONO' }
+        name: { type: string, example: 'Monobank' }
+        color: { type: string, example: '#000000' }
         logo: { type: string, format: uri }
         active: { type: boolean, example: true }
         verified: { type: boolean, example: true }
@@ -770,22 +981,25 @@ components:
     BankDetail:
       type: object
       properties:
-        id: { type: string, example: "mono" }
-        code: { type: string, example: "MONO" }
-        name: { type: string, example: "Monobank" }
-        url_template: { type: string, example: "https://mbnk.app/qr/{payload}" }
-        universal_link: { type: string, example: "https://mbnk.app/qr/{payload}" }
-        ios_scheme: { type: string, example: "mono" }
-        android_package: { type: string, example: "com.ftband.mono" }
-        alternative_url: { type: string, example: "mono://bank.gov.ua/qr/{payload}" }
-        encoding: { type: string, example: "1" }
-        nbu_version: { type: string, example: "003" }
+        id: { type: string, example: 'mono' }
+        code: { type: string, example: 'MONO' }
+        name: { type: string, example: 'Monobank' }
+        url_template: { type: string, example: 'https://mbnk.app/qr/{payload}' }
+        universal_link: { type: string, example: 'https://mbnk.app/qr/{payload}' }
+        ios_scheme: { type: string, example: 'mono' }
+        android_package: { type: string, example: 'com.ftband.mono' }
+        alternative_url: { type: string, example: 'mono://bank.gov.ua/qr/{payload}' }
+        encoding: { type: string, example: '1' }
+        nbu_version: { type: string, example: '003' }
 
     Error:
       type: object
+      required: [error, message]
       properties:
-        error: { type: string, example: "Помилка валідації даних" }
-        code: { type: integer, example: 400 }
+        error: { type: boolean, example: true }
+        message: { type: string, example: 'Помилка валідації даних' }
+        details:
+          nullable: true
 
   responses:
     BadRequest:
@@ -796,6 +1010,12 @@ components:
             $ref: '#/components/schemas/Error'
     Unauthorized:
       description: Помилка авторизації (недійсний або відсутній Bearer JWT)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    KsoUnauthorized:
+      description: Відсутні або недійсні HMAC-заголовки, timestamp, nonce чи підпис
       content:
         application/json:
           schema:

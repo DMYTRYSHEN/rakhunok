@@ -558,7 +558,9 @@
 		{:else if view === 'team'}
 			{#await loadTeamSettings() then module}<module.default />{/await}
 		{:else if view === 'developer-api'}
-			{#await loadDeveloperApi() then module}<module.default />{/await}
+			{#await loadDeveloperApi() then module}
+				<module.default gateway={gateway!} merchantId={sessionState.merchant.id} />
+			{/await}
 		{:else if view === 'sandbox'}
 			{#await loadPaymentSandbox() then module}<module.default />{/await}
 		{:else if view === 'structure'}

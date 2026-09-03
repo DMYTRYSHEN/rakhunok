@@ -97,6 +97,70 @@ afterEach(() => {
 });
 
 describe('dashboard gateway', () => {
+	it('persists only a hash when creating a merchant API key', async () => {
+		let insertedPayload: Record<string, unknown> | null = null;
+		const createdRow = {
+			id: 'key-1',
+			name: 'Production',
+			key_prefix: 'rhk_live_12345678',
+			scopes: ['orders:read'],
+			created_at: '2026-09-03T10:00:00.000Z',
+			expires_at: null,
+			last_used_at: null,
+			revoked_at: null
+		};
+		const builder = {
+			insert: vi.fn((payload: Record<string, unknown>) => {
+				insertedPayload = payload;
+				return builder;
+			}),
+			select: vi.fn(() => builder),
+			single: vi.fn(async () => ({ data: createdRow, error: null }))
+		};
+		const client = {
+			from: vi.fn(() => builder)
+		} as unknown as SupabaseClient;
+
+		const result = await createDashboardGateway(client).createMerchantApiKey('merchant-1', {
+			name: 'Production',
+			expiresAt: null
+		});
+		const secretHex = result.apiKey.slice('rhk_live_'.length);
+		const expectedHash = Array.from(
+			new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(result.apiKey)))
+		)
+			.map((byte) => byte.toString(16).padStart(2, '0'))
+			.join('');
+
+		expect(result.apiKey).toMatch(/^rhk_live_[a-f0-9]{64}$/);
+		expect(insertedPayload).toMatchObject({
+			merchant_id: 'merchant-1',
+			name: 'Production',
+			key_prefix: `rhk_live_${secretHex.slice(0, 8)}`,
+			secret_hash: expectedHash,
+			expires_at: null
+		});
+		expect(Object.values(insertedPayload ?? {})).not.toContain(result.apiKey);
+	});
+
+	it('returns the current access token and expiry for developer testing', async () => {
+		const expiringSession = {
+			...session,
+			access_token: 'short-lived-jwt',
+			expires_at: 1_800_000_000
+		} as Session;
+		const client = {
+			auth: {
+				getSession: vi.fn(async () => ({ data: { session: expiringSession }, error: null }))
+			}
+		} as unknown as SupabaseClient;
+
+		await expect(createDashboardGateway(client).getDeveloperSession()).resolves.toEqual({
+			accessToken: 'short-lived-jwt',
+			expiresAt: 1_800_000_000
+		});
+	});
+
 	it('exchanges a Google credential and nonce without an OAuth redirect', async () => {
 		const { client } = createClient();
 

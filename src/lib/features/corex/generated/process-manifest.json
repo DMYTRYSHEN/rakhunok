@@ -200,7 +200,7 @@
 		{
 			"id": "rahunok-edge-api",
 			"title": "Rahunok Edge API & Mobile SDK Specification",
-			"version": "1.1.0",
+			"version": "1.2.0",
 			"servers": [
 				"https://rakhunok.com/api/v1",
 				"https://rahunok.dmitrishen.workers.dev/api/v1",
@@ -389,10 +389,19 @@
 				},
 				{
 					"method": "POST",
-					"path": "/api/v1/webhooks/simulate",
-					"operationId": "simulatePaymentWebhook",
-					"summary": "Симуляція банківської оплати (Sandbox)",
-					"tags": ["Webhooks"],
+					"path": "/api/v1/kso/checkout-requests",
+					"operationId": "createKsoCheckoutRequest",
+					"summary": "Створення платіжного запиту з касового термінала",
+					"tags": ["KSO"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/kso/checkout-requests/{id}",
+					"operationId": "getKsoCheckoutRequest",
+					"summary": "Отримання стану платіжного запиту КСО",
+					"tags": ["KSO"],
 					"status": "planned",
 					"source": "docs/openapi.yaml"
 				},

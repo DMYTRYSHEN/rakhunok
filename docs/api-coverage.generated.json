@@ -1,9 +1,10 @@
 {
   "contract": "docs/openapi.yaml",
-  "generatedAt": "2026-09-03T17:39:49.249Z",
+  "generatedAt": "2026-09-03T20:42:02.687Z",
   "summary": {
-    "openApiOperations": 23,
-    "implementedOperations": 23,
+    "openApiOperations": 24,
+    "implementedOperations": 24,
+    "developmentOnlyOperations": 1,
     "consumedOperations": 8,
     "documentedConsumedOperations": 8,
     "missingConsumedOperations": 0,
@@ -219,9 +220,13 @@
     },
     {
       "method": "POST",
-      "path": "/api/v1/webhooks/simulate",
-      "source": "../core/worker/src/routes/webhooks.ts",
-      "availability": "development-only"
+      "path": "/api/v1/kso/checkout-requests",
+      "source": "../core/worker/src/routes/kso.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/kso/checkout-requests/{id}",
+      "source": "../core/worker/src/routes/kso.ts"
     },
     {
       "method": "POST",
@@ -232,6 +237,14 @@
       "method": "GET",
       "path": "/api/v1/stats/summary",
       "source": "../core/worker/src/routes/stats.ts"
+    }
+  ],
+  "developmentOnlyOperations": [
+    {
+      "method": "POST",
+      "path": "/api/v1/webhooks/simulate",
+      "source": "../core/worker/src/routes/webhooks.ts",
+      "availability": "development-only"
     }
   ],
   "implementedButUndocumented": [],
@@ -319,9 +332,15 @@
     },
     {
       "method": "POST",
-      "path": "/api/v1/webhooks/simulate",
-      "operationId": "simulatePaymentWebhook",
-      "summary": "Симуляція банківської оплати (Sandbox)"
+      "path": "/api/v1/kso/checkout-requests",
+      "operationId": "createKsoCheckoutRequest",
+      "summary": "Створення платіжного запиту з касового термінала"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/kso/checkout-requests/{id}",
+      "operationId": "getKsoCheckoutRequest",
+      "summary": "Отримання стану платіжного запиту КСО"
     },
     {
       "method": "POST",
