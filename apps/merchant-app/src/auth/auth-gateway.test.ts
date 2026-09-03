@@ -17,7 +17,7 @@ function createClient(options: { session?: boolean; merchant?: boolean; queryErr
 	const client = {
 		auth: {
 			getSession: vi.fn(async () => ({ data: { session: options.session ? { user } : null }, error: null })),
-			signInWithOAuth: vi.fn(async () => ({ data: {}, error: null })),
+				signInWithIdToken: vi.fn(async () => ({ data: {}, error: null })),
 			signOut: vi.fn(async () => ({ error: null })),
 			onAuthStateChange: vi.fn((callback) => {
 				authChange = callback;
@@ -30,6 +30,16 @@ function createClient(options: { session?: boolean; merchant?: boolean; queryErr
 }
 
 describe('auth gateway', () => {
+	it('exchanges a Google credential and nonce without an OAuth redirect', async () => {
+		const { client } = createClient();
+		await createAuthGateway(client).signInWithGoogleIdToken('google-credential', 'nonce');
+		expect(client.auth.signInWithIdToken).toHaveBeenCalledWith({
+			provider: 'google',
+			token: 'google-credential',
+			nonce: 'nonce'
+		});
+	});
+
 	it('returns guest without querying merchants when there is no session', async () => {
 		const { client, from } = createClient();
 		expect(await createAuthGateway(client).restore()).toEqual({ status: 'guest' });

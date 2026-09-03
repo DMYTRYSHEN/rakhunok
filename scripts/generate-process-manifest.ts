@@ -181,15 +181,27 @@ async function workerInventory(configName: string) {
 	};
 }
 
-async function openApiInventory(fileName: string) {
+function serverBasePath(serverUrl: string | undefined): string {
+	if (!serverUrl) return '';
+	try {
+		const pathname = new URL(serverUrl).pathname.replace(/\/$/, '');
+		return pathname === '/' ? '' : pathname;
+	} catch {
+		return '';
+	}
+}
+
+async function openApiInventory(fileName: string, id: string) {
 	const file = resolve(root, fileName);
 	const document = parseYaml(await readFile(file, 'utf8')) as OpenApiDocument;
+	const servers = (document.servers ?? []).map((server: { url: string }) => server.url);
+	const basePath = serverBasePath(servers[0]);
 	const routes = Object.entries(document.paths ?? {}).flatMap(([path, pathItem]) =>
 		Object.entries(pathItem)
 			.filter(([method]) => /^(get|post|put|patch|delete|options|head)$/i.test(method))
 			.map(([method, operation]) => ({
 				method: method.toUpperCase(),
-				path,
+				path: `${basePath}${path}`,
 				operationId: operation.operationId ?? null,
 				summary: operation.summary ?? null,
 				tags: operation.tags ?? [],
@@ -198,10 +210,10 @@ async function openApiInventory(fileName: string) {
 			}))
 	);
 	return {
-		id: 'kso-mobile-api',
+		id,
 		title: document.info?.title ?? fileName,
 		version: String(document.info?.version ?? 'unknown'),
-		servers: (document.servers ?? []).map((server: { url: string }) => server.url),
+		servers,
 		routes
 	};
 }
@@ -209,7 +221,10 @@ async function openApiInventory(fileName: string) {
 const manifest = {
 	schemaVersion: 1,
 	workers: await Promise.all(workerConfigs.map(workerInventory)),
-	contracts: [await openApiInventory('docs/kso-mobile-openapi.yaml')]
+	contracts: [
+		await openApiInventory('docs/openapi.yaml', 'rahunok-edge-api'),
+		await openApiInventory('docs/kso-mobile-openapi.yaml', 'kso-mobile-api')
+	]
 };
 
 await mkdir(dirname(outputFile), { recursive: true });
@@ -220,5 +235,5 @@ const output = await prettier.format(JSON.stringify(manifest), {
 });
 await writeFile(outputFile, output);
 console.log(
-	`Generated ${workspacePath(outputFile)} with ${manifest.workers.length} workers and ${manifest.contracts[0].routes.length} contract routes.`
+	`Generated ${workspacePath(outputFile)} with ${manifest.workers.length} workers and ${manifest.contracts.reduce((total, contract) => total + contract.routes.length, 0)} contract routes.`
 );

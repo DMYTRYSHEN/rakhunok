@@ -17,6 +17,7 @@
 	import X from '@lucide/svelte/icons/x';
 	import UserRound from '@lucide/svelte/icons/user-round';
 	import type { AuthGateway, AuthState } from './auth/auth-gateway';
+	import { createGoogleNonce, loadGoogleIdentityServices } from './auth/google-identity';
 	import type { BusinessEntity, MerchantDataGateway, OrderSummary, Terminal } from './data/merchant-data-gateway';
 	import { evaluateAmount, formatAmount } from './lib/calculator';
 	import PaymentQr from './lib/PaymentQr.svelte';
@@ -50,6 +51,7 @@
 	let authGateway: AuthGateway | null = null;
 	let merchantDataGateway: MerchantDataGateway | null = null;
 	let authBusy = $state(false);
+	let googleLoginMessage = $state('');
 	let structureLoading = $state(false);
 	let structureError = $state('');
 	let entities = $state<BusinessEntity[]>([]);
@@ -111,6 +113,36 @@
 			else activeView = 'kasa';
 		});
 	});
+
+	function initializeGoogleButton(buttonElement: HTMLDivElement) {
+		const clientId = import.meta.env.PUBLIC_GOOGLE_CLIENT_ID?.trim();
+		if (!clientId) {
+			googleLoginMessage = 'Сервіс входу тимчасово недоступний.';
+			return;
+		}
+
+		void Promise.all([loadGoogleIdentityServices(), createGoogleNonce()])
+			.then(([google, nonce]) => {
+				google.accounts.id.initialize({
+					client_id: clientId,
+					nonce: nonce.hashed,
+					callback: (response) => {
+						if (response.credential) void signIn(response.credential, nonce.raw);
+					}
+				});
+				google.accounts.id.renderButton(buttonElement, {
+					type: 'standard',
+					theme: 'outline',
+					size: 'large',
+					text: 'signin_with',
+					shape: 'rectangular',
+					width: 320
+				});
+			})
+			.catch(() => {
+				googleLoginMessage = 'Не вдалося завантажити вхід через Google. Оновіть сторінку.';
+			});
+	}
 
 	onMount(() => {
 		let mounted = true;
@@ -390,13 +422,14 @@
 		if (authState.status === 'ready') void loadStructure(authState.user.id);
 	}
 
-	async function signIn() {
+	async function signIn(credential: string, nonce: string) {
 		if (!authGateway || authBusy) return;
 		authBusy = true;
+		googleLoginMessage = '';
 		try {
-			await authGateway.signInWithGoogle(`${window.location.origin}${import.meta.env.BASE_URL}`);
+			await authGateway.signInWithGoogleIdToken(credential, nonce);
 		} catch {
-			authState = { status: 'error', message: 'Не вдалося увійти через Google.' };
+			googleLoginMessage = 'Не вдалося увійти через Google.';
 			authBusy = false;
 		}
 	}
@@ -530,15 +563,11 @@
 			{#if authState.status === 'loading'}
 				<div class="auth-progress"><span></span><p>Перевіряємо сесію</p></div>
 			{:else if authState.status === 'guest'}
-				<button class="google-button" type="button" onclick={signIn} disabled={authBusy}>
-					<svg viewBox="0 0 24 24" aria-hidden="true">
-						<path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285f4" />
-						<path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34a853" />
-						<path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#fbbc05" />
-						<path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#ea4335" />
-					</svg>
-					{authBusy ? 'Авторизація...' : 'Увійти через Google'}
-				</button>
+				<div class="google-login">
+					<div {@attach initializeGoogleButton} class:invisible={authBusy}></div>
+					{#if authBusy}<p>Авторизація...</p>{/if}
+					{#if googleLoginMessage}<p class="google-login-error" role="alert">{googleLoginMessage}</p>{/if}
+				</div>
 			{:else if authState.status === 'onboarding'}
 				<div class="auth-message">
 					<strong>Бізнес ще не налаштовано</strong>

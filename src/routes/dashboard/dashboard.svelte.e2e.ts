@@ -217,6 +217,7 @@ test('browses, filters, and opens demo invoice details', async ({ page }) => {
 
 	await expect(page).toHaveURL(/\/dashboard\/invoices\?demo=1$/);
 	await expect(page.getByRole('heading', { name: 'Рахунки', exact: true })).toBeVisible();
+	await page.getByRole('combobox', { name: 'Період' }).selectOption('all');
 	await expect(page.getByText('Знайдено:').locator('..')).toContainText('24');
 	await expect(page.getByRole('row')).toHaveCount(11);
 	const cancellation = page.getByRole('button', { name: 'Скасувати' }).first();
@@ -261,6 +262,7 @@ test('keeps invoice routes protected outside demo mode', async ({ page }) => {
 test('renders invoice rows without horizontal scrolling on mobile', async ({ page }) => {
 	await page.setViewportSize({ width: 375, height: 812 });
 	await page.goto('/dashboard/invoices?demo=1');
+	await page.getByRole('combobox', { name: 'Період' }).selectOption('all');
 
 	await expect(page.getByTestId('mobile-invoice-list')).toBeVisible();
 	await expect(page.getByRole('table')).toBeHidden();

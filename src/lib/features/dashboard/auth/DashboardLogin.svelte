@@ -17,6 +17,9 @@
 	let pending = $state(false);
 	let googleButton = $state<HTMLDivElement>();
 	let message = $state<string | null>(null);
+	let resolvedHomeHref = $derived(
+		/^[a-z][a-z\d+.-]*:/i.test(homeHref) ? homeHref : resolve(homeHref as '/')
+	);
 
 	async function handleCredential(credential: string, nonce: string) {
 		if (!onGoogleLogin || pending) return;
@@ -69,13 +72,15 @@
 		class="mx-auto w-full max-w-md overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-[0_24px_80px_rgba(24,24,27,0.08)]"
 	>
 		<div class="border-b border-zinc-200 px-6 py-5">
+			<!-- eslint-disable svelte/no-navigation-without-resolve -- absolute URLs bypass resolve() -->
 			<a
-				href={homeHref}
+				href={resolvedHomeHref}
 				class="inline-flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-zinc-950"
 			>
 				<ArrowLeft size={15} aria-hidden="true" />
 				На головну
 			</a>
+			<!-- eslint-enable svelte/no-navigation-without-resolve -->
 		</div>
 		<div class="p-6 sm:p-8">
 			<div class="grid size-11 place-items-center rounded-md bg-zinc-950 text-white">
@@ -98,9 +103,11 @@
 				<div class="relative mt-7 flex h-11 w-full items-center justify-center">
 					<div bind:this={googleButton} class:invisible={pending}></div>
 					{#if pending}
-						<div class="absolute inset-0 flex items-center justify-center gap-2 text-sm font-semibold text-zinc-700">
-						<LoaderCircle size={18} class="animate-spin" aria-hidden="true" />
-						Вхід…
+						<div
+							class="absolute inset-0 flex items-center justify-center gap-2 text-sm font-semibold text-zinc-700"
+						>
+							<LoaderCircle size={18} class="animate-spin" aria-hidden="true" />
+							Вхід…
 						</div>
 					{/if}
 				</div>

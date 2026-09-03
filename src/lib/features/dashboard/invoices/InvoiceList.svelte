@@ -7,7 +7,15 @@
 	import { buildLegacyInvoiceCancellation } from './invoice-cancellation-contract';
 	import { filterInvoices } from './invoice-filters';
 
-	let { invoices, onCancel, demo = false }: { invoices: InvoiceRecord[]; onCancel?: (invoiceId: string) => Promise<void>; demo?: boolean } = $props();
+	let {
+		invoices,
+		onCancel,
+		demo = false
+	}: {
+		invoices: InvoiceRecord[];
+		onCancel?: (invoiceId: string) => Promise<void>;
+		demo?: boolean;
+	} = $props();
 	let cancellingId = $state<string | null>(null);
 	let actionError = $state<string | null>(null);
 	let search = $state('');
@@ -40,9 +48,13 @@
 		if (!onCancel || cancellingId || !confirm('Скасувати цей рахунок?')) return;
 		cancellingId = invoiceId;
 		actionError = null;
-		try { await onCancel(invoiceId); } catch (error) {
+		try {
+			await onCancel(invoiceId);
+		} catch (error) {
 			actionError = error instanceof Error ? error.message : 'Не вдалося скасувати рахунок.';
-		} finally { cancellingId = null; }
+		} finally {
+			cancellingId = null;
+		}
 	}
 </script>
 
@@ -62,7 +74,12 @@
 	</header>
 
 	<section class="rounded-lg border border-zinc-200 bg-white" aria-label="Реєстр рахунків">
-		{#if actionError}<p class="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{actionError}</p>{/if}
+		{#if actionError}<p
+				class="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+				role="alert"
+			>
+				{actionError}
+			</p>{/if}
 		<div
 			class="grid gap-3 border-b border-zinc-200 p-4 md:grid-cols-[minmax(15rem,1fr)_repeat(3,minmax(8rem,auto))]"
 		>

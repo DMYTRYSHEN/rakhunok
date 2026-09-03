@@ -68,7 +68,9 @@ export function taxIdLabel(legalForm: BusinessLegalForm) {
 }
 
 export function formatInvoiceNumber(rules: InvoiceRules, date: Date = new Date()) {
-	const sequence = Math.max(1, Math.trunc(rules.nextNumber)).toString().padStart(rules.padding, '0');
+	const sequence = Math.max(1, Math.trunc(rules.nextNumber))
+		.toString()
+		.padStart(rules.padding, '0');
 	const parts = [rules.invoicePrefix.trim()];
 	if (rules.resetPeriod === 'yearly' || rules.resetPeriod === 'monthly') {
 		parts.push(String(date.getFullYear()));
@@ -92,7 +94,10 @@ export function formatPaymentPurpose(rules: InvoiceRules, context: InvoiceRuleCo
 	};
 
 	return rules.purposeTemplate
-		.replace(/\{(number|date|scenario|amount|customer|contract|tax)\}/g, (_, key: string) => values[key])
+		.replace(
+			/\{(number|date|scenario|amount|customer|contract|tax)\}/g,
+			(_, key: string) => values[key]
+		)
 		.replace(/\s+/g, ' ')
 		.trim();
 }
@@ -109,13 +114,20 @@ export function validateInvoiceRules(rules: InvoiceRules) {
 
 	if (!rules.invoicePrefix.trim()) issues.push('Додайте префікс рахунку.');
 	if (reference.length > 35) issues.push('Reference перевищує 35 символів для QR формату 003.');
-	if (!Number.isInteger(rules.nextNumber) || rules.nextNumber < 1) issues.push('Наступний номер має бути цілим числом від 1.');
-	if (!Number.isInteger(rules.padding) || rules.padding < 1 || rules.padding > 12) issues.push('Довжина номера має бути від 1 до 12 цифр.');
+	if (!Number.isInteger(rules.nextNumber) || rules.nextNumber < 1)
+		issues.push('Наступний номер має бути цілим числом від 1.');
+	if (!Number.isInteger(rules.padding) || rules.padding < 1 || rules.padding > 12)
+		issues.push('Довжина номера має бути від 1 до 12 цифр.');
 	if (!rules.taxId.trim()) issues.push(`Вкажіть ${taxIdLabel(rules.legalForm)}.`);
 	if (!rules.purposeTemplate.trim()) issues.push('Додайте шаблон призначення платежу.');
-	if (samplePurpose.length > 420) issues.push('Призначення платежу перевищує 420 символів для QR формату 003.');
-	if (!/^[A-Z]{4}\/[A-Z]{4}$/.test(rules.qrCategory)) issues.push('Категорія / ціль має формат CCCC/PPPP.');
-	if (rules.expiryHours !== null && (!Number.isInteger(rules.expiryHours) || rules.expiryHours < 1 || rules.expiryHours > 8760)) {
+	if (samplePurpose.length > 420)
+		issues.push('Призначення платежу перевищує 420 символів для QR формату 003.');
+	if (!/^[A-Z]{4}\/[A-Z]{4}$/.test(rules.qrCategory))
+		issues.push('Категорія / ціль має формат CCCC/PPPP.');
+	if (
+		rules.expiryHours !== null &&
+		(!Number.isInteger(rules.expiryHours) || rules.expiryHours < 1 || rules.expiryHours > 8760)
+	) {
 		issues.push('Строк дії має бути від 1 до 8760 годин або необмеженим.');
 	}
 
@@ -125,7 +137,9 @@ export function validateInvoiceRules(rules: InvoiceRules) {
 export function loadInvoiceRules(): InvoiceRules {
 	if (typeof localStorage === 'undefined') return { ...defaultInvoiceRules };
 	try {
-		const stored = JSON.parse(localStorage.getItem(INVOICE_RULES_STORAGE_KEY) ?? '{}') as Partial<InvoiceRules>;
+		const stored = JSON.parse(
+			localStorage.getItem(INVOICE_RULES_STORAGE_KEY) ?? '{}'
+		) as Partial<InvoiceRules>;
 		return { ...defaultInvoiceRules, ...stored };
 	} catch {
 		return { ...defaultInvoiceRules };

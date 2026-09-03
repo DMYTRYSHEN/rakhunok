@@ -38,14 +38,15 @@ function query(result: QueryResult) {
 
 function createClient(options?: { merchantError?: Error; merchantMissing?: boolean }) {
 	const merchantQuery = query({
-		data: options?.merchantError || options?.merchantMissing
-			? null
-			: {
-					id: 'merchant-1',
-					user_id: 'user-1',
-					business_name: 'Test Business',
-					display_name: 'Test'
-				},
+		data:
+			options?.merchantError || options?.merchantMissing
+				? null
+				: {
+						id: 'merchant-1',
+						user_id: 'user-1',
+						business_name: 'Test Business',
+						display_name: 'Test'
+					},
 		error: options?.merchantError ?? null
 	});
 	const todayQuery = query({
@@ -155,7 +156,9 @@ describe('dashboard gateway', () => {
 			data: { session: { ...session, access_token: 'access-token' } as Session },
 			error: null
 		});
-		const fetcher = vi.fn(async () => new Response(JSON.stringify({ success: true }), { status: 200 }));
+		const fetcher = vi.fn(
+			async () => new Response(JSON.stringify({ success: true }), { status: 200 })
+		);
 
 		await createDashboardGateway(client, {
 			fetcher: fetcher as typeof fetch,
@@ -189,7 +192,9 @@ describe('dashboard gateway', () => {
 		const fetcher = vi
 			.fn()
 			.mockResolvedValueOnce(
-				new Response(JSON.stringify({ success: true, order: { id: 'invoice-new' } }), { status: 201 })
+				new Response(JSON.stringify({ success: true, order: { id: 'invoice-new' } }), {
+					status: 201
+				})
 			)
 			.mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }));
 		const gateway = createDashboardGateway(client, {
@@ -213,7 +218,10 @@ describe('dashboard gateway', () => {
 		expect(fetcher).toHaveBeenNthCalledWith(
 			1,
 			'https://api.example.com/api/v1/orders',
-			expect.objectContaining({ method: 'POST', body: expect.stringContaining('"delivery_fee":20') })
+			expect.objectContaining({
+				method: 'POST',
+				body: expect.stringContaining('"delivery_fee":20')
+			})
 		);
 		expect(fetcher).toHaveBeenNthCalledWith(
 			2,
@@ -241,7 +249,12 @@ describe('dashboard gateway', () => {
 		const gateway = createDashboardGateway(client, { fetcher });
 
 		await expect(
-			gateway.createInvoice({ type: 'fixed', reference: 'INV-1', title: 'Test invoice', amount: 100 })
+			gateway.createInvoice({
+				type: 'fixed',
+				reference: 'INV-1',
+				title: 'Test invoice',
+				amount: 100
+			})
 		).rejects.toThrow('Failed to create order');
 	});
 
@@ -285,10 +298,16 @@ describe('dashboard gateway', () => {
 		} as unknown as SupabaseClient;
 		const gateway = createDashboardGateway(client);
 		const payload = {
-			merchant_id: 'merchant-1', type: 'table' as const, order_number: 'table-1',
-			title: 'POS Стіл (table-1)', base_amount: 100, total_amount: 100,
-			currency: 'UAH' as const, status: 'pending' as const,
-			created_at: '2026-08-26T00:00:00.000Z', terminal_id: 'terminal-1'
+			merchant_id: 'merchant-1',
+			type: 'table' as const,
+			order_number: 'table-1',
+			title: 'POS Стіл (table-1)',
+			base_amount: 100,
+			total_amount: 100,
+			currency: 'UAH' as const,
+			status: 'pending' as const,
+			created_at: '2026-08-26T00:00:00.000Z',
+			terminal_id: 'terminal-1'
 		};
 
 		await gateway.createPosOrder(payload);
@@ -298,7 +317,10 @@ describe('dashboard gateway', () => {
 		expect(insert).toHaveBeenCalledTimes(1);
 		expect(insert).toHaveBeenCalledWith(payload);
 		expect(update).toHaveBeenCalledTimes(2);
-		expect(updateFilters).toEqual([['id', 'order-1'], ['id', 'order-2']]);
+		expect(updateFilters).toEqual([
+			['id', 'order-1'],
+			['id', 'order-2']
+		]);
 	});
 
 	it('writes each structure mutation once and scopes deletes by user and immutable ID', async () => {
@@ -311,17 +333,22 @@ describe('dashboard gateway', () => {
 					deleteFilters.push([`${table}.${column}`, value]);
 					return deleteBuilder;
 				}),
-				then: (resolve: (value: QueryResult) => unknown) => Promise.resolve({ data: null, error: null }).then(resolve)
+				then: (resolve: (value: QueryResult) => unknown) =>
+					Promise.resolve({ data: null, error: null }).then(resolve)
 			};
 			const updateBuilder = {
 				eq: vi.fn((column: string, value: unknown) => {
 					updateFilters.push([`${table}.${column}`, value]);
 					return updateBuilder;
 				}),
-				then: (resolve: (value: QueryResult) => unknown) => Promise.resolve({ data: null, error: null }).then(resolve)
+				then: (resolve: (value: QueryResult) => unknown) =>
+					Promise.resolve({ data: null, error: null }).then(resolve)
 			};
 			return {
-				insert: vi.fn(async (payload: unknown) => { inserts.push([table, payload]); return { error: null }; }),
+				insert: vi.fn(async (payload: unknown) => {
+					inserts.push([table, payload]);
+					return { error: null };
+				}),
 				delete: vi.fn(() => deleteBuilder),
 				update: vi.fn(() => updateBuilder)
 			};
@@ -331,15 +358,41 @@ describe('dashboard gateway', () => {
 			['business_entities', createMutation('business_entities')],
 			['terminals', createMutation('terminals')]
 		]);
-		const client = { from: vi.fn((table: string) => mutations.get(table)) } as unknown as SupabaseClient;
+		const client = {
+			from: vi.fn((table: string) => mutations.get(table))
+		} as unknown as SupabaseClient;
 		const gateway = createDashboardGateway(client);
 
 		await gateway.updateMerchantName('merchant-1', 'Нова назва');
-		await gateway.createBusinessEntity('user-1', { businessType: 'fop', businessName: 'ФОП Тест', displayName: 'Тест', taxId: '1234567890', bankName: 'Банк', iban: 'UA123456789012345678901234567' });
-		await gateway.updateBusinessEntity('user-1', 'entity-1', { businessType: 'tov', businessName: 'ТОВ Тест', displayName: 'Тест 2', taxId: '12345678', bankName: 'Банк', iban: 'UA123456789012345678901234567' });
+		await gateway.createBusinessEntity('user-1', {
+			businessType: 'fop',
+			businessName: 'ФОП Тест',
+			displayName: 'Тест',
+			taxId: '1234567890',
+			bankName: 'Банк',
+			iban: 'UA123456789012345678901234567'
+		});
+		await gateway.updateBusinessEntity('user-1', 'entity-1', {
+			businessType: 'tov',
+			businessName: 'ТОВ Тест',
+			displayName: 'Тест 2',
+			taxId: '12345678',
+			bankName: 'Банк',
+			iban: 'UA123456789012345678901234567'
+		});
 		await gateway.deleteBusinessEntity('user-1', 'entity-1');
-		await gateway.createTerminal('user-1', { entityId: 'entity-1', name: 'Стіл 1', code: 'table-1', type: 'table' });
-		await gateway.updateTerminal('user-1', 'terminal-1', { entityId: 'entity-1', name: 'Стіл 2', code: 'table-2', type: 'table' });
+		await gateway.createTerminal('user-1', {
+			entityId: 'entity-1',
+			name: 'Стіл 1',
+			code: 'table-1',
+			type: 'table'
+		});
+		await gateway.updateTerminal('user-1', 'terminal-1', {
+			entityId: 'entity-1',
+			name: 'Стіл 2',
+			code: 'table-2',
+			type: 'table'
+		});
 		await gateway.deleteTerminal('user-1', 'terminal-1');
 
 		expect(inserts).toHaveLength(2);
@@ -349,13 +402,17 @@ describe('dashboard gateway', () => {
 		expect(mutations.get('business_entities')?.update).toHaveBeenCalledTimes(1);
 		expect(mutations.get('terminals')?.update).toHaveBeenCalledTimes(1);
 		expect(deleteFilters).toEqual([
-			['business_entities.user_id', 'user-1'], ['business_entities.id', 'entity-1'],
-			['terminals.user_id', 'user-1'], ['terminals.id', 'terminal-1']
+			['business_entities.user_id', 'user-1'],
+			['business_entities.id', 'entity-1'],
+			['terminals.user_id', 'user-1'],
+			['terminals.id', 'terminal-1']
 		]);
 		expect(updateFilters).toEqual([
 			['merchants.id', 'merchant-1'],
-			['business_entities.user_id', 'user-1'], ['business_entities.id', 'entity-1'],
-			['terminals.user_id', 'user-1'], ['terminals.id', 'terminal-1']
+			['business_entities.user_id', 'user-1'],
+			['business_entities.id', 'entity-1'],
+			['terminals.user_id', 'user-1'],
+			['terminals.id', 'terminal-1']
 		]);
 	});
 

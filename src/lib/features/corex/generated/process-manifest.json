@@ -22,6 +22,20 @@
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/docs",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/docs/",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
 				}
 			]
 		},
@@ -184,6 +198,225 @@
 	],
 	"contracts": [
 		{
+			"id": "rahunok-edge-api",
+			"title": "Rahunok Edge API & Mobile SDK Specification",
+			"version": "1.1.0",
+			"servers": [
+				"https://rakhunok.com/api/v1",
+				"https://rahunok.dmitrishen.workers.dev/api/v1",
+				"http://localhost:8787/api/v1"
+			],
+			"routes": [
+				{
+					"method": "GET",
+					"path": "/api/v1/health",
+					"operationId": "getHealth",
+					"summary": "Перевірка працездатності сервісу",
+					"tags": ["System"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/auth/config",
+					"operationId": "getAuthConfig",
+					"summary": "Отримати публічну конфігурацію Supabase Auth",
+					"tags": ["Auth"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/auth/demo-session",
+					"operationId": "createDemoSession",
+					"summary": "Створити демонстраційну merchant-сесію",
+					"tags": ["Auth"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/merchant/me",
+					"operationId": "getMerchant",
+					"summary": "Отримати повний профіль та банківські налаштування",
+					"tags": ["Merchant"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/merchant/me",
+					"operationId": "updateMerchant",
+					"summary": "Оновити реквізити або назву бренду",
+					"tags": ["Merchant"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/merchant/onboarding",
+					"operationId": "completeMerchantOnboarding",
+					"summary": "Завершити 3-кроковий онбординг мерчанта",
+					"tags": ["Merchant"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/orders",
+					"operationId": "listOrders",
+					"summary": "Список виставлених рахунків мерчанта з пагінацією та фільтрацією",
+					"tags": ["Orders"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/orders",
+					"operationId": "createOrder",
+					"summary": "Створити новий платіжний рахунок (з генерацією NBU 003 QR та короткого лінка)",
+					"tags": ["Orders"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/orders/{id}",
+					"operationId": "getOrder",
+					"summary": "Отримати інформацію про рахунок за UUID або кодом",
+					"tags": ["Orders"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/orders/{id}",
+					"operationId": "updateOrder",
+					"summary": "Оновити статус або суму рахунку",
+					"tags": ["Orders"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/checkout/{id}",
+					"operationId": "getCheckout",
+					"summary": "Публічні дані рахунку для відкриття чекауту (без авторизації)",
+					"tags": ["Checkout"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/checkout/{id}/initiate",
+					"operationId": "initiateCheckoutPayment",
+					"summary": "Ініціалізувати оплату через обраний банк (генерація Deep Link / Universal Link)",
+					"tags": ["Checkout"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/checkout/{id}/status",
+					"operationId": "getCheckoutStatus",
+					"summary": "Перевірка статусу оплати в реальному часі (Polling)",
+					"tags": ["Checkout"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/checkout/{id}/events",
+					"operationId": "listCheckoutEvents",
+					"summary": "Отримати історію подій чекауту",
+					"tags": ["Checkout"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/checkout/{id}/event",
+					"operationId": "recordCheckoutEvent",
+					"summary": "Записати клієнтську подію життєвого циклу чекауту",
+					"tags": ["Checkout"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/checkout/{id}/apply-promo",
+					"operationId": "applyCheckoutPromo",
+					"summary": "Застосувати промокод до замовлення",
+					"tags": ["Checkout"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/checkout/{id}/delivery",
+					"operationId": "setCheckoutDelivery",
+					"summary": "Зберегти дані доставки Нової Пошти (Сценарій 4)",
+					"tags": ["Checkout"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/banks",
+					"operationId": "listBanks",
+					"summary": "Отримати повний каталог українських банків (із Cloudflare KV кешу)",
+					"tags": ["Banks"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/banks/{idOrCode}",
+					"operationId": "getBank",
+					"summary": "Отримати точну конфігурацію та Deep Link шаблони конкретного банку",
+					"tags": ["Banks"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/logos",
+					"operationId": "listBankLogos",
+					"summary": "Швидкий словник усіх банків з кольорами, логотипами та правилами Universal Links (O(1) lookup)",
+					"tags": ["Banks"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/webhooks/simulate",
+					"operationId": "simulatePaymentWebhook",
+					"summary": "Симуляція банківської оплати (Sandbox)",
+					"tags": ["Webhooks"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/webhooks/{bankCode}",
+					"operationId": "receiveBankWebhook",
+					"summary": "Прийом вебхуків від банків (Monobank, PrivatBank тощо)",
+					"tags": ["Webhooks"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/stats/summary",
+					"operationId": "getStatsSummary",
+					"summary": "Загальна статистика продажів мерчанта",
+					"tags": ["Analytics"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				}
+			]
+		},
+		{
 			"id": "kso-mobile-api",
 			"title": "Rahunok KSO and Mobile API",
 			"version": "0.1.0",
@@ -191,7 +424,7 @@
 			"routes": [
 				{
 					"method": "POST",
-					"path": "/kso/customer-sessions",
+					"path": "/api/v1/kso/customer-sessions",
 					"operationId": "createKsoCustomerSession",
 					"summary": "Resolve or register customer context for a KSO session",
 					"tags": ["KSO customer"],
@@ -200,7 +433,7 @@
 				},
 				{
 					"method": "POST",
-					"path": "/kso/customer-sessions/{session_id}/quote",
+					"path": "/api/v1/kso/customer-sessions/{session_id}/quote",
 					"operationId": "quoteKsoBasket",
 					"summary": "Obtain a network-authoritative loyalty quote",
 					"tags": ["KSO customer"],
@@ -209,7 +442,7 @@
 				},
 				{
 					"method": "POST",
-					"path": "/kso/checkout-requests",
+					"path": "/api/v1/kso/checkout-requests",
 					"operationId": "createKsoCheckoutRequest",
 					"summary": "Create a guest, loyalty, or mobile-push checkout",
 					"tags": ["KSO checkout"],
@@ -218,7 +451,7 @@
 				},
 				{
 					"method": "GET",
-					"path": "/kso/checkout-requests/{checkout_request_id}",
+					"path": "/api/v1/kso/checkout-requests/{checkout_request_id}",
 					"operationId": "getKsoCheckoutRequest",
 					"summary": "Get payment, loyalty, and link status",
 					"tags": ["KSO checkout"],
@@ -227,7 +460,7 @@
 				},
 				{
 					"method": "POST",
-					"path": "/kso/checkout-requests/{checkout_request_id}/cancel",
+					"path": "/api/v1/kso/checkout-requests/{checkout_request_id}/cancel",
 					"operationId": "cancelKsoCheckoutRequest",
 					"summary": "Cancel an unpaid checkout",
 					"tags": ["KSO checkout"],
@@ -236,7 +469,7 @@
 				},
 				{
 					"method": "PUT",
-					"path": "/kso/terminals/{terminal_id}/active-checkout",
+					"path": "/api/v1/kso/terminals/{terminal_id}/active-checkout",
 					"operationId": "assignTerminalCheckout",
 					"summary": "Assign a checkout to the terminal's static NFC resolver",
 					"tags": ["KSO checkout"],
@@ -245,7 +478,7 @@
 				},
 				{
 					"method": "POST",
-					"path": "/mobile/devices",
+					"path": "/api/v1/mobile/devices",
 					"operationId": "registerMobileDevice",
 					"summary": "Register or rotate a mobile push token",
 					"tags": ["Mobile devices"],
@@ -254,7 +487,7 @@
 				},
 				{
 					"method": "GET",
-					"path": "/mobile/identity-token",
+					"path": "/api/v1/mobile/identity-token",
 					"operationId": "getMobileIdentityToken",
 					"summary": "Get the opaque token displayed as QR or Wallet identity",
 					"tags": ["Mobile devices"],
@@ -263,7 +496,7 @@
 				},
 				{
 					"method": "POST",
-					"path": "/mobile/identity-token",
+					"path": "/api/v1/mobile/identity-token",
 					"operationId": "rotateMobileIdentityToken",
 					"summary": "Rotate the opaque customer identity token",
 					"tags": ["Mobile devices"],
@@ -272,7 +505,7 @@
 				},
 				{
 					"method": "GET",
-					"path": "/mobile/payment-requests",
+					"path": "/api/v1/mobile/payment-requests",
 					"operationId": "listMobilePaymentRequests",
 					"summary": "List payment requests for the authenticated customer",
 					"tags": ["Mobile payments"],
@@ -281,7 +514,7 @@
 				},
 				{
 					"method": "GET",
-					"path": "/mobile/payment-requests/{payment_request_id}",
+					"path": "/api/v1/mobile/payment-requests/{payment_request_id}",
 					"operationId": "getMobilePaymentRequest",
 					"summary": "Get an authenticated payment request",
 					"tags": ["Mobile payments"],
@@ -290,7 +523,7 @@
 				},
 				{
 					"method": "POST",
-					"path": "/mobile/payment-requests/{payment_request_id}/open-checkout",
+					"path": "/api/v1/mobile/payment-requests/{payment_request_id}/open-checkout",
 					"operationId": "openMobileCheckout",
 					"summary": "Create a single-use handoff to the existing checkout",
 					"tags": ["Mobile payments"],
@@ -299,7 +532,7 @@
 				},
 				{
 					"method": "POST",
-					"path": "/mobile/payment-requests/{payment_request_id}/decline",
+					"path": "/api/v1/mobile/payment-requests/{payment_request_id}/decline",
 					"operationId": "declineMobilePaymentRequest",
 					"summary": "Decline a pending payment request",
 					"tags": ["Mobile payments"],

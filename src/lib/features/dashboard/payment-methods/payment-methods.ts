@@ -28,7 +28,9 @@ export function validatePaymentMethodsConfig(config: PaymentMethodsConfig) {
 		issues.push('Додайте POS_ID з кабінету Tranzzo.');
 	}
 	if (!canRequestWallets(config) && config.requestedWallets.length > 0) {
-		issues.push('Apple Pay і Google Pay можна запитати після активації акаунта та додавання POS_ID.');
+		issues.push(
+			'Apple Pay і Google Pay можна запитати після активації акаунта та додавання POS_ID.'
+		);
 	}
 	return issues;
 }

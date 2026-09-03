@@ -53,10 +53,11 @@ export function createAuthGateway(client: SupabaseClient) {
 			};
 		},
 
-		async signInWithGoogle(redirectTo: string): Promise<void> {
-			const { error } = await client.auth.signInWithOAuth({
+		async signInWithGoogleIdToken(token: string, nonce: string): Promise<void> {
+			const { error } = await client.auth.signInWithIdToken({
 				provider: 'google',
-				options: { redirectTo }
+				token,
+				nonce
 			});
 			if (error) throw error;
 		},

@@ -84,7 +84,13 @@ describe('legacy POS order contract', () => {
 		const draft = { ...createPosDraft(), inputAmount: '100' };
 
 		expect(
-			decideLegacyPosOrderCreation('merchant-1', terminal, draft, [], new Date('2026-08-26T09:30:00.000Z'))
+			decideLegacyPosOrderCreation(
+				'merchant-1',
+				terminal,
+				draft,
+				[],
+				new Date('2026-08-26T09:30:00.000Z')
+			)
 		).toMatchObject({
 			status: 'ready',
 			payload: {

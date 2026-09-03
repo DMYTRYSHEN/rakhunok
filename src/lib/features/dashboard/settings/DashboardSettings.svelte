@@ -68,8 +68,12 @@
 						: 'border-zinc-200 hover:border-zinc-300'}"
 				>
 					<div class="h-32 bg-[#f4f5f6] p-4">
-						<div class="flex h-full overflow-hidden rounded-md border border-zinc-200 bg-white shadow-sm">
-							<div class="w-12 bg-[#151717] p-2"><div class="size-3 rounded-sm bg-[#c9ff4a]"></div></div>
+						<div
+							class="flex h-full overflow-hidden rounded-md border border-zinc-200 bg-white shadow-sm"
+						>
+							<div class="w-12 bg-[#151717] p-2">
+								<div class="size-3 rounded-sm bg-[#c9ff4a]"></div>
+							</div>
 							<div class="flex-1 p-3">
 								<div class="h-2 w-16 rounded bg-zinc-300"></div>
 								<div class="mt-3 grid grid-cols-2 gap-2">
@@ -80,12 +84,16 @@
 						</div>
 					</div>
 					<div class="flex items-start gap-3 border-t border-zinc-200 p-4">
-						<span class="grid size-9 shrink-0 place-items-center rounded-md bg-amber-50 text-amber-700">
+						<span
+							class="grid size-9 shrink-0 place-items-center rounded-md bg-amber-50 text-amber-700"
+						>
 							<Sun size={18} aria-hidden="true" />
 						</span>
 						<span class="min-w-0 flex-1">
 							<strong class="block text-sm">Світла</strong>
-							<span class="mt-0.5 block text-xs leading-5 text-zinc-500">Чистий контраст для роботи вдень</span>
+							<span class="mt-0.5 block text-xs leading-5 text-zinc-500"
+								>Чистий контраст для роботи вдень</span
+							>
 						</span>
 						{#if theme === 'light'}
 							<span class="grid size-6 place-items-center rounded-full bg-blue-600 text-white">
@@ -99,11 +107,18 @@
 					type="button"
 					onclick={() => applyTheme('dark')}
 					aria-pressed={theme === 'dark'}
-					class="group overflow-hidden rounded-lg border-2 text-left transition-colors {theme === 'dark' ? 'border-blue-600' : 'border-zinc-200 hover:border-zinc-300'}"
+					class="group overflow-hidden rounded-lg border-2 text-left transition-colors {theme ===
+					'dark'
+						? 'border-blue-600'
+						: 'border-zinc-200 hover:border-zinc-300'}"
 				>
 					<div class="h-32 bg-[#191b1c] p-4">
-						<div class="flex h-full overflow-hidden rounded-md border border-zinc-700 bg-[#242627] shadow-sm">
-							<div class="w-12 bg-black p-2"><div class="size-3 rounded-sm bg-[#c9ff4a]"></div></div>
+						<div
+							class="flex h-full overflow-hidden rounded-md border border-zinc-700 bg-[#242627] shadow-sm"
+						>
+							<div class="w-12 bg-black p-2">
+								<div class="size-3 rounded-sm bg-[#c9ff4a]"></div>
+							</div>
 							<div class="flex-1 p-3">
 								<div class="h-2 w-16 rounded bg-zinc-600"></div>
 								<div class="mt-3 grid grid-cols-2 gap-2">
@@ -114,14 +129,21 @@
 						</div>
 					</div>
 					<div class="flex items-start gap-3 border-t border-zinc-200 p-4">
-						<span class="grid size-9 shrink-0 place-items-center rounded-md bg-zinc-900 text-zinc-100">
+						<span
+							class="grid size-9 shrink-0 place-items-center rounded-md bg-zinc-900 text-zinc-100"
+						>
 							<Moon size={18} aria-hidden="true" />
 						</span>
 						<span class="min-w-0 flex-1">
 							<strong class="block text-sm">Темна</strong>
-							<span class="mt-0.5 block text-xs leading-5 text-zinc-500">Менше яскравості у вечірню зміну</span>
+							<span class="mt-0.5 block text-xs leading-5 text-zinc-500"
+								>Менше яскравості у вечірню зміну</span
+							>
 						</span>
-						{#if theme === 'dark'}<span class="grid size-6 place-items-center rounded-full bg-blue-600 text-white"><Check size={14} strokeWidth={3} aria-hidden="true" /></span>{/if}
+						{#if theme === 'dark'}<span
+								class="grid size-6 place-items-center rounded-full bg-blue-600 text-white"
+								><Check size={14} strokeWidth={3} aria-hidden="true" /></span
+							>{/if}
 					</div>
 				</button>
 			</div>
@@ -130,14 +152,19 @@
 		<section class="rounded-lg border border-zinc-200 bg-white">
 			<div class="border-b border-zinc-200 px-5 py-5 sm:px-6">
 				<div class="flex items-start gap-3">
-					<span class="grid size-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700">
+					<span
+						class="grid size-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700"
+					>
 						<Clock3 size={19} aria-hidden="true" />
 					</span>
 					<div>
-						<p class="text-xs font-bold tracking-[0.12em] text-zinc-500 uppercase">Ресторан і термінали</p>
+						<p class="text-xs font-bold tracking-[0.12em] text-zinc-500 uppercase">
+							Ресторан і термінали
+						</p>
 						<h2 class="mt-1 text-base font-extrabold">Час активності столика</h2>
 						<p class="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">
-							Скільки часу призначена сума залишається актуальною до повернення столика в режим очікування.
+							Скільки часу призначена сума залишається актуальною до повернення столика в режим
+							очікування.
 						</p>
 					</div>
 				</div>
@@ -147,10 +174,18 @@
 				<fieldset>
 					<legend class="text-sm font-bold">Тривалість сесії</legend>
 					<div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-						{#each ttlOptions as option}
+						{#each ttlOptions as option (option.value)}
 							<label class="cursor-pointer">
-								<input class="peer sr-only" type="radio" name="table-ttl" value={option.value} bind:group={tableTtl} />
-								<span class="block rounded-md border border-zinc-200 px-4 py-3 peer-checked:border-blue-600 peer-checked:bg-blue-50">
+								<input
+									class="peer sr-only"
+									type="radio"
+									name="table-ttl"
+									value={option.value}
+									bind:group={tableTtl}
+								/>
+								<span
+									class="block rounded-md border border-zinc-200 px-4 py-3 peer-checked:border-blue-600 peer-checked:bg-blue-50"
+								>
 									<strong class="block text-sm">{option.label}</strong>
 									<span class="mt-1 block text-xs text-zinc-500">{option.detail}</span>
 								</span>
@@ -159,15 +194,20 @@
 					</div>
 				</fieldset>
 
-				<div class="mt-6 flex flex-col gap-3 border-t border-zinc-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-					<p class="text-xs text-zinc-500">Поточне значення: {savedTtl} хвилин. Застосовується до нових рахунків за столиком.</p>
+				<div
+					class="mt-6 flex flex-col gap-3 border-t border-zinc-200 pt-5 sm:flex-row sm:items-center sm:justify-between"
+				>
+					<p class="text-xs text-zinc-500">
+						Поточне значення: {savedTtl} хвилин. Застосовується до нових рахунків за столиком.
+					</p>
 					<button
 						type="button"
 						disabled={tableTtl === savedTtl}
 						onclick={saveTtl}
 						class="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-blue-600 px-5 text-sm font-extrabold text-white hover:bg-blue-700 disabled:bg-zinc-200 disabled:text-zinc-500"
 					>
-						<Save size={17} aria-hidden="true" /> {saved ? 'Збережено' : 'Зберегти'}
+						<Save size={17} aria-hidden="true" />
+						{saved ? 'Збережено' : 'Зберегти'}
 					</button>
 				</div>
 			</div>

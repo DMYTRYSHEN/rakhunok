@@ -1,0 +1,396 @@
+{
+  "contract": "docs/openapi.yaml",
+  "generatedAt": "2026-09-03T17:39:49.249Z",
+  "summary": {
+    "openApiOperations": 23,
+    "implementedOperations": 23,
+    "consumedOperations": 8,
+    "documentedConsumedOperations": 8,
+    "missingConsumedOperations": 0,
+    "consumedButNotImplemented": 0,
+    "implementedButUndocumented": 0,
+    "documentedButNotImplemented": 0,
+    "operationsWithoutOperationId": 0,
+    "directSupabaseDependencies": 6
+  },
+  "consumedOperations": [
+    {
+      "key": "POST /api/v1/merchant/onboarding",
+      "documented": true,
+      "implemented": true,
+      "operationId": "completeMerchantOnboarding",
+      "consumers": [
+        "dashboard"
+      ],
+      "sources": [
+        "src/lib/features/dashboard/api/dashboard-gateway.ts"
+      ]
+    },
+    {
+      "key": "POST /api/v1/orders",
+      "documented": true,
+      "implemented": true,
+      "operationId": "createOrder",
+      "consumers": [
+        "dashboard",
+        "merchant-app"
+      ],
+      "sources": [
+        "src/lib/features/dashboard/api/dashboard-gateway.ts",
+        "apps/merchant-app/src/data/merchant-data-gateway.ts"
+      ]
+    },
+    {
+      "key": "PATCH /api/v1/orders/{}",
+      "documented": true,
+      "implemented": true,
+      "operationId": "updateOrder",
+      "consumers": [
+        "dashboard",
+        "merchant-app"
+      ],
+      "sources": [
+        "src/lib/features/dashboard/api/dashboard-gateway.ts",
+        "apps/merchant-app/src/data/merchant-data-gateway.ts"
+      ]
+    },
+    {
+      "key": "GET /api/v1/checkout/{}/events",
+      "documented": true,
+      "implemented": true,
+      "operationId": "listCheckoutEvents",
+      "consumers": [
+        "dashboard"
+      ],
+      "sources": [
+        "src/lib/features/dashboard/api/dashboard-gateway.ts"
+      ]
+    },
+    {
+      "key": "GET /api/v1/checkout/{}",
+      "documented": true,
+      "implemented": true,
+      "operationId": "getCheckout",
+      "consumers": [
+        "checkout"
+      ],
+      "sources": [
+        "apps/checkout/js/checkout-api.js",
+        "apps/checkout/js/app.js"
+      ]
+    },
+    {
+      "key": "POST /api/v1/checkout/{}/initiate",
+      "documented": true,
+      "implemented": true,
+      "operationId": "initiateCheckoutPayment",
+      "consumers": [
+        "checkout"
+      ],
+      "sources": [
+        "apps/checkout/js/deep-link.js"
+      ]
+    },
+    {
+      "key": "GET /api/v1/checkout/{}/status",
+      "documented": true,
+      "implemented": true,
+      "operationId": "getCheckoutStatus",
+      "consumers": [
+        "checkout"
+      ],
+      "sources": [
+        "apps/checkout/js/status-poller.js"
+      ]
+    },
+    {
+      "key": "GET /api/v1/banks",
+      "documented": true,
+      "implemented": true,
+      "operationId": "listBanks",
+      "consumers": [
+        "checkout"
+      ],
+      "sources": [
+        "apps/checkout/js/bank-carousel.js"
+      ]
+    }
+  ],
+  "implementedOperations": [
+    {
+      "method": "GET",
+      "path": "/api/v1/health",
+      "source": "../core/worker/src/index.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/config",
+      "source": "../core/worker/src/routes/auth.ts"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/demo-session",
+      "source": "../core/worker/src/routes/auth.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/merchant/me",
+      "source": "../core/worker/src/routes/merchants.ts"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/merchant/me",
+      "source": "../core/worker/src/routes/merchants.ts"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/merchant/onboarding",
+      "source": "../core/worker/src/routes/merchants.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orders",
+      "source": "../core/worker/src/routes/orders.ts"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orders",
+      "source": "../core/worker/src/routes/orders.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orders/{id}",
+      "source": "../core/worker/src/routes/orders.ts"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/orders/{id}",
+      "source": "../core/worker/src/routes/orders.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/checkout/{id}",
+      "source": "../core/worker/src/routes/checkout.ts"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/checkout/{id}/event",
+      "source": "../core/worker/src/routes/checkout.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/checkout/{id}/events",
+      "source": "../core/worker/src/routes/checkout.ts"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/checkout/{id}/initiate",
+      "source": "../core/worker/src/routes/checkout.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/checkout/{id}/status",
+      "source": "../core/worker/src/routes/checkout.ts"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/checkout/{id}/apply-promo",
+      "source": "../core/worker/src/routes/checkout.ts"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/checkout/{id}/delivery",
+      "source": "../core/worker/src/routes/checkout.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/banks",
+      "source": "../core/worker/src/routes/banks.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/banks/{idOrCode}",
+      "source": "../core/worker/src/routes/banks.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logos",
+      "source": "../core/worker/src/routes/logos.ts"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/webhooks/simulate",
+      "source": "../core/worker/src/routes/webhooks.ts",
+      "availability": "development-only"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/webhooks/{bankCode}",
+      "source": "../core/worker/src/routes/webhooks.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stats/summary",
+      "source": "../core/worker/src/routes/stats.ts"
+    }
+  ],
+  "implementedButUndocumented": [],
+  "documentedButNotImplemented": [],
+  "implementationAliases": [
+    {
+      "method": "POST",
+      "path": "/api/v1/checkout/{id}/pay",
+      "canonicalOperation": "POST /api/v1/checkout/{id}/initiate",
+      "source": "../core/worker/src/routes/checkout.ts"
+    }
+  ],
+  "openApiOnlyOperations": [
+    {
+      "method": "GET",
+      "path": "/api/v1/health",
+      "operationId": "getHealth",
+      "summary": "Перевірка працездатності сервісу"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/config",
+      "operationId": "getAuthConfig",
+      "summary": "Отримати публічну конфігурацію Supabase Auth"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/demo-session",
+      "operationId": "createDemoSession",
+      "summary": "Створити демонстраційну merchant-сесію"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/merchant/me",
+      "operationId": "getMerchant",
+      "summary": "Отримати повний профіль та банківські налаштування"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/merchant/me",
+      "operationId": "updateMerchant",
+      "summary": "Оновити реквізити або назву бренду"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orders",
+      "operationId": "listOrders",
+      "summary": "Список виставлених рахунків мерчанта з пагінацією та фільтрацією"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orders/{id}",
+      "operationId": "getOrder",
+      "summary": "Отримати інформацію про рахунок за UUID або кодом"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/checkout/{id}/event",
+      "operationId": "recordCheckoutEvent",
+      "summary": "Записати клієнтську подію життєвого циклу чекауту"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/checkout/{id}/apply-promo",
+      "operationId": "applyCheckoutPromo",
+      "summary": "Застосувати промокод до замовлення"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/checkout/{id}/delivery",
+      "operationId": "setCheckoutDelivery",
+      "summary": "Зберегти дані доставки Нової Пошти (Сценарій 4)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/banks/{idOrCode}",
+      "operationId": "getBank",
+      "summary": "Отримати точну конфігурацію та Deep Link шаблони конкретного банку"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logos",
+      "operationId": "listBankLogos",
+      "summary": "Швидкий словник усіх банків з кольорами, логотипами та правилами Universal Links (O(1) lookup)"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/webhooks/simulate",
+      "operationId": "simulatePaymentWebhook",
+      "summary": "Симуляція банківської оплати (Sandbox)"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/webhooks/{bankCode}",
+      "operationId": "receiveBankWebhook",
+      "summary": "Прийом вебхуків від банків (Monobank, PrivatBank тощо)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stats/summary",
+      "operationId": "getStatsSummary",
+      "summary": "Загальна статистика продажів мерчанта"
+    }
+  ],
+  "directSupabaseDependencies": [
+    {
+      "consumer": "dashboard",
+      "resource": "auth.session",
+      "source": "src/lib/features/dashboard/api/dashboard-gateway.ts"
+    },
+    {
+      "consumer": "dashboard",
+      "resource": "business_entities",
+      "source": "src/lib/features/dashboard/api/dashboard-gateway.ts"
+    },
+    {
+      "consumer": "dashboard",
+      "resource": "merchants",
+      "source": "src/lib/features/dashboard/api/dashboard-gateway.ts"
+    },
+    {
+      "consumer": "dashboard",
+      "resource": "order_events",
+      "source": "src/lib/features/dashboard/api/dashboard-gateway.ts"
+    },
+    {
+      "consumer": "dashboard",
+      "resource": "orders",
+      "source": "src/lib/features/dashboard/api/dashboard-gateway.ts"
+    },
+    {
+      "consumer": "dashboard",
+      "resource": "terminals",
+      "source": "src/lib/features/dashboard/api/dashboard-gateway.ts"
+    },
+    {
+      "consumer": "merchant-app",
+      "resource": "auth.session",
+      "source": "apps/merchant-app/src/auth/auth-gateway.ts"
+    },
+    {
+      "consumer": "merchant-app",
+      "resource": "business_entities",
+      "source": "apps/merchant-app/src/data/merchant-data-gateway.ts"
+    },
+    {
+      "consumer": "merchant-app",
+      "resource": "merchants",
+      "source": "apps/merchant-app/src/auth/auth-gateway.ts"
+    },
+    {
+      "consumer": "merchant-app",
+      "resource": "orders",
+      "source": "apps/merchant-app/src/data/merchant-data-gateway.ts"
+    },
+    {
+      "consumer": "merchant-app",
+      "resource": "terminals",
+      "source": "apps/merchant-app/src/data/merchant-data-gateway.ts"
+    }
+  ]
+}

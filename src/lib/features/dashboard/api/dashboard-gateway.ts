@@ -16,8 +16,8 @@ import type {
 	OverviewSnapshot,
 	PosActiveOrder,
 	PosBoard,
-	PosTerminal
-	, TerminalInput
+	PosTerminal,
+	TerminalInput
 } from '../types';
 import { formatMoney } from '../utils/format';
 import type { LegacyPosOrderInsert } from '../pos/pos-order-contract';
@@ -114,13 +114,7 @@ export type DashboardGateway = {
 };
 
 export type DashboardRealtimeResource =
-	| 'overview'
-	| 'invoices'
-	| 'invoice'
-	| 'events'
-	| 'pos'
-	| 'structure'
-	| 'terminals';
+	'overview' | 'invoices' | 'invoice' | 'events' | 'pos' | 'structure' | 'terminals';
 
 export type DashboardRealtimeScope =
 	| { view: 'overview'; userId: string; merchantId: string }
@@ -338,7 +332,9 @@ export function createDashboardGateway(
 				}
 			});
 		} catch {
-			throw new Error('API рахунків недоступне. Перевірте підключення або запуск локального Worker.');
+			throw new Error(
+				'API рахунків недоступне. Перевірте підключення або запуск локального Worker.'
+			);
 		}
 		if (!response.ok) {
 			const payload = (await response.json().catch(() => null)) as {
@@ -346,9 +342,13 @@ export function createDashboardGateway(
 				message?: string;
 				details?: { message?: string } | string;
 			} | null;
-			const details = typeof payload?.details === 'string' ? payload.details : payload?.details?.message;
+			const details =
+				typeof payload?.details === 'string' ? payload.details : payload?.details?.message;
 			throw new Error(
-				payload?.message || (typeof payload?.error === 'string' ? payload.error : null) || details || 'Запит не виконано.'
+				payload?.message ||
+					(typeof payload?.error === 'string' ? payload.error : null) ||
+					details ||
+					'Запит не виконано.'
 			);
 		}
 		return response;
@@ -494,19 +494,25 @@ export function createDashboardGateway(
 		},
 
 		async cancelPosOrder(orderId) {
-			const result = await client
-				.from('orders')
-				.update({ status: 'cancelled' })
-				.eq('id', orderId);
+			const result = await client.from('orders').update({ status: 'cancelled' }).eq('id', orderId);
 			if (result.error) throw new Error('Не вдалося скасувати POS-замовлення.');
 		},
 
 		async getBusinessStructure(userId) {
 			const [entityResult, terminalResult] = await Promise.all([
-				client.from('business_entities').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-				client.from('terminals').select('id, name, code, type, entity_id, is_active').eq('user_id', userId).order('created_at', { ascending: false })
+				client
+					.from('business_entities')
+					.select('*')
+					.eq('user_id', userId)
+					.order('created_at', { ascending: false }),
+				client
+					.from('terminals')
+					.select('id, name, code, type, entity_id, is_active')
+					.eq('user_id', userId)
+					.order('created_at', { ascending: false })
 			]);
-			if (entityResult.error || terminalResult.error) throw new Error('Не вдалося завантажити структуру бізнесу.');
+			if (entityResult.error || terminalResult.error)
+				throw new Error('Не вдалося завантажити структуру бізнесу.');
 			return {
 				entities: ((entityResult.data ?? []) as BusinessEntityRow[]).map(mapBusinessEntity),
 				terminals: ((terminalResult.data ?? []) as TerminalRow[]).map(mapPosTerminal)
@@ -514,50 +520,87 @@ export function createDashboardGateway(
 		},
 
 		async updateMerchantName(merchantId, name) {
-			const result = await client.from('merchants').update({ business_name: name, display_name: name }).eq('id', merchantId);
+			const result = await client
+				.from('merchants')
+				.update({ business_name: name, display_name: name })
+				.eq('id', merchantId);
 			if (result.error) throw new Error('Не вдалося зберегти назву бізнесу.');
 		},
 
 		async createBusinessEntity(userId, input) {
 			const result = await client.from('business_entities').insert({
-				user_id: userId, business_type: input.businessType, business_name: input.businessName,
-				display_name: input.displayName, tax_id: input.taxId, bank_name: input.bankName,
-				iban: input.iban, is_active: true
+				user_id: userId,
+				business_type: input.businessType,
+				business_name: input.businessName,
+				display_name: input.displayName,
+				tax_id: input.taxId,
+				bank_name: input.bankName,
+				iban: input.iban,
+				is_active: true
 			});
 			if (result.error) throw new Error('Не вдалося створити юридичну особу.');
 		},
 
 		async updateBusinessEntity(userId, entityId, input) {
-			const result = await client.from('business_entities').update({
-				business_type: input.businessType, business_name: input.businessName,
-				display_name: input.displayName, tax_id: input.taxId, bank_name: input.bankName,
-				iban: input.iban
-			}).eq('user_id', userId).eq('id', entityId);
+			const result = await client
+				.from('business_entities')
+				.update({
+					business_type: input.businessType,
+					business_name: input.businessName,
+					display_name: input.displayName,
+					tax_id: input.taxId,
+					bank_name: input.bankName,
+					iban: input.iban
+				})
+				.eq('user_id', userId)
+				.eq('id', entityId);
 			if (result.error) throw new Error('Не вдалося оновити юридичну особу.');
 		},
 
 		async deleteBusinessEntity(userId, entityId) {
-			const result = await client.from('business_entities').delete().eq('user_id', userId).eq('id', entityId);
-			if (result.error) throw new Error('Не вдалося видалити юридичну особу. Перевірте пов’язані термінали.');
+			const result = await client
+				.from('business_entities')
+				.delete()
+				.eq('user_id', userId)
+				.eq('id', entityId);
+			if (result.error)
+				throw new Error('Не вдалося видалити юридичну особу. Перевірте пов’язані термінали.');
 		},
 
 		async createTerminal(userId, input) {
 			const result = await client.from('terminals').insert({
-				user_id: userId, entity_id: input.entityId, name: input.name, code: input.code,
-				type: input.type, is_active: true
+				user_id: userId,
+				entity_id: input.entityId,
+				name: input.name,
+				code: input.code,
+				type: input.type,
+				is_active: true
 			});
-			if (result.error) throw new Error('Не вдалося створити робоче місце. Код має бути унікальним.');
+			if (result.error)
+				throw new Error('Не вдалося створити робоче місце. Код має бути унікальним.');
 		},
 
 		async updateTerminal(userId, terminalId, input) {
-			const result = await client.from('terminals').update({
-				entity_id: input.entityId, name: input.name, code: input.code, type: input.type
-			}).eq('user_id', userId).eq('id', terminalId);
-			if (result.error) throw new Error('Не вдалося оновити робоче місце. Код має бути унікальним.');
+			const result = await client
+				.from('terminals')
+				.update({
+					entity_id: input.entityId,
+					name: input.name,
+					code: input.code,
+					type: input.type
+				})
+				.eq('user_id', userId)
+				.eq('id', terminalId);
+			if (result.error)
+				throw new Error('Не вдалося оновити робоче місце. Код має бути унікальним.');
 		},
 
 		async deleteTerminal(userId, terminalId) {
-			const result = await client.from('terminals').delete().eq('user_id', userId).eq('id', terminalId);
+			const result = await client
+				.from('terminals')
+				.delete()
+				.eq('user_id', userId)
+				.eq('id', terminalId);
 			if (result.error) throw new Error('Не вдалося видалити робоче місце.');
 		},
 

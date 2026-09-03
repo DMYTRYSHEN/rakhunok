@@ -560,7 +560,7 @@ const deploy: FlowScenario = {
 	edges: deployEdges
 };
 
-export const flowScenarios: FlowScenario[] = [
+export const rahunokFlowScenarios: FlowScenario[] = [
 	login,
 	...extendedFlowScenarios,
 	invoiceScenario('fixed'),
@@ -569,6 +569,7 @@ export const flowScenarios: FlowScenario[] = [
 	payment,
 	ksoSandboxScenario,
 	ksoTargetScenario,
-	...generatedFlowScenarios,
 	deploy
 ];
+
+export const flowScenarios: FlowScenario[] = [...rahunokFlowScenarios, ...generatedFlowScenarios];

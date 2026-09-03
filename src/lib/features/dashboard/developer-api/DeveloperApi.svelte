@@ -8,6 +8,7 @@
 		ReceiptText,
 		TerminalSquare
 	} from '@lucide/svelte';
+	import { resolve } from '$app/paths';
 
 	type Endpoint = {
 		id: 'list' | 'create' | 'get' | 'update' | 'stats';
@@ -89,13 +90,11 @@
 
 	let selectedId = $state<Endpoint['id']>('create');
 	let copied = $state(false);
-	let apiBase = $state(apiPath);
+	let apiBase = $derived(
+		typeof window === 'undefined' ? apiPath : `${window.location.origin}${apiPath}`
+	);
 	let selected = $derived(endpoints.find((endpoint) => endpoint.id === selectedId) ?? endpoints[1]);
 	let selectedExample = $derived(selected.example(apiBase));
-
-	$effect(() => {
-		apiBase = `${window.location.origin}${apiPath}`;
-	});
 
 	async function copyExample() {
 		await navigator.clipboard.writeText(selectedExample);
@@ -108,11 +107,13 @@
 	<header class="border-b border-zinc-200 pb-7">
 		<div>
 			<div>
-				<p class="text-xs font-bold tracking-[0.14em] text-blue-700 uppercase">OpenAPI 3.1 · v1.1.0</p>
+				<p class="text-xs font-bold tracking-[0.14em] text-blue-700 uppercase">
+					OpenAPI 3.1 · v1.1.0
+				</p>
 				<h1 class="mt-2 text-2xl font-extrabold sm:text-3xl">API для розробників</h1>
 				<p class="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
-					Чинний контракт для створення рахунків, керування їхнім станом і отримання
-					статистики продавця.
+					Чинний контракт для створення рахунків, керування їхнім станом і отримання статистики
+					продавця.
 				</p>
 			</div>
 		</div>
@@ -122,28 +123,48 @@
 		<section class="min-w-0 space-y-5">
 			<div class="rounded-lg border border-zinc-200 bg-white p-5 sm:p-6">
 				<div class="flex items-start gap-3">
-					<span class="grid size-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700"><KeyRound size={18} /></span>
+					<span class="grid size-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700"
+						><KeyRound size={18} /></span
+					>
 					<div>
 						<h2 class="text-base font-extrabold">Bearer-авторизація</h2>
-						<p class="mt-1 text-sm leading-6 text-zinc-500">Захищені merchant endpoints приймають JWT, отриманий під час входу, у заголовку Authorization. Не передавайте токен у query-параметрах або клієнтських логах.</p>
+						<p class="mt-1 text-sm leading-6 text-zinc-500">
+							Захищені merchant endpoints приймають JWT, отриманий під час входу, у заголовку
+							Authorization. Не передавайте токен у query-параметрах або клієнтських логах.
+						</p>
 					</div>
 				</div>
 				<div class="mt-5 grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center">
 					<span class="text-xs font-bold tracking-wide text-zinc-500 uppercase">Base URL</span>
-					<code class="overflow-x-auto rounded-md bg-zinc-100 px-3 py-2 text-xs text-zinc-800">{apiBase}</code>
+					<code class="overflow-x-auto rounded-md bg-zinc-100 px-3 py-2 text-xs text-zinc-800"
+						>{apiBase}</code
+					>
 					<span class="text-xs font-bold tracking-wide text-zinc-500 uppercase">Заголовок</span>
-					<code class="overflow-x-auto rounded-md bg-zinc-950 px-3 py-2 text-xs text-zinc-100">Authorization: Bearer YOUR_ACCESS_TOKEN</code>
+					<code class="overflow-x-auto rounded-md bg-zinc-950 px-3 py-2 text-xs text-zinc-100"
+						>Authorization: Bearer YOUR_ACCESS_TOKEN</code
+					>
 				</div>
 			</div>
 
 			<div class="overflow-hidden rounded-lg border border-zinc-200 bg-white">
 				<div class="flex items-center justify-between gap-4 border-b border-zinc-200 px-5 py-4">
-					<div><p class="text-xs font-bold text-zinc-500">{selected.method} {selected.path}</p><h2 class="mt-1 text-sm font-extrabold">{selected.title}</h2></div>
-					<button type="button" onclick={copyExample} class="grid size-9 shrink-0 place-items-center rounded-md border border-zinc-200 text-zinc-700 hover:border-blue-400 hover:text-blue-700" aria-label="Скопіювати cURL приклад" title="Скопіювати cURL">
+					<div>
+						<p class="text-xs font-bold text-zinc-500">{selected.method} {selected.path}</p>
+						<h2 class="mt-1 text-sm font-extrabold">{selected.title}</h2>
+					</div>
+					<button
+						type="button"
+						onclick={copyExample}
+						class="grid size-9 shrink-0 place-items-center rounded-md border border-zinc-200 text-zinc-700 hover:border-blue-400 hover:text-blue-700"
+						aria-label="Скопіювати cURL приклад"
+						title="Скопіювати cURL"
+					>
 						{#if copied}<Check size={16} />{:else}<Copy size={16} />{/if}
 					</button>
 				</div>
-				<pre class="overflow-x-auto bg-zinc-950 p-5 text-xs leading-6 text-zinc-100"><code>{selectedExample}</code></pre>
+				<pre class="overflow-x-auto bg-zinc-950 p-5 text-xs leading-6 text-zinc-100"><code
+						>{selectedExample}</code
+					></pre>
 				<div class="grid gap-2 border-t border-zinc-200 px-5 py-4 text-xs sm:grid-cols-2">
 					<p class="leading-5 text-zinc-500">{selected.description}</p>
 					<p class="font-mono leading-5 text-zinc-700 sm:text-right">{selected.response}</p>
@@ -152,24 +173,52 @@
 		</section>
 
 		<aside class="h-fit rounded-lg border border-zinc-200 bg-white p-5">
-			<div class="flex items-center gap-2"><TerminalSquare size={18} /><h2 class="text-sm font-extrabold">Merchant endpoints</h2></div>
+			<div class="flex items-center gap-2">
+				<TerminalSquare size={18} />
+				<h2 class="text-sm font-extrabold">Merchant endpoints</h2>
+			</div>
 			<div class="mt-4 space-y-2" role="region" aria-label="Операції Merchant API">
-				{#each endpoints as endpoint}
-					<button type="button" onclick={() => { selectedId = endpoint.id; copied = false; }} class="flex min-h-11 w-full items-center gap-2 rounded-md border px-3 text-left font-mono text-xs transition-colors" class:border-blue-300={selectedId === endpoint.id} class:bg-blue-50={selectedId === endpoint.id} class:border-zinc-200={selectedId !== endpoint.id} aria-pressed={selectedId === endpoint.id}>
-						<b class:text-emerald-700={endpoint.method === 'GET'} class:text-blue-700={endpoint.method === 'POST'} class:text-amber-700={endpoint.method === 'PATCH'}>{endpoint.method}</b>
+				{#each endpoints as endpoint (endpoint.id)}
+					<button
+						type="button"
+						onclick={() => {
+							selectedId = endpoint.id;
+							copied = false;
+						}}
+						class="flex min-h-11 w-full items-center gap-2 rounded-md border px-3 text-left font-mono text-xs transition-colors"
+						class:border-blue-300={selectedId === endpoint.id}
+						class:bg-blue-50={selectedId === endpoint.id}
+						class:border-zinc-200={selectedId !== endpoint.id}
+						aria-pressed={selectedId === endpoint.id}
+					>
+						<b
+							class:text-emerald-700={endpoint.method === 'GET'}
+							class:text-blue-700={endpoint.method === 'POST'}
+							class:text-amber-700={endpoint.method === 'PATCH'}>{endpoint.method}</b
+						>
 						<span class="min-w-0 truncate">{endpoint.path}</span>
 					</button>
 				{/each}
 			</div>
 
 			<div class="mt-5 border-t border-zinc-200 pt-5 text-xs leading-5 text-zinc-500">
-				<p class="flex items-center gap-2 font-bold text-zinc-800"><ReceiptText size={15} /> Рахунки</p>
+				<p class="flex items-center gap-2 font-bold text-zinc-800">
+					<ReceiptText size={15} /> Рахунки
+				</p>
 				<p class="mt-1">Типи: fixed, open_amount, table, delivery.</p>
-				<p class="mt-4 flex items-center gap-2 font-bold text-zinc-800"><BarChart3 size={15} /> Аналітика</p>
+				<p class="mt-4 flex items-center gap-2 font-bold text-zinc-800">
+					<BarChart3 size={15} /> Аналітика
+				</p>
 				<p class="mt-1">Обсяги повертаються у гривнях.</p>
 			</div>
 
-			<a href="/api" target="_blank" rel="noreferrer" class="mt-5 inline-flex items-center gap-2 text-sm font-bold text-blue-700">Стан API <ExternalLink size={15} /></a>
+			<a
+				href={resolve('/api' as '/')}
+				target="_blank"
+				rel="noreferrer"
+				class="mt-5 inline-flex items-center gap-2 text-sm font-bold text-blue-700"
+				>Стан API <ExternalLink size={15} /></a
+			>
 		</aside>
 	</div>
 </div>

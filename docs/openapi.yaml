@@ -1,0 +1,808 @@
+openapi: 3.1.0
+info:
+  title: Rahunok Edge API & Mobile SDK Specification
+  version: 1.1.0
+  description: |
+    # Rahunok Mobile & Edge Payment API
+    Повна OpenAPI / Swagger специфікація для розробників мобільних застосунків (iOS / Android / Apple App Clip / Web).
+    
+    ## Основні можливості:
+    * **4 бізнес-сценарії оплати:**
+      1. `fixed` — Фіксована сума (товари/послуги)
+      2. `open_amount` — Вільна сума (каса, чайові, донати)
+      3. `table` — Рахунок за столиком (ресторани, кафе)
+      4. `delivery` — Оплата з доставкою Нової Пошти (відділення/поштомат/кур'єр)
+    * **Генерація ISO / NBU 003 QR-кодів (ICT Instant Credit Transfer)**
+    * **OS-Aware маршрутизація банківських Deep Links** (Monobank, Приват24, Sense Bank, ПУМБ, NovaPay, izibank, Абанк тощо)
+    * **Високошвидкісний Cloudflare KV кеш банків та логотипів** (`/banks`, `/logos`)
+    * **Симуляція та Webhook-інтеграція**
+
+servers:
+  - url: https://rakhunok.com/api/v1
+    description: Production Edge API (Cloudflare Global Anycast)
+  - url: https://rahunok.dmitrishen.workers.dev/api/v1
+    description: Staging / Cloudflare Workers Dev
+  - url: http://localhost:8787/api/v1
+    description: Local Development Server (Wrangler)
+
+paths:
+  # =========================================================================
+  # 1. СИСТЕМНІ ЕНДПОІНТИ
+  # =========================================================================
+  /health:
+    get:
+      operationId: getHealth
+      summary: Перевірка працездатності сервісу
+      tags: [System]
+      responses:
+        '200':
+          description: Сервіс працює стабільно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: "ok" }
+                  service: { type: string, example: "Rahunok Edge API" }
+                  version: { type: string, example: "1.1.0" }
+                  nbu_standard: { type: string, example: "v003_ICT_Sandbox" }
+                  timestamp: { type: string, format: date-time }
+
+  # =========================================================================
+  # 2. АВТОРИЗАЦІЯ МЕРЧАНТА
+  # =========================================================================
+  /auth/config:
+    get:
+      operationId: getAuthConfig
+      summary: Отримати публічну конфігурацію Supabase Auth
+      tags: [Auth]
+      responses:
+        '200':
+          description: Публічна конфігурація клієнта авторизації
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  supabaseUrl: { type: string, format: uri }
+                  supabaseAnonKey: { type: string }
+                  publicDomain: { type: string, format: uri }
+                  providers:
+                    type: array
+                    items: { type: string }
+
+  /auth/demo-session:
+    post:
+      operationId: createDemoSession
+      summary: Створити демонстраційну merchant-сесію
+      tags: [Auth]
+      responses:
+        '200':
+          description: Демонстраційну сесію створено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  token: { type: string, example: demo_merchant_token }
+                  user: { type: object }
+                  merchant:
+                    $ref: '#/components/schemas/Merchant'
+
+  # =========================================================================
+  # 3. МЕРЧАНТ ТА ОНБОРДИНГ
+  # =========================================================================
+  /merchant/me:
+    get:
+      operationId: getMerchant
+      summary: Отримати повний профіль та банківські налаштування
+      tags: [Merchant]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  merchant:
+                    $ref: '#/components/schemas/Merchant'
+    put:
+      operationId: updateMerchant
+      summary: Оновити реквізити або назву бренду
+      tags: [Merchant]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name: { type: string, example: "Ресторан Смак" }
+                business_name: { type: string, example: "ТОВ СМАК РЕСТО" }
+                iban: { type: string, example: "UA673005280000026500504354077" }
+                avatar_url: { type: string, format: uri }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  merchant:
+                    $ref: '#/components/schemas/Merchant'
+
+  /merchant/onboarding:
+    post:
+      operationId: completeMerchantOnboarding
+      summary: Завершити 3-кроковий онбординг мерчанта
+      tags: [Merchant]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [business_type, business_name, tax_id, iban, display_name]
+              properties:
+                business_type: { type: string, enum: [fop, tov, ngo] }
+                business_name: { type: string }
+                tax_id: { type: string }
+                iban: { type: string }
+                display_name: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merchant'
+
+  # =========================================================================
+  # 4. КЕРУВАННЯ РАХУНКАМИ (ORDERS / INVOICES)
+  # =========================================================================
+  /orders:
+    get:
+      operationId: listOrders
+      summary: Список виставлених рахунків мерчанта з пагінацією та фільтрацією
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [pending, preparing, ready, paid, cancelled] }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, default: 50 }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Список рахунків мерчанта
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer, example: 42 }
+                  limit: { type: integer, example: 50 }
+                  offset: { type: integer, example: 0 }
+                  orders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+
+    post:
+      operationId: createOrder
+      summary: Створити новий платіжний рахунок (з генерацією NBU 003 QR та короткого лінка)
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, order_number, title]
+              properties:
+                type:
+                  type: string
+                  enum: [fixed, open_amount, table, delivery]
+                  default: fixed
+                order_number: { type: string, example: "№4812-A" }
+                title: { type: string, example: "Оплата замовлення №4812-A" }
+                description: { type: string, example: "Капучино та десерт" }
+                amount: { type: number, example: 180.00, description: "Сума рахунку, яку надсилають Dashboard та Merchant App" }
+                base_amount: { type: number, example: 180.00, description: "0.00 для open_amount" }
+                total_amount: { type: number, example: 180.00 }
+                delivery_fee: { type: number, example: 0.00 }
+                discount_amount: { type: number, example: 0.00 }
+                table_number: { type: integer, example: 12, description: "Тільки для type=table" }
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/OrderItem'
+      responses:
+        '201':
+          description: Рахунок створено, NBU 003 ISO payload та лінки сформовано
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  order:
+                    $ref: '#/components/schemas/Order'
+                  share:
+                    type: object
+                    properties:
+                      url: { type: string, format: uri }
+                      title: { type: string }
+                      text: { type: string }
+                  nbuQr:
+                    type: object
+                    properties:
+                      rawString: { type: string }
+                      base64UrlPayload: { type: string }
+                      standardQrUrl: { type: string, format: uri }
+                      previewText: { type: string }
+
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      summary: Отримати інформацію про рахунок за UUID або кодом
+      tags: [Orders]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, example: "a90b0c3f-1ca5-4991-b3d8-eb7a136dfd92" }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      operationId: updateOrder
+      summary: Оновити статус або суму рахунку
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [pending, preparing, ready, paid, cancelled] }
+                amount: { type: number }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  order:
+                    $ref: '#/components/schemas/Order'
+
+  # =========================================================================
+  # 5. ПУБЛІЧНИЙ ЧЕКАУТ ТА ОПЛАТА (ДЛЯ ПЛАТНИКА / APP CLIP / WEB)
+  # =========================================================================
+  /checkout/{id}:
+    get:
+      operationId: getCheckout
+      summary: Публічні дані рахунку для відкриття чекауту (без авторизації)
+      tags: [Checkout]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, example: "a90b0c3f-1ca5-4991-b3d8-eb7a136dfd92" }
+      responses:
+        '200':
+          description: Деталі замовлення та реквізити мерчанта
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /checkout/{id}/initiate:
+    post:
+      operationId: initiateCheckoutPayment
+      summary: Ініціалізувати оплату через обраний банк (генерація Deep Link / Universal Link)
+      description: |
+        Формує редирект для банківського додатку з урахуванням OS платника (iOS / Android / Desktop)
+        та стандартного 17-рядкового ISO NBU 003 payload.
+      tags: [Checkout]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bank]
+              properties:
+                bank: { type: string, example: "MONO", description: "Код банку (MONO, PBAN, SENS, FUIB, NOVA, TASB тощо)" }
+                bank_code: { type: string, example: "MONO" }
+                amount: { type: number, example: 150.00 }
+                os: { type: string, enum: [ios, android, desktop], default: desktop }
+                recaptcha_token: { type: string, example: "token_from_google" }
+      responses:
+        '200':
+          description: Сформований прямий лінк на застосунок банку
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  order_id: { type: string }
+                  bank_code: { type: string, example: "MONO" }
+                  amount: { type: number, example: 150.00 }
+                  currency: { type: string, example: "UAH" }
+                  redirect_url: { type: string, format: uri, example: "https://mbnk.app/qr/QkNECjAwMwox..." }
+                  fallback_url: { type: string, format: uri }
+                  strategy: { type: string, example: "url_template" }
+                  nbu_payload_base64: { type: string }
+                  nbu_qr_url: { type: string, format: uri, example: "https://qr.bank.gov.ua/QkNECjAwMwox..." }
+
+  /checkout/{id}/status:
+    get:
+      operationId: getCheckoutStatus
+      summary: Перевірка статусу оплати в реальному часі (Polling)
+      tags: [Checkout]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  status: { type: string, enum: [pending, preparing, ready, paid, cancelled] }
+                  paid_at: { type: string, format: date-time, nullable: true }
+                  paid_bank_code: { type: string, nullable: true }
+                  paid_amount: { type: number, nullable: true }
+
+  /checkout/{id}/events:
+    get:
+      operationId: listCheckoutEvents
+      summary: Отримати історію подій чекауту
+      tags: [Checkout]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  order_id: { type: string }
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        event_name: { type: string }
+                        metadata: { type: object }
+                        created_at: { type: string, format: date-time }
+
+  /checkout/{id}/event:
+    post:
+      operationId: recordCheckoutEvent
+      summary: Записати клієнтську подію життєвого циклу чекауту
+      tags: [Checkout]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event_type: { type: string, default: checkout_opened }
+                bank_code: { type: string }
+                previous_bank_code: { type: string }
+                actor_name: { type: string, default: Гість }
+                metadata: { type: object }
+      responses:
+        '200':
+          description: Подію записано
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  event: { type: string }
+
+  /checkout/{id}/apply-promo:
+    post:
+      operationId: applyCheckoutPromo
+      summary: Застосувати промокод до замовлення
+      tags: [Checkout]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [promo_code]
+              properties:
+                promo_code: { type: string, example: "SALE4" }
+      responses:
+        '200':
+          description: Знижку розраховано
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  valid: { type: boolean }
+                  discount_amount: { type: number }
+                  new_total: { type: number }
+
+  /checkout/{id}/delivery:
+    post:
+      operationId: setCheckoutDelivery
+      summary: Зберегти дані доставки Нової Пошти (Сценарій 4)
+      tags: [Checkout]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderDelivery'
+      responses:
+        '200':
+          description: Доставку збережено, підсумкову суму оновлено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  delivery_fee: { type: number, example: 70.00 }
+                  method: { type: string, enum: [branch, locker, courier] }
+                  city: { type: string }
+                  branch_info: { type: string }
+
+  # =========================================================================
+  # 6. КАТАЛОГ БАНКІВ ТА ЛОГОТИПІВ (KV CACHED)
+  # =========================================================================
+  /banks:
+    get:
+      operationId: listBanks
+      summary: Отримати повний каталог українських банків (із Cloudflare KV кешу)
+      tags: [Banks]
+      responses:
+        '200':
+          description: Список банків
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bank'
+
+  /banks/{idOrCode}:
+    get:
+      operationId: getBank
+      summary: Отримати точну конфігурацію та Deep Link шаблони конкретного банку
+      tags: [Banks]
+      parameters:
+        - name: idOrCode
+          in: path
+          required: true
+          schema: { type: string, example: "mono" }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BankDetail'
+
+  /logos:
+    get:
+      operationId: listBankLogos
+      summary: Швидкий словник усіх банків з кольорами, логотипами та правилами Universal Links (O(1) lookup)
+      tags: [Banks]
+      responses:
+        '200':
+          description: Карта банків у форматі JSON-словника
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    code: { type: string, example: "MONO" }
+                    color: { type: string, example: "#000000" }
+                    logo: { type: string, format: uri }
+                    active: { type: boolean, example: true }
+                    verified: { type: boolean, example: true }
+                    url_template: { type: string, example: "https://mbnk.app/qr/{payload}" }
+                    universal_link: { type: string, example: "https://mbnk.app/qr/{payload}" }
+                    ios_scheme: { type: string, example: "mono" }
+                    android_package: { type: string, example: "com.ftband.mono" }
+
+  # =========================================================================
+  # 7. ВЕБХУКИ ТА СИМУЛЯТОР ОПЛАТИ
+  # =========================================================================
+  /webhooks/simulate:
+    post:
+      operationId: simulatePaymentWebhook
+      summary: Симуляція банківської оплати (Sandbox)
+      tags: [Webhooks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_id]
+              properties:
+                order_id: { type: string }
+                bank_code: { type: string, default: "UNJS", example: "MONO" }
+                amount: { type: number, example: 180.00 }
+                status: { type: string, enum: [success, failed], default: success }
+      responses:
+        '200':
+          description: Статус переведено в «Сплачено»
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  simulation: { type: boolean, example: true }
+                  order_id: { type: string }
+                  status: { type: string, example: "paid" }
+                  paid_at: { type: string, format: date-time }
+                  bank_code: { type: string, example: "MONO" }
+
+  /webhooks/{bankCode}:
+    post:
+      operationId: receiveBankWebhook
+      summary: Прийом вебхуків від банків (Monobank, PrivatBank тощо)
+      tags: [Webhooks]
+      parameters:
+        - name: bankCode
+          in: path
+          required: true
+          schema: { type: string, example: "monobank" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Вебхук успішно прийнято та оброблено
+
+  # =========================================================================
+  # 8. АНАЛІТИКА ТА СТАТИСТИКА
+  # =========================================================================
+  /stats/summary:
+    get:
+      operationId: getStatsSummary
+      summary: Загальна статистика продажів мерчанта
+      tags: [Analytics]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_invoices: { type: integer, example: 42 }
+                  paid_invoices: { type: integer, example: 38 }
+                  pending_invoices: { type: integer, example: 4 }
+                  total_volume_uah: { type: number, example: 128450.00 }
+                  today_volume_uah: { type: number, example: 14200.00 }
+                  conversion_pct: { type: number, example: 90.5 }
+
+# =========================================================================
+# КОМПОНЕНТИ ТА СХЕМИ
+# =========================================================================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "JWT токен мерчанта, отриманий при логіні"
+
+  schemas:
+    AuthResponse:
+      type: object
+      properties:
+        access_token: { type: string, example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
+        token_type: { type: string, example: "Bearer" }
+        expires_in: { type: integer, example: 604800 }
+        merchant:
+          $ref: '#/components/schemas/Merchant'
+
+    Merchant:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        business_name: { type: string, example: "ФОП Шевченко Т.Г." }
+        business_type: { type: string, enum: [fop, tov, ngo] }
+        tax_id: { type: string, example: "3124567890" }
+        iban: { type: string, example: "UA673005280000026500504354077" }
+        display_name: { type: string, example: "Кав'ярня «Крапка»" }
+        avatar_url: { type: string, nullable: true }
+        currency: { type: string, example: "UAH" }
+        onboarding_completed: { type: boolean, example: true }
+        created_at: { type: string, format: date-time }
+
+    MerchantPublic:
+      type: object
+      properties:
+        display_name: { type: string, example: "Кав'ярня «Крапка»" }
+        business_name: { type: string, example: "ФОП Шевченко Т.Г." }
+        tax_id: { type: string, example: "3124567890" }
+        iban: { type: string, example: "UA673005280000026500504354077" }
+        avatar_url: { type: string, nullable: true }
+
+    OrderItem:
+      type: object
+      properties:
+        name: { type: string, example: "Капучино з вівсяним молоком" }
+        quantity: { type: number, example: 2 }
+        unit_price: { type: number, example: 75.00 }
+        total_price: { type: number, example: 150.00 }
+
+    OrderDelivery:
+      type: object
+      required: [recipient_name, recipient_phone, method, city, branch_info]
+      properties:
+        recipient_name: { type: string, example: "Олександр Петренко" }
+        recipient_phone: { type: string, example: "+380501234567" }
+        method: { type: string, enum: [branch, locker, courier], example: "branch" }
+        city: { type: string, example: "Київ" }
+        branch_info: { type: string, example: "Відділення №42 (вул. Хрещатик, 15)" }
+        delivery_fee: { type: number, example: 80.00 }
+
+    Order:
+      type: object
+      properties:
+        id: { type: string, format: uuid, example: "a90b0c3f-1ca5-4991-b3d8-eb7a136dfd92" }
+        short_code: { type: string, example: "a90b0c" }
+        merchant_id: { type: string, format: uuid }
+        type: { type: string, enum: [fixed, open_amount, table, delivery] }
+        order_number: { type: string, example: "№4812-A" }
+        title: { type: string, example: "Оплата замовлення №4812-A" }
+        description: { type: string, nullable: true }
+        base_amount: { type: number, example: 180.00 }
+        discount_amount: { type: number, example: 0.00 }
+        delivery_fee: { type: number, example: 0.00 }
+        total_amount: { type: number, example: 180.00 }
+        currency: { type: string, example: "UAH" }
+        table_number: { type: integer, nullable: true, example: 12 }
+        status: { type: string, enum: [draft, pending, preparing, ready, paid, expired, cancelled] }
+        paid_at: { type: string, format: date-time, nullable: true }
+        paid_bank_code: { type: string, nullable: true }
+        paid_amount: { type: number, nullable: true }
+        nbu_payload_base64: { type: string }
+        nbu_qr_url: { type: string, format: uri }
+        share_url: { type: string, format: uri, example: "https://rakhunok.com/pay/a90b0c" }
+        created_at: { type: string, format: date-time }
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        delivery:
+          $ref: '#/components/schemas/OrderDelivery'
+
+    Bank:
+      type: object
+      properties:
+        id: { type: string, example: "mono" }
+        code: { type: string, example: "MONO" }
+        name: { type: string, example: "Monobank" }
+        color: { type: string, example: "#000000" }
+        logo: { type: string, format: uri }
+        active: { type: boolean, example: true }
+        verified: { type: boolean, example: true }
+
+    BankDetail:
+      type: object
+      properties:
+        id: { type: string, example: "mono" }
+        code: { type: string, example: "MONO" }
+        name: { type: string, example: "Monobank" }
+        url_template: { type: string, example: "https://mbnk.app/qr/{payload}" }
+        universal_link: { type: string, example: "https://mbnk.app/qr/{payload}" }
+        ios_scheme: { type: string, example: "mono" }
+        android_package: { type: string, example: "com.ftband.mono" }
+        alternative_url: { type: string, example: "mono://bank.gov.ua/qr/{payload}" }
+        encoding: { type: string, example: "1" }
+        nbu_version: { type: string, example: "003" }
+
+    Error:
+      type: object
+      properties:
+        error: { type: string, example: "Помилка валідації даних" }
+        code: { type: integer, example: 400 }
+
+  responses:
+    BadRequest:
+      description: Некоректні параметри запиту
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Помилка авторизації (недійсний або відсутній Bearer JWT)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Ресурс або рахунок не знайдено
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

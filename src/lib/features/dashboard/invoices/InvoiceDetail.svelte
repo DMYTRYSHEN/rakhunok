@@ -60,9 +60,13 @@
 		if (demo || cancelling || !cancellation.eligible || !confirm('Скасувати цей рахунок?')) return;
 		cancelling = true;
 		cancelError = null;
-		try { await onCancel(invoice.id); }
-		catch (error) { cancelError = error instanceof Error ? error.message : 'Не вдалося скасувати рахунок.'; }
-		finally { cancelling = false; }
+		try {
+			await onCancel(invoice.id);
+		} catch (error) {
+			cancelError = error instanceof Error ? error.message : 'Не вдалося скасувати рахунок.';
+		} finally {
+			cancelling = false;
+		}
 	}
 </script>
 
@@ -81,12 +85,29 @@
 		</div>
 		<div class="flex flex-wrap gap-2">
 			{#if cancellation.eligible}
-				<button type="button" disabled={demo || cancelling} onclick={cancelInvoice} class="inline-flex h-10 items-center gap-2 rounded-md border border-red-200 px-4 text-sm font-bold text-red-700 disabled:opacity-50"><Trash2 size={16} /> {cancelling ? 'Скасовуємо…' : 'Скасувати'}</button>
+				<button
+					type="button"
+					disabled={demo || cancelling}
+					onclick={cancelInvoice}
+					class="inline-flex h-10 items-center gap-2 rounded-md border border-red-200 px-4 text-sm font-bold text-red-700 disabled:opacity-50"
+					><Trash2 size={16} /> {cancelling ? 'Скасовуємо…' : 'Скасувати'}</button
+				>
 			{/if}
-			<a href={resolve(checkoutPath as '/')} target="_blank" rel="noreferrer" class="inline-flex h-10 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white">Відкрити checkout <ExternalLink size={16} /></a>
+			<a
+				href={resolve(checkoutPath as '/')}
+				target="_blank"
+				rel="noreferrer"
+				class="inline-flex h-10 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white"
+				>Відкрити checkout <ExternalLink size={16} /></a
+			>
 		</div>
 	</header>
-	{#if cancelError}<p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{cancelError}</p>{/if}
+	{#if cancelError}<p
+			class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+			role="alert"
+		>
+			{cancelError}
+		</p>{/if}
 
 	<div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
 		<section

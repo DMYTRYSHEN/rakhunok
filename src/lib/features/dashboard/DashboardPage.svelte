@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import DashboardLogin from './auth/DashboardLogin.svelte';
 	import MerchantOnboarding from './auth/MerchantOnboarding.svelte';
 	import DashboardStateScreen from './auth/DashboardStateScreen.svelte';
@@ -100,7 +101,7 @@
 	let posRefreshPromise: Promise<void> | null = null;
 	let posRefreshQueued = false;
 	let realtimeRefreshPromise: Promise<void> | null = null;
-	const pendingRealtimeResources = new Set<DashboardRealtimeResource>();
+	const pendingRealtimeResources = new SvelteSet<DashboardRealtimeResource>();
 	let lastInvoiceId = $state<string | undefined>();
 	let selectedInvoice = $derived(invoices.find((invoice) => invoice.id === invoiceId));
 

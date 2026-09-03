@@ -27,7 +27,13 @@ describe('invoice rules', () => {
 	it('adds the month only for monthly reset rules', () => {
 		expect(
 			formatInvoiceNumber(
-				{ ...configuredRules, invoicePrefix: 'RHK', nextNumber: 7, padding: 3, resetPeriod: 'monthly' },
+				{
+					...configuredRules,
+					invoicePrefix: 'RHK',
+					nextNumber: 7,
+					padding: 3,
+					resetPeriod: 'monthly'
+				},
 				new Date('2026-08-26T10:00:00.000Z')
 			)
 		).toBe('RHK-2026-08-007');
@@ -53,7 +59,9 @@ describe('invoice rules', () => {
 			}
 		);
 
-		expect(purpose).toBe('Оплата за товари та доставку, рахунок RHK-2026-001049 від 26.08.2026, у т.ч. ПДВ.');
+		expect(purpose).toBe(
+			'Оплата за товари та доставку, рахунок RHK-2026-001049 від 26.08.2026, у т.ч. ПДВ.'
+		);
 	});
 
 	it.each([
