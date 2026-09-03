@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { CorexRunEvent } from './corex-process-gateway';
 import { formatRunDetail, summarizeRunEvents } from './run-inspector';
 
-function runEvent(sequence: number, eventType: string, stepName: string | null = null): CorexRunEvent {
+function runEvent(
+	sequence: number,
+	eventType: string,
+	stepName: string | null = null
+): CorexRunEvent {
 	return {
 		id: sequence,
 		runId: 'run-1',

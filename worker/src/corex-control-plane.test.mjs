@@ -10,6 +10,114 @@ const command = {
 	expectedRevision: 4
 };
 
+test('submits and reads operations with the owner derived from the verified token', async () => {
+	const ownerUserId = '018f47a2-8391-7b1c-8f7a-f1d27670f099';
+	const operationId = '018f47a2-8391-7b1c-8f7a-f1d27670f061';
+	const requests = [];
+	const responses = [
+		{ id: ownerUserId },
+		{ id: operationId, status: 'pending', itemCount: 1 },
+		{ id: ownerUserId },
+		[
+			{
+				id: operationId,
+				kind: 'workflow_delete',
+				status: 'processing',
+				item_count: 1,
+				completed_count: 0,
+				failed_count: 0,
+				created_at: '2026-09-03T10:00:00Z',
+				started_at: '2026-09-03T10:01:00Z',
+				completed_at: null
+			}
+		],
+		[{ target_id: 'run-1', status: 'processing', attempts: 1, result: null, error_code: null }]
+	];
+	const controlPlane = createSupabaseCorexControlPlane({
+		url: 'https://project.supabase.co',
+		publishableKey: 'publishable-key',
+		serviceRoleKey: 'service-role-key',
+		fetcher: async (input, init) => {
+			requests.push({ url: String(input), init });
+			return Response.json(responses.shift());
+		}
+	});
+
+	const submitted = await controlPlane.submitOperation({
+		accessToken: 'user-token',
+		requestId: operationId,
+		kind: 'workflow_delete',
+		items: [{ targetId: operationId }]
+	});
+	const status = await controlPlane.getOperation({
+		accessToken: 'user-token',
+		operationId
+	});
+
+	assert.equal(submitted.itemCount, 1);
+	assert.deepEqual(JSON.parse(requests[1].init.body), {
+		p_owner_user_id: ownerUserId,
+		p_requested_by: ownerUserId,
+		p_request_id: operationId,
+		p_kind: 'workflow_delete',
+		p_items: [{ targetId: operationId }]
+	});
+	assert.match(requests[3].url, new RegExp(`owner_user_id=eq\\.${ownerUserId}`));
+	assert.equal(status.items[0].errorCode, null);
+	assert.equal(status.items[0].attempts, 1);
+});
+
+test('resolves an external output descriptor through the authenticated attempt identity', async () => {
+	const requests = [];
+	const controlPlane = createSupabaseCorexControlPlane({
+		url: 'https://project.supabase.co',
+		publishableKey: 'publishable-key',
+		serviceRoleKey: 'service-role-key',
+		fetcher: async (input, init) => {
+			requests.push({ url: String(input), init });
+			if (String(input).endsWith('/auth/v1/user')) {
+				return Response.json({ id: 'owner-1' });
+			}
+			return Response.json([
+				{
+					output: {
+						type: 'object',
+						external: {
+							key: 'corex-output/trusted.json',
+							bytes: 42,
+							contentType: 'application/json'
+						}
+					}
+				}
+			]);
+		}
+	});
+
+	const descriptor = await controlPlane.resolveStepAttemptOutput({
+		accessToken: 'user-token',
+		runId: 'run-1',
+		executionGeneration: 2,
+		stepId: 'transform-1',
+		visit: 3,
+		attempt: 1
+	});
+
+	assert.deepEqual(descriptor, {
+		key: 'corex-output/trusted.json',
+		bytes: 42,
+		contentType: 'application/json'
+	});
+	const query = new URL(requests[1].url).searchParams;
+	assert.equal(query.get('select'), 'output');
+	assert.equal(query.get('run_id'), 'eq.run-1');
+	assert.equal(query.get('owner_user_id'), 'eq.owner-1');
+	assert.equal(query.get('execution_generation'), 'eq.2');
+	assert.equal(query.get('step_id'), 'eq.transform-1');
+	assert.equal(query.get('visit'), 'eq.3');
+	assert.equal(query.get('attempt'), 'eq.1');
+	assert.equal(requests[1].init.headers.Authorization, 'Bearer service-role-key');
+});
+
 test('verifies the user before publishing the persisted process revision', async () => {
 	const requests = [];
 	const draft = {
@@ -49,7 +157,91 @@ test('verifies the user before publishing the persisted process revision', async
 	assert.deepEqual(JSON.parse(requests[2].init.body), {
 		p_process_id: command.processId,
 		p_owner_user_id: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
-		p_expected_revision: 4
+		p_expected_revision: 4,
+		p_environment_id: null,
+		p_route_namespace: null
+	});
+});
+
+test('configures a domain target with the owner from the verified token', async () => {
+	const requests = [];
+	const fetcher = async (input, init) => {
+		requests.push({ url: String(input), init });
+		if (String(input).endsWith('/auth/v1/user')) {
+			return Response.json({ id: '018f47a2-8391-7b1c-8f7a-f1d27670f099' });
+		}
+		return Response.json({
+			environmentId: '018f47a2-8391-7b1c-8f7a-f1d27670f061',
+			environmentKey: 'production',
+			routeNamespace: 'public',
+			domainTargetId: '018f47a2-8391-7b1c-8f7a-f1d27670f062',
+			hostname: 'api.example.com',
+			verificationStatus: 'pending'
+		});
+	};
+	const controlPlane = createSupabaseCorexControlPlane({
+		url: 'https://project.supabase.co',
+		publishableKey: 'publishable-key',
+		serviceRoleKey: 'service-role-key',
+		fetcher
+	});
+
+	const target = await controlPlane.configureDomainTarget({
+		accessToken: 'user-token',
+		environmentKey: 'production',
+		routeNamespace: 'public',
+		hostname: 'api.example.com'
+	});
+
+	assert.equal(target.hostname, 'api.example.com');
+	assert.equal(
+		requests[1].url,
+		'https://project.supabase.co/rest/v1/rpc/corex_configure_domain_target'
+	);
+	assert.deepEqual(JSON.parse(requests[1].init.body), {
+		p_owner_user_id: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+		p_environment_key: 'production',
+		p_route_namespace: 'public',
+		p_hostname: 'api.example.com'
+	});
+});
+
+test('pins publication to the explicit environment and route namespace', async () => {
+	const requests = [];
+	const draft = {
+		...createStarterProcessDefinition(),
+		id: command.processId,
+		revision: command.expectedRevision
+	};
+	const fetcher = async (input, init) => {
+		requests.push({ url: String(input), init });
+		if (String(input).endsWith('/auth/v1/user')) {
+			return Response.json({ id: '018f47a2-8391-7b1c-8f7a-f1d27670f099' });
+		}
+		if (String(input).includes('/rest/v1/corex_processes?')) {
+			return Response.json([{ revision: command.expectedRevision, draft_definition: draft }]);
+		}
+		return Response.json({ id: 'version-1', version: 1 });
+	};
+	const controlPlane = createSupabaseCorexControlPlane({
+		url: 'https://project.supabase.co',
+		publishableKey: 'publishable-key',
+		serviceRoleKey: 'service-role-key',
+		fetcher
+	});
+
+	await controlPlane.publish({
+		...command,
+		environmentId: '018f47a2-8391-7b1c-8f7a-f1d27670f061',
+		routeNamespace: 'production'
+	});
+
+	assert.deepEqual(JSON.parse(requests[2].init.body), {
+		p_process_id: command.processId,
+		p_owner_user_id: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+		p_expected_revision: 4,
+		p_environment_id: '018f47a2-8391-7b1c-8f7a-f1d27670f061',
+		p_route_namespace: 'production'
 	});
 });
 
@@ -70,6 +262,156 @@ test('does not call the publish RPC when the user token is invalid', async () =>
 		(error) => error instanceof CorexControlPlaneError && error.status === 401
 	);
 	assert.equal(calls, 1);
+});
+
+test('maps an atomic HTTP route collision to a distinct sanitized conflict', async () => {
+	const draft = {
+		...createStarterProcessDefinition(),
+		id: command.processId,
+		revision: command.expectedRevision
+	};
+	const responses = [
+		Response.json({ id: '018f47a2-8391-7b1c-8f7a-f1d27670f099' }),
+		Response.json([{ revision: command.expectedRevision, draft_definition: draft }]),
+		Response.json(
+			{ code: '23505', message: 'Corex HTTP route conflict', details: 'internal constraint data' },
+			{ status: 409 }
+		)
+	];
+	const controlPlane = createSupabaseCorexControlPlane({
+		url: 'https://project.supabase.co',
+		publishableKey: 'publishable-key',
+		serviceRoleKey: 'service-role-key',
+		fetcher: async () => responses.shift()
+	});
+
+	await assert.rejects(
+		controlPlane.publish(command),
+		(error) =>
+			error instanceof CorexControlPlaneError &&
+			error.status === 409 &&
+			error.code === 'route_conflict' &&
+			error.message === 'HTTP route is already in use.'
+	);
+});
+
+test('maps a protected HTTP route to a sanitized forbidden publication error', async () => {
+	const draft = {
+		...createStarterProcessDefinition(),
+		id: command.processId,
+		revision: command.expectedRevision
+	};
+	const responses = [
+		Response.json({ id: '018f47a2-8391-7b1c-8f7a-f1d27670f099' }),
+		Response.json([{ revision: command.expectedRevision, draft_definition: draft }]),
+		Response.json(
+			{ code: 'PT403', message: 'Corex HTTP route is protected', details: 'internal policy data' },
+			{ status: 500 }
+		)
+	];
+	const controlPlane = createSupabaseCorexControlPlane({
+		url: 'https://project.supabase.co',
+		publishableKey: 'publishable-key',
+		serviceRoleKey: 'service-role-key',
+		fetcher: async () => responses.shift()
+	});
+
+	await assert.rejects(
+		controlPlane.publish(command),
+		(error) =>
+			error instanceof CorexControlPlaneError &&
+			error.status === 403 &&
+			error.code === 'route_protected' &&
+			error.message === 'HTTP route is protected.'
+	);
+});
+
+test('deactivates and rolls back an owned HTTP trigger through service-only RPCs', async () => {
+	const requests = [];
+	const deactivateRequestId = '018f47a2-8391-7b1c-8f7a-f1d27670f063';
+	const rollbackRequestId = '018f47a2-8391-7b1c-8f7a-f1d27670f064';
+	const responses = [
+		Response.json({ id: 'owner-1' }),
+		Response.json({ processId: command.processId, version: 4, active: false }),
+		Response.json({ id: 'owner-1' }),
+		Response.json({ processId: command.processId, version: 2, active: true })
+	];
+	const controlPlane = createSupabaseCorexControlPlane({
+		url: 'https://project.supabase.co',
+		publishableKey: 'publishable-key',
+		serviceRoleKey: 'service-role-key',
+		fetcher: async (input, init) => {
+			requests.push({ url: String(input), init });
+			return responses.shift();
+		}
+	});
+
+	assert.deepEqual(
+		await controlPlane.deactivateTrigger({
+			...command,
+			requestId: deactivateRequestId,
+			expectedVersion: 4
+		}),
+		{
+			processId: command.processId,
+			version: 4,
+			active: false
+		}
+	);
+	assert.deepEqual(
+		await controlPlane.rollbackTrigger({
+			...command,
+			requestId: rollbackRequestId,
+			expectedVersion: 4,
+			targetVersion: 2
+		}),
+		{ processId: command.processId, version: 2, active: true }
+	);
+	assert.match(requests[1].url, /\/rpc\/corex_deactivate_http_trigger$/);
+	assert.deepEqual(JSON.parse(requests[1].init.body), {
+		p_process_id: command.processId,
+		p_owner_user_id: 'owner-1',
+		p_request_id: deactivateRequestId,
+		p_expected_version: 4
+	});
+	assert.match(requests[3].url, /\/rpc\/corex_rollback_http_trigger$/);
+	assert.deepEqual(JSON.parse(requests[3].init.body), {
+		p_process_id: command.processId,
+		p_owner_user_id: 'owner-1',
+		p_request_id: rollbackRequestId,
+		p_expected_version: 4,
+		p_target_version: 2
+	});
+});
+
+test('maps trigger lifecycle SQLSTATEs independently of the PostgREST status', async () => {
+	for (const [payload, expectedStatus] of [
+		[{ code: '40001', message: 'Corex trigger lifecycle conflict' }, 409],
+		[{ code: 'PT409', message: 'Corex HTTP trigger lifecycle request conflicts' }, 409],
+		[{ code: 'P0002', message: 'Corex rollback version is missing' }, 404],
+		[{ code: '23505', message: 'Corex HTTP route conflict' }, 409]
+	]) {
+		const responses = [Response.json({ id: 'owner-1' }), Response.json(payload, { status: 500 })];
+		const controlPlane = createSupabaseCorexControlPlane({
+			url: 'https://project.supabase.co',
+			publishableKey: 'publishable-key',
+			serviceRoleKey: 'service-role-key',
+			fetcher: async () => responses.shift()
+		});
+
+		await assert.rejects(
+			controlPlane.rollbackTrigger({
+				...command,
+				requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f064',
+				expectedVersion: 4,
+				targetVersion: 2
+			}),
+			(error) =>
+				error instanceof CorexControlPlaneError &&
+				error.status === expectedStatus &&
+				(payload.code !== '23505' || error.code === 'route_conflict')
+		);
+	}
 });
 
 test('rejects an invalid persisted draft before calling the publish RPC', async () => {
@@ -161,6 +503,59 @@ test('starts a run from the server-loaded immutable version', async () => {
 	assert.equal(workflowCalls[0].params.ownerUserId, '018f47a2-8391-7b1c-8f7a-f1d27670f099');
 	assert.equal(workflowCalls[0].params.plan.processId, command.processId);
 	assert.deepEqual(workflowCalls[0].params.input, { paymentId: 'pay-42' });
+});
+
+test('scopes a caller instance ID to its owner and forwards the location hint', async () => {
+	const requests = [];
+	const workflowCalls = [];
+	const ownerUserId = '018f47a2-8391-7b1c-8f7a-f1d27670f099';
+	const instanceId = '018f47a2-8391-7b1c-8f7a-f1d27670f062';
+	const workflowInstanceId = `corex:${ownerUserId}:${instanceId}`;
+	const definition = {
+		...createStarterProcessDefinition(),
+		id: command.processId,
+		revision: 4,
+		lifecycle: 'published'
+	};
+	const responses = [
+		Response.json({ id: ownerUserId }),
+		Response.json({
+			id: 'run-1',
+			workflowInstanceId,
+			status: 'queued',
+			definition
+		})
+	];
+	const controlPlane = createSupabaseCorexControlPlane({
+		url: 'https://project.supabase.co',
+		publishableKey: 'publishable-key',
+		serviceRoleKey: 'service-role-key',
+		fetcher: async (input, init) => {
+			requests.push({ url: String(input), init });
+			return responses.shift();
+		},
+		workflow: {
+			async create(options) {
+				workflowCalls.push(options);
+				return { id: options.id };
+			}
+		},
+		createId: () => {
+			throw new Error('generated ID must not be used');
+		}
+	});
+
+	await controlPlane.start({
+		accessToken: command.accessToken,
+		processId: command.processId,
+		input: {},
+		instanceId,
+		locationHint: 'weur'
+	});
+
+	assert.equal(JSON.parse(requests[1].init.body).p_workflow_instance_id, workflowInstanceId);
+	assert.equal(workflowCalls[0].id, workflowInstanceId);
+	assert.equal(workflowCalls[0].locationHint, 'weur');
 });
 
 test('marks a created run as errored when Workflow creation fails', async () => {
@@ -645,4 +1040,45 @@ test('archives a terminal run without calling Workflow directly', async () => {
 		p_request_id: '018f47a2-8391-7b1c-8f7a-f1d27670f063'
 	});
 	assert.equal(workflowCalls, 0);
+});
+
+test('retires a process with the owner resolved from the access token', async () => {
+	const requests = [];
+	const responses = [
+		Response.json({ id: 'owner-1' }),
+		Response.json({
+			id: command.processId,
+			lifecycle: 'retired',
+			retiredAt: '2026-09-03T08:00:00.000Z',
+			accepted: true
+		})
+	];
+	const controlPlane = createSupabaseCorexControlPlane({
+		url: 'https://project.supabase.co',
+		publishableKey: 'publishable-key',
+		serviceRoleKey: 'service-role-key',
+		fetcher: async (input, init) => {
+			requests.push({ url: String(input), init });
+			return responses.shift();
+		}
+	});
+
+	const result = await controlPlane.retireProcess({
+		accessToken: 'user-token',
+		processId: command.processId,
+		requestId: '018f47a2-8391-7b1c-8f7a-f1d27670f063'
+	});
+
+	assert.deepEqual(result, {
+		id: command.processId,
+		lifecycle: 'retired',
+		retiredAt: '2026-09-03T08:00:00.000Z',
+		accepted: true
+	});
+	assert.equal(requests[1].url, 'https://project.supabase.co/rest/v1/rpc/corex_retire_process');
+	assert.deepEqual(JSON.parse(requests[1].init.body), {
+		p_process_id: command.processId,
+		p_owner_user_id: 'owner-1',
+		p_request_id: '018f47a2-8391-7b1c-8f7a-f1d27670f063'
+	});
 });

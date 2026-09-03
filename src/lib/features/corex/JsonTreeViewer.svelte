@@ -1,7 +1,11 @@
 ﻿<script lang="ts">
 	import { Check, ChevronDown, ChevronRight, Copy } from '@lucide/svelte';
 
-	let { data, label = 'Payload', defaultExpanded = true }: { data: unknown; label?: string; defaultExpanded?: boolean } = $props();
+	let {
+		data,
+		label = 'Payload',
+		defaultExpanded = true
+	}: { data: unknown; label?: string; defaultExpanded?: boolean } = $props();
 
 	let copied = $state(false);
 
@@ -20,7 +24,10 @@
 
 	async function copyJson() {
 		try {
-			const str = typeof parsedData === 'object' ? JSON.stringify(parsedData, null, 2) : String(parsedData ?? '');
+			const str =
+				typeof parsedData === 'object'
+					? JSON.stringify(parsedData, null, 2)
+					: String(parsedData ?? '');
 			await navigator.clipboard.writeText(str);
 			copied = true;
 			setTimeout(() => {
@@ -35,16 +42,31 @@
 {#snippet treeNode(key: string | null, value: unknown, depth: number, isLast: boolean)}
 	{@const isObj = value !== null && typeof value === 'object'}
 	{@const isArr = Array.isArray(value)}
-	{@const entries = isObj ? (isArr ? value.map((v, i) => [String(i), v] as const) : Object.entries(value as Record<string, unknown>)) : []}
+	{@const entries = isObj
+		? isArr
+			? value.map((v, i) => [String(i), v] as const)
+			: Object.entries(value as Record<string, unknown>)
+		: []}
 
 	{#if isObj}
-		<details open={depth < 2 || defaultExpanded} class="tree-details" style="margin-left: {depth * 10}px;">
+		<details
+			open={depth < 2 || defaultExpanded}
+			class="tree-details"
+			style="margin-left: {depth * 10}px;"
+		>
 			<summary class="tree-summary">
-				<span class="chevron"><ChevronRight size={11} class="closed-icon" /><ChevronDown size={11} class="open-icon" /></span>
+				<span class="chevron"
+					><ChevronRight size={11} class="closed-icon" /><ChevronDown
+						size={11}
+						class="open-icon"
+					/></span
+				>
 				{#if key !== null}
 					<span class="key-name">{key}:</span>
 				{/if}
-				<span class="type-bracket">{isArr ? `Array(${entries.length})` : `Object{${entries.length}}`}</span>
+				<span class="type-bracket"
+					>{isArr ? `Array(${entries.length})` : `Object{${entries.length}}`}</span
+				>
 			</summary>
 			<div class="tree-children">
 				{#each entries as [childKey, childValue], i (childKey)}
@@ -76,7 +98,13 @@
 <div class="json-tree-container">
 	<div class="json-header">
 		<span class="json-label">{label}</span>
-		<button type="button" class="copy-btn" onclick={copyJson} title="Copy JSON" aria-label="Copy JSON">
+		<button
+			type="button"
+			class="copy-btn"
+			onclick={copyJson}
+			title="Copy JSON"
+			aria-label="Copy JSON"
+		>
 			{#if copied}
 				<Check size={11} class="text-green" /> <span class="copied-text">Copied!</span>
 			{:else}
@@ -172,8 +200,12 @@
 		place-items: center;
 		color: #94a3b8;
 	}
-	.tree-details:not([open]) .open-icon { display: none; }
-	.tree-details[open] .closed-icon { display: none; }
+	.tree-details:not([open]) :global(.open-icon) {
+		display: none;
+	}
+	.tree-details[open] :global(.closed-icon) {
+		display: none;
+	}
 
 	.key-name {
 		color: #1a73e8;
@@ -196,13 +228,35 @@
 		white-space: pre-wrap;
 		word-break: break-all;
 	}
-	.val-string { color: #16a34a; }
-	.val-number { color: #d97706; font-weight: 700; }
-	.val-boolean { color: #9333ea; font-weight: 700; }
-	.val-null { color: #dc2626; font-style: italic; }
-	.val-other { color: #475569; }
-	.comma { color: #94a3b8; }
-	.empty-val { color: #94a3b8; font-style: italic; }
-	.text-green { color: #16a34a; }
-	.copied-text { color: #16a34a; }
+	.val-string {
+		color: #16a34a;
+	}
+	.val-number {
+		color: #d97706;
+		font-weight: 700;
+	}
+	.val-boolean {
+		color: #9333ea;
+		font-weight: 700;
+	}
+	.val-null {
+		color: #dc2626;
+		font-style: italic;
+	}
+	.val-other {
+		color: #475569;
+	}
+	.comma {
+		color: #94a3b8;
+	}
+	.empty-val {
+		color: #94a3b8;
+		font-style: italic;
+	}
+	:global(.text-green) {
+		color: #16a34a;
+	}
+	.copied-text {
+		color: #16a34a;
+	}
 </style>

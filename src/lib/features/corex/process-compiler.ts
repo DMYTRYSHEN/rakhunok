@@ -2,13 +2,19 @@ import {
 	type ApprovalNode,
 	type ConditionNode,
 	type BreakNode,
+	type BlockNode,
+	type EventTriggerNode,
 	type EventWaitNode,
 	type FailureNode,
 	type HttpRequestNode,
+	type HttpTriggerNode,
+	isProcessTriggerNode,
 	type InvokeProcessNode,
+	type LocalCallNode,
 	type LoopNode,
 	type ParallelNode,
 	type ProcessDefinition,
+	type ScheduleTriggerNode,
 	type SuccessNode,
 	type SwitchNode,
 	type TransformNode,
@@ -19,66 +25,71 @@ import {
 } from './process-definition.ts';
 
 type LinearExecutionNode = { id: string; name: string; next: string };
+type CompensationExecutionNode =
+	| {
+			id: string;
+			name: string;
+			type: 'http-request';
+			config: HttpRequestNode['config'];
+	  }
+	| {
+			id: string;
+			name: string;
+			type: 'transform';
+			config: TransformNode['config'];
+	  };
 export type HttpExecutionNode = LinearExecutionNode & {
 	type: 'http-request';
 	config: HttpRequestNode['config'];
-	compensation?:
-		| {
-				id: string;
-				name: string;
-				type: 'http-request';
-				config: HttpRequestNode['config'];
-			}
-		| {
-				id: string;
-				name: string;
-				type: 'transform';
-				config: TransformNode['config'];
-			};
+	compensation?: CompensationExecutionNode;
 };
-export type WaitExecutionNode = LinearExecutionNode & { type: 'wait'; config: WaitNode['config'] };
+export type WaitExecutionNode = LinearExecutionNode & {
+	type: 'wait';
+	config: WaitNode['config'];
+	compensation?: CompensationExecutionNode;
+};
 export type WaitUntilExecutionNode = LinearExecutionNode & {
 	type: 'wait-until';
 	config: WaitUntilNode['config'];
+	compensation?: CompensationExecutionNode;
 };
 export type EventWaitExecutionNode = LinearExecutionNode & {
 	type: 'wait-event';
 	config: EventWaitNode['config'];
+	compensation?: CompensationExecutionNode;
 };
 export type InvokeProcessExecutionNode = LinearExecutionNode & {
 	type: 'invoke-process';
 	config: InvokeProcessNode['config'];
-	compensation?:
-		| {
-				id: string;
-				name: string;
-				type: 'http-request';
-				config: HttpRequestNode['config'];
-			}
-		| {
-				id: string;
-				name: string;
-				type: 'transform';
-				config: TransformNode['config'];
-			};
+	compensation?: CompensationExecutionNode;
+};
+export type LocalCallExecutionNode = LinearExecutionNode & {
+	type: 'local-call';
+	config: Pick<LocalCallNode['config'], 'inputPath' | 'resultKey'>;
+	bodyTarget: string;
+	returnTarget: string;
+};
+export type BlockExecutionNode = {
+	id: string;
+	name: string;
+	type: 'block';
+	config: BlockNode['config'];
+	bodyTarget: string;
+	continuationTarget: string;
 };
 export type ApprovalExecutionNode = {
 	id: string;
 	name: string;
 	type: 'approval';
 	config: ApprovalNode['config'];
+	compensation?: CompensationExecutionNode;
 	whenApproved: string;
 	whenRejected: string;
 };
 export type TransformExecutionNode = LinearExecutionNode & {
 	type: 'transform';
 	config: TransformNode['config'];
-	compensation?: {
-		id: string;
-		name: string;
-		type: 'transform';
-		config: TransformNode['config'];
-	};
+	compensation?: CompensationExecutionNode;
 };
 export type ConditionExecutionNode = {
 	id: string;
@@ -148,6 +159,8 @@ export type ProcessExecutionNode =
 	| WaitUntilExecutionNode
 	| EventWaitExecutionNode
 	| InvokeProcessExecutionNode
+	| LocalCallExecutionNode
+	| BlockExecutionNode
 	| ApprovalExecutionNode
 	| TransformExecutionNode
 	| ConditionExecutionNode
@@ -163,10 +176,10 @@ export type ProcessExecutionPlan = {
 	schemaVersion: 1;
 	processId: string;
 	revision: number;
-	trigger: {
-		method: string;
-		path: string;
-	};
+	trigger:
+		| ({ kind: 'http' } & HttpTriggerNode['config'])
+		| ({ kind: 'schedule' } & ScheduleTriggerNode['config'])
+		| ({ kind: 'event' } & EventTriggerNode['config']);
 	entryNodeId: string;
 	nodes: ProcessExecutionNode[];
 };
@@ -179,15 +192,13 @@ export function compileProcessDefinition(definition: ProcessDefinition): Process
 	if (!validation.valid)
 		return { ok: false, errors: validation.issues.map((issue) => issue.message) };
 
-	const trigger = definition.nodes.find((node) => node.type === 'trigger-http');
-	if (!trigger) return { ok: false, errors: ['The process has no HTTP trigger.'] };
+	const trigger = definition.nodes.find(isProcessTriggerNode);
+	if (!trigger) return { ok: false, errors: ['The process has no trigger.'] };
 
 	const targetsById = new Map(
 		definition.nodes.map((node) => [
 			node.id,
-			definition.edges.filter(
-				(edge) => edge.source === node.id && edge.compensation === undefined
-			)
+			definition.edges.filter((edge) => edge.source === node.id && edge.compensation === undefined)
 		])
 	);
 	const compensationTargetIds = new Set(
@@ -204,6 +215,9 @@ export function compileProcessDefinition(definition: ProcessDefinition): Process
 			node.type === 'loop' ||
 			node.type === 'break' ||
 			node.type === 'parallel' ||
+			node.type === 'block' ||
+			node.type === 'local-function' ||
+			node.type === 'local-return' ||
 			node.type === 'try' ||
 			node.type === 'approval'
 		)
@@ -219,7 +233,13 @@ export function compileProcessDefinition(definition: ProcessDefinition): Process
 
 	const nodes: ProcessExecutionNode[] = [];
 	for (const node of definition.nodes) {
-		if (node.type === 'trigger-http' || compensationTargetIds.has(node.id)) continue;
+		if (
+			isProcessTriggerNode(node) ||
+			node.type === 'local-function' ||
+			node.type === 'local-return' ||
+			compensationTargetIds.has(node.id)
+		)
+			continue;
 		if (node.type === 'end-success') {
 			nodes.push({ id: node.id, name: node.name, type: node.type, config: { ...node.config } });
 			continue;
@@ -305,6 +325,18 @@ export function compileProcessDefinition(definition: ProcessDefinition): Process
 			continue;
 		}
 		if (node.type === 'parallel-join') continue;
+		if (node.type === 'block') {
+			const branches = targetsById.get(node.id) ?? [];
+			nodes.push({
+				id: node.id,
+				name: node.name,
+				type: node.type,
+				config: {},
+				bodyTarget: branches.find((edge) => edge.block === 'body')!.target,
+				continuationTarget: branches.find((edge) => edge.block === 'continuation')!.target
+			});
+			continue;
+		}
 		if (node.type === 'try') {
 			const branches = targetsById.get(node.id) ?? [];
 			nodes.push({
@@ -321,18 +353,73 @@ export function compileProcessDefinition(definition: ProcessDefinition): Process
 		}
 		if (node.type === 'approval') {
 			const branches = targetsById.get(node.id) ?? [];
+			const compensationEdge = definition.edges.find(
+				(edge) => edge.source === node.id && edge.compensation === true
+			);
+			const compensation = compensationEdge
+				? definition.nodes.find(
+						(candidate): candidate is HttpRequestNode | TransformNode =>
+							candidate.id === compensationEdge.target &&
+							(candidate.type === 'http-request' || candidate.type === 'transform')
+					)
+				: undefined;
+			const compiledCompensation: CompensationExecutionNode | undefined =
+				compensation?.type === 'transform'
+					? {
+							id: compensation.id,
+							name: compensation.name,
+							type: compensation.type,
+							config: { ...compensation.config, mappings: { ...compensation.config.mappings } }
+						}
+					: compensation?.type === 'http-request'
+						? {
+								id: compensation.id,
+								name: compensation.name,
+								type: compensation.type,
+								config: { ...compensation.config }
+							}
+						: undefined;
 			nodes.push({
 				id: node.id,
 				name: node.name,
 				type: node.type,
 				config: { ...node.config },
+				...(compiledCompensation ? { compensation: compiledCompensation } : {}),
 				whenApproved: branches.find((edge) => edge.when === true)!.target,
 				whenRejected: branches.find((edge) => edge.when === false)!.target
 			});
 			continue;
 		}
+		if (node.type === 'local-call') {
+			const functionNode = definition.nodes.find(
+				(candidate) =>
+					candidate.id === node.config.functionId && candidate.type === 'local-function'
+			)!;
+			const bodyTarget = targetsById.get(functionNode.id)![0].target;
+			const returnTarget = definition.nodes.find(
+				(candidate) =>
+					candidate.type === 'local-return' && candidate.config.functionId === functionNode.id
+			)!.id;
+			nodes.push({
+				id: node.id,
+				name: node.name,
+				type: node.type,
+				config: { inputPath: node.config.inputPath, resultKey: node.config.resultKey },
+				bodyTarget,
+				returnTarget,
+				next: targetsById.get(node.id)![0].target
+			});
+			continue;
+		}
 		const next = targetsById.get(node.id)![0].target;
-		if (node.type === 'http-request' || node.type === 'transform' || node.type === 'invoke-process') {
+		if (
+			node.type === 'http-request' ||
+			node.type === 'transform' ||
+			node.type === 'invoke-process' ||
+			node.type === 'wait-event' ||
+			node.type === 'wait' ||
+			node.type === 'wait-until'
+		) {
 			const compensationEdge = definition.edges.find(
 				(edge) => edge.source === node.id && edge.compensation === true
 			);
@@ -344,7 +431,6 @@ export function compileProcessDefinition(definition: ProcessDefinition): Process
 					)
 				: undefined;
 			const compiledCompensation =
-				(node.type === 'http-request' || node.type === 'invoke-process') &&
 				compensation?.type === 'http-request'
 					? {
 							id: compensation.id,
@@ -366,9 +452,7 @@ export function compileProcessDefinition(definition: ProcessDefinition): Process
 					name: node.name,
 					type: node.type,
 					config: { ...node.config, mappings: { ...node.config.mappings } },
-					...(compiledCompensation?.type === 'transform'
-						? { compensation: compiledCompensation }
-						: {}),
+					...(compiledCompensation ? { compensation: compiledCompensation } : {}),
 					next
 				});
 			} else if (node.type === 'http-request') {
@@ -380,7 +464,34 @@ export function compileProcessDefinition(definition: ProcessDefinition): Process
 					...(compiledCompensation ? { compensation: compiledCompensation } : {}),
 					next
 				});
-			} else {
+			} else if (node.type === 'wait-event') {
+				nodes.push({
+					id: node.id,
+					name: node.name,
+					type: node.type,
+					config: { ...node.config },
+					...(compiledCompensation ? { compensation: compiledCompensation } : {}),
+					next
+				});
+			} else if (node.type === 'invoke-process') {
+				nodes.push({
+					id: node.id,
+					name: node.name,
+					type: node.type,
+					config: { ...node.config },
+					...(compiledCompensation ? { compensation: compiledCompensation } : {}),
+					next
+				});
+			} else if (node.type === 'wait') {
+				nodes.push({
+					id: node.id,
+					name: node.name,
+					type: node.type,
+					config: { ...node.config },
+					...(compiledCompensation ? { compensation: compiledCompensation } : {}),
+					next
+				});
+			} else if (node.type === 'wait-until') {
 				nodes.push({
 					id: node.id,
 					name: node.name,
@@ -390,30 +501,6 @@ export function compileProcessDefinition(definition: ProcessDefinition): Process
 					next
 				});
 			}
-		} else if (node.type === 'wait') {
-			nodes.push({
-				id: node.id,
-				name: node.name,
-				type: node.type,
-				config: { ...node.config },
-				next
-			});
-		} else if (node.type === 'wait-until') {
-			nodes.push({
-				id: node.id,
-				name: node.name,
-				type: node.type,
-				config: { ...node.config },
-				next
-			});
-		} else if (node.type === 'wait-event') {
-			nodes.push({
-				id: node.id,
-				name: node.name,
-				type: node.type,
-				config: { ...node.config },
-				next
-			});
 		}
 	}
 
@@ -423,7 +510,12 @@ export function compileProcessDefinition(definition: ProcessDefinition): Process
 			schemaVersion: 1,
 			processId: definition.id,
 			revision: definition.revision,
-			trigger: { ...trigger.config },
+			trigger:
+				trigger.type === 'trigger-http'
+					? { kind: 'http', ...trigger.config }
+					: trigger.type === 'trigger-schedule'
+						? { kind: 'schedule', ...trigger.config }
+						: { kind: 'event', ...trigger.config },
 			entryNodeId,
 			nodes
 		}

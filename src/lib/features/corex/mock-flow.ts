@@ -117,7 +117,13 @@ export const mockFlowEdges: FlowEdge[] = [
 	{ id: 'start-build', source: 'start', target: 'build' },
 	{ id: 'build-checks', source: 'build', target: 'checks' },
 	{ id: 'checks-gate', source: 'checks', target: 'checks-passed' },
-	{ id: 'checks-preview', source: 'checks-passed', target: 'preview', label: 'yes', tone: 'success' },
+	{
+		id: 'checks-preview',
+		source: 'checks-passed',
+		target: 'preview',
+		label: 'yes',
+		tone: 'success'
+	},
 	{ id: 'checks-stop', source: 'checks-passed', target: 'stop', label: 'no', tone: 'danger' },
 	{ id: 'preview-approval', source: 'preview', target: 'approved' },
 	{ id: 'approval-publish', source: 'approved', target: 'publish', label: 'yes', tone: 'success' },

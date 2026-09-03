@@ -105,7 +105,10 @@ function isClaimedItem(value: unknown): value is ClaimedOutboxItem {
 			typeof from.name === 'string' &&
 			from.name.length > 0 &&
 			from.name.length <= 100 &&
-			!/[\u0000-\u001f\u007f]/.test(from.name) &&
+			![...from.name].some((character) => {
+				const codePoint = character.codePointAt(0) ?? 0;
+				return codePoint <= 0x1f || codePoint === 0x7f;
+			}) &&
 			(!Object.hasOwn(from, 'count') ||
 				(Number.isSafeInteger(from.count) && Number(from.count) > 0)) &&
 			(!Object.hasOwn(from, 'type') || ['do', 'sleep', 'waitForEvent'].includes(String(from.type)))

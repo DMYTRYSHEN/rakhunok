@@ -1,5 +1,9 @@
 import type { FlowNode, FlowScenario } from './types';
-import type { ProcessDefinition, ProcessNode } from './process-definition';
+import {
+	isProcessTriggerNode,
+	type ProcessDefinition,
+	type ProcessNode
+} from './process-definition';
 
 function toFlowNode(node: ProcessNode): FlowNode {
 	if (node.type === 'trigger-http') {
@@ -20,6 +24,46 @@ function toFlowNode(node: ProcessNode): FlowNode {
 				type: node.type,
 				family: 'trigger',
 				trigger: { kind: 'http', method: node.config.method, path: node.config.path }
+			}
+		};
+	}
+
+	if (node.type === 'trigger-schedule') {
+		return {
+			id: node.id,
+			eyebrow: 'Schedule trigger',
+			title: node.name,
+			detail: 'Starts a durable process instance on a published schedule.',
+			status: 'waiting',
+			meta: `${node.config.cron} · ${node.config.timezone}`,
+			kind: 'trigger',
+			position: node.position,
+			layer: 'worker',
+			workflow: {
+				name: node.name,
+				type: node.type,
+				family: 'trigger',
+				trigger: { kind: 'schedule', cron: node.config.cron }
+			}
+		};
+	}
+
+	if (node.type === 'trigger-event') {
+		return {
+			id: node.id,
+			eyebrow: 'Event trigger',
+			title: node.name,
+			detail: 'Starts a durable process instance from a typed platform event.',
+			status: 'waiting',
+			meta: `${node.config.source} · ${node.config.eventType}`,
+			kind: 'trigger',
+			position: node.position,
+			layer: 'worker',
+			workflow: {
+				name: node.name,
+				type: node.type,
+				family: 'trigger',
+				trigger: { kind: 'event', eventSource: node.config.source }
 			}
 		};
 	}
@@ -319,6 +363,76 @@ function toFlowNode(node: ProcessNode): FlowNode {
 		};
 	}
 
+	if (node.type === 'local-function') {
+		return {
+			id: node.id,
+			eyebrow: 'Local function',
+			title: node.name,
+			detail: 'Defines a reusable serial body executed within the current process instance.',
+			status: 'waiting',
+			meta: 'reusable body',
+			kind: 'decision',
+			position: node.position,
+			layer: 'worker',
+			output: 'function body',
+			workflow: { name: node.name, type: node.type, family: 'control', branches: ['body'] }
+		};
+	}
+
+	if (node.type === 'local-call') {
+		return {
+			id: node.id,
+			eyebrow: 'Local call',
+			title: node.name,
+			detail: 'Runs a reusable serial body without creating a subprocess.',
+			status: 'waiting',
+			meta: `${node.config.functionId} · ${node.config.resultKey}`,
+			kind: 'action',
+			position: node.position,
+			layer: 'worker',
+			input: node.config.inputPath,
+			output: node.config.resultKey,
+			workflow: {
+				name: node.name,
+				type: node.type,
+				family: 'control',
+				expression: node.config.functionId
+			}
+		};
+	}
+
+	if (node.type === 'local-return') {
+		return {
+			id: node.id,
+			eyebrow: 'Function return',
+			title: node.name,
+			detail: 'Returns the local function context to its caller.',
+			status: 'waiting',
+			meta: node.config.functionId,
+			kind: 'terminal',
+			position: node.position,
+			layer: 'worker',
+			output: 'caller result',
+			workflow: { name: node.name, type: node.type, family: 'control' }
+		};
+	}
+
+	if (node.type === 'block') {
+		return {
+			id: node.id,
+			eyebrow: 'Executable block',
+			title: node.name,
+			detail: 'Runs an isolated serial body before rejoining the process continuation.',
+			status: 'waiting',
+			meta: 'serial body',
+			kind: 'decision',
+			position: node.position,
+			layer: 'worker',
+			output: 'continuation',
+			workflow: { name: node.name, type: node.type, family: 'structure', branches: ['body'] }
+		};
+	}
+
 	if (node.type === 'end-failure') {
 		return {
 			id: node.id,
@@ -360,14 +474,22 @@ function toFlowNode(node: ProcessNode): FlowNode {
 }
 
 export function processDefinitionToFlowScenario(definition: ProcessDefinition): FlowScenario {
-	const trigger = definition.nodes.find((node) => node.type === 'trigger-http');
+	const trigger = definition.nodes.find(isProcessTriggerNode);
+	const entrypoint =
+		trigger?.type === 'trigger-http'
+			? `${trigger.config.method} ${trigger.config.path}`
+			: trigger?.type === 'trigger-schedule'
+				? `${trigger.config.cron} · ${trigger.config.timezone}`
+				: trigger?.type === 'trigger-event'
+					? `${trigger.config.source} · ${trigger.config.eventType}`
+					: 'No trigger';
 	return {
 		id: definition.id,
 		category: 'Operations',
 		label: definition.name,
 		title: definition.name,
 		description: definition.description,
-		entrypoint: trigger ? `${trigger.config.method} ${trigger.config.path}` : 'No trigger',
+		entrypoint,
 		nodes: definition.nodes.map(toFlowNode),
 		edges: definition.edges.map((edge) => ({
 			id: edge.id,
@@ -375,18 +497,31 @@ export function processDefinitionToFlowScenario(definition: ProcessDefinition): 
 			target: edge.target,
 			...(edge.parallel !== undefined
 				? { label: edge.parallel, tone: 'success' as const }
-				: edge.loop !== undefined
-				? { label: edge.loop, tone: edge.loop === 'body' ? ('success' as const) : ('danger' as const) }
-				: edge.loopBack !== undefined
-					? { label: 'repeat', tone: 'default' as const }
-					: edge.case !== undefined
-				? { label: edge.case, tone: edge.case === 'default' ? ('danger' as const) : ('success' as const) }
-				: edge.when === undefined
-				? {}
-				: {
-						label: edge.when ? 'true' : 'false',
-						tone: edge.when ? ('success' as const) : ('danger' as const)
-					})
+				: edge.function !== undefined
+					? { label: edge.function, tone: 'success' as const }
+					: edge.block !== undefined
+						? {
+								label: edge.block,
+								tone: edge.block === 'body' ? ('success' as const) : ('default' as const)
+							}
+						: edge.loop !== undefined
+							? {
+									label: edge.loop,
+									tone: edge.loop === 'body' ? ('success' as const) : ('danger' as const)
+								}
+							: edge.loopBack !== undefined
+								? { label: 'repeat', tone: 'default' as const }
+								: edge.case !== undefined
+									? {
+											label: edge.case,
+											tone: edge.case === 'default' ? ('danger' as const) : ('success' as const)
+										}
+									: edge.when === undefined
+										? {}
+										: {
+												label: edge.when ? 'true' : 'false',
+												tone: edge.when ? ('success' as const) : ('danger' as const)
+											})
 		}))
 	};
 }

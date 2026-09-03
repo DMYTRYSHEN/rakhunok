@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+	corexParallelBranchStepName,
 	executeCorexWorkflow,
 	executeHttpAction,
 	recordCorexRunEvent,
@@ -54,6 +55,78 @@ function recordedDurableWorkflow() {
 		}
 	};
 }
+
+test('preserves top-level parallel durable step names', async () => {
+	assert.equal(
+		await corexParallelBranchStepName(
+			[{ parallelName: 'prepare-details', branchId: 'risk' }],
+			'prepare-risk',
+			0
+		),
+		'prepare-details:parallel-risk:prepare-risk'
+	);
+	assert.equal(
+		await corexParallelBranchStepName(
+			[{ parallelName: 'prepare-details', branchId: 'risk' }],
+			'prepare-risk',
+			2
+		),
+		'prepare-details:parallel-risk:prepare-risk:visit-2'
+	);
+});
+
+test('qualifies nested parallel durable step names with the complete branch path', async () => {
+	assert.equal(
+		await corexParallelBranchStepName(
+			[
+				{ parallelName: 'prepare-details', branchId: 'risk' },
+				{ parallelName: 'collect-signals', branchId: 'fraud' }
+			],
+			'load-score',
+			1
+		),
+		'prepare-details:parallel-risk/collect-signals:parallel-fraud:load-score:visit-1'
+	);
+});
+
+test('bounds long parallel identities with a deterministic collision-resistant suffix', async () => {
+	const boundaryName = await corexParallelBranchStepName(
+		[{ parallelName: 'a'.repeat(487), branchId: 'b' }],
+		's',
+		0
+	);
+	const unicodeBoundaryName = await corexParallelBranchStepName(
+		[{ parallelName: 'a'.repeat(486) + '😀', branchId: 'b' }],
+		's',
+		0
+	);
+	const sharedPath = [
+		{ parallelName: `prepare-${'a'.repeat(300)}`, branchId: `risk-${'b'.repeat(300)}` }
+	];
+	const first = await corexParallelBranchStepName(sharedPath, 'load-score-a', 7);
+	const replay = await corexParallelBranchStepName(sharedPath, 'load-score-a', 7);
+	const differentStep = await corexParallelBranchStepName(sharedPath, 'load-score-b', 7);
+	const differentVisit = await corexParallelBranchStepName(sharedPath, 'load-score-a', 8);
+	const ambiguousDisplayPath = await corexParallelBranchStepName(
+		[
+			{ parallelName: `prepare-${'a'.repeat(300)}`, branchId: 'risk' },
+			{ parallelName: `b-${'b'.repeat(300)}`, branchId: 'c' }
+		],
+		'load-score-a',
+		7
+	);
+
+	assert.equal(boundaryName.length, 500);
+	assert.doesNotMatch(boundaryName, /:sha256:/);
+	assert.equal(Array.from(unicodeBoundaryName).length, 500);
+	assert.doesNotMatch(unicodeBoundaryName, /:sha256:/);
+	assert.equal(first.length, 500);
+	assert.match(first, /:sha256:[a-f0-9]{64}$/);
+	assert.equal(replay, first);
+	assert.notEqual(differentStep, first);
+	assert.notEqual(differentVisit, first);
+	assert.notEqual(ambiguousDisplayPath, first);
+});
 
 test('executes an HTTP action with JSON input and an idempotency key', async () => {
 	let captured;
@@ -114,7 +187,11 @@ test('registers HTTP compensation without invoking it during normal execution', 
 		}
 	]);
 	const fetcher = async (url, init) => {
-		requests.push({ url: String(url), body: init.body, idempotencyKey: init.headers.get('Idempotency-Key') });
+		requests.push({
+			url: String(url),
+			body: init.body,
+			idempotencyKey: init.headers.get('Idempotency-Key')
+		});
 		return Response.json({ accepted: true }, { status: 202 });
 	};
 
@@ -199,7 +276,12 @@ test('registers a transform compensation with isolated rollback context', async 
 	]);
 
 	await executeCorexWorkflow(
-		{ runId: 'run-transform-compensation', ownerUserId: 'user-1', input: { paymentId: 'pay-1' }, plan },
+		{
+			runId: 'run-transform-compensation',
+			ownerUserId: 'user-1',
+			input: { paymentId: 'pay-1' },
+			plan
+		},
 		workflow,
 		async () => undefined,
 		async () => Response.json({ accepted: true }, { status: 202 }),
@@ -260,7 +342,12 @@ test('registers transform compensation for a transform action', async () => {
 	]);
 
 	await executeCorexWorkflow(
-		{ runId: 'run-transform-action-rollback', ownerUserId: 'user-1', input: { paymentId: 'pay-1' }, plan },
+		{
+			runId: 'run-transform-action-rollback',
+			ownerUserId: 'user-1',
+			input: { paymentId: 'pay-1' },
+			plan
+		},
 		workflow,
 		async () => undefined,
 		async () => Response.json({ accepted: true }),
@@ -289,6 +376,90 @@ test('registers transform compensation for a transform action', async () => {
 		outcome: 'complete',
 		retry: { limit: 0, backoff: 'constant', timeoutMs: 0 },
 		output: { type: 'object', bytes: 21 }
+	});
+});
+
+test('registers HTTP compensation for a transform action', async () => {
+	let rollbackOptions;
+	const attempts = [];
+	const requests = [];
+	const workflow = {
+		async do(name, optionsOrCallback, callback, rollback) {
+			if (name === 'shape-payment') rollbackOptions = rollback;
+			return (callback ?? optionsOrCallback)({ step: { name, count: 1 }, attempt: 1, config: {} });
+		}
+	};
+	const plan = graphPlan([
+		{
+			id: 'shape',
+			name: 'shape-payment',
+			type: 'transform',
+			next: 'done',
+			config: { mode: 'merge', mappings: { normalizedId: '$.paymentId' } },
+			compensation: {
+				id: 'reverse-payment',
+				name: 'reverse-payment',
+				type: 'http-request',
+				config: {
+					method: 'POST',
+					url: 'https://api.example.test/payments/reverse',
+					timeoutMs: 5_000,
+					retry: { limit: 2, backoff: 'exponential' }
+				}
+			}
+		}
+	]);
+	const fetcher = async (url, init) => {
+		requests.push({ url, body: JSON.parse(init.body) });
+		return Response.json({ reversed: true });
+	};
+
+	await executeCorexWorkflow(
+		{
+			runId: 'run-transform-http-rollback',
+			ownerUserId: 'user-1',
+			input: { paymentId: 'pay-1' },
+			plan
+		},
+		workflow,
+		async () => undefined,
+		fetcher,
+		undefined,
+		undefined,
+		6,
+		async (attempt) => attempts.push(attempt)
+	);
+
+	assert.equal(requests.length, 0);
+	assert.ok(rollbackOptions);
+	await rollbackOptions.rollback({
+		ctx: { step: { name: 'shape-payment', count: 1 }, attempt: 2, config: {} },
+		error: new Error('downstream failed'),
+		output: { paymentId: 'pay-1', normalizedId: 'pay-1' }
+	});
+	assert.deepEqual(requests, [
+		{
+			url: 'https://api.example.test/payments/reverse',
+			body: {
+				input: { paymentId: 'pay-1' },
+				output: { paymentId: 'pay-1', normalizedId: 'pay-1' },
+				error: { name: 'Error', message: 'downstream failed' }
+			}
+		}
+	]);
+	const { startedAt, finishedAt, ...rollbackAttempt } = attempts[1];
+	assert.deepEqual(rollbackAttempt, {
+		runId: 'run-transform-http-rollback',
+		ownerUserId: 'user-1',
+		executionGeneration: 6,
+		stepId: 'reverse-payment',
+		visit: 0,
+		durableStepName: 'shape-payment:rollback:reverse-payment',
+		kind: 'compensation',
+		attempt: 2,
+		outcome: 'complete',
+		retry: { limit: 2, backoff: 'exponential', timeoutMs: 5_000 },
+		output: { status: 200, contentType: 'application/json', bytes: 17 }
 	});
 });
 
@@ -383,7 +554,12 @@ test('records failed HTTP compensation attempts without masking the rollback err
 	};
 
 	await executeCorexWorkflow(
-		{ runId: 'run-failed-compensation', ownerUserId: 'user-1', input: { paymentId: 'pay-1' }, plan },
+		{
+			runId: 'run-failed-compensation',
+			ownerUserId: 'user-1',
+			input: { paymentId: 'pay-1' },
+			plan
+		},
 		workflow,
 		async () => undefined,
 		fetcher,
@@ -654,6 +830,92 @@ test('keeps non-JSON HTTP output as metadata when inline output is enabled', asy
 		status: 200,
 		contentType: 'text/plain',
 		bytes: 8
+	});
+});
+
+test('stores redacted HTTP JSON output externally without mutating the response body', async () => {
+	const attempts = [];
+	const stored = [];
+	const body = { accepted: true, customer: { email: 'private@example.com', name: 'Ada' } };
+
+	const result = await executeCorexWorkflow(
+		{
+			runId: 'run-external-http',
+			ownerUserId: 'user-1',
+			input: { paymentId: 'pay-42' },
+			plan: graphPlan([
+				action({
+					outputPolicy: {
+						mode: 'external',
+						maxBytes: 1024,
+						redactPaths: ['$.customer.email']
+					}
+				})
+			])
+		},
+		recordedDurableWorkflow(),
+		async () => undefined,
+		async () => Response.json(body, { status: 202 }),
+		undefined,
+		undefined,
+		2,
+		async (attempt) => attempts.push(attempt),
+		undefined,
+		undefined,
+		undefined,
+		async (object) => stored.push(object)
+	);
+
+	assert.equal(result.customer.email, 'private@example.com');
+	assert.equal(stored.length, 1);
+	assert.match(stored[0].key, /^corex-output\/[a-f0-9]{64}\.json$/);
+	assert.deepEqual(JSON.parse(new TextDecoder().decode(stored[0].body)), {
+		accepted: true,
+		customer: { email: '[REDACTED]', name: 'Ada' }
+	});
+	assert.deepEqual(attempts[0].output, {
+		status: 202,
+		contentType: 'application/json',
+		bytes: new TextEncoder().encode(JSON.stringify(body)).byteLength,
+		external: {
+			key: stored[0].key,
+			bytes: stored[0].body.byteLength,
+			contentType: 'application/json'
+		}
+	});
+});
+
+test('does not store HTTP JSON output above the external byte limit', async () => {
+	const attempts = [];
+	const stored = [];
+	const body = { payload: 'private details' };
+
+	await executeCorexWorkflow(
+		{
+			runId: 'run-external-http-limit',
+			ownerUserId: 'user-1',
+			input: {},
+			plan: graphPlan([action({ outputPolicy: { mode: 'external', maxBytes: 8 } })])
+		},
+		recordedDurableWorkflow(),
+		async () => undefined,
+		async () => Response.json(body),
+		undefined,
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt),
+		undefined,
+		undefined,
+		undefined,
+		async (object) => stored.push(object)
+	);
+
+	assert.equal(stored.length, 0);
+	assert.deepEqual(attempts[0].output, {
+		status: 200,
+		contentType: 'application/json',
+		bytes: new TextEncoder().encode(JSON.stringify(body)).byteLength,
+		truncated: true
 	});
 });
 
@@ -993,6 +1255,84 @@ test('executes parallel branches concurrently and merges results in configured o
 	);
 });
 
+test('executes nested parallel branches with complete branch-path identities', async () => {
+	const durableSteps = [];
+	const plan = graphPlan([
+		{
+			id: 'outer',
+			name: 'prepare-payment',
+			type: 'parallel',
+			config: { branches: [{ id: 'risk' }], resultKey: 'preparation' },
+			branchTargets: { risk: 'inner' },
+			joinTarget: 'outer-join',
+			continuationTarget: 'done'
+		},
+		{
+			id: 'inner',
+			name: 'collect-signals',
+			type: 'parallel',
+			config: { branches: [{ id: 'fraud' }, { id: 'credit' }], resultKey: 'signals' },
+			branchTargets: { fraud: 'fraud', credit: 'credit' },
+			joinTarget: 'inner-join',
+			continuationTarget: 'outer-join'
+		},
+		{
+			id: 'fraud',
+			name: 'load-fraud',
+			type: 'transform',
+			config: { mode: 'merge', mappings: { signal: '$.paymentId' } },
+			next: 'inner-join'
+		},
+		{
+			id: 'credit',
+			name: 'load-credit',
+			type: 'transform',
+			config: { mode: 'merge', mappings: { signal: '$.paymentId' } },
+			next: 'inner-join'
+		}
+	]);
+
+	const output = await executeCorexWorkflow(
+		{ runId: 'run-nested-parallel', ownerUserId: 'user-1', input: { paymentId: 'pay-42' }, plan },
+		{
+			async do(name, optionsOrCallback, callback) {
+				durableSteps.push(name);
+				return (callback ?? optionsOrCallback)({
+					step: { name, count: 1 },
+					attempt: 1,
+					config: {}
+				});
+			}
+		},
+		async () => undefined
+	);
+
+	assert.deepEqual(output, {
+		paymentId: 'pay-42',
+		preparation: {
+			risk: {
+				paymentId: 'pay-42',
+				signals: {
+					fraud: { paymentId: 'pay-42', signal: 'pay-42' },
+					credit: { paymentId: 'pay-42', signal: 'pay-42' }
+				}
+			}
+		}
+	});
+	assert.equal(
+		durableSteps.includes(
+			'prepare-payment:parallel-risk/collect-signals:parallel-fraud:load-fraud'
+		),
+		true
+	);
+	assert.equal(
+		durableSteps.includes(
+			'prepare-payment:parallel-risk/collect-signals:parallel-credit:load-credit'
+		),
+		true
+	);
+});
+
 test('records branch-qualified attempts for parallel decisions', async () => {
 	const attempts = [];
 	const plan = graphPlan([
@@ -1290,6 +1630,7 @@ test('records bounded transform output metadata inside parallel branches', async
 test('performs relative waits inside parallel branches with branch-qualified attempts', async () => {
 	const durableSleeps = [];
 	const attempts = [];
+	const completedRollbacks = [];
 	const plan = graphPlan(
 		[
 			{
@@ -1306,6 +1647,12 @@ test('performs relative waits inside parallel branches with branch-qualified att
 				name: 'settlement-delay',
 				type: 'wait',
 				config: { durationMs: 5_000 },
+				compensation: {
+					id: 'restore-delay',
+					name: 'restore-delay',
+					type: 'transform',
+					config: { mode: 'merge', mappings: { paymentId: '$.input.paymentId' } }
+				},
 				next: 'join'
 			}
 		],
@@ -1315,8 +1662,13 @@ test('performs relative waits inside parallel branches with branch-qualified att
 	await executeCorexWorkflow(
 		{ runId: 'run-parallel-wait', ownerUserId: 'user-1', input: { paymentId: 'pay-2' }, plan },
 		{
-			async do(_name, optionsOrCallback, callback) {
-				return (callback ?? optionsOrCallback)({ step: { name: 'step', count: 1 }, attempt: 1, config: {} });
+			async do(name, optionsOrCallback, callback, rollback) {
+				if (name.endsWith(':completed')) completedRollbacks.push({ name, rollback });
+				return (callback ?? optionsOrCallback)({
+					step: { name: 'step', count: 1 },
+					attempt: 1,
+					config: {}
+				});
 			},
 			async sleep(name, duration) {
 				durableSleeps.push([name, duration]);
@@ -1333,6 +1685,11 @@ test('performs relative waits inside parallel branches with branch-qualified att
 	assert.deepEqual(durableSleeps, [
 		['payment-work:parallel-delay:settlement-delay', '5000 milliseconds']
 	]);
+	assert.deepEqual(
+		completedRollbacks.map(({ name }) => name),
+		['payment-work:parallel-delay:settlement-delay:completed']
+	);
+	assert.ok(completedRollbacks[0].rollback);
 	const { startedAt, finishedAt, ...waitAttempt } = attempts[0];
 	assert.deepEqual(waitAttempt, {
 		runId: 'run-parallel-wait',
@@ -1375,10 +1732,19 @@ test('performs absolute waits inside parallel branches with branch-qualified att
 	);
 
 	await executeCorexWorkflow(
-		{ runId: 'run-parallel-wait-until', ownerUserId: 'user-1', input: { paymentId: 'pay-2' }, plan },
+		{
+			runId: 'run-parallel-wait-until',
+			ownerUserId: 'user-1',
+			input: { paymentId: 'pay-2' },
+			plan
+		},
 		{
 			async do(_name, optionsOrCallback, callback) {
-				return (callback ?? optionsOrCallback)({ step: { name: 'step', count: 1 }, attempt: 1, config: {} });
+				return (callback ?? optionsOrCallback)({
+					step: { name: 'step', count: 1 },
+					attempt: 1,
+					config: {}
+				});
 			},
 			async sleepUntil(name, timestamp) {
 				durableSleeps.push([name, timestamp.toISOString()]);
@@ -1431,7 +1797,12 @@ test('registers and completes independent external-event waits inside parallel b
 				id: 'buyer-confirmed',
 				name: 'wait-for-buyer',
 				type: 'wait-event',
-				config: { eventType: 'buyer_confirmed', timeoutMs: 60_000, resultKey: 'confirmation' },
+				config: {
+					eventType: 'buyer_confirmed',
+					timeoutMs: 60_000,
+					resultKey: 'confirmation',
+					outputPolicy: { mode: 'inline', maxBytes: 1_024, redactPaths: ['$.source'] }
+				},
 				next: 'join'
 			},
 			{
@@ -1449,12 +1820,18 @@ test('registers and completes independent external-event waits inside parallel b
 		{ runId: 'run-parallel-events', ownerUserId: 'user-1', input: { orderId: 'ord-1' }, plan },
 		{
 			async do(name, optionsOrCallback, callback) {
-				return (callback ?? optionsOrCallback)({ step: { name, count: 1 }, attempt: 1, config: {} });
+				return (callback ?? optionsOrCallback)({
+					step: { name, count: 1 },
+					attempt: 1,
+					config: {}
+				});
 			},
 			async waitForEvent(name, options) {
 				waits.push({ name, options });
 				if (options.type.includes('buyer-confirmed')) await Promise.resolve();
-				return { payload: { source: options.type.includes('buyer-confirmed') ? 'buyer' : 'seller' } };
+				return {
+					payload: { source: options.type.includes('buyer-confirmed') ? 'buyer' : 'seller' }
+				};
 			}
 		},
 		async () => undefined,
@@ -1469,7 +1846,10 @@ test('registers and completes independent external-event waits inside parallel b
 
 	assert.deepEqual(
 		registrations.map(({ stepId, eventType, waitEventType, durableStepName }) => ({
-			stepId, eventType, waitEventType, durableStepName
+			stepId,
+			eventType,
+			waitEventType,
+			durableStepName
 		})),
 		[
 			{
@@ -1486,14 +1866,34 @@ test('registers and completes independent external-event waits inside parallel b
 			}
 		]
 	);
-	assert.deepEqual(waits.map(({ options }) => options.type), registrations.map((wait) => wait.waitEventType));
-	assert.deepEqual(new Set(completions.map((wait) => wait.stepId)), new Set(['buyer-confirmed', 'seller-confirmed']));
+	assert.deepEqual(
+		waits.map(({ options }) => options.type),
+		registrations.map((wait) => wait.waitEventType)
+	);
+	assert.deepEqual(
+		new Set(completions.map((wait) => wait.stepId)),
+		new Set(['buyer-confirmed', 'seller-confirmed'])
+	);
 	assert.deepEqual(output.results, {
 		buyer: { orderId: 'ord-1', confirmation: { source: 'buyer' } },
 		seller: { orderId: 'ord-1', confirmation: { source: 'seller' } }
 	});
-	assert.deepEqual(new Set(attempts.map((attempt) => attempt.stepId)), new Set(['buyer-confirmed', 'seller-confirmed']));
-	assert.equal(attempts.every((attempt) => attempt.output.type === 'redacted'), true);
+	assert.deepEqual(
+		new Set(attempts.map((attempt) => attempt.stepId)),
+		new Set(['buyer-confirmed', 'seller-confirmed'])
+	);
+	assert.deepEqual(
+		attempts
+			.map(({ stepId, output }) => ({ stepId, output }))
+			.sort((left, right) => left.stepId.localeCompare(right.stepId)),
+		[
+			{
+				stepId: 'buyer-confirmed',
+				output: { type: 'object', bytes: 18, value: { source: '[REDACTED]' } }
+			},
+			{ stepId: 'seller-confirmed', output: { type: 'redacted' } }
+		]
+	);
 });
 
 test('awaits parallel active-wait persistence and propagates completion failures', async () => {
@@ -1527,7 +1927,11 @@ test('awaits parallel active-wait persistence and propagates completion failures
 		{ runId: 'run-persisted-wait', ownerUserId: 'user-1', input: {}, plan },
 		{
 			async do(name, optionsOrCallback, callback) {
-				return (callback ?? optionsOrCallback)({ step: { name, count: 1 }, attempt: 1, config: {} });
+				return (callback ?? optionsOrCallback)({
+					step: { name, count: 1 },
+					attempt: 1,
+					config: {}
+				});
 			},
 			async waitForEvent() {
 				waitStarted = true;
@@ -1541,7 +1945,9 @@ test('awaits parallel active-wait persistence and propagates completion failures
 		1,
 		async () => undefined,
 		async () => registration,
-		async () => { throw new Error('completion persistence failed'); }
+		async () => {
+			throw new Error('completion persistence failed');
+		}
 	);
 
 	await Promise.resolve();
@@ -1555,6 +1961,7 @@ test('routes independent approval decisions inside parallel branches', async () 
 	const registrations = [];
 	const completions = [];
 	const attempts = [];
+	const completedRollbacks = [];
 	const plan = graphPlan(
 		[
 			{
@@ -1570,13 +1977,27 @@ test('routes independent approval decisions inside parallel branches', async () 
 				id: 'finance-review',
 				name: 'review-finance',
 				type: 'approval',
-				config: { assigneeUserId: 'reviewer-1', timeoutMs: 60_000, resultKey: 'decision' },
+				config: {
+					assigneeUserId: 'reviewer-1',
+					timeoutMs: 60_000,
+					resultKey: 'decision',
+					outputPolicy: { mode: 'inline', maxBytes: 1_024, redactPaths: ['$.actorUserId'] }
+				},
 				whenApproved: 'finance-result',
-				whenRejected: 'finance-result'
+				whenRejected: 'finance-result',
+				compensation: {
+					id: 'restore-finance-review',
+					name: 'restore-finance-review',
+					type: 'transform',
+					config: { mode: 'merge', mappings: { decision: '$.output.decision' } }
+				}
 			},
 			{
-				id: 'finance-result', name: 'store-finance', type: 'transform',
-				config: { mode: 'merge', mappings: { routed: '$.decision.decision' } }, next: 'join'
+				id: 'finance-result',
+				name: 'store-finance',
+				type: 'transform',
+				config: { mode: 'merge', mappings: { routed: '$.decision.decision' } },
+				next: 'join'
 			},
 			{
 				id: 'legal-review',
@@ -1587,8 +2008,11 @@ test('routes independent approval decisions inside parallel branches', async () 
 				whenRejected: 'legal-result'
 			},
 			{
-				id: 'legal-result', name: 'store-legal', type: 'transform',
-				config: { mode: 'merge', mappings: { routed: '$.decision.decision' } }, next: 'join'
+				id: 'legal-result',
+				name: 'store-legal',
+				type: 'transform',
+				config: { mode: 'merge', mappings: { routed: '$.decision.decision' } },
+				next: 'join'
 			}
 		],
 		'parallel'
@@ -1597,8 +2021,13 @@ test('routes independent approval decisions inside parallel branches', async () 
 	const output = await executeCorexWorkflow(
 		{ runId: 'run-parallel-approvals', ownerUserId: 'user-1', input: {}, plan },
 		{
-			async do(name, optionsOrCallback, callback) {
-				return (callback ?? optionsOrCallback)({ step: { name, count: 1 }, attempt: 1, config: {} });
+			async do(name, optionsOrCallback, callback, rollback) {
+				if (name.endsWith(':completed')) completedRollbacks.push({ name, rollback });
+				return (callback ?? optionsOrCallback)({
+					step: { name, count: 1 },
+					attempt: 1,
+					config: {}
+				});
 			},
 			async waitForEvent(_name, options) {
 				const decision = options.type.includes('finance-review') ? 'approved' : 'rejected';
@@ -1618,25 +2047,50 @@ test('routes independent approval decisions inside parallel branches', async () 
 
 	assert.deepEqual(
 		registrations.map(({ stepId, assigneeUserId, waitEventType }) => ({
-			stepId, assigneeUserId, waitEventType
+			stepId,
+			assigneeUserId,
+			waitEventType
 		})),
 		[
 			{
-				stepId: 'finance-review', assigneeUserId: 'reviewer-1',
+				stepId: 'finance-review',
+				assigneeUserId: 'reviewer-1',
 				waitEventType: 'corex-wait-run-parallel-approvals-3-finance-review-0'
 			},
 			{
-				stepId: 'legal-review', assigneeUserId: 'reviewer-1',
+				stepId: 'legal-review',
+				assigneeUserId: 'reviewer-1',
 				waitEventType: 'corex-wait-run-parallel-approvals-3-legal-review-0'
 			}
 		]
 	);
-	assert.deepEqual(new Set(completions.map((wait) => wait.stepId)), new Set(['finance-review', 'legal-review']));
+	assert.deepEqual(
+		new Set(completions.map((wait) => wait.stepId)),
+		new Set(['finance-review', 'legal-review'])
+	);
 	assert.equal(output.results.finance.routed, 'approved');
 	assert.equal(output.results.legal.routed, 'rejected');
 	assert.deepEqual(
-		attempts.filter((attempt) => attempt.stepId.endsWith('-review')).map((attempt) => attempt.output),
-		[{ type: 'redacted' }, { type: 'redacted' }]
+		completedRollbacks.map(({ name }) => name),
+		['collect-reviews:parallel-finance:review-finance:completed']
+	);
+	assert.ok(completedRollbacks[0].rollback);
+	assert.deepEqual(
+		attempts
+			.filter((attempt) => attempt.stepId.endsWith('-review'))
+			.map(({ stepId, output }) => ({ stepId, output }))
+			.sort((left, right) => left.stepId.localeCompare(right.stepId)),
+		[
+			{
+				stepId: 'finance-review',
+				output: {
+					type: 'object',
+					bytes: 50,
+					value: { decision: 'approved', actorUserId: '[REDACTED]' }
+				}
+			},
+			{ stepId: 'legal-review', output: { type: 'redacted' } }
+		]
 	);
 });
 
@@ -1656,33 +2110,51 @@ test('correlates parallel subprocesses and preserves configured result order', a
 				continuationTarget: 'done'
 			},
 			{
-				id: 'invoice-process', name: 'create-invoice', type: 'invoke-process', next: 'join',
+				id: 'invoice-process',
+				name: 'create-invoice',
+				type: 'invoke-process',
+				next: 'join',
 				config: {
-					processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099', inputPath: '$',
-					resultKey: 'invoice', timeoutMs: 60_000
+					processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+					inputPath: '$',
+					resultKey: 'invoice',
+					timeoutMs: 60_000
 				}
 			},
 			{
-				id: 'receipt-process', name: 'create-receipt', type: 'invoke-process', next: 'join',
+				id: 'receipt-process',
+				name: 'create-receipt',
+				type: 'invoke-process',
+				next: 'join',
 				config: {
-					processId: '018f47a2-8391-7b1c-8f7a-f1d27670f100', inputPath: '$',
-					resultKey: 'receipt', timeoutMs: 60_000
+					processId: '018f47a2-8391-7b1c-8f7a-f1d27670f100',
+					inputPath: '$',
+					resultKey: 'receipt',
+					timeoutMs: 60_000
 				}
 			}
 		],
 		'parallel'
 	);
 	let releaseInvoice;
-	const invoiceResult = new Promise((resolve) => { releaseInvoice = resolve; });
+	const invoiceResult = new Promise((resolve) => {
+		releaseInvoice = resolve;
+	});
 
 	const output = await executeCorexWorkflow(
 		{ runId: 'run-parallel-subprocess', ownerUserId: 'user-1', input: { orderId: 'ord-1' }, plan },
 		{
 			async do(name, optionsOrCallback, callback) {
-				return (callback ?? optionsOrCallback)({ step: { name, count: 1 }, attempt: 1, config: {} });
+				return (callback ?? optionsOrCallback)({
+					step: { name, count: 1 },
+					attempt: 1,
+					config: {}
+				});
 			},
 			async waitForEvent(_name, options) {
-				const childRunId = options.type.endsWith('child-invoice') ? 'child-invoice' : 'child-receipt';
+				const childRunId = options.type.endsWith('child-invoice')
+					? 'child-invoice'
+					: 'child-receipt';
 				if (childRunId === 'child-invoice') await invoiceResult;
 				else releaseInvoice();
 				resolutions.push(childRunId);
@@ -1704,16 +2176,29 @@ test('correlates parallel subprocesses and preserves configured result order', a
 	);
 
 	assert.deepEqual(resolutions, ['child-receipt', 'child-invoice']);
-	assert.deepEqual(starts.map(({ stepId, parent }) => ({ stepId, invocationKey: parent.invocationKey })), [
-		{ stepId: 'invoice-process', invocationKey: '6:invoice-process:0' },
-		{ stepId: 'receipt-process', invocationKey: '6:receipt-process:0' }
-	]);
+	assert.deepEqual(
+		starts.map(({ stepId, parent }) => ({ stepId, invocationKey: parent.invocationKey })),
+		[
+			{ stepId: 'invoice-process', invocationKey: '6:invoice-process:0' },
+			{ stepId: 'receipt-process', invocationKey: '6:receipt-process:0' }
+		]
+	);
 	assert.deepEqual(Object.keys(output.documents), ['invoice', 'receipt']);
 	assert.equal(output.documents.invoice.invoice.childRunId, 'child-invoice');
 	assert.equal(output.documents.receipt.receipt.childRunId, 'child-receipt');
-	assert.deepEqual(new Set(attempts.map((attempt) => attempt.stepId)),
-		new Set(['invoice-process', 'receipt-process']));
-	assert.equal(attempts.every((attempt) => attempt.output.type === 'redacted'), true);
+	assert.deepEqual(
+		new Set(attempts.map((attempt) => attempt.stepId)),
+		new Set(['invoice-process', 'receipt-process'])
+	);
+	assert.equal(
+		attempts.every(
+			(attempt) =>
+				attempt.output.type === 'object' &&
+				typeof attempt.output.bytes === 'number' &&
+				!('value' in attempt.output)
+		),
+		true
+	);
 });
 
 test('terminates only the timed-out subprocess inside a parallel branch', async () => {
@@ -1722,27 +2207,42 @@ test('terminates only the timed-out subprocess inside a parallel branch', async 
 	const plan = graphPlan(
 		[
 			{
-				id: 'parallel', name: 'run-children', type: 'parallel',
+				id: 'parallel',
+				name: 'run-children',
+				type: 'parallel',
 				config: { branches: [{ id: 'slow' }, { id: 'fast' }], resultKey: 'children' },
 				branchTargets: { slow: 'slow-process', fast: 'fast-process' },
-				joinTarget: 'join', continuationTarget: 'done'
+				joinTarget: 'join',
+				continuationTarget: 'done'
 			},
 			{
-				id: 'slow-process', name: 'run-slow', type: 'invoke-process', next: 'join',
+				id: 'slow-process',
+				name: 'run-slow',
+				type: 'invoke-process',
+				next: 'join',
 				config: {
-					processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099', inputPath: '$',
-					resultKey: 'slow', timeoutMs: 1_000
+					processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+					inputPath: '$',
+					resultKey: 'slow',
+					timeoutMs: 1_000
 				},
 				compensation: {
-					id: 'restore-slow-context', name: 'restore-slow-context', type: 'transform',
+					id: 'restore-slow-context',
+					name: 'restore-slow-context',
+					type: 'transform',
 					config: { mode: 'replace', mappings: {} }
 				}
 			},
 			{
-				id: 'fast-process', name: 'run-fast', type: 'invoke-process', next: 'join',
+				id: 'fast-process',
+				name: 'run-fast',
+				type: 'invoke-process',
+				next: 'join',
 				config: {
-					processId: '018f47a2-8391-7b1c-8f7a-f1d27670f100', inputPath: '$',
-					resultKey: 'fast', timeoutMs: 1_000
+					processId: '018f47a2-8391-7b1c-8f7a-f1d27670f100',
+					inputPath: '$',
+					resultKey: 'fast',
+					timeoutMs: 1_000
 				}
 			}
 		],
@@ -1755,11 +2255,17 @@ test('terminates only the timed-out subprocess inside a parallel branch', async 
 			{
 				async do(name, optionsOrCallback, callback, rollback) {
 					if (rollback) compensationCheckpoints.push(name);
-					return (callback ?? optionsOrCallback)({ step: { name, count: 1 }, attempt: 1, config: {} });
+					return (callback ?? optionsOrCallback)({
+						step: { name, count: 1 },
+						attempt: 1,
+						config: {}
+					});
 				},
 				async waitForEvent(_name, options) {
 					if (options.type.endsWith('child-slow')) throw new Error('slow child timeout');
-					return { payload: { childRunId: 'child-fast', status: 'complete', output: { ok: true } } };
+					return {
+						payload: { childRunId: 'child-fast', status: 'complete', output: { ok: true } }
+					};
 				}
 			},
 			async () => undefined,
@@ -1774,15 +2280,21 @@ test('terminates only the timed-out subprocess inside a parallel branch', async 
 		/slow child timeout/
 	);
 
-	assert.deepEqual(terminations, [{
-		stepId: 'slow-process',
-		child: { childRunId: 'child-slow', workflowInstanceId: 'workflow-slow-process' },
-		parent: {
-			runId: 'run-parallel-timeout', ownerUserId: 'user-1',
-			invocationKey: '4:slow-process:0'
+	assert.deepEqual(terminations, [
+		{
+			stepId: 'slow-process',
+			child: { childRunId: 'child-slow', workflowInstanceId: 'workflow-slow-process' },
+			parent: {
+				runId: 'run-parallel-timeout',
+				ownerUserId: 'user-1',
+				invocationKey: '4:slow-process:0'
+			}
 		}
-	}]);
-	assert.equal(compensationCheckpoints.includes('run-children:parallel-slow:run-slow:completed'), false);
+	]);
+	assert.equal(
+		compensationCheckpoints.includes('run-children:parallel-slow:run-slow:completed'),
+		false
+	);
 });
 
 test('registers compensation for an HTTP action inside a parallel branch', async () => {
@@ -1827,12 +2339,21 @@ test('registers compensation for an HTTP action inside a parallel branch', async
 		'parallel'
 	);
 	const fetcher = async (url, init) => {
-		requests.push({ url: String(url), body: init.body, idempotencyKey: init.headers.get('Idempotency-Key') });
+		requests.push({
+			url: String(url),
+			body: init.body,
+			idempotencyKey: init.headers.get('Idempotency-Key')
+		});
 		return Response.json({ accepted: true }, { status: 202 });
 	};
 
 	await executeCorexWorkflow(
-		{ runId: 'run-parallel-compensation', ownerUserId: 'user-1', input: { paymentId: 'pay-2' }, plan },
+		{
+			runId: 'run-parallel-compensation',
+			ownerUserId: 'user-1',
+			input: { paymentId: 'pay-2' },
+			plan
+		},
 		workflow,
 		async () => undefined,
 		fetcher
@@ -1890,7 +2411,12 @@ test('records branch-qualified transform compensation inside a parallel branch',
 	);
 
 	await executeCorexWorkflow(
-		{ runId: 'run-parallel-transform-rollback', ownerUserId: 'user-1', input: { paymentId: 'pay-2' }, plan },
+		{
+			runId: 'run-parallel-transform-rollback',
+			ownerUserId: 'user-1',
+			input: { paymentId: 'pay-2' },
+			plan
+		},
 		workflow,
 		async () => undefined,
 		async () => Response.json({ accepted: true }, { status: 202 }),
@@ -1912,8 +2438,7 @@ test('records branch-qualified transform compensation inside a parallel branch',
 		executionGeneration: 6,
 		stepId: 'restore-context',
 		visit: 0,
-		durableStepName:
-			'payment-work:parallel-charge:charge-card:rollback:restore-payment-context',
+		durableStepName: 'payment-work:parallel-charge:charge-card:rollback:restore-payment-context',
 		kind: 'compensation',
 		attempt: 2,
 		outcome: 'complete',
@@ -1960,7 +2485,12 @@ test('records branch-qualified compensation for a transform action inside a para
 	);
 
 	await executeCorexWorkflow(
-		{ runId: 'run-parallel-transform-action-rollback', ownerUserId: 'user-1', input: { paymentId: 'pay-2' }, plan },
+		{
+			runId: 'run-parallel-transform-action-rollback',
+			ownerUserId: 'user-1',
+			input: { paymentId: 'pay-2' },
+			plan
+		},
 		workflow,
 		async () => undefined,
 		fetch,
@@ -1983,14 +2513,92 @@ test('records branch-qualified compensation for a transform action inside a para
 		executionGeneration: 7,
 		stepId: 'restore-context',
 		visit: 0,
-		durableStepName:
-			'payment-work:parallel-shape:shape-payment:rollback:restore-payment-context',
+		durableStepName: 'payment-work:parallel-shape:shape-payment:rollback:restore-payment-context',
 		kind: 'compensation',
 		attempt: 2,
 		outcome: 'complete',
 		retry: { limit: 0, backoff: 'constant', timeoutMs: 0 },
 		output: { type: 'object', bytes: 21 }
 	});
+});
+
+test('records branch-qualified HTTP compensation for a transform action inside a parallel branch', async () => {
+	let rollbackOptions;
+	const attempts = [];
+	const requests = [];
+	const workflow = {
+		async do(name, optionsOrCallback, callback, rollback) {
+			if (name.includes('shape-payment')) rollbackOptions = rollback;
+			return (callback ?? optionsOrCallback)({ step: { name, count: 1 }, attempt: 1, config: {} });
+		}
+	};
+	const plan = graphPlan(
+		[
+			{
+				id: 'parallel',
+				name: 'payment-work',
+				type: 'parallel',
+				config: { branches: [{ id: 'shape' }], resultKey: 'results' },
+				branchTargets: { shape: 'shape' },
+				joinTarget: 'join',
+				continuationTarget: 'done'
+			},
+			{
+				id: 'shape',
+				name: 'shape-payment',
+				type: 'transform',
+				next: 'join',
+				config: { mode: 'merge', mappings: { normalizedId: '$.paymentId' } },
+				compensation: {
+					id: 'reverse-payment',
+					name: 'reverse-payment',
+					type: 'http-request',
+					config: {
+						method: 'POST',
+						url: 'https://api.example.test/payments/reverse',
+						timeoutMs: 5_000,
+						retry: { limit: 1, backoff: 'constant' }
+					}
+				}
+			}
+		],
+		'parallel'
+	);
+	const fetcher = async (url) => {
+		requests.push(url);
+		return Response.json({ reversed: true });
+	};
+
+	await executeCorexWorkflow(
+		{
+			runId: 'run-parallel-transform-http-rollback',
+			ownerUserId: 'user-1',
+			input: { paymentId: 'pay-2' },
+			plan
+		},
+		workflow,
+		async () => undefined,
+		fetcher,
+		undefined,
+		undefined,
+		8,
+		async (attempt) => attempts.push(attempt)
+	);
+
+	assert.ok(rollbackOptions);
+	await rollbackOptions.rollback({
+		ctx: { step: { name: 'shape-payment', count: 1 }, attempt: 2, config: {} },
+		error: new Error('later branch failed'),
+		output: { paymentId: 'pay-2', normalizedId: 'pay-2' }
+	});
+	assert.deepEqual(requests, ['https://api.example.test/payments/reverse']);
+	const { startedAt, finishedAt, ...rollbackAttempt } = attempts[1];
+	assert.equal(
+		rollbackAttempt.durableStepName,
+		'payment-work:parallel-shape:shape-payment:rollback:reverse-payment'
+	);
+	assert.equal(rollbackAttempt.kind, 'compensation');
+	assert.equal(rollbackAttempt.outcome, 'complete');
 });
 
 test('projects the completed run output through the success terminal expression', async () => {
@@ -2195,7 +2803,12 @@ test('records transform output inline when the configured byte limit permits it'
 	]);
 
 	await executeCorexWorkflow(
-		{ runId: 'run-inline-transform', ownerUserId: 'user-1', input: { payment: { id: 'pay-42' } }, plan },
+		{
+			runId: 'run-inline-transform',
+			ownerUserId: 'user-1',
+			input: { payment: { id: 'pay-42' } },
+			plan
+		},
 		{
 			async do(name, optionsOrCallback, callback) {
 				return (callback ?? optionsOrCallback)({
@@ -2311,7 +2924,12 @@ test('falls back to transform output metadata when inline output exceeds the con
 	]);
 
 	await executeCorexWorkflow(
-		{ runId: 'run-oversized-transform', ownerUserId: 'user-1', input: { payment: { id: 'pay-42' } }, plan },
+		{
+			runId: 'run-oversized-transform',
+			ownerUserId: 'user-1',
+			input: { payment: { id: 'pay-42' } },
+			plan
+		},
 		{
 			async do(name, optionsOrCallback, callback) {
 				return (callback ?? optionsOrCallback)({
@@ -2336,6 +2954,158 @@ test('falls back to transform output metadata when inline output exceeds the con
 		truncated: true
 	});
 	assert.equal('value' in attempts[0].output, false);
+});
+
+test('stores redacted transform output externally without mutating execution output', async () => {
+	const attempts = [];
+	const stored = [];
+	const input = { customer: { email: 'private@example.com', name: 'Ada' } };
+	const plan = graphPlan([
+		{
+			id: 'shape',
+			name: 'shape-external-output',
+			type: 'transform',
+			next: 'done',
+			config: {
+				mode: 'replace',
+				mappings: { customer: '$.customer' },
+				outputPolicy: {
+					mode: 'external',
+					maxBytes: 1024,
+					redactPaths: ['$.customer.email']
+				}
+			}
+		}
+	]);
+
+	const result = await executeCorexWorkflow(
+		{ runId: 'run-external-transform', ownerUserId: 'user-1', input, plan },
+		recordedDurableWorkflow(),
+		async () => undefined,
+		fetch,
+		undefined,
+		undefined,
+		3,
+		async (attempt) => attempts.push(attempt),
+		undefined,
+		undefined,
+		undefined,
+		async (object) => stored.push(object)
+	);
+
+	assert.equal(result.customer.email, 'private@example.com');
+	assert.equal(stored.length, 1);
+	assert.equal(
+		stored[0].key,
+		'corex-output/2c5c272c9a65ed1d7303c80b3a9a332267d5afc2b2c91e59b4dbcb42061a48a6.json'
+	);
+	assert.deepEqual(JSON.parse(new TextDecoder().decode(stored[0].body)), {
+		customer: { email: '[REDACTED]', name: 'Ada' }
+	});
+	assert.equal(JSON.stringify(stored).includes('private@example.com'), false);
+	assert.deepEqual(attempts[0].output, {
+		type: 'object',
+		bytes: new TextEncoder().encode(JSON.stringify(result)).byteLength,
+		external: {
+			key: stored[0].key,
+			bytes: stored[0].body.byteLength,
+			contentType: 'application/json'
+		}
+	});
+});
+
+test('falls back to transform metadata when external output storage fails', async () => {
+	const attempts = [];
+	const plan = graphPlan([
+		{
+			id: 'shape',
+			name: 'shape-external-fallback',
+			type: 'transform',
+			next: 'done',
+			config: {
+				mode: 'replace',
+				mappings: { normalizedId: '$.payment.id' },
+				outputPolicy: { mode: 'external', maxBytes: 1024 }
+			}
+		}
+	]);
+
+	const result = await executeCorexWorkflow(
+		{
+			runId: 'run-external-fallback',
+			ownerUserId: 'user-1',
+			input: { payment: { id: 'pay-42' } },
+			plan
+		},
+		recordedDurableWorkflow(),
+		async () => undefined,
+		fetch,
+		undefined,
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt),
+		undefined,
+		undefined,
+		undefined,
+		async () => {
+			throw new Error('storage unavailable');
+		}
+	);
+
+	assert.deepEqual(result, { normalizedId: 'pay-42' });
+	assert.deepEqual(attempts[0].output, {
+		type: 'object',
+		bytes: new TextEncoder().encode(JSON.stringify(result)).byteLength,
+		truncated: true
+	});
+});
+
+test('stores transform output externally inside a parallel branch', async () => {
+	const attempts = [];
+	const stored = [];
+	const plan = graphPlan([
+		{
+			id: 'parallel',
+			name: 'collect',
+			type: 'parallel',
+			config: { branches: [{ id: 'buyer' }], resultKey: 'results' },
+			branchTargets: { buyer: 'shape' },
+			joinTarget: 'join',
+			continuationTarget: 'done'
+		},
+		{
+			id: 'shape',
+			name: 'shape-buyer',
+			type: 'transform',
+			next: 'join',
+			config: {
+				mode: 'replace',
+				mappings: { id: '$.id' },
+				outputPolicy: { mode: 'external', maxBytes: 1024 }
+			}
+		}
+	]);
+
+	await executeCorexWorkflow(
+		{ runId: 'run-parallel-external', ownerUserId: 'user-1', input: { id: 'buyer-1' }, plan },
+		recordedDurableWorkflow(),
+		async () => undefined,
+		fetch,
+		undefined,
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt),
+		undefined,
+		undefined,
+		undefined,
+		async (object) => stored.push(object)
+	);
+
+	assert.equal(stored.length, 1);
+	assert.equal(
+		attempts.find((attempt) => attempt.stepId === 'shape').output.external.key,
+		stored[0].key
+	);
 });
 
 test('records sanitized transform failures from a malformed trusted plan', async () => {
@@ -2618,6 +3388,545 @@ test('executes bounded loops with deterministic visit identities', async () => {
 	);
 });
 
+test('executes a reusable local function serially without starting subprocesses', async () => {
+	const attempts = [];
+	const plan = graphPlan([
+		{
+			id: 'first-call',
+			name: 'normalize-first',
+			type: 'local-call',
+			config: { inputPath: '$.first', resultKey: 'firstResult' },
+			bodyTarget: 'normalize-body',
+			returnTarget: 'normalize-return',
+			next: 'second-call'
+		},
+		{
+			id: 'second-call',
+			name: 'normalize-second',
+			type: 'local-call',
+			config: { inputPath: '$.second', resultKey: 'secondResult' },
+			bodyTarget: 'normalize-body',
+			returnTarget: 'normalize-return',
+			next: 'done'
+		},
+		{
+			id: 'normalize-body',
+			name: 'normalize-value',
+			type: 'transform',
+			config: { mode: 'replace', mappings: { value: '$.value' } },
+			next: 'normalize-return'
+		}
+	]);
+	let subprocessStarts = 0;
+
+	const output = await executeCorexWorkflow(
+		{
+			runId: 'run-local-call',
+			ownerUserId: 'user-1',
+			input: { first: { value: 1 }, second: { value: 2 } },
+			plan
+		},
+		recordedDurableWorkflow(),
+		async () => undefined,
+		fetch,
+		async () => {
+			subprocessStarts += 1;
+			throw new Error('Local calls must not start subprocesses.');
+		},
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt)
+	);
+
+	assert.deepEqual(output, {
+		first: { value: 1 },
+		second: { value: 2 },
+		firstResult: { value: 1 },
+		secondResult: { value: 2 }
+	});
+	assert.equal(subprocessStarts, 0);
+	assert.deepEqual(
+		attempts.map((attempt) => ({
+			stepId: attempt.stepId,
+			visit: attempt.visit,
+			durableStepName: attempt.durableStepName
+		})),
+		[
+			{ stepId: 'first-call', visit: 0, durableStepName: 'normalize-first' },
+			{ stepId: 'normalize-body', visit: 0, durableStepName: 'normalize-value' },
+			{ stepId: 'second-call', visit: 0, durableStepName: 'normalize-second' },
+			{ stepId: 'normalize-body', visit: 1, durableStepName: 'normalize-value:visit-1' }
+		]
+	);
+});
+
+test('executes a terminating recursive local function with isolated call frames', async () => {
+	const attempts = [];
+	const plan = graphPlan([
+		{
+			id: 'entry-call',
+			name: 'walk-list',
+			type: 'local-call',
+			config: { inputPath: '$', resultKey: 'result' },
+			bodyTarget: 'has-next',
+			returnTarget: 'walk-return',
+			next: 'done'
+		},
+		{
+			id: 'has-next',
+			name: 'has-next-item',
+			type: 'condition',
+			config: { path: '$.next', operator: 'exists' },
+			whenTrue: 'recursive-call',
+			whenFalse: 'walk-return'
+		},
+		{
+			id: 'recursive-call',
+			name: 'walk-next',
+			type: 'local-call',
+			config: { inputPath: '$.next', resultKey: 'child' },
+			bodyTarget: 'has-next',
+			returnTarget: 'walk-return',
+			next: 'walk-return'
+		}
+	]);
+
+	const output = await executeCorexWorkflow(
+		{
+			runId: 'run-recursive-local-call',
+			ownerUserId: 'user-1',
+			input: { value: 1, next: { value: 2, next: { value: 3 } } },
+			plan
+		},
+		recordedDurableWorkflow(),
+		async () => undefined,
+		fetch,
+		undefined,
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt)
+	);
+
+	assert.deepEqual(output.result, {
+		value: 1,
+		next: { value: 2, next: { value: 3 } },
+		child: {
+			value: 2,
+			next: { value: 3 },
+			child: { value: 3 }
+		}
+	});
+	assert.deepEqual(
+		attempts
+			.filter((attempt) => attempt.stepId === 'recursive-call')
+			.map((attempt) => attempt.visit),
+		[0, 1]
+	);
+});
+
+test('rejects recursive local functions that exceed the call depth limit', async () => {
+	const plan = graphPlan([
+		{
+			id: 'recursive-call',
+			name: 'recurse-forever',
+			type: 'local-call',
+			config: { inputPath: '$', resultKey: 'result' },
+			bodyTarget: 'recursive-call',
+			returnTarget: 'recursive-return',
+			next: 'done'
+		}
+	]);
+
+	await assert.rejects(
+		executeCorexWorkflow(
+			{ runId: 'run-recursion-limit', ownerUserId: 'user-1', input: {}, plan },
+			recordedDurableWorkflow(),
+			async () => undefined
+		),
+		/Local function call depth exceeded 64\./
+	);
+});
+
+test('executes reusable local functions with isolated contexts inside parallel branches', async () => {
+	const attempts = [];
+	const plan = graphPlan([
+		{
+			id: 'parallel',
+			name: 'normalize-inputs',
+			type: 'parallel',
+			config: { branches: [{ id: 'first' }, { id: 'second' }], resultKey: 'normalized' },
+			branchTargets: { first: 'first-call', second: 'second-call' },
+			joinTarget: 'join',
+			continuationTarget: 'done'
+		},
+		{
+			id: 'first-call',
+			name: 'normalize-first',
+			type: 'local-call',
+			config: { inputPath: '$.first', resultKey: 'result' },
+			bodyTarget: 'normalize-body',
+			returnTarget: 'normalize-return',
+			next: 'join'
+		},
+		{
+			id: 'second-call',
+			name: 'normalize-second',
+			type: 'local-call',
+			config: { inputPath: '$.second', resultKey: 'result' },
+			bodyTarget: 'normalize-body',
+			returnTarget: 'normalize-return',
+			next: 'join'
+		},
+		{
+			id: 'normalize-body',
+			name: 'normalize-value',
+			type: 'transform',
+			config: { mode: 'replace', mappings: { value: '$.value' } },
+			next: 'normalize-return'
+		}
+	]);
+	let subprocessStarts = 0;
+
+	const output = await executeCorexWorkflow(
+		{
+			runId: 'run-parallel-local-call',
+			ownerUserId: 'user-1',
+			input: { first: { value: 1 }, second: { value: 2 } },
+			plan
+		},
+		recordedDurableWorkflow(),
+		async () => undefined,
+		fetch,
+		async () => {
+			subprocessStarts += 1;
+			throw new Error('Local calls must not start subprocesses.');
+		},
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt)
+	);
+
+	assert.deepEqual(output, {
+		first: { value: 1 },
+		second: { value: 2 },
+		normalized: {
+			first: { first: { value: 1 }, second: { value: 2 }, result: { value: 1 } },
+			second: { first: { value: 1 }, second: { value: 2 }, result: { value: 2 } }
+		}
+	});
+	assert.equal(subprocessStarts, 0);
+	assert.deepEqual(
+		attempts
+			.map((attempt) => ({ stepId: attempt.stepId, durableStepName: attempt.durableStepName }))
+			.sort((left, right) => left.durableStepName.localeCompare(right.durableStepName)),
+		[
+			{ stepId: 'first-call', durableStepName: 'normalize-inputs:parallel-first:normalize-first' },
+			{
+				stepId: 'normalize-body',
+				durableStepName: 'normalize-inputs:parallel-first:normalize-value'
+			},
+			{
+				stepId: 'second-call',
+				durableStepName: 'normalize-inputs:parallel-second:normalize-second'
+			},
+			{
+				stepId: 'normalize-body',
+				durableStepName: 'normalize-inputs:parallel-second:normalize-value'
+			}
+		].sort((left, right) => left.durableStepName.localeCompare(right.durableStepName))
+	);
+});
+
+test('executes a serial block body before its continuation without starting a subprocess', async () => {
+	const attempts = [];
+	const plan = graphPlan([
+		{
+			id: 'prepare-block',
+			name: 'prepare-payment',
+			type: 'block',
+			config: {},
+			bodyTarget: 'normalize-body',
+			continuationTarget: 'prepare-result'
+		},
+		{
+			id: 'normalize-body',
+			name: 'normalize-payment',
+			type: 'transform',
+			config: { mode: 'merge', mappings: { paymentId: '$.payment.id' } },
+			next: 'prepare-result'
+		},
+		{
+			id: 'prepare-result',
+			name: 'prepare-result',
+			type: 'transform',
+			config: { mode: 'merge', mappings: { result: '$.paymentId' } },
+			next: 'done'
+		}
+	]);
+	let subprocessStarts = 0;
+
+	const output = await executeCorexWorkflow(
+		{
+			runId: 'run-block',
+			ownerUserId: 'user-1',
+			input: { payment: { id: 'payment-1' } },
+			plan
+		},
+		recordedDurableWorkflow(),
+		async () => undefined,
+		fetch,
+		async () => {
+			subprocessStarts += 1;
+			throw new Error('Blocks must not start subprocesses.');
+		},
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt)
+	);
+
+	assert.deepEqual(output, {
+		payment: { id: 'payment-1' },
+		paymentId: 'payment-1',
+		result: 'payment-1'
+	});
+	assert.equal(subprocessStarts, 0);
+	assert.deepEqual(
+		attempts.map((attempt) => attempt.stepId),
+		['normalize-body', 'prepare-result']
+	);
+});
+
+test('executes parallel branches inside a block body before its continuation', async () => {
+	const attempts = [];
+	const plan = graphPlan([
+		{
+			id: 'prepare-block',
+			name: 'prepare-payment',
+			type: 'block',
+			config: {},
+			bodyTarget: 'parallel',
+			continuationTarget: 'finish'
+		},
+		{
+			id: 'parallel',
+			name: 'prepare-details',
+			type: 'parallel',
+			config: { branches: [{ id: 'risk' }, { id: 'receipt' }], resultKey: 'preparation' },
+			branchTargets: { risk: 'risk', receipt: 'receipt' },
+			joinTarget: 'join',
+			continuationTarget: 'finish'
+		},
+		{
+			id: 'risk',
+			name: 'prepare-risk',
+			type: 'transform',
+			config: { mode: 'merge', mappings: { riskPaymentId: '$.payment.id' } },
+			next: 'join'
+		},
+		{
+			id: 'receipt',
+			name: 'prepare-receipt',
+			type: 'transform',
+			config: { mode: 'merge', mappings: { receiptPaymentId: '$.payment.id' } },
+			next: 'join'
+		},
+		{
+			id: 'finish',
+			name: 'finish-payment',
+			type: 'transform',
+			config: { mode: 'merge', mappings: { result: '$.preparation.risk.riskPaymentId' } },
+			next: 'done'
+		}
+	]);
+	let subprocessStarts = 0;
+
+	const output = await executeCorexWorkflow(
+		{
+			runId: 'run-parallel-block',
+			ownerUserId: 'user-1',
+			input: { payment: { id: 'payment-1' } },
+			plan
+		},
+		recordedDurableWorkflow(),
+		async () => undefined,
+		fetch,
+		async () => {
+			subprocessStarts += 1;
+			throw new Error('Blocks must not start subprocesses.');
+		},
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt)
+	);
+
+	assert.deepEqual(output, {
+		payment: { id: 'payment-1' },
+		preparation: {
+			risk: { payment: { id: 'payment-1' }, riskPaymentId: 'payment-1' },
+			receipt: { payment: { id: 'payment-1' }, receiptPaymentId: 'payment-1' }
+		},
+		result: 'payment-1'
+	});
+	assert.equal(subprocessStarts, 0);
+	assert.deepEqual(
+		attempts.map((attempt) => ({
+			stepId: attempt.stepId,
+			durableStepName: attempt.durableStepName
+		})),
+		[
+			{ stepId: 'risk', durableStepName: 'prepare-details:parallel-risk:prepare-risk' },
+			{ stepId: 'receipt', durableStepName: 'prepare-details:parallel-receipt:prepare-receipt' },
+			{ stepId: 'finish', durableStepName: 'finish-payment' }
+		]
+	);
+});
+
+test('executes nested serial block bodies in continuation order', async () => {
+	const attempts = [];
+	const plan = graphPlan([
+		{
+			id: 'outer-block',
+			name: 'prepare-payment',
+			type: 'block',
+			config: {},
+			bodyTarget: 'inner-block',
+			continuationTarget: 'outer-result'
+		},
+		{
+			id: 'inner-block',
+			name: 'normalize-payment',
+			type: 'block',
+			config: {},
+			bodyTarget: 'inner-body',
+			continuationTarget: 'inner-result'
+		},
+		{
+			id: 'inner-body',
+			name: 'copy-payment-id',
+			type: 'transform',
+			config: { mode: 'merge', mappings: { paymentId: '$.payment.id' } },
+			next: 'inner-result'
+		},
+		{
+			id: 'inner-result',
+			name: 'mark-normalized',
+			type: 'transform',
+			config: { mode: 'merge', mappings: { normalizedId: '$.paymentId' } },
+			next: 'outer-result'
+		},
+		{
+			id: 'outer-result',
+			name: 'prepare-result',
+			type: 'transform',
+			config: { mode: 'merge', mappings: { result: '$.normalizedId' } },
+			next: 'done'
+		}
+	]);
+	let subprocessStarts = 0;
+
+	const output = await executeCorexWorkflow(
+		{
+			runId: 'run-nested-block',
+			ownerUserId: 'user-1',
+			input: { payment: { id: 'payment-1' } },
+			plan
+		},
+		recordedDurableWorkflow(),
+		async () => undefined,
+		fetch,
+		async () => {
+			subprocessStarts += 1;
+			throw new Error('Nested blocks must not start subprocesses.');
+		},
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt)
+	);
+
+	assert.deepEqual(output, {
+		payment: { id: 'payment-1' },
+		paymentId: 'payment-1',
+		normalizedId: 'payment-1',
+		result: 'payment-1'
+	});
+	assert.equal(subprocessStarts, 0);
+	assert.deepEqual(
+		attempts.map((attempt) => attempt.stepId),
+		['inner-body', 'inner-result', 'outer-result']
+	);
+});
+
+test('executes a serial block inside a parallel branch', async () => {
+	const attempts = [];
+	const plan = graphPlan(
+		[
+			{
+				id: 'parallel',
+				name: 'prepare-payments',
+				type: 'parallel',
+				config: { branches: [{ id: 'payment' }], resultKey: 'prepared' },
+				branchTargets: { payment: 'prepare-block' },
+				joinTarget: 'join',
+				continuationTarget: 'done'
+			},
+			{
+				id: 'prepare-block',
+				name: 'prepare-payment',
+				type: 'block',
+				config: {},
+				bodyTarget: 'normalize-body',
+				continuationTarget: 'prepare-result'
+			},
+			{
+				id: 'normalize-body',
+				name: 'normalize-payment',
+				type: 'transform',
+				config: { mode: 'merge', mappings: { paymentId: '$.payment.id' } },
+				next: 'prepare-result'
+			},
+			{
+				id: 'prepare-result',
+				name: 'prepare-result',
+				type: 'transform',
+				config: { mode: 'merge', mappings: { result: '$.paymentId' } },
+				next: 'join'
+			}
+		],
+		'parallel'
+	);
+
+	const output = await executeCorexWorkflow(
+		{
+			runId: 'run-parallel-block',
+			ownerUserId: 'user-1',
+			input: { payment: { id: 'payment-1' } },
+			plan
+		},
+		recordedDurableWorkflow(),
+		async () => undefined,
+		fetch,
+		undefined,
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt)
+	);
+
+	assert.deepEqual(output, {
+		payment: { id: 'payment-1' },
+		prepared: {
+			payment: {
+				payment: { id: 'payment-1' },
+				paymentId: 'payment-1',
+				result: 'payment-1'
+			}
+		}
+	});
+	assert.deepEqual(
+		attempts.map((attempt) => attempt.stepId),
+		['normalize-body', 'prepare-result']
+	);
+});
+
 test('break exits its referenced loop immediately', async () => {
 	const visited = [];
 	const attempts = [];
@@ -2741,6 +4050,91 @@ test('performs an absolute durable wait and records it as waiting', async () => 
 	);
 });
 
+test('registers timer compensation only after a durable wait completes', async () => {
+	let rollbackOptions;
+	const attempts = [];
+	const completedNames = [];
+	const compensatedPlan = graphPlan([
+		{
+			id: 'wait',
+			name: 'settlement-delay',
+			type: 'wait',
+			config: { durationMs: 5_000 },
+			compensation: {
+				id: 'restore-wait',
+				name: 'restore-wait',
+				type: 'transform',
+				config: {
+					mode: 'replace',
+					mappings: { amount: '$.input.amount', failure: '$.error.message' },
+					outputPolicy: { mode: 'inline', maxBytes: 1_024 }
+				}
+			},
+			next: 'done'
+		}
+	]);
+
+	await executeCorexWorkflow(
+		{
+			runId: 'run-wait-compensation',
+			ownerUserId: 'user-1',
+			input: { amount: 900 },
+			plan: compensatedPlan
+		},
+		{
+			async do(name, optionsOrCallback, callback, rollback) {
+				if (name.endsWith(':completed')) {
+					completedNames.push(name);
+					rollbackOptions = rollback;
+				}
+				return (callback ?? optionsOrCallback)({
+					step: { name, count: 1 },
+					attempt: 1,
+					config: {}
+				});
+			},
+			async sleep() {}
+		},
+		async () => undefined,
+		fetch,
+		undefined,
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt)
+	);
+
+	assert.deepEqual(completedNames, ['settlement-delay:completed']);
+	assert.ok(rollbackOptions);
+	await rollbackOptions.rollback({
+		ctx: { step: { name: 'settlement-delay:completed', count: 1 }, attempt: 1, config: {} },
+		error: new Error('later step failed'),
+		output: undefined
+	});
+	assert.deepEqual(attempts.find((attempt) => attempt.kind === 'compensation').output.value, {
+		amount: 900,
+		failure: 'later step failed'
+	});
+
+	completedNames.length = 0;
+	await assert.rejects(
+		executeCorexWorkflow(
+			{ runId: 'run-wait-failed', ownerUserId: 'user-1', input: {}, plan: compensatedPlan },
+			{
+				async do(name, optionsOrCallback, callback) {
+					if (name.endsWith(':completed')) completedNames.push(name);
+					return (callback ?? optionsOrCallback)();
+				},
+				async sleep() {
+					throw new Error('sleep failed');
+				}
+			},
+			async () => undefined
+		),
+		/sleep failed/
+	);
+	assert.deepEqual(completedNames, []);
+});
+
 test('ignores an attempt recorder failure after a completed durable wait', async () => {
 	const plan = graphPlan([
 		{
@@ -2822,7 +4216,12 @@ test('waits for an external event and adds its payload to process context', asyn
 			name: 'wait-for-approval',
 			type: 'wait-event',
 			next: 'send',
-			config: { eventType: 'payment-approved', timeoutMs: 86_400_000, resultKey: 'approval' }
+			config: {
+				eventType: 'payment-approved',
+				timeoutMs: 86_400_000,
+				resultKey: 'approval',
+				outputPolicy: { mode: 'inline', maxBytes: 1_024, redactPaths: ['$.approvedBy'] }
+			}
 		},
 		{ ...action(), id: 'send', name: 'send-payment' }
 	]);
@@ -2866,23 +4265,235 @@ test('waits for an external event and adds its payload to process context', asyn
 		}
 	]);
 	const waitAttempt = attempts.find((attempt) => attempt.stepId === 'approval');
-	assert.deepEqual(
-		(({ startedAt, finishedAt, ...attempt }) => attempt)(waitAttempt),
-		{
-			runId: 'run-1',
-			ownerUserId: 'user-1',
-			executionGeneration: 1,
-			stepId: 'approval',
-			visit: 0,
-			durableStepName: 'wait-for-approval',
-			kind: 'forward',
-			attempt: 1,
-			outcome: 'complete',
-			retry: { limit: 0, backoff: 'constant', timeoutMs: 86_400_000 },
-			output: { type: 'redacted' }
+	assert.deepEqual((({ startedAt, finishedAt, ...attempt }) => attempt)(waitAttempt), {
+		runId: 'run-1',
+		ownerUserId: 'user-1',
+		executionGeneration: 1,
+		stepId: 'approval',
+		visit: 0,
+		durableStepName: 'wait-for-approval',
+		kind: 'forward',
+		attempt: 1,
+		outcome: 'complete',
+		retry: { limit: 0, backoff: 'constant', timeoutMs: 86_400_000 },
+		output: {
+			type: 'object',
+			bytes: 40,
+			value: { approved: true, approvedBy: '[REDACTED]' }
 		}
-	);
+	});
 	assert.deepEqual(result, { accepted: true });
+});
+
+test('registers transform compensation after an external event arrives', async () => {
+	let rollbackOptions;
+	const attempts = [];
+	const plan = graphPlan([
+		{
+			id: 'payment-event',
+			name: 'wait-for-payment',
+			type: 'wait-event',
+			next: 'done',
+			config: {
+				eventType: 'payment-completed',
+				timeoutMs: 60_000,
+				resultKey: 'payment',
+				outputPolicy: { mode: 'metadata', maxBytes: 16_384 }
+			},
+			compensation: {
+				id: 'restore-payment',
+				name: 'restore-payment',
+				type: 'transform',
+				config: {
+					mode: 'replace',
+					mappings: {
+						paymentId: '$.input.paymentId',
+						providerId: '$.output.providerId',
+						failure: '$.error.message'
+					},
+					outputPolicy: { mode: 'inline', maxBytes: 1_024 }
+				}
+			}
+		}
+	]);
+
+	await executeCorexWorkflow(
+		{
+			runId: 'run-event-compensation',
+			ownerUserId: 'user-1',
+			input: { paymentId: 'pay-42' },
+			plan
+		},
+		{
+			async do(name, optionsOrCallback, callback, rollback) {
+				if (name === 'wait-for-payment:completed') rollbackOptions = rollback;
+				return (callback ?? optionsOrCallback)({
+					step: { name, count: 1 },
+					attempt: 1,
+					config: {}
+				});
+			},
+			async waitForEvent() {
+				return { payload: { providerId: 'provider-7' } };
+			}
+		},
+		async () => undefined,
+		fetch,
+		undefined,
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt)
+	);
+
+	assert.ok(rollbackOptions);
+	await rollbackOptions.rollback({
+		ctx: { step: { name: 'wait-for-payment:completed', count: 1 }, attempt: 1, config: {} },
+		error: new Error('later step failed'),
+		output: { providerId: 'provider-7' }
+	});
+	const compensationAttempt = attempts.find((attempt) => attempt.kind === 'compensation');
+	assert.deepEqual(compensationAttempt.output.value, {
+		paymentId: 'pay-42',
+		providerId: 'provider-7',
+		failure: 'later step failed'
+	});
+});
+
+test('registers branch-qualified event compensation only after a parallel event arrives', async () => {
+	let rollbackOptions;
+	const checkpoints = [];
+	const plan = graphPlan(
+		[
+			{
+				id: 'parallel',
+				name: 'event-work',
+				type: 'parallel',
+				config: { branches: [{ id: 'payment' }], resultKey: 'results' },
+				branchTargets: { payment: 'payment-event' },
+				joinTarget: 'join',
+				continuationTarget: 'done'
+			},
+			{
+				id: 'payment-event',
+				name: 'wait-for-payment',
+				type: 'wait-event',
+				next: 'join',
+				config: {
+					eventType: 'payment-completed',
+					timeoutMs: 60_000,
+					resultKey: 'payment',
+					outputPolicy: { mode: 'metadata', maxBytes: 16_384 }
+				},
+				compensation: {
+					id: 'restore-payment',
+					name: 'restore-payment',
+					type: 'transform',
+					config: {
+						mode: 'replace',
+						mappings: {},
+						outputPolicy: { mode: 'metadata', maxBytes: 16_384 }
+					}
+				}
+			}
+		],
+		'parallel'
+	);
+	const execute = (failWait) =>
+		executeCorexWorkflow(
+			{ runId: 'run-parallel-event', ownerUserId: 'user-1', input: {}, plan },
+			{
+				async do(name, optionsOrCallback, callback, rollback) {
+					if (name.endsWith(':completed')) {
+						checkpoints.push(name);
+						rollbackOptions = rollback;
+					}
+					return (callback ?? optionsOrCallback)({
+						step: { name, count: 1 },
+						attempt: 1,
+						config: {}
+					});
+				},
+				async waitForEvent() {
+					if (failWait) throw new Error('event timeout');
+					return { payload: { providerId: 'provider-7' } };
+				}
+			},
+			async () => undefined,
+			fetch,
+			undefined,
+			undefined,
+			1,
+			undefined,
+			async () => undefined,
+			async () => undefined
+		);
+
+	await execute(false);
+	assert.deepEqual(checkpoints, ['event-work:parallel-payment:wait-for-payment:completed']);
+	assert.ok(rollbackOptions);
+	checkpoints.length = 0;
+	rollbackOptions = undefined;
+	await assert.rejects(execute(true), /event timeout/);
+	assert.deepEqual(checkpoints, []);
+	assert.equal(rollbackOptions, undefined);
+});
+
+test('stores redacted external-event payload externally without mutating process context', async () => {
+	const attempts = [];
+	const stored = [];
+	const plan = graphPlan([
+		{
+			id: 'payment-event',
+			name: 'wait-for-payment',
+			type: 'wait-event',
+			next: 'done',
+			config: {
+				eventType: 'payment-approved',
+				timeoutMs: 60_000,
+				resultKey: 'payment',
+				outputPolicy: { mode: 'external', maxBytes: 1024, redactPaths: ['$.token'] }
+			}
+		}
+	]);
+	plan.nodes.at(-1).config.outputExpression = '$.payment';
+
+	const output = await executeCorexWorkflow(
+		{ runId: 'run-event', ownerUserId: 'user-1', input: {}, plan },
+		{
+			async do(_name, optionsOrCallback, callback) {
+				return (callback ?? optionsOrCallback)();
+			},
+			async waitForEvent() {
+				return { payload: { approved: true, token: 'private' } };
+			}
+		},
+		async () => undefined,
+		fetch,
+		undefined,
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt),
+		undefined,
+		undefined,
+		undefined,
+		async (object) => stored.push(object)
+	);
+
+	assert.deepEqual(output, { approved: true, token: 'private' });
+	assert.equal(stored.length, 1);
+	assert.deepEqual(JSON.parse(new TextDecoder().decode(stored[0].body)), {
+		approved: true,
+		token: '[REDACTED]'
+	});
+	assert.deepEqual(attempts[0].output, {
+		type: 'object',
+		bytes: 35,
+		external: {
+			key: stored[0].key,
+			bytes: 38,
+			contentType: 'application/json'
+		}
+	});
 });
 
 test('ignores an attempt recorder failure after a completed external event wait', async () => {
@@ -2933,7 +4544,8 @@ test('starts a subprocess and waits durably for its correlated result', async ()
 				processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
 				inputPath: '$.payment',
 				resultKey: 'invoice',
-				timeoutMs: 2_592_000_000
+				timeoutMs: 2_592_000_000,
+				outputPolicy: { mode: 'inline', maxBytes: 128, redactPaths: ['$.token'] }
 			}
 		}
 	]);
@@ -2948,7 +4560,11 @@ test('starts a subprocess and waits durably for its correlated result', async ()
 			async waitForEvent(name, options) {
 				waits.push([name, options]);
 				return {
-					payload: { childRunId: 'child-run', status: 'complete', output: { id: 'inv-1' } }
+					payload: {
+						childRunId: 'child-run',
+						status: 'complete',
+						output: { id: 'inv-1', token: 'private' }
+					}
 				};
 			}
 		},
@@ -2965,7 +4581,9 @@ test('starts a subprocess and waits durably for its correlated result', async ()
 
 	assert.deepEqual(starts[0].input, { id: 'pay-42' });
 	assert.deepEqual(starts[0].parent, {
-		runId: 'parent-run', ownerUserId: 'user-1', invocationKey: '1:invoice:0'
+		runId: 'parent-run',
+		ownerUserId: 'user-1',
+		invocationKey: '1:invoice:0'
 	});
 	assert.deepEqual(waits, [
 		[
@@ -2973,7 +4591,7 @@ test('starts a subprocess and waits durably for its correlated result', async ()
 			{ type: 'corex-subprocess-result:child-run', timeout: '2592000000 milliseconds' }
 		]
 	]);
-	assert.deepEqual(output, { id: 'inv-1' });
+	assert.deepEqual(output, { id: 'inv-1', token: 'private' });
 	assert.deepEqual(
 		attempts.map(({ startedAt, finishedAt, ...attempt }) => attempt),
 		[
@@ -2988,11 +4606,123 @@ test('starts a subprocess and waits durably for its correlated result', async ()
 				attempt: 1,
 				outcome: 'complete',
 				retry: { limit: 0, backoff: 'constant', timeoutMs: 2_592_000_000 },
-				output: { type: 'redacted' }
+				output: {
+					type: 'object',
+					bytes: 32,
+					value: { id: 'inv-1', token: '[REDACTED]' }
+				}
 			}
 		]
 	);
+	assert.equal(JSON.stringify(attempts).includes('private'), false);
+});
+
+test('falls back to subprocess output metadata above the inline limit', async () => {
+	const attempts = [];
+	const plan = graphPlan([
+		{
+			id: 'invoice',
+			name: 'create-invoice',
+			type: 'invoke-process',
+			next: 'done',
+			config: {
+				processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				inputPath: '$',
+				resultKey: 'invoice',
+				timeoutMs: 60_000,
+				outputPolicy: { mode: 'inline', maxBytes: 4 }
+			}
+		}
+	]);
+
+	await executeCorexWorkflow(
+		{ runId: 'parent-run', ownerUserId: 'user-1', input: {}, plan },
+		{
+			async do(_name, optionsOrCallback, callback) {
+				return (callback ?? optionsOrCallback)();
+			},
+			async waitForEvent() {
+				return {
+					payload: { childRunId: 'child-run', status: 'complete', output: { id: 'inv-1' } }
+				};
+			}
+		},
+		async () => undefined,
+		fetch,
+		async () => ({ childRunId: 'child-run', workflowInstanceId: 'child-workflow' }),
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt)
+	);
+
+	assert.deepEqual(attempts[0].output, { type: 'object', bytes: 14, truncated: true });
 	assert.equal(JSON.stringify(attempts).includes('inv-1'), false);
+});
+
+test('stores redacted subprocess business output externally without storing correlation data', async () => {
+	const attempts = [];
+	const stored = [];
+	const plan = graphPlan([
+		{
+			id: 'invoice',
+			name: 'create-invoice',
+			type: 'invoke-process',
+			next: 'done',
+			config: {
+				processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
+				inputPath: '$',
+				resultKey: 'invoice',
+				timeoutMs: 60_000,
+				outputPolicy: { mode: 'external', maxBytes: 1024, redactPaths: ['$.token'] }
+			}
+		}
+	]);
+	plan.nodes.at(-1).config.outputExpression = '$.invoice';
+
+	const output = await executeCorexWorkflow(
+		{ runId: 'parent-run', ownerUserId: 'user-1', input: {}, plan },
+		{
+			async do(_name, optionsOrCallback, callback) {
+				return (callback ?? optionsOrCallback)();
+			},
+			async waitForEvent() {
+				return {
+					payload: {
+						childRunId: 'child-run',
+						status: 'complete',
+						output: { id: 'inv-1', token: 'private' }
+					}
+				};
+			}
+		},
+		async () => undefined,
+		fetch,
+		async () => ({ childRunId: 'child-run', workflowInstanceId: 'child-workflow' }),
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt),
+		undefined,
+		undefined,
+		undefined,
+		async (object) => stored.push(object)
+	);
+
+	assert.deepEqual(output, { id: 'inv-1', token: 'private' });
+	assert.equal(stored.length, 1);
+	assert.deepEqual(JSON.parse(new TextDecoder().decode(stored[0].body)), {
+		id: 'inv-1',
+		token: '[REDACTED]'
+	});
+	assert.equal(JSON.stringify(stored).includes('child-run'), false);
+	assert.deepEqual(attempts[0].output, {
+		type: 'object',
+		bytes: 32,
+		external: {
+			key: stored[0].key,
+			bytes: 35,
+			contentType: 'application/json'
+		}
+	});
 });
 
 test('registers transform compensation after a subprocess completes', async () => {
@@ -3027,7 +4757,9 @@ test('registers transform compensation after a subprocess completes', async () =
 				durableNames.push(name);
 				if (name === 'create-invoice:completed') rollbackOptions = rollback;
 				return (callback ?? optionsOrCallback)({
-					step: { name, count: 1 }, attempt: 1, config: {}
+					step: { name, count: 1 },
+					attempt: 1,
+					config: {}
 				});
 			},
 			async waitForEvent() {
@@ -3081,12 +4813,18 @@ test('registers HTTP compensation after a subprocess completes', async () => {
 			next: 'done',
 			config: {
 				processId: '018f47a2-8391-7b1c-8f7a-f1d27670f099',
-				inputPath: '$', resultKey: 'invoice', timeoutMs: 60_000
+				inputPath: '$',
+				resultKey: 'invoice',
+				timeoutMs: 60_000
 			},
 			compensation: {
-				id: 'cancel-invoice', name: 'cancel-invoice', type: 'http-request',
+				id: 'cancel-invoice',
+				name: 'cancel-invoice',
+				type: 'http-request',
 				config: {
-					method: 'POST', url: 'https://api.example.com/invoices/cancel', timeoutMs: 8_000,
+					method: 'POST',
+					url: 'https://api.example.com/invoices/cancel',
+					timeoutMs: 8_000,
 					retry: { limit: 3, backoff: 'exponential' },
 					idempotencyKey: '$.output.childRunId'
 				}
@@ -3095,7 +4833,8 @@ test('registers HTTP compensation after a subprocess completes', async () => {
 	]);
 	const fetcher = async (url, init) => {
 		requests.push({
-			url: String(url), body: JSON.parse(init.body),
+			url: String(url),
+			body: JSON.parse(init.body),
 			idempotencyKey: init.headers.get('Idempotency-Key')
 		});
 		return Response.json({ cancelled: true }, { status: 202 });
@@ -3107,7 +4846,9 @@ test('registers HTTP compensation after a subprocess completes', async () => {
 			async do(name, optionsOrCallback, callback, rollback) {
 				if (name === 'create-invoice:completed') rollbackOptions = rollback;
 				return (callback ?? optionsOrCallback)({
-					step: { name, count: 1 }, attempt: 1, config: {}
+					step: { name, count: 1 },
+					attempt: 1,
+					config: {}
 				});
 			},
 			async waitForEvent() {
@@ -3122,22 +4863,25 @@ test('registers HTTP compensation after a subprocess completes', async () => {
 	);
 
 	assert.deepEqual(rollbackOptions.rollbackConfig, {
-		retries: { limit: 3, delay: 1_000, backoff: 'exponential' }, timeout: 8_000
+		retries: { limit: 3, delay: 1_000, backoff: 'exponential' },
+		timeout: 8_000
 	});
 	await rollbackOptions.rollback({
 		ctx: { step: { name: 'create-invoice:completed', count: 1 }, attempt: 1, config: {} },
 		error: new Error('later action failed'),
 		output: { childRunId: 'child-run', status: 'complete', output: { id: 'inv-1' } }
 	});
-	assert.deepEqual(requests, [{
-		url: 'https://api.example.com/invoices/cancel',
-		idempotencyKey: 'child-run',
-		body: {
-			input: { orderId: 'ord-1' },
-			output: { childRunId: 'child-run', status: 'complete', output: { id: 'inv-1' } },
-			error: { name: 'Error', message: 'later action failed' }
+	assert.deepEqual(requests, [
+		{
+			url: 'https://api.example.com/invoices/cancel',
+			idempotencyKey: 'child-run',
+			body: {
+				input: { orderId: 'ord-1' },
+				output: { childRunId: 'child-run', status: 'complete', output: { id: 'inv-1' } },
+				error: { name: 'Error', message: 'later action failed' }
+			}
 		}
-	}]);
+	]);
 });
 
 test('ignores an attempt recorder failure after a completed subprocess', async () => {
@@ -3645,7 +5389,12 @@ test('waits for and audits a validated human approval decision', async () => {
 						id: 'approval',
 						name: 'review-payment',
 						type: 'approval',
-						config: { assigneeUserId: 'user-1', timeoutMs: 86400000, resultKey: 'approval' },
+						config: {
+							assigneeUserId: 'user-1',
+							timeoutMs: 86400000,
+							resultKey: 'approval',
+							outputPolicy: { mode: 'inline', maxBytes: 1_024, redactPaths: ['$.actorUserId'] }
+						},
 						whenApproved: 'success',
 						whenRejected: 'rejected'
 					},
@@ -3709,14 +5458,156 @@ test('waits for and audits a validated human approval decision', async () => {
 				attempt: 1,
 				outcome: 'complete',
 				retry: { limit: 0, backoff: 'constant', timeoutMs: 86_400_000 },
-				output: { type: 'redacted' }
+				output: {
+					type: 'object',
+					bytes: 67,
+					value: { decision: 'approved', comment: 'Verified', actorUserId: '[REDACTED]' }
+				}
 			}
 		]
 	);
 });
 
+test('registers approval compensation without changing the decision route', async () => {
+	let rollbackOptions;
+	const attempts = [];
+	const plan = graphPlan([
+		{
+			id: 'approval',
+			name: 'review-payment',
+			type: 'approval',
+			config: {
+				assigneeUserId: 'user-1',
+				timeoutMs: 60_000,
+				resultKey: 'approval',
+				outputPolicy: { mode: 'metadata', maxBytes: 16_384 }
+			},
+			whenApproved: 'approved',
+			whenRejected: 'rejected',
+			compensation: {
+				id: 'restore-approval',
+				name: 'restore-approval',
+				type: 'transform',
+				config: {
+					mode: 'replace',
+					mappings: {
+						amount: '$.input.amount',
+						decision: '$.output.decision',
+						failure: '$.error.message'
+					},
+					outputPolicy: { mode: 'inline', maxBytes: 1_024 }
+				}
+			}
+		},
+		{
+			id: 'approved',
+			name: 'approved',
+			type: 'end-success',
+			config: { outputExpression: '$.approval.decision' }
+		},
+		{ id: 'rejected', name: 'rejected', type: 'end-success', config: {} }
+	]);
+
+	const output = await executeCorexWorkflow(
+		{ runId: 'run-approval-compensation', ownerUserId: 'user-1', input: { amount: 900 }, plan },
+		{
+			async do(name, optionsOrCallback, callback, rollback) {
+				if (name === 'review-payment:completed') rollbackOptions = rollback;
+				return (callback ?? optionsOrCallback)({
+					step: { name, count: 1 },
+					attempt: 1,
+					config: {}
+				});
+			},
+			async waitForEvent() {
+				return { payload: { decision: 'approved', actorUserId: 'user-1' } };
+			}
+		},
+		async () => undefined,
+		fetch,
+		undefined,
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt)
+	);
+
+	assert.equal(output, 'approved');
+	assert.ok(rollbackOptions);
+	await rollbackOptions.rollback({
+		ctx: { step: { name: 'review-payment:completed', count: 1 }, attempt: 1, config: {} },
+		error: new Error('later step failed'),
+		output: { decision: 'approved', actorUserId: 'user-1' }
+	});
+	const compensationAttempt = attempts.find((attempt) => attempt.kind === 'compensation');
+	assert.deepEqual(compensationAttempt.output.value, {
+		amount: 900,
+		decision: 'approved',
+		failure: 'later step failed'
+	});
+});
+
+test('stores a redacted approval decision externally without changing its route or context', async () => {
+	const attempts = [];
+	const stored = [];
+	const plan = graphPlan([
+		{
+			id: 'approval',
+			name: 'review-payment',
+			type: 'approval',
+			config: {
+				assigneeUserId: 'user-1',
+				timeoutMs: 60_000,
+				resultKey: 'approval',
+				outputPolicy: { mode: 'external', maxBytes: 1_024, redactPaths: ['$.actorUserId'] }
+			},
+			whenApproved: 'done',
+			whenRejected: 'done'
+		}
+	]);
+	plan.nodes.at(-1).config.outputExpression = '$.approval';
+
+	const output = await executeCorexWorkflow(
+		{ runId: 'run-approval', ownerUserId: 'user-1', input: {}, plan },
+		{
+			async do(_name, optionsOrCallback, callback) {
+				return (callback ?? optionsOrCallback)();
+			},
+			async waitForEvent() {
+				return {
+					payload: { decision: 'approved', comment: 'Verified', actorUserId: 'user-1' }
+				};
+			}
+		},
+		async () => undefined,
+		fetch,
+		undefined,
+		undefined,
+		1,
+		async (attempt) => attempts.push(attempt),
+		undefined,
+		undefined,
+		undefined,
+		async (object) => stored.push(object)
+	);
+
+	assert.deepEqual(output, {
+		decision: 'approved',
+		comment: 'Verified',
+		actorUserId: 'user-1'
+	});
+	assert.equal(stored.length, 1);
+	assert.deepEqual(JSON.parse(new TextDecoder().decode(stored[0].body)), {
+		decision: 'approved',
+		comment: 'Verified',
+		actorUserId: '[REDACTED]'
+	});
+	assert.equal(attempts[0].output.external.key, stored[0].key);
+	assert.equal(attempts[0].output.external.bytes, stored[0].body.byteLength);
+});
+
 test('records a sanitized failed attempt for an invalid approval event', async () => {
 	const attempts = [];
+	const stepNames = [];
 	const plan = graphPlan([
 		{
 			id: 'approval',
@@ -3732,7 +5623,8 @@ test('records a sanitized failed attempt for an invalid approval event', async (
 		executeCorexWorkflow(
 			{ runId: 'run-approval', ownerUserId: 'user-1', input: {}, plan },
 			{
-				async do(_name, optionsOrCallback, callback) {
+				async do(name, optionsOrCallback, callback) {
+					stepNames.push(name);
 					return (callback ?? optionsOrCallback)();
 				},
 				async waitForEvent() {
@@ -3765,6 +5657,10 @@ test('records a sanitized failed attempt for an invalid approval event', async (
 		error: { code: 'approval_failed' }
 	});
 	assert.equal(JSON.stringify(attempts).includes('do not persist'), false);
+	assert.equal(
+		stepNames.some((name) => name.endsWith(':completed')),
+		false
+	);
 });
 
 test('routes a rejected human approval through the rejected transition', async () => {

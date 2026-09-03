@@ -92,7 +92,9 @@
 		border-radius: 9999px;
 		background: rgba(255, 255, 255, 0.95);
 		backdrop-filter: blur(12px);
-		box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+		box-shadow:
+			0 4px 20px -2px rgba(15, 23, 42, 0.08),
+			0 1px 3px rgba(0, 0, 0, 0.04);
 		font-family: 'Manrope', sans-serif;
 	}
 	.ctrl-btn {

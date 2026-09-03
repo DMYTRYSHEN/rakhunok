@@ -89,6 +89,135 @@ const stepAttemptKindMigration = readFileSync(
 	),
 	'utf8'
 ).toLowerCase();
+const runRetentionMigration = readFileSync(
+	fileURLToPath(
+		new URL('../../../../supabase/migrations/202609030001_corex_run_retention.sql', import.meta.url)
+	),
+	'utf8'
+).toLowerCase();
+const operationsMigration = readFileSync(
+	fileURLToPath(
+		new URL('../../../../supabase/migrations/202609030015_corex_operations.sql', import.meta.url)
+	),
+	'utf8'
+).toLowerCase();
+const operationExecutionMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/202609030016_corex_operation_execution.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
+const publishedHttpTriggersMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/202609030002_corex_published_http_triggers.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
+const httpTriggerLifecycleMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/202609030003_corex_http_trigger_lifecycle.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
+const httpTriggerLifecycleIdempotencyMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/202609030004_corex_http_trigger_lifecycle_idempotency.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
+const httpRouteOwnershipMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/202609030005_corex_http_route_ownership.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
+const httpRouteReconciliationMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/202609030006_corex_http_route_reconciliation.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
+const publishedTriggerRegistryMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/202609030007_corex_published_trigger_registry.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
+const canonicalTriggerPublicationMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/202609030008_corex_canonical_trigger_publication.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
+const environmentNamespaceAllocationMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/202609030009_corex_environment_namespace_allocation.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
+const environmentNamespaceRetirementMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/202609030010_corex_environment_namespace_retirement.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
+const domainTargetSelectionMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/202609030011_corex_domain_target_selection.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
+const domainScopedPublicationMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/202609030012_corex_domain_scoped_publication.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
+const domainTargetConfigurationMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/202609030013_corex_domain_target_configuration.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
 const outboxDeadLettersMigration = readFileSync(
 	fileURLToPath(
 		new URL(
@@ -179,8 +308,57 @@ const runArchiveMigration = readFileSync(
 	),
 	'utf8'
 ).toLowerCase();
+const processRetirementMigration = readFileSync(
+	fileURLToPath(
+		new URL(
+			'../../../../supabase/migrations/202609030014_corex_process_retirement.sql',
+			import.meta.url
+		)
+	),
+	'utf8'
+).toLowerCase();
 
 describe('Corex control-plane migration', () => {
+	it('models bounded asynchronous operations and privileged process deletion', () => {
+		expect(operationsMigration).toContain('create table public.corex_privileged_operators');
+		expect(operationsMigration).toContain('create table public.corex_process_legal_holds');
+		expect(operationsMigration).toContain('create table public.corex_operations');
+		expect(operationsMigration).toContain('create table public.corex_operation_items');
+		expect(operationsMigration).toContain('item_count between 1 and 100');
+		expect(operationsMigration).toContain('unique (owner_user_id, request_id)');
+		expect(operationsMigration).toContain('operator.can_delete_processes');
+		expect(operationsMigration).toContain("target_process.lifecycle <> 'retired'");
+		expect(operationsMigration).toContain('hold.released_at is null');
+		expect(operationsMigration).toContain('for update skip locked');
+		expect(operationsMigration).toContain('process_run_count > 99');
+		expect(operationsMigration).toContain("'action', 'run_cleanup'");
+		expect(operationsMigration).toContain("item.payload ->> 'action' <> 'process_finalize'");
+		expect(operationsMigration).toContain("dependency.payload ->> 'action' = 'process_finalize'");
+		expect(operationsMigration).toContain("error_code = 'dependency_failed'");
+		expect(operationsMigration).toContain("'itemcount', existing_operation.item_count");
+		expect(operationsMigration).toContain(
+			'grant execute on function public.corex_submit_process_deletion(uuid, uuid, uuid, uuid) to service_role'
+		);
+	});
+
+	it('finalizes destructive deletion only through a live authorized claim', () => {
+		expect(operationExecutionMigration).toContain('corex.deletion_claim_token');
+		expect(operationExecutionMigration).toContain('authorized_process_deletion(old.process_id)');
+		expect(operationExecutionMigration).toContain('operator.expires_at > now()');
+		expect(operationExecutionMigration).toContain('hold.released_at is null');
+		expect(operationExecutionMigration).toContain("target_process.lifecycle <> 'retired'");
+		expect(operationExecutionMigration).toContain('delete from public.corex_runs');
+		expect(operationExecutionMigration).toContain('corex_process_deletion_tombstones');
+		expect(operationExecutionMigration).toContain('jsonb_array_length(p_items)');
+		expect(operationExecutionMigration).toContain('item_count not between 1 and 100');
+		expect(operationExecutionMigration).toContain("p_kind in ('run_terminate', 'workflow_delete')");
+		expect(operationExecutionMigration).toContain(
+			"coalesce(item -> 'payload', '{}'::jsonb) <> '{}'::jsonb"
+		);
+		expect(operationExecutionMigration).toContain("payload ->> 'action' = 'process_finalize'");
+		expect(operationExecutionMigration).toContain('dependency.ordinal < target_item.ordinal');
+		expect(operationExecutionMigration).toContain("dependency.status <> 'complete'");
+	});
 	it('creates RLS-protected approval tasks with an assignee-only decision RPC', () => {
 		expect(approvalMigration).toContain('create table public.corex_approval_tasks');
 		expect(approvalMigration).toContain('assignee_user_id = (select auth.uid())');
@@ -438,11 +616,9 @@ describe('Corex control-plane migration', () => {
 		);
 		expect(targetedWaitEventsMigration).toContain('p_step_id text');
 		expect(targetedWaitEventsMigration).toContain(
-			"existing_request.step_id is distinct from p_step_id"
+			'existing_request.step_id is distinct from p_step_id'
 		);
-		expect(targetedWaitEventsMigration).toContain(
-			'from public.corex_active_waits wait'
-		);
+		expect(targetedWaitEventsMigration).toContain('from public.corex_active_waits wait');
 		expect(targetedWaitEventsMigration).toContain('wait.step_id = p_step_id');
 		expect(targetedWaitEventsMigration).toContain("active_wait.status <> 'active'");
 		expect(targetedWaitEventsMigration).toContain(
@@ -456,9 +632,7 @@ describe('Corex control-plane migration', () => {
 		expect(targetedWaitEventsMigration).toContain(
 			'create function public.corex_register_active_approval('
 		);
-		expect(targetedWaitEventsMigration).toContain(
-			'perform public.corex_register_active_wait('
-		);
+		expect(targetedWaitEventsMigration).toContain('perform public.corex_register_active_wait(');
 		expect(targetedWaitEventsMigration).toContain(
 			'on conflict (run_id, execution_generation, step_id, visit)'
 		);
@@ -676,6 +850,52 @@ describe('Corex control-plane migration', () => {
 		expect(runArchiveMigration).not.toContain('security definer');
 	});
 
+	it('retires a process without deleting immutable versions or run history', () => {
+		expect(processRetirementMigration).toContain('add column retired_at timestamptz');
+		expect(processRetirementMigration).toContain(
+			'create table public.corex_process_retirement_requests'
+		);
+		expect(processRetirementMigration).toContain('primary key (owner_user_id, request_id)');
+		expect(processRetirementMigration.match(/select \* into existing_request/g)).toHaveLength(2);
+		expect(processRetirementMigration).toContain(
+			"old.lifecycle = 'retired' and new.lifecycle <> 'retired'"
+		);
+		expect(processRetirementMigration).toContain("process.lifecycle = 'published'");
+		expect(processRetirementMigration).toContain('delete from public.corex_active_http_routes');
+		expect(processRetirementMigration).toContain("set lifecycle = 'retired'");
+		expect(processRetirementMigration).toContain(
+			'grant execute on function public.corex_retire_process(uuid, uuid, uuid) to service_role'
+		);
+		expect(processRetirementMigration).not.toContain('delete from public.corex_process_versions');
+		expect(processRetirementMigration).not.toContain('delete from public.corex_runs');
+		expect(processRetirementMigration).not.toContain('security definer');
+	});
+
+	it('purges retained archived leaf runs through leased service-role jobs', () => {
+		expect(runRetentionMigration).toContain('create table public.corex_run_purge_jobs');
+		expect(runRetentionMigration).toContain("reason text not null check (reason = 'retention')");
+		expect(runRetentionMigration).toContain(
+			'run.archived_at <= now() - make_interval(days => p_retention_days)'
+		);
+		expect(runRetentionMigration).toContain(
+			'not exists (select 1 from public.corex_runs child where child.parent_run_id = run.id)'
+		);
+		expect(runRetentionMigration).toContain("active_wait.status = 'active'");
+		expect(runRetentionMigration).toContain('outbox.delivered_at is null');
+		expect(runRetentionMigration).toContain("attempt.output #>> '{external,key}'");
+		expect(runRetentionMigration).toContain('for update skip locked');
+		expect(runRetentionMigration).toContain('target_job.claim_token <> p_claim_token');
+		expect(runRetentionMigration).toContain(
+			'delete from public.corex_runs where id = target_job.run_id'
+		);
+		expect(runRetentionMigration).toContain("status = 'complete'");
+		expect(runRetentionMigration).toContain(
+			'grant execute on function public.corex_claim_retention_purges(integer, integer, integer) to service_role'
+		);
+		expect(runRetentionMigration).not.toContain('references public.corex_runs');
+		expect(runRetentionMigration).not.toContain('security definer');
+	});
+
 	it('decides approvals and enqueues their workflow event atomically', () => {
 		expect(approvalOutboxMigration).toContain(
 			'create or replace function public.corex_decide_approval_task('
@@ -764,6 +984,418 @@ describe('Corex control-plane migration', () => {
 		expect(migration).not.toContain('p_definition');
 	});
 
+	it('claims domain-neutral HTTP routes atomically while publishing immutable versions', () => {
+		expect(publishedHttpTriggersMigration).toContain(
+			'create table public.corex_published_triggers'
+		);
+		expect(publishedHttpTriggersMigration).toContain(
+			'create table public.corex_active_http_routes'
+		);
+		expect(publishedHttpTriggersMigration).toContain(
+			'primary key (route_namespace, http_method, route_path)'
+		);
+		expect(publishedHttpTriggersMigration).toContain("route_namespace constant text := 'default'");
+		expect(publishedHttpTriggersMigration).toContain("where node ->> 'type' = 'trigger-http'");
+		expect(publishedHttpTriggersMigration).toContain('delete from public.corex_active_http_routes');
+		expect(publishedHttpTriggersMigration).toContain('insert into public.corex_active_http_routes');
+		expect(publishedHttpTriggersMigration).toContain(
+			"raise exception 'corex http route conflict' using errcode = '23505'"
+		);
+		expect(publishedHttpTriggersMigration).toContain(
+			'create trigger corex_published_triggers_immutable'
+		);
+		expect(publishedHttpTriggersMigration).not.toContain('hostname');
+		expect(publishedHttpTriggersMigration).not.toContain('domain');
+		expect(publishedHttpTriggersMigration).not.toContain('security definer');
+	});
+
+	it('registers immutable non-HTTP trigger descriptors against published versions', () => {
+		expect(publishedTriggerRegistryMigration).toContain(
+			'create table public.corex_published_trigger_registrations'
+		);
+		expect(publishedTriggerRegistryMigration).toContain(
+			"kind text not null check (kind in ('webhook', 'schedule', 'internal_event', 'queue'))"
+		);
+		expect(publishedTriggerRegistryMigration).toContain(
+			'foreign key (process_version_id, process_id, owner_user_id)'
+		);
+		expect(publishedTriggerRegistryMigration).toContain(
+			'unique (process_version_id, kind, trigger_key)'
+		);
+		expect(publishedTriggerRegistryMigration).toContain(
+			'create trigger corex_published_trigger_registrations_immutable'
+		);
+		expect(publishedTriggerRegistryMigration).toContain(
+			'create or replace function public.corex_register_published_trigger('
+		);
+		expect(publishedTriggerRegistryMigration).toContain('for key share');
+		expect(publishedTriggerRegistryMigration).toContain(
+			"jsonb_typeof(p_configuration) <> 'object'"
+		);
+		expect(publishedTriggerRegistryMigration).toContain('jsonb_path_exists');
+		expect(publishedTriggerRegistryMigration).toContain(
+			'existing_registration.configuration_sha256 <> configuration_fingerprint'
+		);
+		expect(publishedTriggerRegistryMigration).toContain("using errcode = 'pt409'");
+		expect(publishedTriggerRegistryMigration).toContain(
+			'grant execute on function public.corex_register_published_trigger(uuid, uuid, text, text, jsonb) to service_role'
+		);
+		expect(publishedTriggerRegistryMigration).not.toContain('hostname');
+		expect(publishedTriggerRegistryMigration).not.toContain('domain');
+		expect(publishedTriggerRegistryMigration).not.toContain('security definer');
+	});
+
+	it('extracts canonical trigger descriptors atomically during publication', () => {
+		expect(canonicalTriggerPublicationMigration).toContain(
+			'create or replace function public.corex_publish_process('
+		);
+		expect(canonicalTriggerPublicationMigration).toContain(
+			"where node ->> 'type' in ('trigger-http', 'trigger-schedule', 'trigger-event')"
+		);
+		expect(canonicalTriggerPublicationMigration).toContain(
+			"raise exception 'corex publish requires exactly one trigger'"
+		);
+		expect(canonicalTriggerPublicationMigration).toContain("if trigger_type = 'trigger-http' then");
+		expect(canonicalTriggerPublicationMigration).toContain(
+			'perform public.corex_register_published_trigger('
+		);
+		expect(canonicalTriggerPublicationMigration).toContain("'schedule'");
+		expect(canonicalTriggerPublicationMigration).toContain("'queue'");
+		expect(canonicalTriggerPublicationMigration).toContain("'internal_event'");
+		expect(canonicalTriggerPublicationMigration).toContain("'database-webhook'");
+		expect(canonicalTriggerPublicationMigration).toContain(
+			'delete from public.corex_active_http_routes'
+		);
+		expect(canonicalTriggerPublicationMigration).not.toContain('hostname');
+		expect(canonicalTriggerPublicationMigration).not.toContain('domain');
+		expect(canonicalTriggerPublicationMigration).not.toContain('security definer');
+	});
+
+	it('allocates owner-scoped environments and route namespaces without domain semantics', () => {
+		expect(environmentNamespaceAllocationMigration).toContain(
+			'create or replace function public.corex_ensure_environment('
+		);
+		expect(environmentNamespaceAllocationMigration).toContain(
+			'create or replace function public.corex_ensure_route_namespace('
+		);
+		expect(environmentNamespaceAllocationMigration).toContain(
+			'normalized_environment_key text := lower(trim(p_environment_key))'
+		);
+		expect(environmentNamespaceAllocationMigration).toContain(
+			'normalized_route_namespace text := lower(trim(p_route_namespace))'
+		);
+		expect(environmentNamespaceAllocationMigration).toContain(
+			'on conflict (owner_user_id, environment_key) do nothing'
+		);
+		expect(environmentNamespaceAllocationMigration).toContain(
+			'on conflict (environment_id, route_namespace) do nothing'
+		);
+		expect(environmentNamespaceAllocationMigration).toMatch(
+			/where id = p_environment_id\s+and owner_user_id = p_owner_user_id\s+for key share/
+		);
+		expect(environmentNamespaceAllocationMigration).toContain(
+			"raise exception 'corex environment not found' using errcode = 'p0002'"
+		);
+		expect(environmentNamespaceAllocationMigration).toContain(
+			'grant execute on function public.corex_ensure_environment(uuid, text) to service_role'
+		);
+		expect(environmentNamespaceAllocationMigration).toContain(
+			'grant execute on function public.corex_ensure_route_namespace(uuid, uuid, text) to service_role'
+		);
+		expect(environmentNamespaceAllocationMigration).not.toContain(
+			'grant execute on function public.corex_ensure_environment(uuid, text) to authenticated'
+		);
+		expect(environmentNamespaceAllocationMigration).not.toContain('hostname');
+		expect(environmentNamespaceAllocationMigration).not.toContain('domain');
+		expect(environmentNamespaceAllocationMigration).not.toContain('security definer');
+	});
+
+	it('retires unused non-default environments and route namespaces without deleting history', () => {
+		expect(environmentNamespaceRetirementMigration).toContain(
+			"check (lifecycle in ('active', 'retired'))"
+		);
+		expect(environmentNamespaceRetirementMigration).toContain(
+			'create or replace function public.corex_retire_route_namespace('
+		);
+		expect(environmentNamespaceRetirementMigration).toContain(
+			'create or replace function public.corex_retire_environment('
+		);
+		expect(environmentNamespaceRetirementMigration).toContain(
+			"raise exception 'corex default environment namespace cannot be retired' using errcode = 'pt403'"
+		);
+		expect(environmentNamespaceRetirementMigration).toContain(
+			"raise exception 'corex default environment cannot be retired' using errcode = 'pt403'"
+		);
+		expect(environmentNamespaceRetirementMigration).toContain(
+			'from public.corex_active_http_routes'
+		);
+		expect(environmentNamespaceRetirementMigration).toContain(
+			"raise exception 'corex route namespace is in use' using errcode = 'pt409'"
+		);
+		expect(environmentNamespaceRetirementMigration).toMatch(
+			/from public\.corex_route_namespaces\s+where environment_id = target_environment\.id\s+and lifecycle = 'active'/
+		);
+		expect(environmentNamespaceRetirementMigration).toContain(
+			"raise exception 'corex environment is retired' using errcode = 'pt409'"
+		);
+		expect(environmentNamespaceRetirementMigration).toContain(
+			"raise exception 'corex route namespace is retired' using errcode = 'pt409'"
+		);
+		expect(environmentNamespaceRetirementMigration).toContain(
+			'grant execute on function public.corex_retire_route_namespace(uuid, uuid, text) to service_role'
+		);
+		expect(environmentNamespaceRetirementMigration).toContain(
+			'grant execute on function public.corex_retire_environment(uuid, uuid) to service_role'
+		);
+		expect(environmentNamespaceRetirementMigration).toContain(
+			'grant update (lifecycle, retired_at) on public.corex_environments to service_role'
+		);
+		expect(environmentNamespaceRetirementMigration).toContain(
+			'grant update (lifecycle, retired_at) on public.corex_route_namespaces to service_role'
+		);
+		expect(environmentNamespaceRetirementMigration).not.toMatch(
+			/delete from public\.corex_(environments|route_namespaces)/
+		);
+		expect(environmentNamespaceRetirementMigration).not.toContain('hostname');
+		expect(environmentNamespaceRetirementMigration).not.toContain('domain');
+		expect(environmentNamespaceRetirementMigration).not.toContain('security definer');
+	});
+
+	it('selects an explicit protected-aware domain target without claiming activation', () => {
+		expect(domainTargetSelectionMigration).toContain('create table public.corex_domain_targets');
+		expect(domainTargetSelectionMigration).toContain(
+			'create table public.corex_environment_domain_targets'
+		);
+		expect(domainTargetSelectionMigration).toContain('unique (hostname)');
+		expect(domainTargetSelectionMigration).toContain('environment_id uuid primary key');
+		expect(domainTargetSelectionMigration).toContain('domain_target_id uuid not null unique');
+		expect(domainTargetSelectionMigration).toContain(
+			'foreign key (domain_target_id, owner_user_id)'
+		);
+		expect(domainTargetSelectionMigration).toContain(
+			'create or replace function corex_private.is_protected_domain(p_hostname text)'
+		);
+		expect(domainTargetSelectionMigration).toContain("p_hostname = 'rakhunok.com'");
+		expect(domainTargetSelectionMigration).toContain("p_hostname like '%.rakhunok.com'");
+		expect(domainTargetSelectionMigration).toContain(
+			"normalized_hostname text := rtrim(lower(trim(p_hostname)), '.')"
+		);
+		expect(domainTargetSelectionMigration).toContain(
+			"raise exception 'corex domain is protected' using errcode = 'pt403'"
+		);
+		expect(domainTargetSelectionMigration).toContain(
+			"raise exception 'corex domain target conflicts' using errcode = 'pt409'"
+		);
+		expect(domainTargetSelectionMigration).toContain(
+			"raise exception 'corex environment domain already selected' using errcode = 'pt409'"
+		);
+		expect(domainTargetSelectionMigration).toContain(
+			'grant execute on function public.corex_register_domain_target(uuid, text) to service_role'
+		);
+		expect(domainTargetSelectionMigration).toContain(
+			'grant execute on function public.corex_select_environment_domain(uuid, uuid, uuid) to service_role'
+		);
+		expect(domainTargetSelectionMigration).not.toContain('dns');
+		expect(domainTargetSelectionMigration).not.toContain('cloudflare');
+		expect(domainTargetSelectionMigration).not.toContain('security definer');
+	});
+
+	it('pins HTTP publication to an explicitly selected environment domain', () => {
+		expect(domainScopedPublicationMigration).toContain('add column domain_target_id uuid');
+		expect(domainScopedPublicationMigration).toContain(
+			'foreign key (domain_target_id, owner_user_id)'
+		);
+		expect(domainScopedPublicationMigration).toContain(
+			"check (kind <> 'http' or domain_target_id is not null) not valid"
+		);
+		expect(domainScopedPublicationMigration).toContain(
+			'revoke execute on function public.corex_publish_process(uuid, uuid, bigint) from service_role'
+		);
+		expect(domainScopedPublicationMigration).toContain('p_environment_id uuid');
+		expect(domainScopedPublicationMigration).toContain('p_route_namespace text');
+		expect(domainScopedPublicationMigration).toContain(
+			'from public.corex_environment_domain_targets'
+		);
+		expect(domainScopedPublicationMigration).toContain(
+			"raise exception 'corex environment domain is not selected' using errcode = 'pt409'"
+		);
+		expect(domainScopedPublicationMigration).toContain('target_domain_selection.domain_target_id');
+		expect(domainScopedPublicationMigration).toContain(
+			"raise exception 'corex published domain target conflicts' using errcode = 'pt409'"
+		);
+		expect(domainScopedPublicationMigration).toContain(
+			'grant execute on function public.corex_publish_process(uuid, uuid, bigint, uuid, text)'
+		);
+		expect(domainScopedPublicationMigration).not.toContain('cloudflare');
+		expect(domainScopedPublicationMigration).not.toContain('security definer');
+	});
+
+	it('configures an environment domain target atomically through one service-only RPC', () => {
+		expect(domainTargetConfigurationMigration).toContain(
+			'create or replace function public.corex_configure_domain_target('
+		);
+		expect(domainTargetConfigurationMigration).toContain(
+			'target_environment := public.corex_ensure_environment('
+		);
+		expect(domainTargetConfigurationMigration).toContain(
+			'target_namespace := public.corex_ensure_route_namespace('
+		);
+		expect(domainTargetConfigurationMigration).toContain(
+			'target_domain := public.corex_register_domain_target('
+		);
+		expect(domainTargetConfigurationMigration).toContain(
+			'domain_selection := public.corex_select_environment_domain('
+		);
+		expect(domainTargetConfigurationMigration).toContain("'environmentid'");
+		expect(domainTargetConfigurationMigration).toContain("'routenamespace'");
+		expect(domainTargetConfigurationMigration).toContain("'hostname'");
+		expect(domainTargetConfigurationMigration).toContain("'verificationstatus'");
+		expect(domainTargetConfigurationMigration).toContain(
+			'grant execute on function public.corex_configure_domain_target(uuid, text, text, text)'
+		);
+		expect(domainTargetConfigurationMigration).not.toContain('cloudflare');
+		expect(domainTargetConfigurationMigration).not.toContain('security definer');
+	});
+
+	it('deactivates and rolls back HTTP routes through locked service-only operations', () => {
+		expect(httpTriggerLifecycleMigration).toContain(
+			'create or replace function public.corex_deactivate_http_trigger('
+		);
+		expect(httpTriggerLifecycleMigration).toContain(
+			'create or replace function public.corex_rollback_http_trigger('
+		);
+		expect(httpTriggerLifecycleMigration.match(/for update;/g)).toHaveLength(2);
+		expect(httpTriggerLifecycleMigration).toContain('where process_id = target_process.id');
+		expect(httpTriggerLifecycleMigration).toContain('where process_version_id = target_version.id');
+		expect(httpTriggerLifecycleMigration).toContain('delete from public.corex_active_http_routes');
+		expect(httpTriggerLifecycleMigration).toContain('insert into public.corex_active_http_routes');
+		expect(httpTriggerLifecycleMigration).toContain(
+			"raise exception 'corex http route conflict' using errcode = '23505'"
+		);
+		expect(httpTriggerLifecycleMigration).toContain(
+			'grant execute on function public.corex_deactivate_http_trigger(uuid, uuid, integer) to service_role'
+		);
+		expect(httpTriggerLifecycleMigration).toContain(
+			'grant execute on function public.corex_rollback_http_trigger(uuid, uuid, integer, integer) to service_role'
+		);
+		expect(httpTriggerLifecycleMigration).not.toContain('hostname');
+		expect(httpTriggerLifecycleMigration).not.toContain('domain');
+		expect(httpTriggerLifecycleMigration).not.toContain('security definer');
+	});
+
+	it('makes HTTP trigger lifecycle requests replayable and conflict-safe', () => {
+		expect(httpTriggerLifecycleIdempotencyMigration).toContain(
+			'create table public.corex_http_trigger_lifecycle_requests'
+		);
+		expect(httpTriggerLifecycleIdempotencyMigration).toContain(
+			'primary key (owner_user_id, request_id)'
+		);
+		expect(httpTriggerLifecycleIdempotencyMigration).toContain(
+			'alter table public.corex_http_trigger_lifecycle_requests enable row level security'
+		);
+		expect(httpTriggerLifecycleIdempotencyMigration).toContain(
+			'revoke all on public.corex_http_trigger_lifecycle_requests from public, anon, authenticated'
+		);
+		expect(httpTriggerLifecycleIdempotencyMigration).toContain('p_request_id uuid');
+		expect(httpTriggerLifecycleIdempotencyMigration).toContain('result jsonb');
+		expect(httpTriggerLifecycleIdempotencyMigration).toContain('existing_request.result');
+		expect(httpTriggerLifecycleIdempotencyMigration).toContain(
+			"raise exception 'corex http trigger lifecycle request conflicts' using errcode = 'pt409'"
+		);
+		expect(httpTriggerLifecycleIdempotencyMigration).toContain(
+			'grant execute on function public.corex_deactivate_http_trigger(uuid, uuid, uuid, integer) to service_role'
+		);
+		expect(httpTriggerLifecycleIdempotencyMigration).toContain(
+			'grant execute on function public.corex_rollback_http_trigger(uuid, uuid, uuid, integer, integer) to service_role'
+		);
+		expect(httpTriggerLifecycleIdempotencyMigration).not.toContain('hostname');
+		expect(httpTriggerLifecycleIdempotencyMigration).not.toContain('domain');
+		expect(httpTriggerLifecycleIdempotencyMigration).not.toContain('security definer');
+	});
+
+	it('owns domain-neutral route namespaces by environment and rejects protected paths', () => {
+		expect(httpRouteOwnershipMigration).toContain('create table public.corex_environments');
+		expect(httpRouteOwnershipMigration).toContain('unique (owner_user_id, environment_key)');
+		expect(httpRouteOwnershipMigration).toContain('create table public.corex_route_namespaces');
+		expect(httpRouteOwnershipMigration).toContain('primary key (environment_id, route_namespace)');
+		expect(httpRouteOwnershipMigration).toContain(
+			'create or replace function corex_private.is_protected_http_route('
+		);
+		expect(httpRouteOwnershipMigration).toContain(
+			"target_route_namespace constant text := 'default'"
+		);
+		expect(httpRouteOwnershipMigration).toContain(
+			"target_environment_key constant text := 'default'"
+		);
+		expect(httpRouteOwnershipMigration).toContain(
+			"raise exception 'corex http route is protected' using errcode = 'pt403'"
+		);
+		expect(httpRouteOwnershipMigration).toContain(
+			'foreign key (environment_id, route_namespace, owner_user_id)'
+		);
+		expect(httpRouteOwnershipMigration).toContain(
+			'create trigger corex_active_http_routes_prepare_ownership'
+		);
+		expect(httpRouteOwnershipMigration).toContain(
+			'new.environment_id := published_trigger.environment_id'
+		);
+		expect(httpRouteOwnershipMigration).toContain(
+			'new.owner_user_id := published_trigger.owner_user_id'
+		);
+		expect(httpRouteOwnershipMigration).toContain('on delete restrict');
+		expect(httpRouteOwnershipMigration).toContain(
+			'revoke all on public.corex_environments from public, anon, authenticated'
+		);
+		expect(httpRouteOwnershipMigration).toContain(
+			'revoke all on public.corex_route_namespaces from public, anon, authenticated'
+		);
+		expect(httpRouteOwnershipMigration).not.toContain('hostname');
+		expect(httpRouteOwnershipMigration).not.toContain('rakhunok.com');
+		expect(httpRouteOwnershipMigration).not.toContain('security definer');
+	});
+
+	it('leases desired HTTP routes and records bounded observed reconciliation state', () => {
+		expect(httpRouteReconciliationMigration).toContain(
+			'create table public.corex_http_route_reconciliations'
+		);
+		expect(httpRouteReconciliationMigration).toContain(
+			'primary key (environment_id, route_namespace, http_method, route_path)'
+		);
+		expect(httpRouteReconciliationMigration).toContain(
+			'create or replace function public.corex_claim_http_route_reconciliation('
+		);
+		expect(httpRouteReconciliationMigration).toContain('for update skip locked');
+		expect(httpRouteReconciliationMigration).toContain('claim_token = gen_random_uuid()');
+		expect(httpRouteReconciliationMigration).toContain('where claim_token = p_claim_token');
+		expect(httpRouteReconciliationMigration).toContain('and lease_expires_at > now()');
+		expect(httpRouteReconciliationMigration).toContain('attempts < 8');
+		expect(httpRouteReconciliationMigration).toContain("observed_status = 'converged'");
+		expect(httpRouteReconciliationMigration).toContain(
+			'observed_fingerprint = p_observed_fingerprint'
+		);
+		expect(httpRouteReconciliationMigration).toContain(
+			'dead_lettered_at = case when attempts >= 8 then now() else null end'
+		);
+		expect(httpRouteReconciliationMigration).toContain(
+			'create or replace function public.corex_get_http_route_reconciliation_health()'
+		);
+		expect(httpRouteReconciliationMigration).toContain(
+			'grant execute on function public.corex_claim_http_route_reconciliation(integer, integer) to service_role'
+		);
+		expect(httpRouteReconciliationMigration).toContain(
+			'grant execute on function public.corex_ack_http_route_reconciliation(uuid, text) to service_role'
+		);
+		expect(httpRouteReconciliationMigration).toContain(
+			'grant execute on function public.corex_fail_http_route_reconciliation(uuid, jsonb) to service_role'
+		);
+		expect(httpRouteReconciliationMigration).toContain(
+			'grant execute on function corex_private.set_http_route_reconciliation_desired(uuid, text, text, text, uuid, text, uuid)'
+		);
+		expect(httpRouteReconciliationMigration).not.toContain('hostname');
+		expect(httpRouteReconciliationMigration).not.toContain('domain');
+		expect(httpRouteReconciliationMigration).not.toContain('security definer');
+	});
+
 	it('starts runs only from the current immutable version through a service-role-only function', () => {
 		expect(migration).toContain('create or replace function public.corex_start_process_run(');
 		expect(migration).toContain('target_process.published_version is null');
@@ -815,9 +1447,13 @@ describe('Corex control-plane migration', () => {
 		expect(stepAttemptsMigration).toContain(
 			'primary key (run_id, execution_generation, step_id, visit, attempt)'
 		);
-		expect(stepAttemptsMigration).toContain('alter table public.corex_step_attempts enable row level security');
+		expect(stepAttemptsMigration).toContain(
+			'alter table public.corex_step_attempts enable row level security'
+		);
 		expect(stepAttemptsMigration).toContain('using (owner_user_id = (select auth.uid()))');
-		expect(stepAttemptsMigration).toContain('on conflict (run_id, execution_generation, step_id, visit, attempt) do nothing');
+		expect(stepAttemptsMigration).toContain(
+			'on conflict (run_id, execution_generation, step_id, visit, attempt) do nothing'
+		);
 		expect(stepAttemptsMigration).toContain("raise exception 'conflicting corex step attempt'");
 		expect(stepAttemptsMigration).toMatch(
 			/grant execute on function public\.corex_record_step_attempt\(\s*uuid, uuid, integer, text, integer, text, integer, timestamptz, timestamptz,\s*text, jsonb, jsonb, jsonb\s*\) to service_role/

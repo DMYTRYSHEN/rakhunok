@@ -19,8 +19,16 @@ function subprocessPayload(overrides = {}) {
 			entryNodeId: 'invoice',
 			nodes: [
 				{
-					id: 'invoice', name: 'create-invoice', type: 'invoke-process', next: 'done',
-					config: { processId: childProcessId, inputPath: '$.payment', resultKey: 'invoice', timeoutMs: 86_400_000 }
+					id: 'invoice',
+					name: 'create-invoice',
+					type: 'invoke-process',
+					next: 'done',
+					config: {
+						processId: childProcessId,
+						inputPath: '$.payment',
+						resultKey: 'invoice',
+						timeoutMs: 86_400_000
+					}
 				},
 				{ id: 'done', name: 'done', type: 'end-success', config: { outputExpression: '$.invoice' } }
 			]
@@ -85,8 +93,12 @@ function createHarness({ created = true, existingStatus = 'running', createError
 			async get(id) {
 				gets.push(id);
 				return {
-					async status() { return { status: existingStatus }; },
-					async terminate(options) { terminations.push({ id, options }); },
+					async status() {
+						return { status: existingStatus };
+					},
+					async terminate(options) {
+						terminations.push({ id, options });
+					},
 					async sendEvent() {}
 				};
 			}
@@ -104,7 +116,9 @@ test('creates a child from its server-compiled immutable definition', async () =
 		{ fetcher: harness.fetcher, createId: () => 'proposed-workflow' }
 	);
 
-	const start = harness.requests.find((request) => request.url.endsWith('/corex_start_subprocess_run'));
+	const start = harness.requests.find((request) =>
+		request.url.endsWith('/corex_start_subprocess_run')
+	);
 	assert.deepEqual(start.body, {
 		p_process_id: childProcessId,
 		p_owner_user_id: 'owner-1',
@@ -117,19 +131,25 @@ test('creates a child from its server-compiled immutable definition', async () =
 	assert.equal(harness.creates[0].id, 'child-workflow');
 	assert.equal(harness.creates[0].params.plan.processId, childProcessId);
 	assert.deepEqual(harness.creates[0].params.parent, {
-		runId: 'parent-run', workflowInstanceId: 'parent-workflow', stepId: 'invoice'
+		runId: 'parent-run',
+		workflowInstanceId: 'parent-workflow',
+		stepId: 'invoice'
 	});
 	assert.deepEqual(output, { id: 'inv-1' });
 });
 
 test('recreates an idempotent child only when its Workflow status is unknown', async () => {
 	const unknown = createHarness({ created: false, existingStatus: 'unknown' });
-	await runCorexProcessWorkflow(unknown.env, subprocessPayload(), durableWorkflow(), { fetcher: unknown.fetcher });
+	await runCorexProcessWorkflow(unknown.env, subprocessPayload(), durableWorkflow(), {
+		fetcher: unknown.fetcher
+	});
 	assert.deepEqual(unknown.gets, ['child-workflow']);
 	assert.equal(unknown.creates.length, 1);
 
 	const running = createHarness({ created: false, existingStatus: 'running' });
-	await runCorexProcessWorkflow(running.env, subprocessPayload(), durableWorkflow(), { fetcher: running.fetcher });
+	await runCorexProcessWorkflow(running.env, subprocessPayload(), durableWorkflow(), {
+		fetcher: running.fetcher
+	});
 	assert.deepEqual(running.gets, ['child-workflow']);
 	assert.equal(running.creates.length, 0);
 });
@@ -138,14 +158,24 @@ test('records child completion and failure without sending a best-effort parent 
 	const childPayload = subprocessPayload({
 		runId: 'child-run',
 		workflowInstanceId: 'child-workflow',
-		plan: { schemaVersion: 1, processId: childProcessId, revision: 1, entryNodeId: 'done', nodes: [{ id: 'done', name: 'done', type: 'end-success', config: {} }] },
+		plan: {
+			schemaVersion: 1,
+			processId: childProcessId,
+			revision: 1,
+			entryNodeId: 'done',
+			nodes: [{ id: 'done', name: 'done', type: 'end-success', config: {} }]
+		},
 		input: { invoiceId: 'inv-1' },
 		parent: { runId: 'parent-run', workflowInstanceId: 'parent-workflow', stepId: 'invoice' }
 	});
 	const success = createHarness();
-	await runCorexProcessWorkflow(success.env, childPayload, durableWorkflow(), { fetcher: success.fetcher });
+	await runCorexProcessWorkflow(success.env, childPayload, durableWorkflow(), {
+		fetcher: success.fetcher
+	});
 	assert.equal(success.gets.includes('parent-workflow'), false);
-	const completion = success.requests.find((request) => request.body?.p_event_type === 'run_completed');
+	const completion = success.requests.find(
+		(request) => request.body?.p_event_type === 'run_completed'
+	);
 	assert.equal(completion.body.p_status, 'complete');
 	assert.deepEqual(completion.body.p_output, { invoiceId: 'inv-1' });
 
@@ -168,10 +198,14 @@ test('records child completion and failure without sending a best-effort parent 
 test('compensates a queued child when Workflow creation fails', async () => {
 	const harness = createHarness({ createError: new Error('secret provider details') });
 	await assert.rejects(
-		runCorexProcessWorkflow(harness.env, subprocessPayload(), durableWorkflow(), { fetcher: harness.fetcher }),
+		runCorexProcessWorkflow(harness.env, subprocessPayload(), durableWorkflow(), {
+			fetcher: harness.fetcher
+		}),
 		/secret provider details/
 	);
-	const compensation = harness.requests.find((request) => request.url.endsWith('/corex_fail_process_run'));
+	const compensation = harness.requests.find((request) =>
+		request.url.endsWith('/corex_fail_process_run')
+	);
 	assert.deepEqual(compensation.body, {
 		p_run_id: 'child-run',
 		p_owner_user_id: 'owner-1',
@@ -188,7 +222,9 @@ test('terminates and reconciles a child when the parent wait times out', async (
 			stepNames.push(name);
 			return (callback ?? optionsOrCallback)();
 		},
-		async waitForEvent() { throw new Error('private timeout details'); }
+		async waitForEvent() {
+			throw new Error('private timeout details');
+		}
 	};
 
 	await assert.rejects(
@@ -200,7 +236,9 @@ test('terminates and reconciles a child when the parent wait times out', async (
 	);
 
 	assert.deepEqual(harness.terminations, [{ id: 'child-workflow', options: { rollback: true } }]);
-	const termination = harness.requests.find((request) => request.url.endsWith('/corex_terminate_subprocess_run'));
+	const termination = harness.requests.find((request) =>
+		request.url.endsWith('/corex_terminate_subprocess_run')
+	);
 	assert.deepEqual(termination.body, {
 		p_run_id: 'child-run',
 		p_owner_user_id: 'owner-1',
@@ -224,12 +262,19 @@ test('persists branch-qualified active wait registration and completion', async 
 			entryNodeId: 'parallel',
 			nodes: [
 				{
-					id: 'parallel', name: 'collect', type: 'parallel',
+					id: 'parallel',
+					name: 'collect',
+					type: 'parallel',
 					config: { branches: [{ id: 'buyer' }], resultKey: 'results' },
-					branchTargets: { buyer: 'confirmed' }, joinTarget: 'join', continuationTarget: 'done'
+					branchTargets: { buyer: 'confirmed' },
+					joinTarget: 'join',
+					continuationTarget: 'done'
 				},
 				{
-					id: 'confirmed', name: 'wait-confirmation', type: 'wait-event', next: 'join',
+					id: 'confirmed',
+					name: 'wait-confirmation',
+					type: 'wait-event',
+					next: 'join',
 					config: { eventType: 'buyer_confirmed', timeoutMs: 60_000, resultKey: 'confirmation' }
 				},
 				{ id: 'done', name: 'done', type: 'end-success', config: {} }
@@ -240,7 +285,9 @@ test('persists branch-qualified active wait registration and completion', async 
 		async do(name, optionsOrCallback, callback) {
 			return (callback ?? optionsOrCallback)({ step: { name, count: 1 }, attempt: 1, config: {} });
 		},
-		async waitForEvent() { return { payload: { accepted: true } }; }
+		async waitForEvent() {
+			return { payload: { accepted: true } };
+		}
 	};
 
 	await runCorexProcessWorkflow(harness.env, payload, workflow, { fetcher: harness.fetcher });
@@ -282,14 +329,21 @@ test('persists branch-qualified approval registration and completion', async () 
 			entryNodeId: 'parallel',
 			nodes: [
 				{
-					id: 'parallel', name: 'collect', type: 'parallel',
+					id: 'parallel',
+					name: 'collect',
+					type: 'parallel',
 					config: { branches: [{ id: 'finance' }], resultKey: 'results' },
-					branchTargets: { finance: 'review' }, joinTarget: 'join', continuationTarget: 'done'
+					branchTargets: { finance: 'review' },
+					joinTarget: 'join',
+					continuationTarget: 'done'
 				},
 				{
-					id: 'review', name: 'review-finance', type: 'approval',
+					id: 'review',
+					name: 'review-finance',
+					type: 'approval',
 					config: { assigneeUserId: 'reviewer-1', timeoutMs: 60_000, resultKey: 'decision' },
-					whenApproved: 'join', whenRejected: 'join'
+					whenApproved: 'join',
+					whenRejected: 'join'
 				},
 				{ id: 'done', name: 'done', type: 'end-success', config: {} }
 			]
@@ -324,4 +378,67 @@ test('persists branch-qualified approval registration and completion', async () 
 		request.url.endsWith('/corex_complete_active_wait')
 	);
 	assert.equal(completion.body.p_step_id, 'review');
+});
+
+test('stores external transform output through the optional R2 binding', async () => {
+	const harness = createHarness();
+	const puts = [];
+	harness.env.COREX_OUTPUTS = {
+		async put(key, value, options) {
+			puts.push({ key, value, options });
+			return { key };
+		}
+	};
+	const payload = subprocessPayload({
+		runId: 'external-output-run',
+		plan: {
+			schemaVersion: 1,
+			processId: 'external-output-process',
+			revision: 1,
+			entryNodeId: 'shape',
+			nodes: [
+				{
+					id: 'shape',
+					name: 'shape-output',
+					type: 'transform',
+					next: 'done',
+					config: {
+						mode: 'replace',
+						mappings: { customer: '$.customer' },
+						outputPolicy: {
+							mode: 'external',
+							maxBytes: 1024,
+							redactPaths: ['$.customer.email']
+						}
+					}
+				},
+				{ id: 'done', name: 'done', type: 'end-success', config: {} }
+			]
+		},
+		input: { customer: { email: 'private@example.com', name: 'Ada' } }
+	});
+
+	const workflow = {
+		async do(name, optionsOrCallback, callback) {
+			return (callback ?? optionsOrCallback)({ step: { name, count: 1 }, attempt: 1, config: {} });
+		}
+	};
+	const output = await runCorexProcessWorkflow(harness.env, payload, workflow, {
+		fetcher: harness.fetcher
+	});
+
+	assert.equal(output.customer.email, 'private@example.com');
+	assert.equal(puts.length, 1);
+	assert.deepEqual(puts[0].options, { httpMetadata: { contentType: 'application/json' } });
+	assert.deepEqual(JSON.parse(new TextDecoder().decode(puts[0].value)), {
+		customer: { email: '[REDACTED]', name: 'Ada' }
+	});
+	const attempt = harness.requests.find((request) =>
+		request.url.endsWith('/corex_record_step_attempt')
+	);
+	assert.deepEqual(attempt.body.p_output.external, {
+		key: puts[0].key,
+		bytes: puts[0].value.byteLength,
+		contentType: 'application/json'
+	});
 });

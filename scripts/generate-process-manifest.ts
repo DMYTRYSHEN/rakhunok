@@ -12,6 +12,29 @@ type WorkerRoute = {
 	source: string;
 };
 
+type WorkerService = { binding: string; service: string };
+type WorkerAssets = { binding?: string; directory?: string };
+type WorkerConfig = {
+	name: string;
+	main: string;
+	services?: WorkerService[];
+	assets?: WorkerAssets;
+	env?: {
+		production?: {
+			name?: string;
+			services?: WorkerService[];
+			assets?: WorkerAssets;
+			routes?: Array<{ pattern: string }>;
+		};
+	};
+};
+type OpenApiOperation = {
+	operationId?: string;
+	summary?: string;
+	tags?: string[];
+};
+type OpenApiDocument = { paths?: Record<string, Record<string, OpenApiOperation>> };
+
 const root = resolve(import.meta.dirname, '..');
 const workerRoot = resolve(root, 'worker');
 const outputFile = resolve(root, 'src/lib/features/corex/generated/process-manifest.json');
@@ -119,11 +142,11 @@ function extractWorkerRoutes(sourceText: string, sourceFileName: string): Worker
 	);
 }
 
-function bindingInventory(config: Record<string, any>) {
+function bindingInventory(config: WorkerConfig) {
 	const production = config.env?.production ?? {};
 	const services = [...(config.services ?? []), ...(production.services ?? [])];
 	const bindings = new Map(
-		services.map((service: { binding: string; service: string }) => [
+		services.map((service) => [
 			`service:${service.binding}`,
 			{ name: service.binding, type: 'service', target: service.service }
 		])
@@ -141,7 +164,7 @@ function bindingInventory(config: Record<string, any>) {
 
 async function workerInventory(configName: string) {
 	const configFile = resolve(workerRoot, configName);
-	const config = readJsonc(await readFile(configFile, 'utf8'), configFile) as Record<string, any>;
+	const config = readJsonc(await readFile(configFile, 'utf8'), configFile) as WorkerConfig;
 	const production = config.env?.production ?? {};
 	const entrypointFile = resolve(workerRoot, config.main);
 	const entrypoint = workspacePath(entrypointFile);
@@ -160,9 +183,9 @@ async function workerInventory(configName: string) {
 
 async function openApiInventory(fileName: string) {
 	const file = resolve(root, fileName);
-	const document = parseYaml(await readFile(file, 'utf8')) as Record<string, any>;
+	const document = parseYaml(await readFile(file, 'utf8')) as OpenApiDocument;
 	const routes = Object.entries(document.paths ?? {}).flatMap(([path, pathItem]) =>
-		Object.entries(pathItem as Record<string, any>)
+		Object.entries(pathItem)
 			.filter(([method]) => /^(get|post|put|patch|delete|options|head)$/i.test(method))
 			.map(([method, operation]) => ({
 				method: method.toUpperCase(),

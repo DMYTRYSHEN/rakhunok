@@ -57,31 +57,45 @@ Covered:
 
 - HTTP, transform, condition, typed switch with a mandatory default route, relative and absolute sleep, external event wait, approval, subprocess, success, and explicit failure nodes.
 - Bounded deterministic loops with explicit structured back edges and loop-targeted `break`.
-- Deterministic parallel fork/join with isolated branch contexts, stable durable step identities, configured result ordering, and recorded `starts`/`resolves` indices.
+- Reusable local functions execute in serial and parallel branch regions of the same workflow without subprocess creation. Trusted compilation resolves each isolated declaration body and matching return, calls map a safe input path into function context, branch-local frame stacks isolate concurrent callers, and direct or indirect recursion is bounded to 64 active call frames per execution region.
+- Executable blocks run isolated bodies from serial flows or parallel branches in the same workflow without subprocesses or artificial attempts. Blocks may nest while preserving each continuation boundary, and their bodies may contain bounded parallel fork/join regions. Trusted compilation resolves explicit body and continuation edges, validation rejects external entry and non-converging exits, and the editor inserts each complete protected region atomically.
+- Deterministic recursive parallel fork/join with isolated branch contexts, configured result ordering, and recorded top-level `starts`/`resolves` indices. Existing short branch-path durable identities remain byte-for-byte stable; identities above the 500-character persistence limit retain a readable prefix and use a deterministic SHA-256 suffix over the complete structured branch path, step, and visit.
 - Explicit failure terminals with validated public error codes/messages and one sanitized `run_failed` lifecycle event.
 - Durable lifecycle events, sanitized failures, retry configuration, and bounded subprocess depth.
 - Serial and parallel-branch HTTP retries persist idempotent attempt identity, duration, retry policy, branch-qualified durable names, and bounded sanitized response or error metadata for owner-scoped inspection.
 - Successful serial, parallel, and compensation HTTP actions remain metadata-only by default. Definitions may opt into owner-scoped inline JSON response output up to 16 KiB with up to 20 validated child JSON paths redacted before persistence; oversized JSON and non-JSON responses remain metadata-only without failing or replaying the action, and the run inspector renders captured values.
+- Successful serial and parallel HTTP actions may opt into bounded external JSON response output up to 10 MiB. Redaction is applied before the optional object-store port receives the payload, object keys are deterministic SHA-256 references over complete structured attempt identity, and non-JSON, oversized, unavailable-storage, or failed-storage cases fall back to response metadata without replaying or failing the completed action. Compensation HTTP actions retain their existing bounded metadata semantics.
 - Transform, condition, switch, loop, break, serial relative/absolute waits, external event waits, approvals, and subprocesses persist deterministic attempt identity, visit, duration, and outcome without storing process context; transform, event-wait, approval, and subprocess failures are sanitized.
 - Transform, condition, switch, loop, and break nodes inside supported parallel branches persist branch-qualified attempt identity and visit; parallel transform failures are sanitized.
 - Successful serial, parallel, and compensation transforms default to a structural output descriptor and UTF-8 serialized byte count. Definitions may opt into owner-scoped inline output up to 16 KiB with up to 20 validated child JSON paths redacted before persistence; oversized values fall back to metadata without failing execution, and the run inspector renders captured values.
-- Successful control-flow and timer attempts persist an explicit no-output descriptor, while event, approval, and subprocess results persist a redacted descriptor. Every complete attempt therefore satisfies the database output invariant without exposing process data.
+- Serial and parallel transforms may opt into bounded external JSON output up to 10 MiB. Redaction is applied before the optional object-store port receives the payload, object keys are deterministic SHA-256 references over structured attempt identity, step-attempt rows retain only bounded reference metadata, and unavailable storage falls back to metadata without replaying or failing the transform. The Worker has an R2-compatible adapter, but no preview or production bucket binding has been provisioned or configured yet.
+- External transform and HTTP JSON output retrieval is authenticated and owner-scoped by complete attempt identity. The control plane resolves the authoritative object key from the owned step-attempt row before R2 access, missing descriptors and objects remain opaque, responses are private and non-cacheable, and the run inspector loads the bounded payload only after an explicit user action.
+- Successful subprocess actions default to a structural descriptor for child business output and its UTF-8 serialized byte count. Definitions may opt into owner-scoped inline business output up to 16 KiB with up to 20 validated child JSON paths redacted before persistence; oversized values fall back to metadata, and correlation envelopes are never captured as business output.
+- Successful serial and parallel subprocess actions may opt into bounded external business output up to 10 MiB. Redaction is applied before the optional object-store port receives only the child business value, deterministic object references use the complete parent attempt identity, and unavailable or failed storage falls back to metadata without failing the completed child invocation. Correlation envelopes remain excluded from stored business output.
+- Successful control-flow and timer attempts persist an explicit no-output descriptor, while event and approval results remain redacted by default. Every complete attempt therefore satisfies the database output invariant without exposing process data.
 - Relative and absolute durable waits execute in serial and parallel branches with stable branch-qualified identities and explicit no-output attempt descriptors.
 - External-event waits execute in serial and parallel branches with replay-stable internal event types, branch-qualified attempt telemetry, deterministic configured result ordering, and active-wait cleanup on success or timeout.
+- External-event definitions may opt into owner-scoped inline payload output up to 16 KiB with up to 20 validated child JSON paths redacted before persistence. Oversized payloads fall back to structural metadata, while the unredacted payload continues into process context; waits without a policy remain redacted.
 - External-event delivery accepts an optional validated step identity and atomically resolves exactly one active registry entry for the current execution generation. Registry identity includes step and visit, so concurrent waits do not depend on lifecycle insertion order. The untargeted serial contract remains backward compatible; the targeted migration is local and not yet applied remotely.
+- Successfully completed external-event waits can register isolated HTTP or transform compensation in serial and parallel branches. The rollback input is the pre-wait context, the rollback output is the received payload, branch identities remain qualified, and timeouts never register a completed rollback checkpoint.
 - Approvals execute in serial and parallel branches. Parallel approvals atomically register exact task and active-wait identities by execution generation, step, and visit; decisions target an explicit task ID, route through the registered internal event type, and expire pending tasks during wait cleanup. The migration is local and not yet applied remotely.
+- Approval definitions may opt into owner-scoped inline validated decision output up to 16 KiB or bounded external output up to 10 MiB, with up to 20 child JSON paths redacted before persistence. Routing envelopes are never captured, the original decision remains available to process context, unavailable storage falls back to metadata, and approvals without a policy remain redacted.
+- Successfully completed approvals can register isolated HTTP or transform compensation in serial and parallel branches. The rollback input is the pre-approval context, the rollback output is the validated decision, approved and rejected routing remains unchanged, branch identities remain qualified, and invalid decisions or timeouts never register a completed rollback checkpoint.
+- Successfully completed relative and absolute durable waits can register isolated HTTP or transform compensation in serial and parallel branches. The rollback input is the pre-wait context, timer handlers receive no business output, branch identities remain qualified, and failed sleeps never register a completed rollback checkpoint.
 - Subprocesses execute in serial and parallel branches with generation/step/visit invocation identity, child-run callback correlation, configured branch result ordering, and branch-local durable termination on timeout. The bounded persistence key is a SHA-256 digest of the invocation identity.
 - Correlated child completion callbacks and timeout cleanup.
 - HTTP actions support deterministic compensation routes in serial and parallel execution. Compiled handlers register as Cloudflare rollback callbacks with isolated action input, bounded output/error context, independent retry and timeout policy, and owner-scoped per-handler attempt inspection.
 - Serial and parallel HTTP actions may also register an isolated transform compensation handler. Its rollback envelope is limited to the captured action input, bounded action output, and normalized error; telemetry stores only structural output metadata or a sanitized transform failure code with branch-qualified identity where applicable.
-- Serial and parallel deterministic transform actions may register isolated transform compensation with the same bounded rollback envelope, sanitized telemetry, and branch-qualified identity.
+- Serial and parallel deterministic transform actions may register isolated HTTP or transform compensation with the same bounded rollback envelope, sanitized telemetry, independent HTTP retry/timeout policy, and branch-qualified identity.
 - Serial and parallel subprocess actions may register isolated HTTP or transform compensation after correlated child completion. Timed-out or errored children never register the rollback checkpoint; HTTP handlers retain independent retry, timeout, and idempotency policy, while compensation telemetry preserves generation, step, visit, and branch-qualified durable identity.
+- The P0.2 compensation matrix is complete and intentionally finite: HTTP actions, deterministic transforms, completed subprocesses, completed external-event waits, completed approvals, relative waits, and absolute waits may register either HTTP or transform handlers. Control-flow nodes have no external side effect to compensate; additional sources or handler types require a separately scoped feature.
+- Archived terminal leaf runs are eligible for automatic purge after 30 days. A service-role-only leased job snapshots authoritative external-output keys, blocks active waits and every undelivered or dead-letter outbox row, deletes R2 objects in retry-safe bounded batches, and only then deletes the run while retaining the purge tombstone. Parent runs become eligible after their terminal children are removed.
+- The 10 MiB maximum for external JSON output is an intentional P0.2 safety contract. It keeps redaction and persistence bounded; streaming JSON redaction and multipart object upload are future capabilities, not P0.2 exit criteria.
 
 Critical gaps:
 
-- Compensation handlers beyond HTTP and transform handlers, and compensation sources beyond HTTP, deterministic transforms, and completed subprocesses.
-- Executable blocks and reusable local functions where subprocesses are too coarse.
-- Full step output retrieval beyond the bounded, path-redacted transform and HTTP JSON slices: policies for other step kinds and external-object or streaming storage for larger values.
+- Preview and production R2 buckets and `COREX_OUTPUTS` bindings are not provisioned. External output therefore keeps its metadata fallback until the infrastructure gate is approved and configured.
+- Remaining node-specific output policies outside the bounded transform, HTTP JSON, subprocess business-output, external-event payload, and approval decision slices require separate scope.
 
 Exit criteria:
 
@@ -89,7 +103,7 @@ Exit criteria:
 - The runtime and visual graph preserve step, branch, attempt, and subprocess identity.
 - Cloudflare visualizer constructs are covered or have a documented safer Corex equivalent.
 
-### P0.3 Reliable command and event delivery - In progress
+### P0.3 Reliable command and event delivery - Done
 
 Covered:
 
@@ -113,16 +127,33 @@ Exit criteria:
 - Delivery is at-least-once while process effects remain idempotent.
 - Direct best-effort `sendEvent()` is not the only delivery path anywhere.
 
-### P0.4 Published triggers, domains, routes, and redirects - Planned
+### P0.4 Published triggers, domains, routes, and redirects - In progress
+
+Covered:
+
+- Domain-neutral HTTP trigger publication is pinned to an immutable process version. Active method/path claims are atomic, collision-safe, private to the service role, and retain immutable trigger history.
+- HTTP trigger deactivation and rollback lock the owned process, restore an exact previously published trigger, and reject stale versions or occupied routes.
+- Lifecycle commands require a caller UUID, persist an owner-scoped request ledger before mutation, replay the original result exactly, and reject mismatched request reuse.
+- Owner-scoped environments and route namespaces are server-created and immutable to browser roles. Existing HTTP trigger state is backfilled into the `default` environment and namespace without introducing hostname or domain configuration.
+- Active routes derive environment and owner identity from their immutable published trigger. Composite foreign keys reject cross-owner or cross-environment route claims.
+- A server-side protected-path policy prevents publication over Corex, API, application, asset, checkout, dashboard, documentation, payment, framework, root, and ACME/system routes. Publication reports a stable sanitized forbidden error.
+- Active route mutations update a durable desired/observed reconciliation registry. Claims use leases and fencing tokens, failures use bounded retries and dead letters, and aggregate reconciliation health is service-role-only.
+- The scheduled Worker reconciliation port is vendor-neutral and runs only when an adapter binding is actually configured. Exact desired fingerprints fence successful observations; missing adapters cannot create false observed state.
+- Webhook, schedule, internal-event, and queue trigger descriptors have an immutable, owner-scoped publication registry pinned to a published process version. Registration validates kind-specific configuration, rejects secret-bearing metadata, replays exact requests, and reports conflicting descriptor reuse.
+- Canonical process definitions support HTTP, schedule, and typed event entry nodes under the same single-trigger graph invariants. Compilation emits a discriminated trigger descriptor, and publication atomically registers schedule, queue, or internal-event metadata against the immutable version without claiming external platform activation.
+- Owner-scoped environments and route namespaces can be allocated idempotently through service-role-only control-plane operations. Keys are normalized and validated, namespace allocation verifies exact environment ownership, and no hostname or domain semantics are introduced.
+- Non-default environments and route namespaces can be retired without deleting immutable route history. Default resources are protected, active routes block namespace retirement, active namespaces block environment retirement, and allocation cannot silently reactivate retired resources.
+- Public work is explicitly scoped to an adapter-neutral domain target selected for one owner environment. Hostnames are normalized and globally collision-safe, selection is immutable and owner-scoped, and `rakhunok.com` plus every subdomain is permanently protected before any DNS or provider activation.
+- HTTP publication uses an explicit active environment and route namespace, requires that environment to have a selected domain target, and pins the target ID into the immutable published trigger descriptor. The legacy implicit `default/default` publish signature is no longer executable by the service role.
+- Environment, namespace, domain registration, and immutable domain selection are composed by one service-role-only transactional operation that returns the explicit publish target without performing verification or provider activation.
 
 Critical gaps:
 
-- Registry for HTTP, webhook, schedule, internal event, and queue triggers pinned to an immutable published version.
-- Controlled public namespace and environment ownership.
-- Method, path, hostname, and route uniqueness.
-- Protected route/domain checks, including the permanent exclusion of `rakhunok.com`.
-- Activation, deactivation, rollback, drift detection, and reconciliation.
-- Cloudflare route, custom-domain, DNS, Worker, and schedule adapter behind the Corex control plane.
+- Activation of published non-HTTP trigger descriptors through concrete platform adapters.
+- Environment promotion and public namespace lifecycle beyond owner-scoped domain-neutral allocation and retirement.
+- Verified domain ownership; registration, selection, and publication pinning alone do not claim DNS control or activation.
+- A concrete Cloudflare route, custom-domain, DNS, Worker, and schedule adapter behind the Corex control plane.
+- Real PostgreSQL concurrency coverage for route mutation, lease expiry, stale claims, and desired-state replacement.
 - Redirect creation, ordering, loop detection, collision checks, preview, rollback, and audit.
 - Request authentication/signatures, schema validation, rate limits, body limits, replay protection, and trigger idempotency.
 - Safe handling of custom hostnames and certificates when that later capability is authorized.
@@ -150,14 +181,19 @@ Covered:
 - Rollback request replay returns the current durable run state and outcome rather than reopening or redispatching a completed rollback.
 - Archive is separate from cancellation, rollback, retention purge, and destructive deletion: an idempotent service-role command marks only terminal runs as archived, preserves their execution status and history, emits an audited lifecycle event, and never calls Workflow or enqueues delivery work.
 - Archived runs remain visible in owner-scoped history and cannot re-enter an active execution status.
+- Automatic retention purge is separate from archive and privileged destructive deletion: archived terminal leaf runs age for 30 days, leased service-role jobs delete their snapshotted external objects before database finalization, protected delivery/wait state blocks claims, failures retry, and purge tombstones survive run deletion.
+- Process retirement is an irreversible, idempotent owner-scoped lifecycle command distinct from run archive and destructive deletion. It preserves versions, runs, events, and audit history, withdraws active routes through desired-absent reconciliation, and blocks future publish, rollback reactivation, and run creation at the database boundary.
+- The editor exposes retirement with explicit confirmation, preserves the selected process and its version/run history, and switches retired definitions to read-only while disabling save, validate, publish, run, and version restore controls.
+- Owner-scoped run history supports bounded status/date/identifier filtering, ascending or descending stable ordering, and deterministic compound-cursor pagination by creation time and run ID.
+- Workflow definitions use an owner-scoped bounded list with name/slug search, lifecycle filtering, stable updated-time and ID ordering, deterministic compound-cursor pagination, and selection-preserving incremental loading in the editor.
+- The persisted, Worker, command, and inspector contracts cover the complete run-state vocabulary: `queued`, `running`, `waiting`, `waiting_for_pause` (`waitingForPause` at the Cloudflare boundary), `paused`, `rolling_back`, `complete`, `errored`, and `terminated`. Browser reads reject unknown persisted states, and shared active/terminal subsets control valid run actions.
+- Caller-defined UUIDs map to stable owner-scoped Workflow instance IDs, and starts accept only the documented Cloudflare location hints.
+- Authenticated batch create, terminate, and delete commands are bounded to 100 items, idempotent by owner and request ID, execute asynchronously through leased operation items, and expose sanitized progress and per-item outcomes.
+- Privileged process deletion requires a current elevated grant, a retired owner-scoped process, no legal hold, no active route, and no active run. Cleanup is bounded to 99 run items plus one transactionally guarded finalizer; permanent cleanup failure terminalizes the dependent finalizer instead of leaving the operation pending.
 
 Critical gaps:
 
-- Define retire, retention purge, and destructive delete as distinct operations from the completed terminate, rollback, and archive semantics.
-- Batch create, batch terminate, and batch delete with bounds, idempotency, partial results, and asynchronous operation status.
-- Workflow list/search and instance cursor pagination with status/date/direction filters.
-- Full Cloudflare-compatible states: queued, running, waiting, waiting-for-pause, paused, rolling-back, complete, errored, and terminated.
-- Per-instance location hints and caller-defined IDs where explicitly needed.
+- No remaining critical gaps are known for the current run-operation and Cloudflare management subset; remote migration and deployment remain separately approval-gated.
 
 Exit criteria:
 
@@ -175,14 +211,24 @@ Covered:
 - The inspector exposes explicit rollback separately from cancellation, prevents conflicting controls and events while rollback is active, and displays sanitized rollback success or failure details from the durable read model.
 - The inspector archives eligible terminal runs without hiding them, prevents conflicting lifecycle controls while the request is active, and displays durable archive metadata after refresh.
 - The inspector shows owner-scoped HTTP attempts with durable identity, duration, retry policy, status, content type, byte count, or sanitized error code. Raw response bodies remain hidden by default; opt-in JSON responses up to 16 KiB are rendered inline, while oversized or non-JSON responses stay metadata-only.
+- The editor exposes metadata-only, bounded inline, or bounded external storage for transform, HTTP JSON, subprocess business-output, and external-event payloads, with per-node byte limits and child JSON-path redaction. The inspector renders captured values without exposing callback correlation envelopes.
+- Pure deterministic projectors generate escaped Mermaid source for definition topology and ordered run sequences from trusted Corex read models without exposing persisted identifiers or accepting arbitrary Mermaid input.
+- The standalone process diagram renders definition topology and selected-run sequence views from the trusted projectors through a local Mermaid dependency with strict security settings. The renderer sanitizes the generated SVG before mounting it and remains independent from the editable canvas and compiler.
+- Declarative cross-process Flow definitions compose actors, executable processes, external systems, and ordered responsibility handoffs into one business journey. Scenario capabilities derive variants such as payment-only, delivery, and delivery-with-loyalty from the same Flow while omitting inactive stages and participants.
+- Trusted owner-scoped Flow resolution rejects missing, unpublished, or cross-owner process references and pins every executable participant to an exact immutable process-version ID before publication.
+- Local Flow persistence stores mutable authored drafts separately from immutable resolved publication snapshots, with optimistic revisions, compound owner constraints, owner-scoped RLS, and a typed draft/version gateway. The migration remains local and unapplied remotely.
+- Service-role-only Flow publication locks the authored draft, verifies its optimistic revision, resolves every process participant from authoritative published process rows, and creates idempotent current or monotonically increasing immutable Flow versions.
+- Cross-process correlation persists an idempotent business Flow execution pinned to one immutable Flow version and scenario, then links existing process runs only when their owner, process, and immutable process version match the resolved participant. Browser access is read-only.
 
 Critical gaps:
 
 - Stable read-only DAG and graph projection for each published version.
-- Standalone process diagram component with two read-only projections: a definition/version topology and a selected-run sequence. Generate Mermaid source from trusted `ProcessDefinition` and ordered run events through pure deterministic projectors, render with a local dependency under strict security settings, and cover escaping, branches, waits, retries, subprocesses, terminal states, empty states, and render failures. The component must remain independent from the editable canvas and must not become a second compiler.
+- Trusted server orchestration that starts Flow executions and links process runs through the service-role-only correlation operations, plus an authoring UI for participants, ordered stages, scenarios, and capability gates.
+- Ordered actual-event projection across correlated runs, including optional stages, waits, retries, failures, compensation, and alternative branches.
+- Extended standalone diagram coverage for waits, retries, subprocesses, terminal states, empty states, and Mermaid render failures.
 - Runtime overlays for active, waiting, retrying, paused, failed, completed, and rolled-back paths.
 - Collapsed and expanded nested conditions, loops, blocks, functions, and parallel lanes.
-- Full step output retrieval beyond bounded transform and HTTP JSON values, including redaction profiles and policies for other step kinds.
+- Full step output retrieval beyond bounded transform, HTTP JSON, subprocess business-output, external-event payload, and approval decision values, including reusable redaction profiles and policies for other step kinds.
 - External-object or streaming strategy for outputs that should not be stored inline.
 - Resumable live event subscription with cursor and event filters.
 - Workflow/version diff and run comparison.
@@ -251,9 +297,11 @@ Exit criteria:
 Covered:
 
 - Focused Worker and unit suites, Wrangler dry-runs, sanitized errors, narrow browser commands, and Cloudflare observability configuration.
+- Corex browser, domain, generator, and Worker source/test paths pass ESLint and Prettier with zero Svelte diagnostics.
 
 Critical gaps:
 
+- Outside the Corex scope, the strict repository lint gate still has an authored-code baseline of 80 ESLint errors and 96 Prettier failures across the landing page, dashboard, merchant app, checkout scripts, and shared scripts. Generated bundles, local agent metadata, Supabase temp state, and generated Worker declarations are excluded; this external debt remains blocking for the repository-wide gate but is not part of the Corex remediation scope.
 - Authenticated browser E2E for author, save, validate, publish, run, event, approval, cancellation, and inspection.
 - Failure injection across database commit, Workflow creation, event send, callback, timeout, cancellation, and outbox acknowledgement.
 - Structured logs, correlation IDs, metrics, traces, dashboards, alerts, and operator runbooks.
@@ -265,6 +313,7 @@ Critical gaps:
 
 Exit criteria:
 
+- `npm run lint` passes with both formatting and ESLint checks green; generated artifacts remain excluded rather than manually edited.
 - P0 workflows pass local database, Worker integration, browser E2E, and failure-injection suites.
 - Alerts cover stuck runs, outbox backlog, reconciliation drift, error-rate spikes, and quota pressure.
 - No deployment or remote migration occurs without explicit authorization and a recorded release gate.

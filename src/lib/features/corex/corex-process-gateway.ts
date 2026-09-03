@@ -23,6 +23,34 @@ type ProcessVersionRow = {
 	published_at: string;
 };
 
+export const COREX_RUN_STATUSES = [
+	'queued',
+	'running',
+	'waiting',
+	'waiting_for_pause',
+	'paused',
+	'rolling_back',
+	'complete',
+	'errored',
+	'terminated'
+] as const;
+
+export type CorexRunStatus = (typeof COREX_RUN_STATUSES)[number];
+
+const ACTIVE_COREX_RUN_STATUSES: ReadonlySet<CorexRunStatus> = new Set([
+	'queued',
+	'running',
+	'waiting',
+	'waiting_for_pause',
+	'paused'
+]);
+
+const TERMINAL_COREX_RUN_STATUSES: ReadonlySet<CorexRunStatus> = new Set([
+	'complete',
+	'errored',
+	'terminated'
+]);
+
 type RunRow = {
 	id: string;
 	process_id: string;
@@ -32,7 +60,7 @@ type RunRow = {
 	parent_step_id: string | null;
 	depth: number;
 	execution_generation: number;
-	status: string;
+	status: unknown;
 	input: unknown;
 	output: unknown | null;
 	error: unknown | null;
@@ -75,8 +103,14 @@ type StepAttemptRow = {
 				bytes: number;
 				value?: unknown;
 				truncated?: true;
-			}
-		| { type: 'object'; bytes: number; value?: unknown; truncated?: true }
+		  }
+		| {
+				type: 'object';
+				bytes: number;
+				value?: unknown;
+				truncated?: true;
+				external?: { key: string; bytes: number; contentType: 'application/json' };
+		  }
 		| { type: 'none' | 'redacted' }
 		| null;
 	error: {
@@ -115,6 +149,24 @@ export type CorexProcess = {
 	updatedAt: string;
 };
 
+export type CorexProcessCursor = {
+	updatedAt: string;
+	id: string;
+};
+
+export type CorexProcessListOptions = {
+	limit?: number;
+	cursor?: CorexProcessCursor;
+	direction?: 'asc' | 'desc';
+	lifecycle?: ProcessLifecycle;
+	search?: string;
+};
+
+export type CorexProcessPage = {
+	processes: CorexProcess[];
+	nextCursor: CorexProcessCursor | null;
+};
+
 export type CorexProcessVersion = {
 	id: string;
 	processId: string;
@@ -133,7 +185,7 @@ export type CorexRun = {
 	parentStepId: string | null;
 	depth: number;
 	executionGeneration: number;
-	status: string;
+	status: CorexRunStatus;
 	input: unknown;
 	output: unknown | null;
 	error: unknown | null;
@@ -143,6 +195,26 @@ export type CorexRun = {
 	startedAt: string | null;
 	finishedAt: string | null;
 	createdAt: string;
+};
+
+export type CorexRunCursor = {
+	createdAt: string;
+	id: string;
+};
+
+export type CorexRunListOptions = {
+	limit?: number;
+	cursor?: CorexRunCursor;
+	direction?: 'asc' | 'desc';
+	status?: CorexRunStatus;
+	createdFrom?: string;
+	createdTo?: string;
+	search?: string;
+};
+
+export type CorexRunPage = {
+	runs: CorexRun[];
+	nextCursor: CorexRunCursor | null;
 };
 
 export type CorexRunEvent = {
@@ -208,6 +280,43 @@ function mapProcess(row: ProcessRow): CorexProcess {
 	};
 }
 
+export function isCorexRunStatus(value: unknown): value is CorexRunStatus {
+	return typeof value === 'string' && COREX_RUN_STATUSES.some((status) => status === value);
+}
+
+export function isActiveCorexRunStatus(status: CorexRunStatus): boolean {
+	return ACTIVE_COREX_RUN_STATUSES.has(status);
+}
+
+export function isTerminalCorexRunStatus(status: CorexRunStatus): boolean {
+	return TERMINAL_COREX_RUN_STATUSES.has(status);
+}
+
+function mapRun(row: RunRow): CorexRun {
+	if (!isCorexRunStatus(row.status))
+		throw new Error(`Unknown Corex run status: ${String(row.status)}`);
+	return {
+		id: row.id,
+		processId: row.process_id,
+		processVersionId: row.process_version_id,
+		workflowInstanceId: row.workflow_instance_id,
+		parentRunId: row.parent_run_id,
+		parentStepId: row.parent_step_id,
+		depth: row.depth,
+		executionGeneration: row.execution_generation,
+		status: row.status,
+		input: row.input,
+		output: row.output,
+		error: row.error,
+		rollbackOutcome: row.rollback_outcome,
+		rollbackError: row.rollback_error,
+		archivedAt: row.archived_at,
+		startedAt: row.started_at,
+		finishedAt: row.finished_at,
+		createdAt: row.created_at
+	};
+}
+
 export function createCorexProcessGateway(client: SupabaseClient) {
 	return {
 		async listProcesses(ownerUserId: string): Promise<CorexProcess[]> {
@@ -220,6 +329,44 @@ export function createCorexProcessGateway(client: SupabaseClient) {
 				.order('updated_at', { ascending: false });
 			if (error) throw error;
 			return ((data ?? []) as ProcessRow[]).map(mapProcess);
+		},
+
+		async listProcessPage(
+			ownerUserId: string,
+			options: CorexProcessListOptions = {}
+		): Promise<CorexProcessPage> {
+			const limit = Math.min(100, Math.max(1, Math.trunc(options.limit ?? 25)));
+			const ascending = options.direction === 'asc';
+			let query = client
+				.from('corex_processes')
+				.select(
+					'id, owner_user_id, slug, name, description, lifecycle, revision, draft_definition, published_version, updated_at'
+				)
+				.eq('owner_user_id', ownerUserId);
+			if (options.lifecycle) query = query.eq('lifecycle', options.lifecycle);
+			const search = options.search?.trim().replace(/[^\p{L}\p{N}\s_-]/gu, '');
+			if (search) {
+				const escapedSearch = search.replaceAll('_', '\\_');
+				query = query.or(`name.ilike.%${escapedSearch}%,slug.ilike.%${escapedSearch}%`);
+			}
+			if (options.cursor) {
+				const comparison = ascending ? 'gt' : 'lt';
+				query = query.or(
+					`updated_at.${comparison}.${options.cursor.updatedAt},and(updated_at.eq.${options.cursor.updatedAt},id.${comparison}.${options.cursor.id})`
+				);
+			}
+			const { data, error } = await query
+				.order('updated_at', { ascending })
+				.order('id', { ascending })
+				.limit(limit + 1);
+			if (error) throw error;
+			const rows = (data ?? []) as ProcessRow[];
+			const pageRows = rows.slice(0, limit);
+			const last = pageRows.at(-1);
+			return {
+				processes: pageRows.map(mapProcess),
+				nextCursor: rows.length > limit && last ? { updatedAt: last.updated_at, id: last.id } : null
+			};
 		},
 
 		async createProcess(
@@ -293,26 +440,46 @@ export function createCorexProcessGateway(client: SupabaseClient) {
 				.eq('process_id', processId)
 				.order('created_at', { ascending: false });
 			if (error) throw error;
-			return ((data ?? []) as RunRow[]).map((row) => ({
-				id: row.id,
-				processId: row.process_id,
-				processVersionId: row.process_version_id,
-				workflowInstanceId: row.workflow_instance_id,
-				parentRunId: row.parent_run_id,
-				parentStepId: row.parent_step_id,
-				depth: row.depth,
-				executionGeneration: row.execution_generation,
-				status: row.status,
-				input: row.input,
-				output: row.output,
-				error: row.error,
-				rollbackOutcome: row.rollback_outcome,
-				rollbackError: row.rollback_error,
-				archivedAt: row.archived_at,
-				startedAt: row.started_at,
-				finishedAt: row.finished_at,
-				createdAt: row.created_at
-			}));
+			return ((data ?? []) as RunRow[]).map(mapRun);
+		},
+
+		async listRunPage(processId: string, options: CorexRunListOptions = {}): Promise<CorexRunPage> {
+			const limit = Math.min(100, Math.max(1, Math.trunc(options.limit ?? 25)));
+			const ascending = options.direction === 'asc';
+			let query = client
+				.from('corex_runs')
+				.select(
+					'id, process_id, process_version_id, workflow_instance_id, parent_run_id, parent_step_id, depth, execution_generation, status, input, output, error, rollback_outcome, rollback_error, archived_at, started_at, finished_at, created_at'
+				)
+				.eq('process_id', processId);
+			if (options.status) query = query.eq('status', options.status);
+			if (options.createdFrom) query = query.gte('created_at', options.createdFrom);
+			if (options.createdTo) query = query.lte('created_at', options.createdTo);
+			const search = options.search?.trim().replace(/[^a-zA-Z0-9:_-]/g, '');
+			if (search) {
+				const escapedSearch = search.replaceAll('%', '\\%').replaceAll('_', '\\_');
+				query = query.or(
+					`id.ilike.%${escapedSearch}%,workflow_instance_id.ilike.%${escapedSearch}%`
+				);
+			}
+			if (options.cursor) {
+				const comparison = ascending ? 'gt' : 'lt';
+				query = query.or(
+					`created_at.${comparison}.${options.cursor.createdAt},and(created_at.eq.${options.cursor.createdAt},id.${comparison}.${options.cursor.id})`
+				);
+			}
+			const { data, error } = await query
+				.order('created_at', { ascending })
+				.order('id', { ascending })
+				.limit(limit + 1);
+			if (error) throw error;
+			const rows = (data ?? []) as RunRow[];
+			const pageRows = rows.slice(0, limit);
+			const last = pageRows.at(-1);
+			return {
+				runs: pageRows.map(mapRun),
+				nextCursor: rows.length > limit && last ? { createdAt: last.created_at, id: last.id } : null
+			};
 		},
 
 		async listRunEvents(runId: string): Promise<CorexRunEvent[]> {

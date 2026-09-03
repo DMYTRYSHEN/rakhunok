@@ -32,9 +32,13 @@ export type WorkflowNodeType =
 	| 'block'
 	| 'function-definition'
 	| 'function-call'
+	| 'local-function'
+	| 'local-call'
+	| 'local-return'
 	| 'break';
 
-export type WorkflowNodeFamily = 'trigger' | 'control' | 'wait' | 'data' | 'integration' | 'resilience' | 'terminal' | 'structure';
+export type WorkflowNodeFamily =
+	'trigger' | 'control' | 'wait' | 'data' | 'integration' | 'resilience' | 'terminal' | 'structure';
 
 export type WorkflowTriggerConfig = {
 	kind: 'http' | 'schedule' | 'event';
@@ -107,7 +111,17 @@ export type FlowEdge = {
 
 export type FlowScenario = {
 	id: string;
-	category: 'Access' | 'PWA' | 'Invoices' | 'Routing' | 'Checkout' | 'Payments' | 'POS' | 'Dashboard' | 'Delivery' | 'Operations';
+	category:
+		| 'Access'
+		| 'PWA'
+		| 'Invoices'
+		| 'Routing'
+		| 'Checkout'
+		| 'Payments'
+		| 'POS'
+		| 'Dashboard'
+		| 'Delivery'
+		| 'Operations';
 	label: string;
 	title: string;
 	description: string;

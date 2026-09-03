@@ -8,7 +8,7 @@ export type ProcessPosition = {
 };
 
 export type ProcessOutputPolicy = {
-	mode: 'metadata' | 'inline';
+	mode: 'metadata' | 'inline' | 'external';
 	maxBytes: number;
 	redactPaths?: string[];
 };
@@ -24,6 +24,20 @@ export type HttpTriggerNode = ProcessNodeBase & {
 	config: {
 		method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 		path: string;
+	};
+};
+
+export type ScheduleTriggerNode = ProcessNodeBase & {
+	type: 'trigger-schedule';
+	config: { cron: string; timezone: string };
+};
+
+export type EventTriggerNode = ProcessNodeBase & {
+	type: 'trigger-event';
+	config: {
+		source: 'queue' | 'workflow-binding' | 'durable-object' | 'database-webhook' | 'custom';
+		eventType: string;
+		binding?: string;
 	};
 };
 
@@ -127,6 +141,7 @@ export type EventWaitNode = ProcessNodeBase & {
 		eventType: string;
 		timeoutMs: number;
 		resultKey: string;
+		outputPolicy?: ProcessOutputPolicy;
 	};
 };
 
@@ -136,6 +151,7 @@ export type ApprovalNode = ProcessNodeBase & {
 		assigneeUserId: string;
 		timeoutMs: number;
 		resultKey: string;
+		outputPolicy?: ProcessOutputPolicy;
 	};
 };
 
@@ -155,11 +171,38 @@ export type InvokeProcessNode = ProcessNodeBase & {
 		inputPath: string;
 		resultKey: string;
 		timeoutMs: number;
+		outputPolicy?: ProcessOutputPolicy;
 	};
+};
+
+export type LocalFunctionNode = ProcessNodeBase & {
+	type: 'local-function';
+	config: Record<string, never>;
+};
+
+export type LocalReturnNode = ProcessNodeBase & {
+	type: 'local-return';
+	config: { functionId: string };
+};
+
+export type LocalCallNode = ProcessNodeBase & {
+	type: 'local-call';
+	config: {
+		functionId: string;
+		inputPath: string;
+		resultKey: string;
+	};
+};
+
+export type BlockNode = ProcessNodeBase & {
+	type: 'block';
+	config: Record<string, never>;
 };
 
 export type ProcessNode =
 	| HttpTriggerNode
+	| ScheduleTriggerNode
+	| EventTriggerNode
 	| HttpRequestNode
 	| ConditionNode
 	| SwitchNode
@@ -174,8 +217,14 @@ export type ProcessNode =
 	| ApprovalNode
 	| TransformNode
 	| InvokeProcessNode
+	| LocalFunctionNode
+	| LocalReturnNode
+	| LocalCallNode
+	| BlockNode
 	| SuccessNode
 	| FailureNode;
+
+export type ProcessTriggerNode = HttpTriggerNode | ScheduleTriggerNode | EventTriggerNode;
 
 export type ProcessEdge = {
 	id: string;
@@ -188,6 +237,8 @@ export type ProcessEdge = {
 	loopBack?: string;
 	parallel?: string;
 	try?: 'body' | 'catch' | 'finally' | 'continuation';
+	function?: 'body';
+	block?: 'body' | 'continuation';
 };
 
 export type ProcessDefinition = {
@@ -215,6 +266,8 @@ export type ProcessValidationCode =
 	| 'invalid-condition'
 	| 'invalid-compensation'
 	| 'invalid-loop'
+	| 'invalid-local-function'
+	| 'invalid-block'
 	| 'invalid-break'
 	| 'invalid-parallel'
 	| 'invalid-try'
@@ -224,6 +277,7 @@ export type ProcessValidationCode =
 	| 'invalid-switch'
 	| 'invalid-subprocess'
 	| 'invalid-timeout'
+	| 'invalid-trigger'
 	| 'invalid-transform'
 	| 'invalid-wait'
 	| 'missing-terminal'
@@ -245,6 +299,8 @@ export type ProcessValidationResult =
 
 const NODE_TYPES = new Set([
 	'trigger-http',
+	'trigger-schedule',
+	'trigger-event',
 	'http-request',
 	'condition',
 	'switch',
@@ -259,10 +315,26 @@ const NODE_TYPES = new Set([
 	'approval',
 	'transform',
 	'invoke-process',
+	'local-function',
+	'local-return',
+	'local-call',
+	'block',
 	'end-success',
 	'end-failure'
 ]);
 const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
+const EVENT_TRIGGER_SOURCES = new Set([
+	'queue',
+	'workflow-binding',
+	'durable-object',
+	'database-webhook',
+	'custom'
+]);
+const TRIGGER_TYPES = new Set(['trigger-http', 'trigger-schedule', 'trigger-event']);
+
+export function isProcessTriggerNode(node: ProcessNode): node is ProcessTriggerNode {
+	return TRIGGER_TYPES.has(node.type);
+}
 const CONDITION_OPERATORS = new Set([
 	'equals',
 	'not-equals',
@@ -272,8 +344,9 @@ const CONDITION_OPERATORS = new Set([
 ]);
 const RETRY_BACKOFFS = new Set(['constant', 'linear', 'exponential']);
 const TRANSFORM_MODES = new Set(['merge', 'replace']);
-const OUTPUT_MODES = new Set(['metadata', 'inline']);
+const OUTPUT_MODES = new Set(['metadata', 'inline', 'external']);
 const MAX_INLINE_OUTPUT_BYTES = 16_384;
+const MAX_EXTERNAL_OUTPUT_BYTES = 10_485_760;
 const MAX_OUTPUT_REDACT_PATHS = 20;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -314,6 +387,14 @@ function isProcessNode(value: unknown): value is ProcessNode {
 	switch (value.type) {
 		case 'trigger-http':
 			return HTTP_METHODS.has(String(config.method)) && typeof config.path === 'string';
+		case 'trigger-schedule':
+			return typeof config.cron === 'string' && typeof config.timezone === 'string';
+		case 'trigger-event':
+			return (
+				EVENT_TRIGGER_SOURCES.has(String(config.source)) &&
+				typeof config.eventType === 'string' &&
+				(config.binding === undefined || typeof config.binding === 'string')
+			);
 		case 'http-request':
 			return (
 				HTTP_METHODS.has(String(config.method)) &&
@@ -361,13 +442,15 @@ function isProcessNode(value: unknown): value is ProcessNode {
 			return (
 				typeof config.eventType === 'string' &&
 				typeof config.timeoutMs === 'number' &&
-				typeof config.resultKey === 'string'
+				typeof config.resultKey === 'string' &&
+				(config.outputPolicy === undefined || isOutputPolicy(config.outputPolicy))
 			);
 		case 'approval':
 			return (
 				typeof config.assigneeUserId === 'string' &&
 				typeof config.timeoutMs === 'number' &&
-				typeof config.resultKey === 'string'
+				typeof config.resultKey === 'string' &&
+				(config.outputPolicy === undefined || isOutputPolicy(config.outputPolicy))
 			);
 		case 'transform':
 			return (
@@ -381,8 +464,21 @@ function isProcessNode(value: unknown): value is ProcessNode {
 				typeof config.processId === 'string' &&
 				typeof config.inputPath === 'string' &&
 				typeof config.resultKey === 'string' &&
-				typeof config.timeoutMs === 'number'
+				typeof config.timeoutMs === 'number' &&
+				(config.outputPolicy === undefined || isOutputPolicy(config.outputPolicy))
 			);
+		case 'local-function':
+			return Object.keys(config).length === 0;
+		case 'local-return':
+			return typeof config.functionId === 'string';
+		case 'local-call':
+			return (
+				typeof config.functionId === 'string' &&
+				typeof config.inputPath === 'string' &&
+				typeof config.resultKey === 'string'
+			);
+		case 'block':
+			return Object.keys(config).length === 0;
 		case 'end-success':
 			return config.outputExpression === undefined || typeof config.outputExpression === 'string';
 		case 'end-failure':
@@ -426,7 +522,9 @@ export function parseProcessDefinition(value: unknown): ProcessDefinition | unde
 				(edge.loopBack === undefined || typeof edge.loopBack === 'string') &&
 				(edge.parallel === undefined || typeof edge.parallel === 'string') &&
 				(edge.try === undefined ||
-					['body', 'catch', 'finally', 'continuation'].includes(String(edge.try)))
+					['body', 'catch', 'finally', 'continuation'].includes(String(edge.try))) &&
+				(edge.function === undefined || edge.function === 'body') &&
+				(edge.block === undefined || ['body', 'continuation'].includes(String(edge.block)))
 		)
 	)
 		return undefined;
@@ -492,13 +590,18 @@ const JSON_PATH = /^\$(?:\.[A-Za-z_][A-Za-z0-9_-]*)*$/;
 const REDACT_PATH = /^\$\.[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*$/;
 const TRANSFORM_KEY = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
-function hasInvalidOutputPolicy(policy: ProcessOutputPolicy | undefined): boolean {
+function hasInvalidOutputPolicy(
+	policy: ProcessOutputPolicy | undefined,
+	allowExternal = false
+): boolean {
 	if (policy === undefined) return false;
 	const redactPaths = policy.redactPaths ?? [];
+	const maxBytes = policy.mode === 'external' ? MAX_EXTERNAL_OUTPUT_BYTES : MAX_INLINE_OUTPUT_BYTES;
 	return (
+		(policy.mode === 'external' && !allowExternal) ||
 		!Number.isInteger(policy.maxBytes) ||
 		policy.maxBytes < 1 ||
-		policy.maxBytes > MAX_INLINE_OUTPUT_BYTES ||
+		policy.maxBytes > maxBytes ||
 		redactPaths.length > MAX_OUTPUT_REDACT_PATHS ||
 		new Set(redactPaths).size !== redactPaths.length ||
 		redactPaths.some((path) => !REDACT_PATH.test(path))
@@ -532,11 +635,11 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 		});
 	}
 
-	const triggers = definition.nodes.filter((node) => node.type === 'trigger-http');
+	const triggers = definition.nodes.filter(isProcessTriggerNode);
 	if (triggers.length !== 1) {
 		issues.push({
 			code: 'multiple-triggers',
-			message: 'A process must have exactly one HTTP trigger.'
+			message: 'A process must have exactly one trigger.'
 		});
 	}
 	if (
@@ -556,6 +659,27 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			issues.push({
 				code: 'invalid-http-path',
 				message: 'Trigger path must be an absolute path without a query string.',
+				nodeId: node.id
+			});
+		}
+		if (
+			node.type === 'trigger-schedule' &&
+			(node.config.cron.trim().length === 0 || node.config.timezone.trim().length === 0)
+		) {
+			issues.push({
+				code: 'invalid-trigger',
+				message: 'Schedule triggers require a cron expression and timezone.',
+				nodeId: node.id
+			});
+		}
+		if (
+			node.type === 'trigger-event' &&
+			(node.config.eventType.trim().length === 0 ||
+				(node.config.source !== 'custom' && !node.config.binding?.trim()))
+		) {
+			issues.push({
+				code: 'invalid-trigger',
+				message: 'Event triggers require an event type and a binding for managed sources.',
 				nodeId: node.id
 			});
 		}
@@ -596,11 +720,11 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 					nodeId: node.id
 				});
 			}
-			if (hasInvalidOutputPolicy(node.config.outputPolicy)) {
+			if (hasInvalidOutputPolicy(node.config.outputPolicy, true)) {
 				issues.push({
 					code: 'invalid-http-output',
 					message:
-						'HTTP inline output requires a 1 to 16384 byte limit and up to 20 unique child JSON paths for redaction.',
+						'HTTP inline or external output requires a bounded byte limit and up to 20 unique child JSON paths for redaction.',
 					nodeId: node.id
 				});
 			}
@@ -734,12 +858,13 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 				!TRANSFORM_KEY.test(node.config.resultKey) ||
 				!Number.isInteger(node.config.timeoutMs) ||
 				node.config.timeoutMs < 1 ||
-				node.config.timeoutMs > 31_536_000_000)
+				node.config.timeoutMs > 31_536_000_000 ||
+				hasInvalidOutputPolicy(node.config.outputPolicy, true))
 		) {
 			issues.push({
 				code: 'invalid-wait',
 				message:
-					'Event waits require safe event/result names and a timeout between 1 ms and 365 days.',
+					'Event waits require safe event/result names, a timeout between 1 ms and 365 days, an inline limit up to 16384 bytes or external limit up to 10485760 bytes, and up to 20 unique child JSON paths for redaction.',
 				nodeId: node.id
 			});
 		}
@@ -749,12 +874,13 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 				!TRANSFORM_KEY.test(node.config.resultKey) ||
 				!Number.isInteger(node.config.timeoutMs) ||
 				node.config.timeoutMs < 1 ||
-				node.config.timeoutMs > 31_536_000_000)
+				node.config.timeoutMs > 31_536_000_000 ||
+				hasInvalidOutputPolicy(node.config.outputPolicy, true))
 		) {
 			issues.push({
 				code: 'invalid-wait',
 				message:
-					'Approvals require an assignee user ID, a safe result name, and a timeout between 1 ms and 365 days.',
+					'Approvals require an assignee user ID, a safe result name, a timeout between 1 ms and 365 days, an inline limit up to 16384 bytes or external limit up to 10485760 bytes, and up to 20 unique child JSON paths for redaction.',
 				nodeId: node.id
 			});
 		}
@@ -763,12 +889,12 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			if (
 				mappings.length === 0 ||
 				mappings.some(([key, path]) => !TRANSFORM_KEY.test(key) || !JSON_PATH.test(path)) ||
-				hasInvalidOutputPolicy(node.config.outputPolicy)
+				hasInvalidOutputPolicy(node.config.outputPolicy, true)
 			) {
 				issues.push({
 					code: 'invalid-transform',
 					message:
-						'Transforms require safe mappings, a 1 to 16384 byte output limit, and up to 20 unique child JSON paths for redaction.',
+						'Transforms require safe mappings, an inline limit up to 16384 bytes or external limit up to 10485760 bytes, and up to 20 unique child JSON paths for redaction.',
 					nodeId: node.id
 				});
 			}
@@ -780,12 +906,23 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 				!TRANSFORM_KEY.test(node.config.resultKey) ||
 				!Number.isInteger(node.config.timeoutMs) ||
 				node.config.timeoutMs < 1 ||
-				node.config.timeoutMs > 31_536_000_000)
+				node.config.timeoutMs > 31_536_000_000 ||
+				hasInvalidOutputPolicy(node.config.outputPolicy, true))
 		) {
 			issues.push({
 				code: 'invalid-subprocess',
 				message:
-					'Subprocesses require a process ID, safe input/result names, and a timeout between 1 ms and 365 days.',
+					'Subprocesses require a process ID, safe input/result names, a timeout between 1 ms and 365 days, an inline limit up to 16384 bytes or external limit up to 10485760 bytes, and up to 20 unique child JSON paths for redaction.',
+				nodeId: node.id
+			});
+		}
+		if (
+			node.type === 'local-call' &&
+			(!JSON_PATH.test(node.config.inputPath) || !TRANSFORM_KEY.test(node.config.resultKey))
+		) {
+			issues.push({
+				code: 'invalid-local-function',
+				message: 'Local function calls require safe input and result paths.',
 				nodeId: node.id
 			});
 		}
@@ -810,14 +947,25 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 		const targetNode = definition.nodes.find((node) => node.id === edge.target);
 		if (
 			(edge.compensation !== undefined &&
-				!((sourceNode?.type === 'http-request' &&
-					(targetNode?.type === 'http-request' || targetNode?.type === 'transform')) ||
-					(sourceNode?.type === 'transform' && targetNode?.type === 'transform') ||
+				!(
+					(sourceNode?.type === 'http-request' &&
+						(targetNode?.type === 'http-request' || targetNode?.type === 'transform')) ||
+					(sourceNode?.type === 'transform' &&
+						(targetNode?.type === 'http-request' || targetNode?.type === 'transform')) ||
 					(sourceNode?.type === 'invoke-process' &&
-						(targetNode?.type === 'http-request' || targetNode?.type === 'transform')))) ||
+						(targetNode?.type === 'http-request' || targetNode?.type === 'transform')) ||
+					(sourceNode?.type === 'wait-event' &&
+						(targetNode?.type === 'http-request' || targetNode?.type === 'transform')) ||
+					(sourceNode?.type === 'approval' &&
+						(targetNode?.type === 'http-request' || targetNode?.type === 'transform')) ||
+					((sourceNode?.type === 'wait' || sourceNode?.type === 'wait-until') &&
+						(targetNode?.type === 'http-request' || targetNode?.type === 'transform'))
+				)) ||
 			(edge.loop !== undefined && sourceNode?.type !== 'loop') ||
 			(edge.parallel !== undefined && sourceNode?.type !== 'parallel') ||
 			(edge.try !== undefined && sourceNode?.type !== 'try') ||
+			(edge.function !== undefined && sourceNode?.type !== 'local-function') ||
+			(edge.block !== undefined && sourceNode?.type !== 'block') ||
 			(edge.loopBack !== undefined &&
 				(targetNode?.type !== 'loop' || edge.loopBack !== targetNode.id)) ||
 			[
@@ -827,10 +975,10 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 				edge.loop,
 				edge.loopBack,
 				edge.parallel,
-				edge.try
-			].filter(
-				(value) => value !== undefined
-			).length > 1
+				edge.try,
+				edge.function,
+				edge.block
+			].filter((value) => value !== undefined).length > 1
 		) {
 			issues.push({
 				code: 'invalid-edge',
@@ -847,7 +995,11 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 		(candidate) =>
 			candidate.type === 'http-request' ||
 			candidate.type === 'transform' ||
-			candidate.type === 'invoke-process'
+			candidate.type === 'invoke-process' ||
+			candidate.type === 'wait-event' ||
+			candidate.type === 'approval' ||
+			candidate.type === 'wait' ||
+			candidate.type === 'wait-until'
 	)) {
 		const handlers = compensationEdges.filter((edge) => edge.source === node.id);
 		const incomingCompensations = compensationEdges.filter((edge) => edge.target === node.id);
@@ -865,7 +1017,7 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 		) {
 			issues.push({
 				code: 'invalid-compensation',
-				message: `${node.type === 'http-request' ? 'HTTP' : node.type === 'transform' ? 'Transform' : 'Subprocess'} step "${node.name}" has an invalid compensation route.`,
+				message: `${node.type === 'http-request' ? 'HTTP' : node.type === 'transform' ? 'Transform' : node.type === 'invoke-process' ? 'Subprocess' : node.type === 'wait-event' ? 'Event wait' : node.type === 'approval' ? 'Approval' : 'Wait'} step "${node.name}" has an invalid compensation route.`,
 				nodeId: node.id
 			});
 		}
@@ -875,7 +1027,7 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 		if ((incoming.get(trigger.id) ?? 0) > 0) {
 			issues.push({
 				code: 'trigger-has-input',
-				message: 'An HTTP trigger cannot have incoming edges.',
+				message: 'A trigger cannot have incoming edges.',
 				nodeId: trigger.id
 			});
 		}
@@ -984,11 +1136,50 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 				if (reachesJoin.has(nodeId)) return reachesJoin.get(nodeId)!;
 				if (visiting.has(nodeId)) return false;
 				const node = definition.nodes.find((candidate) => candidate.id === nodeId);
+				if (node?.type === 'parallel') {
+					const nestedJoins = definition.nodes.filter(
+						(candidate) =>
+							candidate.type === 'parallel-join' && candidate.config.parallelId === node.id
+					);
+					const nestedJoin = nestedJoins.length === 1 ? nestedJoins[0] : undefined;
+					const continuations = nestedJoin
+						? definition.edges.filter(
+								(edge) =>
+									edge.source === nestedJoin.id &&
+									edge.loopBack === undefined &&
+									edge.compensation !== true
+							)
+						: [];
+					if (!nestedJoin || continuations.length !== 1) return false;
+					visiting.add(nodeId);
+					const nestedRegion = [nodeId];
+					const enclosed = new Set<string>();
+					while (nestedRegion.length > 0) {
+						const nestedNodeId = nestedRegion.pop()!;
+						if (enclosed.has(nestedNodeId)) continue;
+						enclosed.add(nestedNodeId);
+						region.add(nestedNodeId);
+						if (nestedNodeId === nestedJoin.id) continue;
+						nestedRegion.push(
+							...definition.edges
+								.filter(
+									(edge) =>
+										edge.source === nestedNodeId &&
+										edge.loopBack === undefined &&
+										edge.compensation !== true
+								)
+								.map((edge) => edge.target)
+						);
+					}
+					const valid = reachesOnlyJoin(continuations[0].target);
+					visiting.delete(nodeId);
+					reachesJoin.set(nodeId, valid);
+					return valid;
+				}
 				if (
 					!node ||
 					node.type === 'end-success' ||
 					node.type === 'end-failure' ||
-					node.type === 'parallel' ||
 					node.type === 'parallel-join'
 				)
 					return false;
@@ -997,9 +1188,7 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 				const targets = definition.edges
 					.filter(
 						(edge) =>
-							edge.source === nodeId &&
-							edge.loopBack === undefined &&
-							edge.compensation !== true
+							edge.source === nodeId && edge.loopBack === undefined && edge.compensation !== true
 					)
 					.map((edge) => edge.target);
 				const valid = targets.length > 0 && targets.every(reachesOnlyJoin);
@@ -1051,6 +1240,147 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			});
 		}
 	}
+	const localFunctionRegions = new Map<string, Set<string>>();
+	for (const functionNode of definition.nodes.filter((node) => node.type === 'local-function')) {
+		const bodyEdges = definition.edges.filter(
+			(edge) => edge.source === functionNode.id && edge.function === 'body'
+		);
+		const region = new Set<string>();
+		const returns = new Set<string>();
+		const visiting = new Set<string>();
+		const reachesReturn = new Map<string, boolean>();
+		const reachesOnlyReturn = (nodeId: string): boolean => {
+			const node = definition.nodes.find((candidate) => candidate.id === nodeId);
+			if (node?.type === 'local-return') {
+				if (node.config.functionId !== functionNode.id) return false;
+				region.add(nodeId);
+				returns.add(nodeId);
+				return true;
+			}
+			if (!node || reachesReturn.has(nodeId)) return reachesReturn.get(nodeId) ?? false;
+			if (
+				visiting.has(nodeId) ||
+				TRIGGER_TYPES.has(node.type) ||
+				node.type === 'end-success' ||
+				node.type === 'end-failure' ||
+				node.type === 'local-function' ||
+				node.type === 'parallel' ||
+				node.type === 'parallel-join'
+			)
+				return false;
+			visiting.add(nodeId);
+			region.add(nodeId);
+			const targets = definition.edges
+				.filter(
+					(edge) =>
+						edge.source === nodeId && edge.loopBack === undefined && edge.compensation !== true
+				)
+				.map((edge) => edge.target);
+			const valid = targets.length > 0 && targets.every(reachesOnlyReturn);
+			visiting.delete(nodeId);
+			reachesReturn.set(nodeId, valid);
+			return valid;
+		};
+		const bodyTarget = bodyEdges[0]?.target;
+		if (
+			bodyEdges.length !== 1 ||
+			definition.edges.filter((edge) => edge.source === functionNode.id).length !== 1 ||
+			definition.edges.filter((edge) => edge.target === functionNode.id).length !== 0 ||
+			!bodyTarget ||
+			!reachesOnlyReturn(bodyTarget) ||
+			returns.size !== 1 ||
+			definition.edges.some(
+				(edge) =>
+					region.has(edge.target) && edge.source !== functionNode.id && !region.has(edge.source)
+			)
+		) {
+			issues.push({
+				code: 'invalid-local-function',
+				message: `Local function "${functionNode.name}" requires one isolated serial body ending at one matching return.`,
+				nodeId: functionNode.id
+			});
+		}
+		localFunctionRegions.set(functionNode.id, region);
+	}
+	for (const returnNode of definition.nodes.filter((node) => node.type === 'local-return')) {
+		const owner = definition.nodes.find(
+			(node) => node.id === returnNode.config.functionId && node.type === 'local-function'
+		);
+		if (!owner || (outgoing.get(returnNode.id)?.length ?? 0) !== 0) {
+			issues.push({
+				code: 'invalid-local-function',
+				message: `Local return "${returnNode.name}" must end its referenced function body.`,
+				nodeId: returnNode.id
+			});
+		}
+	}
+	const localFunctionCalls = definition.nodes.filter((node) => node.type === 'local-call');
+	for (const callNode of localFunctionCalls) {
+		if (!localFunctionRegions.has(callNode.config.functionId)) {
+			issues.push({
+				code: 'invalid-local-function',
+				message: `Local call "${callNode.name}" must reference an existing local function.`,
+				nodeId: callNode.id
+			});
+		}
+	}
+	for (const blockNode of definition.nodes.filter((node) => node.type === 'block')) {
+		const branches = definition.edges.filter((edge) => edge.source === blockNode.id);
+		const bodyEdges = branches.filter((edge) => edge.block === 'body');
+		const continuationEdges = branches.filter((edge) => edge.block === 'continuation');
+		const bodyTarget = bodyEdges[0]?.target;
+		const continuationTarget = continuationEdges[0]?.target;
+		const region = new Set<string>();
+		const visiting = new Set<string>();
+		const reachesContinuation = new Map<string, boolean>();
+		const reachesOnlyContinuation = (nodeId: string): boolean => {
+			if (nodeId === continuationTarget) return true;
+			const cached = reachesContinuation.get(nodeId);
+			if (cached !== undefined) return cached;
+			const node = definition.nodes.find((candidate) => candidate.id === nodeId);
+			if (
+				!node ||
+				visiting.has(nodeId) ||
+				TRIGGER_TYPES.has(node.type) ||
+				node.type === 'end-success' ||
+				node.type === 'end-failure' ||
+				node.type === 'local-function' ||
+				node.type === 'local-return'
+			)
+				return false;
+			visiting.add(nodeId);
+			region.add(nodeId);
+			const targets = definition.edges
+				.filter(
+					(edge) =>
+						edge.source === nodeId && edge.loopBack === undefined && edge.compensation !== true
+				)
+				.map((edge) => edge.target);
+			const valid = targets.length > 0 && targets.every(reachesOnlyContinuation);
+			visiting.delete(nodeId);
+			reachesContinuation.set(nodeId, valid);
+			return valid;
+		};
+		if (
+			branches.length !== 2 ||
+			bodyEdges.length !== 1 ||
+			continuationEdges.length !== 1 ||
+			!bodyTarget ||
+			!continuationTarget ||
+			bodyTarget === continuationTarget ||
+			!reachesOnlyContinuation(bodyTarget) ||
+			definition.edges.some(
+				(edge) =>
+					region.has(edge.target) && edge.source !== blockNode.id && !region.has(edge.source)
+			)
+		) {
+			issues.push({
+				code: 'invalid-block',
+				message: `Block "${blockNode.name}" requires one isolated body region that rejoins its continuation.`,
+				nodeId: blockNode.id
+			});
+		}
+	}
 	for (const tryNode of definition.nodes.filter((node) => node.type === 'try')) {
 		const branches = definition.edges.filter((edge) => edge.source === tryNode.id);
 		const targets = branches.map((edge) => edge.target);
@@ -1072,7 +1402,9 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 		}
 	}
 	for (const approval of definition.nodes.filter((node) => node.type === 'approval')) {
-		const branches = definition.edges.filter((edge) => edge.source === approval.id);
+		const branches = definition.edges.filter(
+			(edge) => edge.source === approval.id && edge.compensation === undefined
+		);
 		if (
 			branches.length !== 2 ||
 			!branches.some((edge) => edge.when === true) ||
@@ -1121,6 +1453,19 @@ export function validateProcessDefinition(definition: ProcessDefinition): Proces
 			queue.push(...(outgoing.get(nodeId) ?? []));
 		}
 		for (const targetId of compensationTargetIds) reachable.add(targetId);
+		const reachableFunctions = localFunctionCalls
+			.filter((node) => reachable.has(node.id))
+			.map((node) => node.config.functionId);
+		while (reachableFunctions.length > 0) {
+			const functionId = reachableFunctions.shift();
+			if (!functionId || reachable.has(functionId)) continue;
+			reachable.add(functionId);
+			for (const nodeId of localFunctionRegions.get(functionId) ?? []) {
+				reachable.add(nodeId);
+				const node = definition.nodes.find((candidate) => candidate.id === nodeId);
+				if (node?.type === 'local-call') reachableFunctions.push(node.config.functionId);
+			}
+		}
 		for (const node of definition.nodes) {
 			if (!reachable.has(node.id)) {
 				issues.push({

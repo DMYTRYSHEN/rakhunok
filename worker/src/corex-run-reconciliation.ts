@@ -50,7 +50,8 @@ function isClaimedRun(value: unknown): value is ClaimedRun {
 		Number.isSafeInteger(run.attempts) &&
 		typeof run.claimToken === 'string' &&
 		nullableStringsAreValid &&
-		(parentFields.every((field) => field === null) || parentFields.every((field) => typeof field === 'string'))
+		(parentFields.every((field) => field === null) ||
+			parentFields.every((field) => typeof field === 'string'))
 	);
 }
 
@@ -79,7 +80,7 @@ export async function reconcileQueuedCorexRuns(options: CorexRunReconciliationOp
 	let reconciled = 0;
 	let failed = 0;
 	for (const run of claimed as ClaimedRun[]) {
-		let reconciliationSucceeded = false;
+		let reconciliationSucceeded: boolean;
 		try {
 			const compilation = compileProcessDefinition(run.definition);
 			if (!compilation.ok) throw new Error('invalid_published_definition');

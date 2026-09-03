@@ -9,13 +9,13 @@
 		Check,
 		ChevronDown,
 		ChevronRight,
+		CircleOff,
 		CirclePause,
 		ClipboardPaste,
 		Clock3,
 		Code2,
 		Copy,
 		Database,
-		FileInput,
 		FileOutput,
 		FileUp,
 		FolderTree,
@@ -46,7 +46,6 @@
 	import {
 		Background,
 		BackgroundVariant,
-		Controls,
 		MarkerType,
 		MiniMap,
 		SvelteFlow,
@@ -61,27 +60,39 @@
 	import { statusText } from './i18n';
 	import {
 		createStarterProcessDefinition,
+		isProcessTriggerNode,
 		type ProcessDefinition,
 		type ProcessNode,
 		type ProcessValidationResult,
 		validateProcessDefinition
 	} from './process-definition';
 	import { processDefinitionToFlowScenario } from './process-definition-adapter';
+	import { insertProcessRegionBefore } from './process-definition-editing';
 	import {
 		canPublishProcess,
 		canRunProcess,
 		parseRunInput,
 		type CorexCommandState
 	} from './process-command-state';
-	import { CorexCommandError, type CorexStartedRun } from './corex-command-gateway';
+	import {
+		CorexCommandError,
+		type CorexDomainTarget,
+		type CorexStartedRun
+	} from './corex-command-gateway';
 	import { getCorexCommandGateway, getCorexProcessGateway } from './corex-process-browser';
 	import {
+		COREX_RUN_STATUSES,
 		CorexDraftConflictError,
+		isActiveCorexRunStatus,
+		isTerminalCorexRunStatus,
 		type CorexApprovalTask,
 		type CorexProcess,
+		type CorexProcessCursor,
 		type CorexProcessVersion,
 		type CorexRun,
+		type CorexRunCursor,
 		type CorexRunEvent,
+		type CorexRunStatus,
 		type CorexStepAttempt
 	} from './corex-process-gateway';
 	import { restoreVersionAsDraft } from './process-version-history';
@@ -90,6 +101,8 @@
 	import StickyNoteNode from './StickyNoteNode.svelte';
 	import JsonTreeViewer from './JsonTreeViewer.svelte';
 	import CanvasControlsOverlay from './CanvasControlsOverlay.svelte';
+	import ProcessDiagram from './ProcessDiagram.svelte';
+	import { merchantPaymentFlow, merchantPaymentScenarios } from './merchant-payment-flow';
 	import type { FlowEdge, FlowNode, FlowScenario } from './types';
 
 	const nodeTypes: NodeTypes = { release: ReleaseFlowNode, stickyNote: StickyNoteNode };
@@ -99,6 +112,12 @@
 	let processGateway = getCorexProcessGateway();
 	let commandGateway = getCorexCommandGateway();
 	let persistedProcesses = $state<CorexProcess[]>([]);
+	let processListCursor = $state<CorexProcessCursor | null>(null);
+	let processListSearch = $state('');
+	let processListLifecycle = $state('');
+	let processListLoading = $state(false);
+	let processListLoadingMore = $state(false);
+	let processListRequest = 0;
 	let activeProcess = $state<CorexProcess | null>(null);
 	let persistenceState = $state<'loading' | 'idle' | 'saving'>('loading');
 	let persistenceError = $state('');
@@ -112,7 +131,8 @@
 	let activeScenario = $derived(
 		scenarios.find((scenario) => scenario.id === activeScenarioId) ?? executableScenario
 	);
-	let isExecutableDraft = $derived(activeScenarioId === draftDefinition.id);
+	let isCurrentProcessDraft = $derived(activeScenarioId === draftDefinition.id);
+	let isExecutableDraft = $derived(isCurrentProcessDraft && activeProcess?.lifecycle !== 'retired');
 	type StickyNoteItem = {
 		id: string;
 		title: string;
@@ -198,13 +218,19 @@
 	let selectedNodeIds = $state.raw<string[]>([initialExecutableScenario.nodes[0].id]);
 	let copiedNode = $state.raw<ProcessNode | null>(null);
 	let paletteQuery = $state('');
-	let inspectorTab = $state<'details' | 'runs'>('details');
+	let inspectorTab = $state<'details' | 'runs' | 'diagram'>('details');
 	let aiPrompt = $state('');
 	let draftNotice = $state('');
 	let draftDirty = $state(true);
 	let validationResult = $state<ProcessValidationResult | null>(null);
 	let commandState = $state<CorexCommandState>('idle');
 	let commandNotice = $state('');
+	let domainEnvironmentKey = $state('production');
+	let domainRouteNamespace = $state('public');
+	let domainHostname = $state('');
+	let configuredDomainTarget = $state<CorexDomainTarget | null>(null);
+	let domainConfigurationState = $state<'idle' | 'configuring'>('idle');
+	let hasHttpTrigger = $derived(draftDefinition.nodes.some((node) => node.type === 'trigger-http'));
 	let runInput = $state('{}');
 	let runEventType = $state('process-event');
 	let runEventPayload = $state('{}');
@@ -220,6 +246,8 @@
 	let selectedRunId = $state('');
 	let runEvents = $state<CorexRunEvent[]>([]);
 	let stepAttempts = $state<CorexStepAttempt[]>([]);
+	let externalAttemptOutputs = $state<Record<string, unknown>>({});
+	let externalAttemptOutputStates = $state<Record<string, 'loading' | 'error'>>({});
 	let approvalTasks = $state<CorexApprovalTask[]>([]);
 	let approvalTaskComments = $state<Record<string, string>>({});
 	let approvalTaskSendingId = $state('');
@@ -231,6 +259,13 @@
 	let runHistoryState = $state<'idle' | 'loading'>('idle');
 	let runHistoryError = $state('');
 	let runHistoryRequest = 0;
+	let runHistoryCursor = $state<CorexRunCursor | null>(null);
+	let runHistoryLoadingMore = $state(false);
+	let runStatusFilter = $state<'' | CorexRunStatus>('');
+	let runSearchFilter = $state('');
+	let runCreatedFrom = $state('');
+	let runCreatedTo = $state('');
+	let runSortDirection = $state<'asc' | 'desc'>('desc');
 	let selectedRun = $derived(runs.find((run) => run.id === selectedRunId) ?? null);
 	let runSummary = $derived(summarizeRunEvents(runEvents));
 	let selectedRunOutput = $derived(formatRunDetail(selectedRun?.output));
@@ -252,27 +287,48 @@
 	});
 	let activeApprovalTask = $derived.by(() => {
 		if (!selectedRun || !activeApproval) return null;
-		return approvalTasks.find(
-			(task) =>
-				task.runId === selectedRun.id &&
-				task.executionGeneration === selectedRun.executionGeneration &&
-				task.stepName === activeApproval.stepName &&
-				task.status === 'pending'
-		) ?? null;
+		return (
+			approvalTasks.find(
+				(task) =>
+					task.runId === selectedRun.id &&
+					task.executionGeneration === selectedRun.executionGeneration &&
+					task.stepName === activeApproval.stepName &&
+					task.status === 'pending'
+			) ?? null
+		);
 	});
+
+	function stepAttemptKey(attempt: CorexStepAttempt): string {
+		return `${attempt.runId}:${attempt.executionGeneration}:${attempt.stepId}:${attempt.visit}:${attempt.attempt}`;
+	}
+
+	async function loadExternalAttemptOutput(attempt: CorexStepAttempt) {
+		if (!commandGateway) return;
+		const key = stepAttemptKey(attempt);
+		externalAttemptOutputStates[key] = 'loading';
+		try {
+			externalAttemptOutputs[key] = await commandGateway.getStepAttemptOutput(attempt);
+			delete externalAttemptOutputStates[key];
+		} catch {
+			externalAttemptOutputStates[key] = 'error';
+		}
+	}
 	let publishEnabled = $derived(
 		canPublishProcess({
 			hasGateway: Boolean(commandGateway),
 			hasProcess: Boolean(activeProcess),
+			isRetired: activeProcess?.lifecycle === 'retired',
 			draftDirty,
 			validationValid: validationResult?.valid === true,
 			commandState
-		})
+		}) &&
+			(!hasHttpTrigger || configuredDomainTarget !== null)
 	);
 	let runEnabled = $derived(
 		canRunProcess({
 			hasGateway: Boolean(commandGateway),
 			hasPublishedVersion: Boolean(activeProcess?.publishedVersion),
+			isRetired: activeProcess?.lifecycle === 'retired',
 			draftDirty,
 			commandState
 		})
@@ -289,15 +345,35 @@
 			: []
 	);
 	let selectionHasProtectedNodes = $derived(
-		selectedDefinitionNodes.some((node) =>
-			['trigger-http', 'loop', 'parallel', 'parallel-join', 'end-success'].includes(node.type)
+		selectedDefinitionNodes.some(
+			(node) =>
+				isProcessTriggerNode(node) ||
+				[
+					'loop',
+					'parallel',
+					'parallel-join',
+					'local-function',
+					'local-return',
+					'block',
+					'end-success'
+				].includes(node.type)
 		)
 	);
 	let selectionHasNonCopyableNodes = $derived(
-		selectedDefinitionNodes.some((node) =>
-			['trigger-http', 'loop', 'break', 'parallel', 'parallel-join', 'end-success', 'end-failure'].includes(
-				node.type
-			)
+		selectedDefinitionNodes.some(
+			(node) =>
+				isProcessTriggerNode(node) ||
+				[
+					'loop',
+					'break',
+					'parallel',
+					'parallel-join',
+					'local-function',
+					'local-return',
+					'block',
+					'end-success',
+					'end-failure'
+				].includes(node.type)
 		)
 	);
 	let text = $derived(canvasText[locale]);
@@ -396,8 +472,18 @@
 		{
 			label: 'Структура',
 			items: [
-				{ label: 'Функція', api: 'FunctionDef / Call', icon: Braces },
-				{ label: 'Група кроків', api: 'BlockNode', icon: FolderTree },
+				{
+					label: 'Локальна функція',
+					api: 'serial reusable body',
+					icon: SquareFunction,
+					nodeType: 'local-call' as const
+				},
+				{
+					label: 'Група кроків',
+					api: 'serial executable block',
+					icon: FolderTree,
+					nodeType: 'block' as const
+				},
 				{ label: 'Вийти з циклу', api: 'break', icon: PanelRightClose, nodeType: 'break' as const }
 			]
 		}
@@ -425,6 +511,7 @@
 	function selectScenario(scenario: FlowScenario) {
 		runHistoryRequest += 1;
 		versionHistoryRequest += 1;
+		configuredDomainTarget = null;
 		versionHistoryOpen = false;
 		versions = [];
 		activeScenarioId = scenario.id;
@@ -445,8 +532,65 @@
 		return `process:${process.id}`;
 	}
 
+	async function loadProcessList() {
+		if (!processGateway) return;
+		const request = ++processListRequest;
+		processListLoading = true;
+		processListCursor = null;
+		try {
+			const page = await processGateway.listProcessPage(ownerUserId, {
+				search: processListSearch || undefined,
+				lifecycle: processListLifecycle
+					? (processListLifecycle as CorexProcess['lifecycle'])
+					: undefined
+			});
+			if (request !== processListRequest) return;
+			persistedProcesses = activeProcess
+				? [activeProcess, ...page.processes.filter((process) => process.id !== activeProcess?.id)]
+				: page.processes;
+			processListCursor = page.nextCursor;
+		} catch {
+			if (request === processListRequest) {
+				persistenceError =
+					locale === 'uk' ? 'Не вдалося завантажити процеси.' : 'Could not load processes.';
+			}
+		} finally {
+			if (request === processListRequest) processListLoading = false;
+		}
+	}
+
+	async function loadMoreProcesses() {
+		if (!processGateway || !processListCursor || processListLoadingMore) return;
+		const cursor = processListCursor;
+		processListLoadingMore = true;
+		try {
+			const page = await processGateway.listProcessPage(ownerUserId, {
+				cursor,
+				search: processListSearch || undefined,
+				lifecycle: processListLifecycle
+					? (processListLifecycle as CorexProcess['lifecycle'])
+					: undefined
+			});
+			if (processListCursor !== cursor) return;
+			const loadedIds = new Set(persistedProcesses.map((process) => process.id));
+			persistedProcesses = [
+				...persistedProcesses,
+				...page.processes.filter((process) => !loadedIds.has(process.id))
+			];
+			processListCursor = page.nextCursor;
+		} catch {
+			persistenceError =
+				locale === 'uk'
+					? 'Не вдалося завантажити більше процесів.'
+					: 'Could not load more processes.';
+		} finally {
+			processListLoadingMore = false;
+		}
+	}
+
 	function selectProcess(process: CorexProcess) {
 		versionHistoryRequest += 1;
+		configuredDomainTarget = null;
 		versionHistoryOpen = false;
 		versions = [];
 		versionHistoryError = '';
@@ -486,7 +630,7 @@
 	}
 
 	function toggleVersionHistory() {
-		if (!activeProcess || !isExecutableDraft) return;
+		if (!activeProcess || !isCurrentProcessDraft) return;
 		versionHistoryOpen = !versionHistoryOpen;
 		if (versionHistoryOpen) void loadVersionHistory(activeProcess);
 	}
@@ -511,10 +655,19 @@
 		const request = ++runHistoryRequest;
 		runHistoryState = 'loading';
 		runHistoryError = '';
+		runHistoryCursor = null;
 		try {
-			const loadedRuns = await processGateway.listRuns(processId);
+			const page = await processGateway.listRunPage(processId, {
+				status: runStatusFilter || undefined,
+				search: runSearchFilter || undefined,
+				createdFrom: runCreatedFrom ? `${runCreatedFrom}T00:00:00.000Z` : undefined,
+				createdTo: runCreatedTo ? `${runCreatedTo}T23:59:59.999Z` : undefined,
+				direction: runSortDirection
+			});
 			if (request !== runHistoryRequest || activeProcess?.id !== processId) return;
+			const loadedRuns = page.runs;
 			runs = loadedRuns;
+			runHistoryCursor = page.nextCursor;
 			const nextRunId =
 				preferredRunId && loadedRuns.some((run) => run.id === preferredRunId)
 					? preferredRunId
@@ -537,6 +690,33 @@
 					: 'Could not load run history.';
 		} finally {
 			if (request === runHistoryRequest) runHistoryState = 'idle';
+		}
+	}
+
+	async function loadMoreRuns() {
+		if (!processGateway || !activeProcess || !runHistoryCursor || runHistoryLoadingMore) return;
+		const processId = activeProcess.id;
+		const cursor = runHistoryCursor;
+		runHistoryLoadingMore = true;
+		runHistoryError = '';
+		try {
+			const page = await processGateway.listRunPage(processId, {
+				cursor,
+				status: runStatusFilter || undefined,
+				search: runSearchFilter || undefined,
+				createdFrom: runCreatedFrom ? `${runCreatedFrom}T00:00:00.000Z` : undefined,
+				createdTo: runCreatedTo ? `${runCreatedTo}T23:59:59.999Z` : undefined,
+				direction: runSortDirection
+			});
+			if (activeProcess?.id !== processId || runHistoryCursor !== cursor) return;
+			const loadedIds = new Set(runs.map((run) => run.id));
+			runs = [...runs, ...page.runs.filter((run) => !loadedIds.has(run.id))];
+			runHistoryCursor = page.nextCursor;
+		} catch {
+			runHistoryError =
+				locale === 'uk' ? 'Не вдалося завантажити більше запусків.' : 'Could not load more runs.';
+		} finally {
+			runHistoryLoadingMore = false;
 		}
 	}
 
@@ -642,6 +822,7 @@
 						process_not_executable: 'Опублікований процес не можна виконати.',
 						run_not_found: 'Запуск не знайдено.',
 						run_not_accepting_event: 'Запуск більше не приймає події.',
+						step_output_not_found: 'Результат кроку не знайдено.',
 						runtime_unavailable: 'Середовище виконання зараз недоступне.',
 						command_failed: 'Команда не виконана.'
 					}
@@ -652,6 +833,7 @@
 						process_not_executable: 'The published process is not executable.',
 						run_not_found: 'The run was not found.',
 						run_not_accepting_event: 'The run no longer accepts events.',
+						step_output_not_found: 'The step output was not found.',
 						runtime_unavailable: 'The runtime is currently unavailable.',
 						command_failed: 'The command failed.'
 					};
@@ -663,7 +845,16 @@
 		commandState = 'publishing';
 		commandNotice = '';
 		try {
-			const published = await commandGateway.publish(activeProcess.id, activeProcess.revision);
+			const published = await commandGateway.publish(
+				activeProcess.id,
+				activeProcess.revision,
+				hasHttpTrigger && configuredDomainTarget
+					? {
+							environmentId: configuredDomainTarget.environmentId,
+							routeNamespace: configuredDomainTarget.routeNamespace
+						}
+					: undefined
+			);
 			const updatedProcess: CorexProcess = {
 				...activeProcess,
 				lifecycle: 'published',
@@ -684,6 +875,38 @@
 		}
 	}
 
+	function updateDomainIntent(field: 'environment' | 'namespace' | 'hostname', value: string) {
+		configuredDomainTarget = null;
+		if (field === 'environment') domainEnvironmentKey = value;
+		else if (field === 'namespace') domainRouteNamespace = value;
+		else domainHostname = value;
+	}
+
+	async function configureDomainTarget() {
+		if (!commandGateway || domainConfigurationState === 'configuring') return;
+		domainConfigurationState = 'configuring';
+		commandNotice = '';
+		try {
+			configuredDomainTarget = await commandGateway.configureDomainTarget({
+				environmentKey: domainEnvironmentKey,
+				routeNamespace: domainRouteNamespace,
+				hostname: domainHostname
+			});
+			commandNotice =
+				configuredDomainTarget.verificationStatus === 'pending'
+					? locale === 'uk'
+						? 'Ціль збережено. Перевірка домену очікується; DNS ще не активовано.'
+						: 'Target saved. Domain verification is pending; DNS is not active.'
+					: locale === 'uk'
+						? 'Ціль домену збережено.'
+						: 'Domain target saved.';
+		} catch (error) {
+			commandNotice = commandErrorMessage(error);
+		} finally {
+			domainConfigurationState = 'idle';
+		}
+	}
+
 	async function runProcess() {
 		if (!commandGateway || !activeProcess || !runEnabled) return;
 		const parsedInput = parseRunInput(runInput);
@@ -700,6 +923,36 @@
 			commandNotice =
 				locale === 'uk' ? `Запуск ${lastRun.id} створено.` : `Run ${lastRun.id} created.`;
 			await loadRunHistory(activeProcess.id, lastRun.id);
+		} catch (error) {
+			commandNotice = commandErrorMessage(error);
+		} finally {
+			commandState = 'idle';
+		}
+	}
+
+	async function retireProcess() {
+		if (!commandGateway || !activeProcess || activeProcess.lifecycle === 'retired') return;
+		if (
+			!globalThis.confirm(
+				locale === 'uk'
+					? 'Вивести процес з експлуатації? Його не можна буде запустити або опублікувати знову.'
+					: 'Retire this process? It cannot be run or published again.'
+			)
+		)
+			return;
+		commandState = 'retiring';
+		commandNotice = '';
+		try {
+			await commandGateway.retireProcess(activeProcess.id, crypto.randomUUID());
+			const retiredProcess: CorexProcess = { ...activeProcess, lifecycle: 'retired' };
+			activeProcess = retiredProcess;
+			persistedProcesses = persistedProcesses.map((process) =>
+				process.id === retiredProcess.id ? retiredProcess : process
+			);
+			commandNotice =
+				locale === 'uk'
+					? 'Процес виведено з експлуатації. Історію збережено.'
+					: 'Process retired. History was preserved.';
 		} catch (error) {
 			commandNotice = commandErrorMessage(error);
 		} finally {
@@ -858,7 +1111,7 @@
 			runRollingBack ||
 			runArchiving ||
 			runLifecycleAction ||
-			!['complete', 'errored', 'terminated'].includes(selectedRun.status)
+			!isTerminalCorexRunStatus(selectedRun.status)
 		)
 			return;
 		const processId = activeProcess.id;
@@ -887,7 +1140,7 @@
 			runRestarting ||
 			runRollingBack ||
 			runLifecycleAction ||
-			!['queued', 'running', 'waiting', 'waiting_for_pause', 'paused'].includes(selectedRun.status)
+			!isActiveCorexRunStatus(selectedRun.status)
 		)
 			return;
 		const processId = activeProcess.id;
@@ -920,7 +1173,7 @@
 			runRollingBack ||
 			runArchiving ||
 			runLifecycleAction ||
-			!['complete', 'errored', 'terminated'].includes(selectedRun.status)
+			!isTerminalCorexRunStatus(selectedRun.status)
 		)
 			return;
 		const processId = activeProcess.id;
@@ -1051,16 +1304,29 @@
 		}
 	}
 
-	function updateSelectedOutputMode(mode: 'metadata' | 'inline') {
+	function updateSelectedOutputMode(mode: 'metadata' | 'inline' | 'external') {
 		updateSelectedDefinitionNode((node) => {
+			const maxBytes = Math.min(
+				node.type === 'http-request' ||
+					node.type === 'transform' ||
+					node.type === 'invoke-process' ||
+					node.type === 'wait-event' ||
+					node.type === 'approval'
+					? (node.config.outputPolicy?.maxBytes ?? (mode === 'external' ? 10_485_760 : 16_384))
+					: 16_384,
+				mode === 'external' ? 10_485_760 : 16_384
+			);
 			if (node.type === 'http-request') {
 				return {
 					...node,
 					config: {
 						...node.config,
 						outputPolicy:
-							mode === 'inline'
-								? { mode, maxBytes: node.config.outputPolicy?.maxBytes ?? 16_384 }
+							mode !== 'metadata'
+								? {
+										mode,
+										maxBytes
+									}
 								: undefined
 					}
 				};
@@ -1071,9 +1337,39 @@
 					config: {
 						...node.config,
 						outputPolicy:
-							mode === 'inline'
-								? { mode, maxBytes: node.config.outputPolicy?.maxBytes ?? 16_384 }
+							mode !== 'metadata'
+								? {
+										mode,
+										maxBytes
+									}
 								: undefined
+					}
+				};
+			}
+			if (node.type === 'invoke-process') {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy: mode !== 'metadata' ? { mode, maxBytes } : undefined
+					}
+				};
+			}
+			if (node.type === 'wait-event') {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy: mode !== 'metadata' ? { mode, maxBytes } : undefined
+					}
+				};
+			}
+			if (node.type === 'approval') {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy: mode !== 'metadata' ? { mode, maxBytes } : undefined
 					}
 				};
 			}
@@ -1083,7 +1379,7 @@
 
 	function updateSelectedOutputLimit(maxBytes: number) {
 		updateSelectedDefinitionNode((node) => {
-			if (node.type === 'http-request' && node.config.outputPolicy?.mode === 'inline') {
+			if (node.type === 'http-request' && node.config.outputPolicy) {
 				return {
 					...node,
 					config: {
@@ -1092,7 +1388,34 @@
 					}
 				};
 			}
-			if (node.type === 'transform' && node.config.outputPolicy?.mode === 'inline') {
+			if (node.type === 'transform' && node.config.outputPolicy) {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy: { ...node.config.outputPolicy, maxBytes }
+					}
+				};
+			}
+			if (node.type === 'invoke-process' && node.config.outputPolicy) {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy: { ...node.config.outputPolicy, maxBytes }
+					}
+				};
+			}
+			if (node.type === 'wait-event' && node.config.outputPolicy) {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy: { ...node.config.outputPolicy, maxBytes }
+					}
+				};
+			}
+			if (node.type === 'approval' && node.config.outputPolicy) {
 				return {
 					...node,
 					config: {
@@ -1111,7 +1434,7 @@
 			.map((path) => path.trim())
 			.filter(Boolean);
 		updateSelectedDefinitionNode((node) => {
-			if (node.type === 'http-request' && node.config.outputPolicy?.mode === 'inline') {
+			if (node.type === 'http-request' && node.config.outputPolicy) {
 				return {
 					...node,
 					config: {
@@ -1123,7 +1446,43 @@
 					}
 				};
 			}
-			if (node.type === 'transform' && node.config.outputPolicy?.mode === 'inline') {
+			if (node.type === 'transform' && node.config.outputPolicy) {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy: {
+							...node.config.outputPolicy,
+							redactPaths: redactPaths.length ? redactPaths : undefined
+						}
+					}
+				};
+			}
+			if (node.type === 'invoke-process' && node.config.outputPolicy) {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy: {
+							...node.config.outputPolicy,
+							redactPaths: redactPaths.length ? redactPaths : undefined
+						}
+					}
+				};
+			}
+			if (node.type === 'wait-event' && node.config.outputPolicy) {
+				return {
+					...node,
+					config: {
+						...node.config,
+						outputPolicy: {
+							...node.config.outputPolicy,
+							redactPaths: redactPaths.length ? redactPaths : undefined
+						}
+					}
+				};
+			}
+			if (node.type === 'approval' && node.config.outputPolicy) {
 				return {
 					...node,
 					config: {
@@ -1179,6 +1538,8 @@
 		| 'approval'
 		| 'transform'
 		| 'invoke-process'
+		| 'local-call'
+		| 'block'
 		| 'end-failure';
 
 	function addSupportedNode(type: SupportedNodeType, droppedPosition?: { x: number; y: number }) {
@@ -1188,9 +1549,27 @@
 				? selectedDefinitionNode
 				: draftDefinition.nodes.find((node) => node.type === 'end-success');
 		if (!terminal) return;
+		const selectedIncoming = selectedDefinitionNode
+			? draftDefinition.edges.filter(
+					(edge) => edge.target === selectedDefinitionNode?.id && edge.compensation !== true
+				)
+			: [];
+		const structuralAnchor =
+			(type === 'block' || type === 'parallel') &&
+			(!selectedDefinitionNode || !isProcessTriggerNode(selectedDefinitionNode)) &&
+			selectedDefinitionNode?.type !== 'parallel-join' &&
+			selectedDefinitionNode?.type !== 'local-function' &&
+			selectedDefinitionNode?.type !== 'local-return' &&
+			(selectedDefinitionNode?.type === 'end-success' || selectedIncoming.length === 1)
+				? selectedDefinitionNode
+				: terminal;
+		if (!structuralAnchor) return;
 		const suffix = crypto.randomUUID().slice(0, 8);
 		const id = `${type}-${suffix}`;
-		const position = droppedPosition ?? { x: terminal.position.x - 280, y: terminal.position.y };
+		const position = droppedPosition ?? {
+			x: structuralAnchor.position.x - 280,
+			y: structuralAnchor.position.y
+		};
 		if (type === 'end-failure') {
 			commitDraft({
 				...draftDefinition,
@@ -1201,7 +1580,10 @@
 						name: `fail-${suffix}`,
 						type,
 						position,
-						config: { code: 'process_failed', message: 'The process ended with a controlled failure.' }
+						config: {
+							code: 'process_failed',
+							message: 'The process ended with a controlled failure.'
+						}
 					}
 				]
 			});
@@ -1234,6 +1616,59 @@
 			const joinId = `parallel-join-${suffix}`;
 			const riskId = `parallel-risk-${suffix}`;
 			const receiptId = `parallel-receipt-${suffix}`;
+			commitDraft(
+				insertProcessRegionBefore(draftDefinition, structuralAnchor.id, {
+					nodes: [
+						{
+							id,
+							name: `parallel-${suffix}`,
+							type,
+							position,
+							config: {
+								branches: [{ id: 'risk' }, { id: 'receipt' }],
+								resultKey: 'parallelResults'
+							}
+						},
+						{
+							id: riskId,
+							name: `risk-${suffix}`,
+							type: 'transform',
+							position: { x: position.x + 280, y: position.y - 140 },
+							config: { mode: 'merge', mappings: { value: '$.value' } }
+						},
+						{
+							id: receiptId,
+							name: `receipt-${suffix}`,
+							type: 'transform',
+							position: { x: position.x + 280, y: position.y + 140 },
+							config: { mode: 'merge', mappings: { value: '$.value' } }
+						},
+						{
+							id: joinId,
+							name: `parallel-join-${suffix}`,
+							type: 'parallel-join',
+							position: { x: position.x + 560, y: position.y },
+							config: { parallelId: id }
+						}
+					],
+					edges: [
+						{ id: `${id}-risk`, source: id, target: riskId, parallel: 'risk' },
+						{ id: `${id}-receipt`, source: id, target: receiptId, parallel: 'receipt' },
+						{ id: `${riskId}-${joinId}`, source: riskId, target: joinId },
+						{ id: `${receiptId}-${joinId}`, source: receiptId, target: joinId }
+					],
+					entryNodeId: id,
+					exitNodeId: joinId,
+					exitEdgeId: `${joinId}-next`
+				})
+			);
+			selectedId = id;
+			return;
+		}
+		if (type === 'local-call') {
+			const functionId = `local-function-${suffix}`;
+			const bodyId = `local-function-body-${suffix}`;
+			const returnId = `local-return-${suffix}`;
 			const incoming = draftDefinition.edges.filter((edge) => edge.target === terminal.id);
 			commitDraft({
 				...draftDefinition,
@@ -1241,43 +1676,87 @@
 					...draftDefinition.nodes,
 					{
 						id,
-						name: `parallel-${suffix}`,
+						name: `call-function-${suffix}`,
 						type,
 						position,
-						config: { branches: [{ id: 'risk' }, { id: 'receipt' }], resultKey: 'parallelResults' }
+						config: { functionId, inputPath: '$', resultKey: 'functionResult' }
 					},
 					{
-						id: riskId,
-						name: `risk-${suffix}`,
+						id: functionId,
+						name: `function-${suffix}`,
+						type: 'local-function',
+						position: { x: position.x, y: position.y + 260 },
+						config: {}
+					},
+					{
+						id: bodyId,
+						name: `function-body-${suffix}`,
 						type: 'transform',
-						position: { x: position.x + 280, y: position.y - 140 },
+						position: { x: position.x + 280, y: position.y + 260 },
 						config: { mode: 'merge', mappings: { value: '$.value' } }
 					},
 					{
-						id: receiptId,
-						name: `receipt-${suffix}`,
-						type: 'transform',
-						position: { x: position.x + 280, y: position.y + 140 },
-						config: { mode: 'merge', mappings: { value: '$.value' } }
-					},
-					{
-						id: joinId,
-						name: `parallel-join-${suffix}`,
-						type: 'parallel-join',
-						position: { x: position.x + 560, y: position.y },
-						config: { parallelId: id }
+						id: returnId,
+						name: `function-return-${suffix}`,
+						type: 'local-return',
+						position: { x: position.x + 560, y: position.y + 260 },
+						config: { functionId }
 					}
 				],
 				edges: [
 					...draftDefinition.edges.filter((edge) => edge.target !== terminal.id),
 					...incoming.map((edge) => ({ ...edge, target: id })),
-					{ id: `${id}-risk`, source: id, target: riskId, parallel: 'risk' },
-					{ id: `${id}-receipt`, source: id, target: receiptId, parallel: 'receipt' },
-					{ id: `${riskId}-${joinId}`, source: riskId, target: joinId },
-					{ id: `${receiptId}-${joinId}`, source: receiptId, target: joinId },
-					{ id: `${joinId}-next`, source: joinId, target: terminal.id }
+					{ id: `${id}-next`, source: id, target: terminal.id },
+					{ id: `${functionId}-body`, source: functionId, target: bodyId, function: 'body' },
+					{ id: `${bodyId}-${returnId}`, source: bodyId, target: returnId }
 				]
 			});
+			selectedId = id;
+			return;
+		}
+		if (type === 'block') {
+			const bodyId = `block-body-${suffix}`;
+			const continuationId = `block-continuation-${suffix}`;
+			commitDraft(
+				insertProcessRegionBefore(draftDefinition, structuralAnchor.id, {
+					nodes: [
+						{
+							id,
+							name: `block-${suffix}`,
+							type,
+							position,
+							config: {}
+						},
+						{
+							id: bodyId,
+							name: `block-body-${suffix}`,
+							type: 'transform',
+							position: { x: position.x + 280, y: position.y + 180 },
+							config: { mode: 'merge', mappings: { value: '$.value' } }
+						},
+						{
+							id: continuationId,
+							name: `after-block-${suffix}`,
+							type: 'transform',
+							position: { x: position.x + 560, y: position.y },
+							config: { mode: 'merge', mappings: { value: '$.value' } }
+						}
+					],
+					edges: [
+						{ id: `${id}-body`, source: id, target: bodyId, block: 'body' },
+						{
+							id: `${id}-continuation`,
+							source: id,
+							target: continuationId,
+							block: 'continuation'
+						},
+						{ id: `${bodyId}-${continuationId}`, source: bodyId, target: continuationId }
+					],
+					entryNodeId: id,
+					exitNodeId: continuationId,
+					exitEdgeId: `${continuationId}-next`
+				})
+			);
 			selectedId = id;
 			return;
 		}
@@ -1318,70 +1797,71 @@
 									]
 								}
 							}
-					: type === 'loop'
-						? {
-								id,
-								name: `loop-${suffix}`,
-								type,
-								position,
-								config: { maxIterations: 10 }
-							}
-					: type === 'wait'
-						? { id, name: `wait-${suffix}`, type, position, config: { durationMs: 1_000 } }
-						: type === 'wait-until'
+						: type === 'loop'
 							? {
 									id,
-									name: `wait-until-${suffix}`,
+									name: `loop-${suffix}`,
 									type,
 									position,
-									config: { timestamp: new Date(Date.now() + 3_600_000).toISOString() }
+									config: { maxIterations: 10 }
 								}
-							: type === 'wait-event'
-								? {
-										id,
-										name: `wait-event-${suffix}`,
-										type,
-										position,
-										config: {
-											eventType: 'process-event',
-											timeoutMs: 86_400_000,
-											resultKey: 'event'
-										}
-									}
-								: type === 'approval'
+							: type === 'wait'
+								? { id, name: `wait-${suffix}`, type, position, config: { durationMs: 1_000 } }
+								: type === 'wait-until'
 									? {
 											id,
-											name: `approval-${suffix}`,
+											name: `wait-until-${suffix}`,
 											type,
 											position,
-											config: {
-												assigneeUserId: ownerUserId,
-												timeoutMs: 86_400_000,
-												resultKey: 'approval'
-											}
+											config: { timestamp: new Date(Date.now() + 3_600_000).toISOString() }
 										}
-									: type === 'invoke-process'
+									: type === 'wait-event'
 										? {
 												id,
-												name: `invoke-process-${suffix}`,
+												name: `wait-event-${suffix}`,
 												type,
 												position,
 												config: {
-													processId:
-														persistedProcesses.find((process) => process.publishedVersion !== null)
-															?.id ?? '',
-													inputPath: '$',
-													resultKey: 'subprocess',
-													timeoutMs: 86_400_000
+													eventType: 'process-event',
+													timeoutMs: 86_400_000,
+													resultKey: 'event'
 												}
 											}
-										: {
-												id,
-												name: `transform-${suffix}`,
-												type,
-												position,
-												config: { mode: 'merge', mappings: { value: '$.value' } }
-											};
+										: type === 'approval'
+											? {
+													id,
+													name: `approval-${suffix}`,
+													type,
+													position,
+													config: {
+														assigneeUserId: ownerUserId,
+														timeoutMs: 86_400_000,
+														resultKey: 'approval'
+													}
+												}
+											: type === 'invoke-process'
+												? {
+														id,
+														name: `invoke-process-${suffix}`,
+														type,
+														position,
+														config: {
+															processId:
+																persistedProcesses.find(
+																	(process) => process.publishedVersion !== null
+																)?.id ?? '',
+															inputPath: '$',
+															resultKey: 'subprocess',
+															timeoutMs: 86_400_000
+														}
+													}
+												: {
+														id,
+														name: `transform-${suffix}`,
+														type,
+														position,
+														config: { mode: 'merge', mappings: { value: '$.value' } }
+													};
 		const incoming = draftDefinition.edges.filter((edge) => edge.target === terminal.id);
 		const retainedEdges = draftDefinition.edges.filter((edge) => edge.target !== terminal.id);
 		const insertedEdges = incoming.map((edge) => ({ ...edge, target: id }));
@@ -1514,6 +1994,8 @@
 				'approval',
 				'transform',
 				'invoke-process',
+				'local-call',
+				'block',
 				'end-failure'
 			].includes(type)
 		)
@@ -1547,8 +2029,10 @@
 		if (
 			!sourceNode ||
 			!targetNode ||
-			(sourceNode.type === 'end-success' || sourceNode.type === 'end-failure') ||
-			targetNode.type === 'trigger-http'
+			sourceNode.type === 'block' ||
+			sourceNode.type === 'end-success' ||
+			sourceNode.type === 'end-failure' ||
+			isProcessTriggerNode(targetNode)
 		)
 			return;
 		const isBooleanBranch = sourceNode.type === 'condition' || sourceNode.type === 'approval';
@@ -1562,24 +2046,24 @@
 					? connection.sourceHandle
 					: null
 				: isSwitchBranch
-				? [...sourceNode.config.cases.map((item) => item.id), 'default'].includes(
-						connection.sourceHandle ?? ''
-					)
-					? connection.sourceHandle
-					: null
-				: isParallelBranch
-					? sourceNode.config.branches.some((item) => item.id === connection.sourceHandle)
+					? [...sourceNode.config.cases.map((item) => item.id), 'default'].includes(
+							connection.sourceHandle ?? ''
+						)
 						? connection.sourceHandle
 						: null
-				: connection.sourceHandle === 'true'
-				? true
-				: connection.sourceHandle === 'false'
-					? false
-					: null
+					: isParallelBranch
+						? sourceNode.config.branches.some((item) => item.id === connection.sourceHandle)
+							? connection.sourceHandle
+							: null
+						: connection.sourceHandle === 'true'
+							? true
+							: connection.sourceHandle === 'false'
+								? false
+								: null
 			: undefined;
 		if (branch === null) return;
 		let isLoopBack = false;
-		if (targetNode.type === 'loop' && sourceNode.type !== 'trigger-http') {
+		if (targetNode.type === 'loop' && !isProcessTriggerNode(sourceNode)) {
 			const bodyTarget = draftDefinition.edges.find(
 				(edge) => edge.source === targetNode.id && edge.loop === 'body'
 			)?.target;
@@ -1619,11 +2103,11 @@
 							: {}
 						: isLoopBranch
 							? { loop: branch as 'body' | 'exit' }
-						: isSwitchBranch
-							? { case: branch as string }
-						: isParallelBranch
-							? { parallel: branch as string }
-							: { when: branch as boolean })
+							: isSwitchBranch
+								? { case: branch as string }
+								: isParallelBranch
+									? { parallel: branch as string }
+									: { when: branch as boolean })
 				}
 			]
 		});
@@ -1634,8 +2118,19 @@
 			isExecutableDraft &&
 			deletedNodes.every((node) => {
 				const definitionNode = draftDefinition.nodes.find((candidate) => candidate.id === node.id);
-				return definitionNode &&
-					!['trigger-http', 'loop', 'parallel', 'parallel-join', 'end-success'].includes(definitionNode.type);
+				return (
+					definitionNode &&
+					!isProcessTriggerNode(definitionNode) &&
+					![
+						'loop',
+						'parallel',
+						'parallel-join',
+						'local-function',
+						'local-return',
+						'block',
+						'end-success'
+					].includes(definitionNode.type)
+				);
 			})
 		);
 	}
@@ -1682,9 +2177,19 @@
 		if (
 			!isExecutableDraft ||
 			!selectedDefinitionNode ||
-			['trigger-http', 'condition', 'switch', 'loop', 'parallel', 'parallel-join', 'approval', 'end-success'].includes(
-				selectedDefinitionNode.type
-			)
+			isProcessTriggerNode(selectedDefinitionNode) ||
+			[
+				'condition',
+				'switch',
+				'loop',
+				'parallel',
+				'parallel-join',
+				'local-function',
+				'local-return',
+				'block',
+				'approval',
+				'end-success'
+			].includes(selectedDefinitionNode.type)
 		)
 			return;
 		const nodeId = selectedDefinitionNode.id;
@@ -1708,9 +2213,18 @@
 	function canCopyNode(node: ProcessNode | undefined): node is ProcessNode {
 		return Boolean(
 			node &&
-				!['trigger-http', 'loop', 'break', 'parallel', 'parallel-join', 'end-success', 'end-failure'].includes(
-					node.type
-				)
+			!isProcessTriggerNode(node) &&
+			![
+				'loop',
+				'break',
+				'parallel',
+				'parallel-join',
+				'local-function',
+				'local-return',
+				'block',
+				'end-success',
+				'end-failure'
+			].includes(node.type)
 		);
 	}
 
@@ -1833,10 +2347,13 @@
 			return;
 		}
 		try {
-			[persistedProcesses, approvalTasks] = await Promise.all([
-				processGateway.listProcesses(ownerUserId),
+			const [processPage, loadedApprovalTasks] = await Promise.all([
+				processGateway.listProcessPage(ownerUserId),
 				processGateway.listApprovalTasks(ownerUserId)
 			]);
+			persistedProcesses = processPage.processes;
+			processListCursor = processPage.nextCursor;
+			approvalTasks = loadedApprovalTasks;
 			if (persistedProcesses[0]) selectProcess(persistedProcesses[0]);
 		} catch {
 			persistenceError =
@@ -1856,20 +2373,67 @@
 			<div>
 				<span>{text.journeys}</span><label
 					><select
-						value={activeProcess && isExecutableDraft
+						value={activeProcess && isCurrentProcessDraft
 							? processOptionId(activeProcess)
 							: activeScenario.id}
 						onchange={(event) => selectJourney(event.currentTarget.value)}
-						>{#each persistedProcesses as process}<option value={processOptionId(process)}
-								>{process.name}</option
+						>{#each persistedProcesses as process (process.id)}<option
+								value={processOptionId(process)}>{process.name}</option
 							>{/each}{#if !activeProcess}<option value={executableScenario.id}
 								>{localizedScenario(executableScenario, locale).label}</option
-							>{/if}{#each flowScenarios as scenario}<option value={scenario.id}
+							>{/if}{#each flowScenarios as scenario (scenario.id)}<option value={scenario.id}
 								>{localizedScenario(scenario, locale).label}</option
 							>{/each}</select
 					><ChevronDown size={12} /></label
 				>
 			</div>
+			<form
+				class="workflow-search"
+				onsubmit={(event) => {
+					event.preventDefault();
+					void loadProcessList();
+				}}
+			>
+				<label>
+					<Search size={12} />
+					<input
+						bind:value={processListSearch}
+						placeholder={locale === 'uk' ? 'Знайти процес' : 'Find process'}
+					/>
+				</label>
+				<select
+					bind:value={processListLifecycle}
+					aria-label={locale === 'uk' ? 'Життєвий цикл процесу' : 'Process lifecycle'}
+				>
+					<option value="">{locale === 'uk' ? 'Усі' : 'All'}</option>
+					<option value="draft">Draft</option>
+					<option value="published">Published</option>
+					<option value="retired">Retired</option>
+				</select>
+				<button
+					type="submit"
+					disabled={processListLoading}
+					aria-label={locale === 'uk' ? 'Застосувати пошук' : 'Apply search'}
+					title={locale === 'uk' ? 'Застосувати пошук' : 'Apply search'}
+				>
+					{#if processListLoading}<LoaderCircle size={12} class="spin" />{:else}<Search
+							size={12}
+						/>{/if}
+				</button>
+				{#if processListCursor}
+					<button
+						type="button"
+						disabled={processListLoadingMore || processListLoading}
+						onclick={loadMoreProcesses}
+						aria-label={locale === 'uk' ? 'Завантажити більше процесів' : 'Load more processes'}
+						title={locale === 'uk' ? 'Завантажити більше процесів' : 'Load more processes'}
+					>
+						{#if processListLoadingMore}<LoaderCircle size={12} class="spin" />{:else}<ChevronDown
+								size={12}
+							/>{/if}
+					</button>
+				{/if}
+			</form>
 		</div>
 		<div class="editor-actions">
 			<button
@@ -1914,6 +2478,53 @@
 			<button type="button" disabled={!isExecutableDraft} onclick={validateDraft}
 				><Check size={14} />{locale === 'uk' ? 'Перевірити' : 'Validate'}</button
 			>
+			{#if isExecutableDraft && hasHttpTrigger}
+				<div class="domain-target" aria-label={locale === 'uk' ? 'Ціль домену' : 'Domain target'}>
+					<label
+						><span>{locale === 'uk' ? 'Середовище' : 'Environment'}</span><input
+							value={domainEnvironmentKey}
+							oninput={(event) => updateDomainIntent('environment', event.currentTarget.value)}
+							placeholder="production"
+						/></label
+					>
+					<label
+						><span>{locale === 'uk' ? 'Простір' : 'Namespace'}</span><input
+							value={domainRouteNamespace}
+							oninput={(event) => updateDomainIntent('namespace', event.currentTarget.value)}
+							placeholder="public"
+						/></label
+					>
+					<label
+						><span>{locale === 'uk' ? 'Домен' : 'Domain'}</span><input
+							value={domainHostname}
+							oninput={(event) => updateDomainIntent('hostname', event.currentTarget.value)}
+							placeholder="api.example.com"
+						/></label
+					>
+					<button
+						type="button"
+						class:configured={configuredDomainTarget !== null}
+						disabled={domainConfigurationState === 'configuring' || !domainHostname.trim()}
+						onclick={configureDomainTarget}
+						aria-label={locale === 'uk' ? 'Зберегти ціль домену' : 'Save domain target'}
+						title={configuredDomainTarget
+							? locale === 'uk'
+								? `Статус перевірки: ${configuredDomainTarget.verificationStatus}`
+								: `Verification: ${configuredDomainTarget.verificationStatus}`
+							: locale === 'uk'
+								? 'Зберегти ціль домену'
+								: 'Save domain target'}
+						><Globe2 size={14} />{#if configuredDomainTarget}<Check size={12} />{/if}</button
+					>
+					{#if configuredDomainTarget}<span class="verification-status"
+							>{configuredDomainTarget.verificationStatus === 'pending'
+								? locale === 'uk'
+									? 'Очікує перевірки'
+									: 'Pending verification'
+								: configuredDomainTarget.verificationStatus}</span
+						>{/if}
+				</div>
+			{/if}
 			<button class="publish" type="button" disabled={!publishEnabled} onclick={publishProcess}
 				><Upload size={14} />{commandState === 'publishing'
 					? locale === 'uk'
@@ -1930,6 +2541,25 @@
 						: 'Starting'
 					: 'Run'}</button
 			>
+			{#if activeProcess}
+				<button
+					type="button"
+					disabled={activeProcess.lifecycle === 'retired' || commandState !== 'idle'}
+					onclick={retireProcess}
+					title={locale === 'uk' ? 'Вивести процес з експлуатації' : 'Retire process'}
+					><CircleOff size={14} />{activeProcess.lifecycle === 'retired'
+						? locale === 'uk'
+							? 'Виведено'
+							: 'Retired'
+						: commandState === 'retiring'
+							? locale === 'uk'
+								? 'Виведення'
+								: 'Retiring'
+							: locale === 'uk'
+								? 'Вивести'
+								: 'Retire'}</button
+				>
+			{/if}
 		</div>
 	</div>
 	{#if validationResult}
@@ -1985,10 +2615,10 @@
 			<nav
 				aria-label={locale === 'uk' ? 'Вузли Cloudflare Workflows' : 'Cloudflare Workflows nodes'}
 			>
-				{#each filteredPalette as group}
+				{#each filteredPalette as group (group.label)}
 					<section>
 						<h3>{group.label}<ChevronDown size={11} /></h3>
-						{#each group.items as item}
+						{#each group.items as item (item.label)}
 							{@const Icon = item.icon}
 							<button
 								type="button"
@@ -2014,7 +2644,7 @@
 						>{approvalTasks.filter((task) => task.status === 'pending').length}</span
 					>
 				</h3>
-				{#each approvalTasks.slice(0, 5) as task}
+				{#each approvalTasks.slice(0, 5) as task (task.id)}
 					<article class:resolved={task.status !== 'pending'}>
 						<div>
 							<strong>{task.stepName}</strong><small
@@ -2065,7 +2695,7 @@
 			<div class="canvas-badge">
 				<span><i></i>PREVIEW</span><button
 					type="button"
-					disabled={!activeProcess || !isExecutableDraft}
+					disabled={!activeProcess || !isCurrentProcessDraft}
 					aria-expanded={versionHistoryOpen}
 					aria-controls="version-history-panel"
 					aria-label={locale === 'uk' ? 'Історія версій' : 'Version history'}
@@ -2109,7 +2739,7 @@
 								{locale === 'uk' ? 'Опублікованих версій ще немає.' : 'No published versions yet.'}
 							</p>
 						{:else}
-							{#each versions as version}
+							{#each versions as version (version.id)}
 								<article>
 									<div class="version-heading">
 										<strong>v{version.version}</strong
@@ -2192,7 +2822,7 @@
 					pannable
 					zoomable
 					nodeColor={(node) => {
-						const status = (node.data as any)?.status;
+						const status = (node.data as FlowNode | undefined)?.status;
 						if (status === 'failed') return '#ef4444';
 						if (status === 'running') return '#f59e0b';
 						if (status === 'complete') return '#16a34a';
@@ -2240,10 +2870,22 @@
 					class:active={inspectorTab === 'runs'}
 					onclick={() => (inspectorTab = 'runs')}
 					type="button">{locale === 'uk' ? 'Виконання' : 'Runs'}</button
+				><button
+					class:active={inspectorTab === 'diagram'}
+					onclick={() => (inspectorTab = 'diagram')}
+					type="button">{locale === 'uk' ? 'Діаграма' : 'Diagram'}</button
 				>
 			</div>
 			<div class="inspector-body">
-				{#if inspectorTab === 'runs'}
+				{#if inspectorTab === 'diagram'}
+					<ProcessDiagram
+						definition={draftDefinition}
+						events={runEvents}
+						flow={merchantPaymentFlow}
+						flowScenarios={merchantPaymentScenarios}
+						{locale}
+					/>
+				{:else if inspectorTab === 'runs'}
 					<label class="run-input"
 						><span>Input JSON</span><textarea bind:value={runInput} spellcheck="false"
 						></textarea></label
@@ -2258,13 +2900,65 @@
 							><RefreshCcw size={13} /></button
 						>
 					</div>
+					<form
+						class="run-filters"
+						onsubmit={(event) => {
+							event.preventDefault();
+							if (activeProcess) void loadRunHistory(activeProcess.id);
+						}}
+					>
+						<label
+							><Search size={12} /><input
+								bind:value={runSearchFilter}
+								placeholder={locale === 'uk' ? 'ID запуску' : 'Run ID'}
+							/></label
+						>
+						<select bind:value={runStatusFilter} aria-label={locale === 'uk' ? 'Статус' : 'Status'}>
+							<option value="">{locale === 'uk' ? 'Усі статуси' : 'All statuses'}</option>
+							{#each COREX_RUN_STATUSES as status (status)}<option value={status}>{status}</option
+								>{/each}
+						</select>
+						<input
+							bind:value={runCreatedFrom}
+							type="date"
+							aria-label={locale === 'uk' ? 'Від дати' : 'From date'}
+						/>
+						<input
+							bind:value={runCreatedTo}
+							type="date"
+							aria-label={locale === 'uk' ? 'До дати' : 'To date'}
+						/>
+						<select
+							bind:value={runSortDirection}
+							aria-label={locale === 'uk' ? 'Порядок' : 'Order'}
+						>
+							<option value="desc">{locale === 'uk' ? 'Нові спочатку' : 'Newest first'}</option>
+							<option value="asc">{locale === 'uk' ? 'Старі спочатку' : 'Oldest first'}</option>
+						</select>
+						<button type="submit" disabled={!activeProcess || runHistoryState === 'loading'}>
+							<Search size={12} />{locale === 'uk' ? 'Застосувати' : 'Apply'}
+						</button>
+					</form>
 					{#if runs.length > 0}<label class="run-picker"
 							><span>{locale === 'uk' ? 'Запуск' : 'Run'}</span><select
 								value={selectedRunId}
 								onchange={(event) => selectRun(event.currentTarget.value)}
-								>{#each runs as run}<option value={run.id}>{run.status} · {run.id}</option
+								>{#each runs as run (run.id)}<option value={run.id}>{run.status} · {run.id}</option
 									>{/each}</select
 							></label
+						>{/if}
+					{#if runHistoryCursor}<button
+							type="button"
+							class="load-more-runs"
+							disabled={runHistoryLoadingMore || runHistoryState === 'loading'}
+							onclick={loadMoreRuns}
+							>{runHistoryLoadingMore
+								? locale === 'uk'
+									? 'Завантаження...'
+									: 'Loading...'
+								: locale === 'uk'
+									? 'Показати більше'
+									: 'Load more'}</button
 						>{/if}
 					{#if runHistoryState === 'loading'}<div class="run-empty">
 							<LoaderCircle size={14} />{locale === 'uk' ? 'Завантаження...' : 'Loading...'}
@@ -2305,7 +2999,7 @@
 												? 'Відновити'
 												: 'Resume'}</button
 									>{/if}
-								{#if ['queued', 'running', 'waiting', 'waiting_for_pause', 'paused'].includes(selectedRun.status)}<button
+								{#if isActiveCorexRunStatus(selectedRun.status)}<button
 										type="button"
 										class="cancel-run"
 										disabled={runCancelling ||
@@ -2322,7 +3016,7 @@
 												? 'Скасувати'
 												: 'Cancel'}</button
 									>{/if}
-								{#if ['queued', 'running', 'waiting', 'waiting_for_pause', 'paused'].includes(selectedRun.status)}<button
+								{#if isActiveCorexRunStatus(selectedRun.status)}<button
 										type="button"
 										disabled={runRollingBack ||
 											runCancelling ||
@@ -2338,7 +3032,7 @@
 												? 'Відкотити'
 												: 'Roll back'}</button
 									>{/if}
-								{#if ['complete', 'errored', 'terminated'].includes(selectedRun.status) && !selectedRun.archivedAt}<button
+								{#if isTerminalCorexRunStatus(selectedRun.status) && !selectedRun.archivedAt}<button
 										type="button"
 										disabled={runRestarting ||
 											runCancelling ||
@@ -2482,7 +3176,7 @@
 								>
 							</div>{/if}
 						<div class="run-events">
-							{#each runEvents as event}<div>
+							{#each runEvents as event (event.sequence)}<div>
 									<b>#{event.sequence} {event.eventType}</b><span
 										>{event.stepName ?? 'process'}{event.attempt
 											? ` · attempt ${event.attempt}`
@@ -2507,20 +3201,28 @@
 								<div class:failed={attempt.outcome === 'failed'}>
 									<header>
 										<b>{attempt.stepId} · visit {attempt.visit}</b>
-										<span>{attempt.kind === 'compensation'
+										<span
+											>{attempt.kind === 'compensation'
 												? locale === 'uk'
 													? 'компенсація'
 													: 'compensation'
-												: attempt.outcome}</span>
+												: attempt.outcome}</span
+										>
 									</header>
-									<small>generation {attempt.executionGeneration} · attempt {attempt.attempt} · {Math.max(
-										0,
-										new Date(attempt.finishedAt).getTime() - new Date(attempt.startedAt).getTime()
-									)} ms</small>
-									<small>{attempt.retry.limit} retries · {attempt.retry.backoff} · {attempt.retry.timeoutMs} ms timeout</small>
+									<small
+										>generation {attempt.executionGeneration} · attempt {attempt.attempt} · {Math.max(
+											0,
+											new Date(attempt.finishedAt).getTime() - new Date(attempt.startedAt).getTime()
+										)} ms</small
+									>
+									<small
+										>{attempt.retry.limit} retries · {attempt.retry.backoff} · {attempt.retry
+											.timeoutMs} ms timeout</small
+									>
 									{#if attempt.output && 'status' in attempt.output}
 										<small
-											>HTTP {attempt.output.status} · {attempt.output.contentType ?? 'unknown'} · {attempt.output.bytes} bytes{attempt.output.truncated
+											>HTTP {attempt.output.status} · {attempt.output.contentType ?? 'unknown'} · {attempt
+												.output.bytes} bytes{attempt.output.truncated
 												? locale === 'uk'
 													? ' · завеликий для inline перегляду'
 													: ' · too large for inline viewing'
@@ -2550,6 +3252,38 @@
 										{/if}
 									{:else if attempt.output?.type === 'redacted'}
 										<small>{locale === 'uk' ? 'output приховано' : 'output redacted'}</small>
+									{/if}
+									{#if attempt.output && 'external' in attempt.output && attempt.output.external}
+										<small>{attempt.output.external.contentType} · external</small>
+										{#if stepAttemptKey(attempt) in externalAttemptOutputs}
+											<JsonTreeViewer
+												data={externalAttemptOutputs[stepAttemptKey(attempt)]}
+												label={locale === 'uk' ? 'Зовнішній результат' : 'External output'}
+												defaultExpanded={false}
+											/>
+										{:else}
+											<button
+												class="load-external-output"
+												type="button"
+												disabled={externalAttemptOutputStates[stepAttemptKey(attempt)] ===
+													'loading'}
+												onclick={() => loadExternalAttemptOutput(attempt)}
+											>
+												{#if externalAttemptOutputStates[stepAttemptKey(attempt)] === 'loading'}
+													<LoaderCircle size={12} class="spin" />
+												{:else}
+													<FileOutput size={12} />
+												{/if}
+												{locale === 'uk' ? 'Завантажити output' : 'Load output'}
+											</button>
+											{#if externalAttemptOutputStates[stepAttemptKey(attempt)] === 'error'}
+												<small class="attempt-output-error"
+													>{locale === 'uk'
+														? 'Не вдалося завантажити output.'
+														: 'Could not load output.'}</small
+												>
+											{/if}
+										{/if}
 									{/if}
 									{#if attempt.error}<small>{attempt.error.code}</small>{/if}
 								</div>
@@ -2685,27 +3419,37 @@
 							><span>{locale === 'uk' ? 'Збереження відповіді' : 'Response storage'}</span><select
 								value={selectedDefinitionNode.config.outputPolicy?.mode ?? 'metadata'}
 								onchange={(event) =>
-									updateSelectedOutputMode(event.currentTarget.value as 'metadata' | 'inline')}
-								><option value="metadata">metadata</option><option value="inline">inline JSON</option></select
+									updateSelectedOutputMode(
+										event.currentTarget.value as 'metadata' | 'inline' | 'external'
+									)}
+								><option value="metadata">metadata</option><option value="inline"
+									>inline JSON</option
+								><option value="external">external JSON</option></select
 							></label
 						>
-						{#if selectedDefinitionNode.config.outputPolicy?.mode === 'inline'}
+						{#if selectedDefinitionNode.config.outputPolicy}
 							<label
-								><span>{locale === 'uk' ? 'Ліміт відповіді (байти)' : 'Response limit (bytes)'}</span><input
+								><span
+									>{locale === 'uk' ? 'Ліміт відповіді (байти)' : 'Response limit (bytes)'}</span
+								><input
 									type="number"
 									min="1"
-									max="16384"
+									max={selectedDefinitionNode.config.outputPolicy.mode === 'external'
+										? 10_485_760
+										: 16_384}
 									step="1"
 									value={selectedDefinitionNode.config.outputPolicy.maxBytes}
 									onchange={(event) => updateSelectedOutputLimit(Number(event.currentTarget.value))}
 								/></label
 							>
 							<label
-								><span>{locale === 'uk' ? 'Приховати JSON paths' : 'Redact JSON paths'}</span><textarea
+								><span>{locale === 'uk' ? 'Приховати JSON paths' : 'Redact JSON paths'}</span
+								><textarea
 									spellcheck="false"
 									placeholder="$.customer.email"
 									onchange={(event) => updateSelectedOutputRedactPaths(event.currentTarget.value)}
-									>{selectedDefinitionNode.config.outputPolicy.redactPaths?.join('\n') ?? ''}</textarea
+									>{selectedDefinitionNode.config.outputPolicy.redactPaths?.join('\n') ??
+										''}</textarea
 								></label
 							>
 						{/if}
@@ -2845,7 +3589,10 @@
 								onchange={(event) =>
 									updateSelectedDefinitionNode((node) =>
 										node.type === 'parallel'
-											? { ...node, config: { ...node.config, resultKey: event.currentTarget.value } }
+											? {
+													...node,
+													config: { ...node.config, resultKey: event.currentTarget.value }
+												}
 											: node
 									)}
 							/></label
@@ -2943,6 +3690,43 @@
 									)}
 							/></label
 						>
+						<label
+							><span>{locale === 'uk' ? 'Збереження результату' : 'Result storage'}</span><select
+								value={selectedDefinitionNode.config.outputPolicy?.mode ?? 'metadata'}
+								onchange={(event) =>
+									updateSelectedOutputMode(
+										event.currentTarget.value as 'metadata' | 'inline' | 'external'
+									)}
+								><option value="metadata">metadata</option><option value="inline"
+									>inline JSON</option
+								><option value="external">external JSON</option></select
+							></label
+						>
+						{#if selectedDefinitionNode.config.outputPolicy}
+							<label
+								><span>{locale === 'uk' ? 'Ліміт результату (байти)' : 'Result limit (bytes)'}</span
+								><input
+									type="number"
+									min="1"
+									max={selectedDefinitionNode.config.outputPolicy.mode === 'external'
+										? 10_485_760
+										: 16_384}
+									step="1"
+									value={selectedDefinitionNode.config.outputPolicy.maxBytes}
+									onchange={(event) => updateSelectedOutputLimit(Number(event.currentTarget.value))}
+								/></label
+							>
+							<label
+								><span>{locale === 'uk' ? 'Приховати JSON paths' : 'Redact JSON paths'}</span
+								><textarea
+									spellcheck="false"
+									placeholder="$.customer.email"
+									onchange={(event) => updateSelectedOutputRedactPaths(event.currentTarget.value)}
+									>{selectedDefinitionNode.config.outputPolicy.redactPaths?.join('\n') ??
+										''}</textarea
+								></label
+							>
+						{/if}
 					</div>
 				{:else if inspectorTab === 'details' && selectedDefinitionNode?.type === 'approval'}
 					<div class="node-config">
@@ -2992,6 +3776,43 @@
 									)}
 							/></label
 						>
+						<label
+							><span>{locale === 'uk' ? 'Збереження результату' : 'Result storage'}</span><select
+								value={selectedDefinitionNode.config.outputPolicy?.mode ?? 'metadata'}
+								onchange={(event) =>
+									updateSelectedOutputMode(
+										event.currentTarget.value as 'metadata' | 'inline' | 'external'
+									)}
+								><option value="metadata">metadata</option><option value="inline"
+									>inline JSON</option
+								><option value="external">external JSON</option></select
+							></label
+						>
+						{#if selectedDefinitionNode.config.outputPolicy}
+							<label
+								><span>{locale === 'uk' ? 'Ліміт результату (байти)' : 'Result limit (bytes)'}</span
+								><input
+									type="number"
+									min="1"
+									max={selectedDefinitionNode.config.outputPolicy.mode === 'external'
+										? 10_485_760
+										: 16_384}
+									step="1"
+									value={selectedDefinitionNode.config.outputPolicy.maxBytes}
+									onchange={(event) => updateSelectedOutputLimit(Number(event.currentTarget.value))}
+								/></label
+							>
+							<label
+								><span>{locale === 'uk' ? 'Приховати JSON paths' : 'Redact JSON paths'}</span
+								><textarea
+									spellcheck="false"
+									placeholder="$.actorUserId"
+									onchange={(event) => updateSelectedOutputRedactPaths(event.currentTarget.value)}
+									>{selectedDefinitionNode.config.outputPolicy.redactPaths?.join('\n') ??
+										''}</textarea
+								></label
+							>
+						{/if}
 					</div>
 				{:else if inspectorTab === 'details' && selectedDefinitionNode?.type === 'transform'}
 					<div class="node-config">
@@ -3025,30 +3846,88 @@
 							><span>{locale === 'uk' ? 'Збереження результату' : 'Result storage'}</span><select
 								value={selectedDefinitionNode.config.outputPolicy?.mode ?? 'metadata'}
 								onchange={(event) =>
-									updateSelectedOutputMode(event.currentTarget.value as 'metadata' | 'inline')}
-								><option value="metadata">metadata</option><option value="inline">inline JSON</option></select
+									updateSelectedOutputMode(
+										event.currentTarget.value as 'metadata' | 'inline' | 'external'
+									)}
+								><option value="metadata">metadata</option><option value="inline"
+									>inline JSON</option
+								><option value="external">external JSON</option></select
 							></label
 						>
-						{#if selectedDefinitionNode.config.outputPolicy?.mode === 'inline'}
+						{#if selectedDefinitionNode.config.outputPolicy}
 							<label
-								><span>{locale === 'uk' ? 'Ліміт результату (байти)' : 'Result limit (bytes)'}</span><input
+								><span>{locale === 'uk' ? 'Ліміт результату (байти)' : 'Result limit (bytes)'}</span
+								><input
 									type="number"
 									min="1"
-									max="16384"
+									max={selectedDefinitionNode.config.outputPolicy.mode === 'external'
+										? 10_485_760
+										: 16_384}
 									step="1"
 									value={selectedDefinitionNode.config.outputPolicy.maxBytes}
 									onchange={(event) => updateSelectedOutputLimit(Number(event.currentTarget.value))}
 								/></label
 							>
 							<label
-								><span>{locale === 'uk' ? 'Приховати JSON paths' : 'Redact JSON paths'}</span><textarea
+								><span>{locale === 'uk' ? 'Приховати JSON paths' : 'Redact JSON paths'}</span
+								><textarea
 									spellcheck="false"
 									placeholder="$.customer.email"
 									onchange={(event) => updateSelectedOutputRedactPaths(event.currentTarget.value)}
-									>{selectedDefinitionNode.config.outputPolicy.redactPaths?.join('\n') ?? ''}</textarea
+									>{selectedDefinitionNode.config.outputPolicy.redactPaths?.join('\n') ??
+										''}</textarea
 								></label
 							>
 						{/if}
+					</div>
+				{:else if inspectorTab === 'details' && selectedDefinitionNode?.type === 'local-call'}
+					<div class="node-config">
+						<label
+							><span>{locale === 'uk' ? 'Локальна функція' : 'Local function'}</span><select
+								value={selectedDefinitionNode.config.functionId}
+								onchange={(event) =>
+									updateSelectedDefinitionNode((node) =>
+										node.type === 'local-call'
+											? {
+													...node,
+													config: { ...node.config, functionId: event.currentTarget.value }
+												}
+											: node
+									)}
+								>{#each draftDefinition.nodes.filter((node) => node.type === 'local-function') as functionNode (functionNode.id)}<option
+										value={functionNode.id}>{functionNode.name}</option
+									>{/each}</select
+							></label
+						>
+						<label
+							><span>Input JSON path</span><input
+								value={selectedDefinitionNode.config.inputPath}
+								placeholder="$"
+								onchange={(event) =>
+									updateSelectedDefinitionNode((node) =>
+										node.type === 'local-call'
+											? {
+													...node,
+													config: { ...node.config, inputPath: event.currentTarget.value }
+												}
+											: node
+									)}
+							/></label
+						>
+						<label
+							><span>Result key</span><input
+								value={selectedDefinitionNode.config.resultKey}
+								onchange={(event) =>
+									updateSelectedDefinitionNode((node) =>
+										node.type === 'local-call'
+											? {
+													...node,
+													config: { ...node.config, resultKey: event.currentTarget.value }
+												}
+											: node
+									)}
+							/></label
+						>
 					</div>
 				{:else if inspectorTab === 'details' && selectedDefinitionNode?.type === 'invoke-process'}
 					<div class="node-config">
@@ -3118,6 +3997,43 @@
 									)}
 							/></label
 						>
+						<label
+							><span>{locale === 'uk' ? 'Збереження результату' : 'Result storage'}</span><select
+								value={selectedDefinitionNode.config.outputPolicy?.mode ?? 'metadata'}
+								onchange={(event) =>
+									updateSelectedOutputMode(
+										event.currentTarget.value as 'metadata' | 'inline' | 'external'
+									)}
+								><option value="metadata">metadata</option><option value="inline"
+									>inline JSON</option
+								><option value="external">external JSON</option></select
+							></label
+						>
+						{#if selectedDefinitionNode.config.outputPolicy}
+							<label
+								><span>{locale === 'uk' ? 'Ліміт результату (байти)' : 'Result limit (bytes)'}</span
+								><input
+									type="number"
+									min="1"
+									max={selectedDefinitionNode.config.outputPolicy.mode === 'external'
+										? 10_485_760
+										: 16_384}
+									step="1"
+									value={selectedDefinitionNode.config.outputPolicy.maxBytes}
+									onchange={(event) => updateSelectedOutputLimit(Number(event.currentTarget.value))}
+								/></label
+							>
+							<label
+								><span>{locale === 'uk' ? 'Приховати JSON paths' : 'Redact JSON paths'}</span
+								><textarea
+									spellcheck="false"
+									placeholder="$.customer.email"
+									onchange={(event) => updateSelectedOutputRedactPaths(event.currentTarget.value)}
+									>{selectedDefinitionNode.config.outputPolicy.redactPaths?.join('\n') ??
+										''}</textarea
+								></label
+							>
+						{/if}
 					</div>
 				{/if}
 				{#if inspectorTab === 'details' && selectedDefinitionNode?.type === 'end-failure'}
@@ -3144,12 +4060,11 @@
 										node.type === 'end-failure'
 											? { ...node, config: { ...node.config, message: event.currentTarget.value } }
 											: node
-									)}
-							></textarea></label
+									)}></textarea></label
 						>
 					</div>
 				{/if}
-				{#if inspectorTab === 'details' && selectedDefinitionNode && !['trigger-http', 'condition', 'end-success'].includes(selectedDefinitionNode.type)}
+				{#if inspectorTab === 'details' && selectedDefinitionNode && !isProcessTriggerNode(selectedDefinitionNode) && !['condition', 'block', 'end-success'].includes(selectedDefinitionNode.type)}
 					<div class="node-actions">
 						<button
 							type="button"
@@ -3271,6 +4186,56 @@
 	.workflow-identity {
 		gap: 11px;
 	}
+	.workflow-search {
+		display: grid;
+		grid-template-columns: minmax(108px, 160px) 88px 28px auto;
+		align-items: center;
+		gap: 5px;
+	}
+	.workflow-search label {
+		position: relative;
+	}
+	.workflow-search label :global(svg) {
+		position: absolute;
+		left: 8px;
+		color: #64748b;
+		pointer-events: none;
+	}
+	.workflow-search input,
+	.workflow-search select {
+		width: 100%;
+		height: 28px;
+		box-sizing: border-box;
+		border: 1px solid #d9e0e8;
+		border-radius: 6px;
+		outline: 0;
+		background: #ffffff;
+		color: #334155;
+		font:
+			600 10px/1 'Manrope',
+			sans-serif;
+	}
+	.workflow-search input {
+		padding: 0 7px 0 25px;
+	}
+	.workflow-search select {
+		padding: 0 5px;
+	}
+	.workflow-search button {
+		width: 28px;
+		height: 28px;
+		display: grid;
+		place-items: center;
+		border: 1px solid #d9e0e8;
+		border-radius: 6px;
+		background: #ffffff;
+		color: #475569;
+		cursor: pointer;
+	}
+	.workflow-search button:disabled {
+		cursor: not-allowed;
+		opacity: 0.55;
+	}
 	.workflow-logo {
 		width: 34px;
 		height: 34px;
@@ -3293,10 +4258,10 @@
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 	}
-	.workflow-identity label {
+	.workflow-identity > div label {
 		position: relative;
 	}
-	.workflow-identity select {
+	.workflow-identity > div select {
 		width: min(320px, 32vw);
 		appearance: none;
 		border: 0;
@@ -3309,7 +4274,7 @@
 			sans-serif;
 		cursor: pointer;
 	}
-	.workflow-identity label :global(svg) {
+	.workflow-identity > div label :global(svg) {
 		position: absolute;
 		right: 0;
 		pointer-events: none;
@@ -3373,6 +4338,50 @@
 
 	.editor-actions {
 		gap: 8px;
+	}
+	.domain-target {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		padding-left: 8px;
+		border-left: 1px solid #e2e8f0;
+	}
+	.domain-target label {
+		display: grid;
+		gap: 2px;
+	}
+	.domain-target label span {
+		color: #64748b;
+		font-size: 8px;
+		font-weight: 700;
+		text-transform: uppercase;
+	}
+	.domain-target input {
+		width: 86px;
+		height: 28px;
+		border: 1px solid #dbe3ed;
+		border-radius: 5px;
+		padding: 0 7px;
+		color: #1e293b;
+		background: #ffffff;
+		font:
+			600 10px/1 'Manrope',
+			sans-serif;
+	}
+	.domain-target label:nth-child(3) input {
+		width: 150px;
+	}
+	.domain-target button.configured {
+		border-color: #86c99a;
+		color: #176b32;
+		background: #edf8f0;
+	}
+	.verification-status {
+		max-width: 86px;
+		color: #8a5a00;
+		font-size: 9px;
+		font-weight: 700;
+		line-height: 1.15;
 	}
 	.editor-actions button {
 		height: 34px;
@@ -4245,14 +5254,6 @@
 		font: 700 10px/1.4 monospace;
 		overflow-wrap: anywhere;
 	}
-	.trace p {
-		margin: 0;
-		color: #475569;
-		font: 650 10px/1.4 monospace;
-	}
-	.trace b {
-		color: #5f6368;
-	}
 
 	.protected {
 		margin-top: 18px;
@@ -4324,6 +5325,58 @@
 		background: #ffffff;
 		cursor: pointer;
 	}
+	.run-filters {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 6px;
+		margin-bottom: 10px;
+	}
+	.run-filters label {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		grid-column: 1 / -1;
+	}
+	.run-filters input,
+	.run-filters select,
+	.run-filters button {
+		min-width: 0;
+		border: 1px solid #e2e8f0;
+		border-radius: 6px;
+		padding: 6px 7px;
+		color: #1e293b;
+		background: #f8fafd;
+		font:
+			650 9.5px/1.3 'Manrope',
+			sans-serif;
+	}
+	.run-filters label input {
+		width: 100%;
+		border: 0;
+		padding: 0;
+		background: transparent;
+		outline: 0;
+	}
+	.run-filters button,
+	.load-more-runs {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 5px;
+		cursor: pointer;
+	}
+	.load-more-runs {
+		width: 100%;
+		margin: -5px 0 10px;
+		border: 1px solid #e2e8f0;
+		border-radius: 6px;
+		padding: 6px;
+		color: #475569;
+		background: #ffffff;
+		font:
+			700 9.5px/1.3 'Manrope',
+			sans-serif;
+	}
 	.run-picker {
 		display: grid;
 		gap: 5px;
@@ -4349,7 +5402,9 @@
 		justify-content: space-between;
 		margin: 14px 0 7px;
 		color: #475569;
-		font: 750 9.5px/1.3 'Manrope', sans-serif;
+		font:
+			750 9.5px/1.3 'Manrope',
+			sans-serif;
 		text-transform: uppercase;
 	}
 	.attempts-head strong {
@@ -4376,7 +5431,9 @@
 		justify-content: space-between;
 		gap: 8px;
 		color: #1e293b;
-		font: 700 9.5px/1.3 'Manrope', sans-serif;
+		font:
+			700 9.5px/1.3 'Manrope',
+			sans-serif;
 	}
 	.step-attempts header span {
 		color: #64748b;
@@ -4386,6 +5443,28 @@
 		overflow-wrap: anywhere;
 		color: #64748b;
 		font: 600 9px/1.4 monospace;
+	}
+	.load-external-output {
+		display: inline-flex;
+		align-items: center;
+		justify-self: start;
+		gap: 5px;
+		border: 1px solid #cbd5e1;
+		border-radius: 6px;
+		padding: 5px 7px;
+		color: #1e293b;
+		background: #fff;
+		font:
+			700 9.5px/1 'Manrope',
+			sans-serif;
+		cursor: pointer;
+	}
+	.load-external-output:disabled {
+		opacity: 0.55;
+		cursor: wait;
+	}
+	.step-attempts .attempt-output-error {
+		color: #c5221f;
 	}
 	.execution-timeline {
 		display: grid;
@@ -4545,6 +5624,22 @@
 			align-items: flex-start;
 			flex-direction: column;
 			padding: 12px 14px;
+		}
+		.workflow-identity {
+			width: 100%;
+			min-width: 0;
+			display: grid;
+			grid-template-columns: 34px minmax(0, 1fr);
+		}
+		.workflow-identity > div,
+		.workflow-identity > div label,
+		.workflow-identity > div select {
+			width: 100%;
+			min-width: 0;
+		}
+		.workflow-search {
+			grid-column: 1 / -1;
+			grid-template-columns: minmax(0, 1fr) 88px 28px auto;
 		}
 		.scenario-heading p {
 			display: none;

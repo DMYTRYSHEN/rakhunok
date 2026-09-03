@@ -1,5 +1,13 @@
 <script lang="ts">
-	import { Check, CirclePause, Diamond, LoaderCircle, LockKeyhole, OctagonX, Play } from '@lucide/svelte';
+	import {
+		Check,
+		CirclePause,
+		Diamond,
+		LoaderCircle,
+		LockKeyhole,
+		OctagonX,
+		Play
+	} from '@lucide/svelte';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
 	import { statusText, type CorexLocale } from './i18n';
 	import type { FlowNode } from './types';
@@ -19,11 +27,23 @@
 	<Handle type="target" position={Position.Left} class="port target-port" />
 	<header>
 		<span class="kind-icon">
-			{#if node.kind === 'trigger'}<Play size={11} fill="currentColor" />{:else if node.kind === 'decision'}<Diamond size={12} />{:else if node.kind === 'terminal'}<OctagonX size={12} />{:else}<span class="action-mark"></span>{/if}
+			{#if node.kind === 'trigger'}<Play
+					size={11}
+					fill="currentColor"
+				/>{:else if node.kind === 'decision'}<Diamond
+					size={12}
+				/>{:else if node.kind === 'terminal'}<OctagonX size={12} />{:else}<span class="action-mark"
+				></span>{/if}
 		</span>
 		<span class="eyebrow">{node.eyebrow}</span>
 		<span class="state" data-status={node.status}>
-			{#if node.status === 'complete'}<Check size={11} />{:else if node.status === 'running'}<LoaderCircle size={11} />{:else if node.status === 'waiting'}<CirclePause size={11} />{:else}<LockKeyhole size={11} />{/if}
+			{#if node.status === 'complete'}<Check
+					size={11}
+				/>{:else if node.status === 'running'}<LoaderCircle
+					size={11}
+				/>{:else if node.status === 'waiting'}<CirclePause size={11} />{:else}<LockKeyhole
+					size={11}
+				/>{/if}
 			{statusText[node.locale][node.status]}
 		</span>
 	</header>
@@ -46,8 +66,20 @@
 			/>
 		{/each}
 	{:else if node.kind === 'decision'}
-		<Handle id="true" type="source" position={Position.Right} class="port branch-port true-port" title="True / Yes" />
-		<Handle id="false" type="source" position={Position.Right} class="port branch-port false-port" title="False / No" />
+		<Handle
+			id="true"
+			type="source"
+			position={Position.Right}
+			class="port branch-port true-port"
+			title="True / Yes"
+		/>
+		<Handle
+			id="false"
+			type="source"
+			position={Position.Right}
+			class="port branch-port false-port"
+			title="False / No"
+		/>
 	{:else if node.kind !== 'terminal'}
 		<Handle id="next" type="source" position={Position.Right} class="port" />
 	{/if}
@@ -64,22 +96,32 @@
 		color: #1f2937;
 		background: rgba(255, 255, 255, 0.98);
 		backdrop-filter: blur(16px);
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px -4px rgba(26, 115, 232, 0.07), 0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+		box-shadow:
+			0 1px 3px rgba(0, 0, 0, 0.04),
+			0 8px 24px -4px rgba(26, 115, 232, 0.07),
+			0 0 0 1px rgba(255, 255, 255, 0.8) inset;
 		font-family: 'Manrope', sans-serif;
 		transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
 	}
 	.flow-node:hover {
 		border-color: rgba(26, 115, 232, 0.45);
-		box-shadow: 0 4px 12px rgba(26, 115, 232, 0.08), 0 16px 36px -6px rgba(26, 115, 232, 0.14);
+		box-shadow:
+			0 4px 12px rgba(26, 115, 232, 0.08),
+			0 16px 36px -6px rgba(26, 115, 232, 0.14);
 		transform: translateY(-3px) scale(1.008);
 	}
 	.flow-node.selected {
 		border-color: #1a73e8;
-		box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.22), 0 12px 32px -4px rgba(26, 115, 232, 0.2);
+		box-shadow:
+			0 0 0 3px rgba(26, 115, 232, 0.22),
+			0 12px 32px -4px rgba(26, 115, 232, 0.2);
 	}
 	.flow-node.running {
 		border-color: transparent;
-		box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(26, 115, 232, 0.35), 0 14px 36px rgba(124, 58, 237, 0.18);
+		box-shadow:
+			0 0 0 2px #fff,
+			0 0 0 4px rgba(26, 115, 232, 0.35),
+			0 14px 36px rgba(124, 58, 237, 0.18);
 		animation: geminiAura 3s ease-in-out infinite alternate;
 	}
 	.flow-node[data-status='blocked'] {
@@ -104,7 +146,9 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		color: #5f6368;
-		font: 750 9.5px/1 'Manrope', sans-serif;
+		font:
+			750 9.5px/1 'Manrope',
+			sans-serif;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 	}
@@ -119,13 +163,37 @@
 		background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%);
 		box-shadow: 0 2px 6px rgba(26, 115, 232, 0.3);
 	}
-	.flow-node[data-layer='auth'] .kind-icon { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3); }
-	.flow-node[data-layer='worker'] .kind-icon { background: linear-gradient(135deg, #0284c7 0%, #06b6d4 100%); box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3); }
-	.flow-node[data-layer='database'] .kind-icon { background: linear-gradient(135deg, #16a34a 0%, #10b981 100%); box-shadow: 0 2px 6px rgba(22, 163, 74, 0.3); }
-	.flow-node[data-layer='external'] .kind-icon { background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%); box-shadow: 0 2px 6px rgba(147, 51, 234, 0.3); }
-	.flow-node[data-layer='deploy'] .kind-icon { background: linear-gradient(135deg, #5f6368 0%, #475569 100%); box-shadow: 0 2px 6px rgba(100, 116, 139, 0.3); }
-	.decision .kind-icon { color: #fff; background: linear-gradient(135deg, #ea580c 0%, #f97316 100%); box-shadow: 0 2px 6px rgba(234, 88, 12, 0.3); }
-	.action-mark { width: 6px; height: 6px; border-radius: 2px; background: currentColor; }
+	.flow-node[data-layer='auth'] .kind-icon {
+		background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+		box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+	}
+	.flow-node[data-layer='worker'] .kind-icon {
+		background: linear-gradient(135deg, #0284c7 0%, #06b6d4 100%);
+		box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3);
+	}
+	.flow-node[data-layer='database'] .kind-icon {
+		background: linear-gradient(135deg, #16a34a 0%, #10b981 100%);
+		box-shadow: 0 2px 6px rgba(22, 163, 74, 0.3);
+	}
+	.flow-node[data-layer='external'] .kind-icon {
+		background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%);
+		box-shadow: 0 2px 6px rgba(147, 51, 234, 0.3);
+	}
+	.flow-node[data-layer='deploy'] .kind-icon {
+		background: linear-gradient(135deg, #5f6368 0%, #475569 100%);
+		box-shadow: 0 2px 6px rgba(100, 116, 139, 0.3);
+	}
+	.decision .kind-icon {
+		color: #fff;
+		background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+		box-shadow: 0 2px 6px rgba(234, 88, 12, 0.3);
+	}
+	.action-mark {
+		width: 6px;
+		height: 6px;
+		border-radius: 2px;
+		background: currentColor;
+	}
 
 	.state {
 		margin-left: auto;
@@ -136,15 +204,35 @@
 		padding: 3px 8px;
 		color: #5f6368;
 		background: #f1f4f8;
-		font: 700 9px/1 'Manrope', sans-serif;
+		font:
+			700 9px/1 'Manrope',
+			sans-serif;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 	}
-	.state[data-status='complete'] { color: #137333; background: #e6f4ea; border: 1px solid #ceead6; }
-	.state[data-status='running'] { color: #b06000; background: #fef7e0; border: 1px solid #feefc3; }
-	.state[data-status='running'] :global(svg) { animation: spin 1.2s linear infinite; }
-	.state[data-status='waiting'] { color: #1967d2; background: #e8f0fe; border: 1px solid #d2e3fc; }
-	.state[data-status='failed'] { color: #c5221f; background: #fce8e6; border: 1px solid #fad2cf; }
+	.state[data-status='complete'] {
+		color: #137333;
+		background: #e6f4ea;
+		border: 1px solid #ceead6;
+	}
+	.state[data-status='running'] {
+		color: #b06000;
+		background: #fef7e0;
+		border: 1px solid #feefc3;
+	}
+	.state[data-status='running'] :global(svg) {
+		animation: spin 1.2s linear infinite;
+	}
+	.state[data-status='waiting'] {
+		color: #1967d2;
+		background: #e8f0fe;
+		border: 1px solid #d2e3fc;
+	}
+	.state[data-status='failed'] {
+		color: #c5221f;
+		background: #fce8e6;
+		border: 1px solid #fad2cf;
+	}
 
 	.body {
 		min-height: 76px;
@@ -190,12 +278,18 @@
 		border: 2.5px solid #ffffff !important;
 		border-radius: 50% !important;
 		background: #1a73e8 !important;
-		box-shadow: 0 0 0 1px rgba(26, 115, 232, 0.6), 0 2px 8px rgba(26, 115, 232, 0.35) !important;
-		transition: transform 140ms ease, box-shadow 140ms ease;
+		box-shadow:
+			0 0 0 1px rgba(26, 115, 232, 0.6),
+			0 2px 8px rgba(26, 115, 232, 0.35) !important;
+		transition:
+			transform 140ms ease,
+			box-shadow 140ms ease;
 	}
 	:global(.port:hover) {
 		transform: scale(1.35) !important;
-		box-shadow: 0 0 0 2px #ffffff, 0 0 10px #1a73e8 !important;
+		box-shadow:
+			0 0 0 2px #ffffff,
+			0 0 10px #1a73e8 !important;
 	}
 	:global(.target-port) {
 		left: -6.5px !important;
@@ -203,34 +297,53 @@
 	:global(.branch-port.true-port) {
 		top: 36% !important;
 		background: #1e8e3e !important;
-		box-shadow: 0 0 0 1px rgba(30, 142, 62, 0.7), 0 2px 8px rgba(30, 142, 62, 0.4) !important;
+		box-shadow:
+			0 0 0 1px rgba(30, 142, 62, 0.7),
+			0 2px 8px rgba(30, 142, 62, 0.4) !important;
 	}
 	:global(.branch-port.false-port) {
 		top: 68% !important;
 		background: #d93025 !important;
-		box-shadow: 0 0 0 1px rgba(217, 48, 37, 0.7), 0 2px 8px rgba(217, 48, 37, 0.4) !important;
+		box-shadow:
+			0 0 0 1px rgba(217, 48, 37, 0.7),
+			0 2px 8px rgba(217, 48, 37, 0.4) !important;
 	}
 	:global(.branch-port.switch-port) {
 		background: #1e8e3e !important;
-		box-shadow: 0 0 0 1px rgba(30, 142, 62, 0.7), 0 2px 8px rgba(30, 142, 62, 0.4) !important;
+		box-shadow:
+			0 0 0 1px rgba(30, 142, 62, 0.7),
+			0 2px 8px rgba(30, 142, 62, 0.4) !important;
 	}
 	:global(.branch-port.switch-port.default-port) {
 		background: #d93025 !important;
-		box-shadow: 0 0 0 1px rgba(217, 48, 37, 0.7), 0 2px 8px rgba(217, 48, 37, 0.4) !important;
+		box-shadow:
+			0 0 0 1px rgba(217, 48, 37, 0.7),
+			0 2px 8px rgba(217, 48, 37, 0.4) !important;
 	}
 
 	@keyframes spin {
-		to { transform: rotate(360deg); }
+		to {
+			transform: rotate(360deg);
+		}
 	}
 	@keyframes geminiAura {
 		0% {
-			box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(26, 115, 232, 0.35), 0 12px 28px rgba(26, 115, 232, 0.15);
+			box-shadow:
+				0 0 0 2px #fff,
+				0 0 0 4px rgba(26, 115, 232, 0.35),
+				0 12px 28px rgba(26, 115, 232, 0.15);
 		}
 		50% {
-			box-shadow: 0 0 0 2px #fff, 0 0 0 5px rgba(124, 58, 237, 0.4), 0 16px 36px rgba(124, 58, 237, 0.22);
+			box-shadow:
+				0 0 0 2px #fff,
+				0 0 0 5px rgba(124, 58, 237, 0.4),
+				0 16px 36px rgba(124, 58, 237, 0.22);
 		}
 		100% {
-			box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(217, 101, 112, 0.4), 0 14px 32px rgba(217, 101, 112, 0.18);
+			box-shadow:
+				0 0 0 2px #fff,
+				0 0 0 4px rgba(217, 101, 112, 0.4),
+				0 14px 32px rgba(217, 101, 112, 0.18);
 		}
 	}
 </style>

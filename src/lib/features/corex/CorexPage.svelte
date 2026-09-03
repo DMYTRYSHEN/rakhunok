@@ -15,7 +15,10 @@
 	import MerchantOnboarding from '$lib/features/dashboard/auth/MerchantOnboarding.svelte';
 	import DashboardStateScreen from '$lib/features/dashboard/auth/DashboardStateScreen.svelte';
 	import { getDashboardGateway } from '$lib/features/dashboard/api/supabase-browser';
-	import type { DashboardSessionState, MerchantOnboardingInput } from '$lib/features/dashboard/types';
+	import type {
+		DashboardSessionState,
+		MerchantOnboardingInput
+	} from '$lib/features/dashboard/types';
 	import ReleaseFlowCanvas from './ReleaseFlowCanvas.svelte';
 	import { shellText, type CorexLocale } from './i18n';
 
@@ -97,11 +100,21 @@
 			<div class="topbar-actions">
 				<span class="mode"><span></span> {text.mockMode}</span>
 				<label class="language-select" aria-label={text.language}>
-					<select value={locale} onchange={(event) => setLocale(event.currentTarget.value as CorexLocale)}>
+					<select
+						value={locale}
+						onchange={(event) => setLocale(event.currentTarget.value as CorexLocale)}
+					>
 						<option value="uk">UA</option><option value="en">EN</option>
 					</select>
 				</label>
-				<button class="icon-button" type="button" onclick={signOut} disabled={signingOut} aria-label={text.signOut} title={text.signOut}>
+				<button
+					class="icon-button"
+					type="button"
+					onclick={signOut}
+					disabled={signingOut}
+					aria-label={text.signOut}
+					title={text.signOut}
+				>
 					<LogOut size={17} aria-hidden="true" />
 				</button>
 			</div>
@@ -128,9 +141,15 @@
 					<strong>{text.contracts}</strong>
 				</div>
 				<div class="commands">
-					<button type="button" disabled title={text.notConnected}><Play size={15} /> {text.deploy}</button>
-					<button type="button" disabled title={text.notConnected}><Pause size={15} /> {text.pause}</button>
-					<button type="button" disabled title={text.notConnected}><RotateCcw size={15} /> {text.rollback}</button>
+					<button type="button" disabled title={text.notConnected}
+						><Play size={15} /> {text.deploy}</button
+					>
+					<button type="button" disabled title={text.notConnected}
+						><Pause size={15} /> {text.pause}</button
+					>
+					<button type="button" disabled title={text.notConnected}
+						><RotateCcw size={15} /> {text.rollback}</button
+					>
 				</div>
 			</section>
 
@@ -138,16 +157,25 @@
 
 			<section class="safety-grid">
 				<div><span>{text.environment}</span><strong>{text.preview}</strong></div>
-				<div><span>{text.mutation}</span><strong class="locked"><LockKeyhole size={14} /> {text.locked}</strong></div>
+				<div>
+					<span>{text.mutation}</span><strong class="locked"
+						><LockKeyhole size={14} /> {text.locked}</strong
+					>
+				</div>
 				<div><span>{text.protectedDomain}</span><strong>{text.excluded}</strong></div>
-				<div><span>{text.session}</span><strong>{sessionState.user.email ?? sessionState.user.fullName ?? text.user}</strong></div>
+				<div>
+					<span>{text.session}</span><strong
+						>{sessionState.user.email ?? sessionState.user.fullName ?? text.user}</strong
+					>
+				</div>
 			</section>
 		</main>
 	</div>
 {/if}
 
 <style>
-	:global(html:has(.corex-root)), :global(body:has(.corex-root)) {
+	:global(html:has(.corex-root)),
+	:global(body:has(.corex-root)) {
 		margin: 0;
 		background: #f8fafd;
 		color: #1f2937;
@@ -172,7 +200,12 @@
 		background: rgba(255, 255, 255, 0.92);
 		backdrop-filter: blur(20px);
 	}
-	.brand, .topbar-actions, .commands, .back-link, .target-card, .locked {
+	.brand,
+	.topbar-actions,
+	.commands,
+	.back-link,
+	.target-card,
+	.locked {
 		display: flex;
 		align-items: center;
 	}
@@ -186,6 +219,7 @@
 	.brand b {
 		font-weight: 800;
 		background: linear-gradient(135deg, #1a73e8 0%, #7c3aed 100%);
+		background-clip: text;
 		-webkit-background-clip: text;
 		-webkit-text-fill-color: transparent;
 	}
@@ -200,7 +234,9 @@
 		font-weight: 900;
 		box-shadow: 0 3px 10px rgba(26, 115, 232, 0.35);
 	}
-	.topbar-actions { gap: 10px; }
+	.topbar-actions {
+		gap: 10px;
+	}
 	.mode {
 		display: flex;
 		align-items: center;
@@ -222,7 +258,9 @@
 		background: #f59e0b;
 		box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
 	}
-	.language-select { position: relative; }
+	.language-select {
+		position: relative;
+	}
 	.language-select select {
 		height: 36px;
 		appearance: none;
@@ -231,11 +269,15 @@
 		padding: 0 26px 0 12px;
 		color: #1e293b;
 		background: #ffffff;
-		font: 750 11.5px/1 'Manrope', sans-serif;
+		font:
+			750 11.5px/1 'Manrope',
+			sans-serif;
 		cursor: pointer;
 		transition: all 160ms ease;
 	}
-	.language-select select:hover { border-color: #1a73e8; }
+	.language-select select:hover {
+		border-color: #1a73e8;
+	}
 	.language-select::after {
 		content: '⌄';
 		position: absolute;
@@ -288,10 +330,13 @@
 		font-weight: 700;
 		transition: color 160ms ease;
 	}
-	.back-link:hover { color: #1a73e8; }
+	.back-link:hover {
+		color: #1a73e8;
+	}
 	.kicker {
 		margin: 0 0 8px;
 		background: linear-gradient(135deg, #1a73e8 0%, #7c3aed 100%);
+		background-clip: text;
 		-webkit-background-clip: text;
 		-webkit-text-fill-color: transparent;
 		font-size: 11.5px;
@@ -308,6 +353,7 @@
 		line-height: 1.15;
 		letter-spacing: -0.025em;
 		background: linear-gradient(135deg, #0f172a 30%, #1a73e8 100%);
+		background-clip: text;
 		-webkit-background-clip: text;
 		-webkit-text-fill-color: transparent;
 	}
@@ -339,10 +385,25 @@
 		border: 1px solid #d2e3fc;
 		box-shadow: 0 2px 8px rgba(26, 115, 232, 0.2);
 	}
-	.target-card div:nth-child(2) { display: grid; gap: 3px; }
-	.target-card span { color: #5f6368; font-size: 10px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.06em; }
-	.target-card strong { font-size: 14px; color: #1e293b; }
-	.target-check { margin-left: auto; color: #1e8e3e; }
+	.target-card div:nth-child(2) {
+		display: grid;
+		gap: 3px;
+	}
+	.target-card span {
+		color: #5f6368;
+		font-size: 10px;
+		text-transform: uppercase;
+		font-weight: 800;
+		letter-spacing: 0.06em;
+	}
+	.target-card strong {
+		font-size: 14px;
+		color: #1e293b;
+	}
+	.target-check {
+		margin-left: auto;
+		color: #1e8e3e;
+	}
 
 	.command-bar {
 		margin-top: 26px;
@@ -357,10 +418,24 @@
 		background: #ffffff;
 		color: #1e293b;
 	}
-	.command-bar > div:first-child { display: grid; gap: 2px; }
-	.command-label { color: #5f6368; font-size: 9.5px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.06em; }
-	.command-bar strong { font-size: 13px; color: #1e293b; }
-	.commands { gap: 6px; }
+	.command-bar > div:first-child {
+		display: grid;
+		gap: 2px;
+	}
+	.command-label {
+		color: #5f6368;
+		font-size: 9.5px;
+		font-weight: 750;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.command-bar strong {
+		font-size: 13px;
+		color: #1e293b;
+	}
+	.commands {
+		gap: 6px;
+	}
 	.commands button {
 		min-height: 32px;
 		display: flex;
@@ -382,7 +457,10 @@
 		background: #ffffff;
 		box-shadow: 0 2px 8px rgba(26, 115, 232, 0.1);
 	}
-	.commands button:disabled { cursor: not-allowed; opacity: 0.5; }
+	.commands button:disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
+	}
 
 	.safety-grid {
 		display: grid;
@@ -401,28 +479,79 @@
 		border-right: 1px solid #f1f4f8;
 		background: #ffffff;
 	}
-	.safety-grid > div:last-child { border-right: 0; }
-	.safety-grid span { color: #5f6368; font: 750 9.5px/1 'Manrope', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
-	.safety-grid strong { overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: #1e293b; white-space: nowrap; }
-	.locked { gap: 6px; color: #b06000; }
+	.safety-grid > div:last-child {
+		border-right: 0;
+	}
+	.safety-grid span {
+		color: #5f6368;
+		font:
+			750 9.5px/1 'Manrope',
+			sans-serif;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+	.safety-grid strong {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		font-size: 12px;
+		color: #1e293b;
+		white-space: nowrap;
+	}
+	.locked {
+		gap: 6px;
+		color: #b06000;
+	}
 
 	@media (max-width: 900px) {
-		.intro { grid-template-columns: 1fr; }
-		.target-card { max-width: 420px; }
-		.safety-grid { grid-template-columns: repeat(2, 1fr); }
-		.safety-grid > div:nth-child(2) { border-right: 0; }
-		.safety-grid > div:nth-child(-n + 2) { border-bottom: 1px solid #f1f4f8; }
+		.intro {
+			grid-template-columns: 1fr;
+		}
+		.target-card {
+			max-width: 420px;
+		}
+		.safety-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+		.safety-grid > div:nth-child(2) {
+			border-right: 0;
+		}
+		.safety-grid > div:nth-child(-n + 2) {
+			border-bottom: 1px solid #f1f4f8;
+		}
 	}
 	@media (max-width: 600px) {
-		.topbar { padding: 0 10px; }
-		.brand > span:last-child { display: none; }
-		main { padding: 16px 5px 24px; }
-		h1 { font-size: 28px; }
-		.command-bar { align-items: flex-start; flex-direction: column; }
-		.commands { width: 100%; }
-		.commands button { flex: 1; justify-content: center; }
-		.safety-grid { grid-template-columns: 1fr; }
-		.safety-grid > div { border-right: 0; border-bottom: 1px solid #f1f4f8; }
-		.safety-grid > div:last-child { border-bottom: 0; }
+		.topbar {
+			padding: 0 10px;
+		}
+		.brand > span:last-child {
+			display: none;
+		}
+		main {
+			padding: 16px 5px 24px;
+		}
+		h1 {
+			font-size: 28px;
+		}
+		.command-bar {
+			align-items: flex-start;
+			flex-direction: column;
+		}
+		.commands {
+			width: 100%;
+		}
+		.commands button {
+			flex: 1;
+			justify-content: center;
+		}
+		.safety-grid {
+			grid-template-columns: 1fr;
+		}
+		.safety-grid > div {
+			border-right: 0;
+			border-bottom: 1px solid #f1f4f8;
+		}
+		.safety-grid > div:last-child {
+			border-bottom: 0;
+		}
 	}
 </style>

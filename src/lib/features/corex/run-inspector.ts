@@ -7,7 +7,9 @@ export type RunEventSummary = {
 
 export function summarizeRunEvents(events: CorexRunEvent[]): RunEventSummary {
 	const completedSteps = events.filter((event) => event.eventType === 'step_completed').length;
-	const latestStepEvent = events.findLast((event) => event.eventType === 'step_started' || event.eventType === 'step_completed');
+	const latestStepEvent = events.findLast(
+		(event) => event.eventType === 'step_started' || event.eventType === 'step_completed'
+	);
 	return {
 		completedSteps,
 		activeStep: latestStepEvent?.eventType === 'step_started' ? latestStepEvent.stepName : null

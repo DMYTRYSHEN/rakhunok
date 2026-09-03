@@ -1,7 +1,20 @@
 ﻿<script lang="ts">
 	import { Pin, Trash2 } from '@lucide/svelte';
 
-	let { data, id }: { data: { title?: string; text?: string; color?: 'yellow' | 'blue' | 'green' | 'purple'; author?: string; onDelete?: (id: string) => void; onUpdate?: (id: string, text: string) => void }; id: string } = $props();
+	let {
+		data,
+		id
+	}: {
+		data: {
+			title?: string;
+			text?: string;
+			color?: 'yellow' | 'blue' | 'green' | 'purple';
+			author?: string;
+			onDelete?: (id: string) => void;
+			onUpdate?: (id: string, text: string) => void;
+		};
+		id: string;
+	} = $props();
 
 	let editing = $state(false);
 	let noteText = $state('');
@@ -25,7 +38,12 @@
 			<span>{data.title ?? 'NOTE'}</span>
 		</div>
 		{#if data.onDelete}
-			<button class="delete-btn" type="button" onclick={() => data.onDelete?.(id)} title="Delete note">
+			<button
+				class="delete-btn"
+				type="button"
+				onclick={() => data.onDelete?.(id)}
+				title="Delete note"
+			>
 				<Trash2 size={11} />
 			</button>
 		{/if}
@@ -36,11 +54,20 @@
 			class="note-textarea"
 			bind:value={noteText}
 			onblur={save}
-			onkeydown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) save(); }}
-			rows={3}
-		></textarea>
+			onkeydown={(e) => {
+				if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) save();
+			}}
+			rows={3}></textarea>
 	{:else}
-		<div class="note-body" ondblclick={edit} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter') edit(); }}>
+		<div
+			class="note-body"
+			ondblclick={edit}
+			role="button"
+			tabindex="0"
+			onkeydown={(e) => {
+				if (e.key === 'Enter') edit();
+			}}
+		>
 			{displayedText}
 		</div>
 	{/if}
@@ -63,9 +90,13 @@
 		flex-direction: column;
 		justify-content: space-between;
 		font-family: 'Manrope', sans-serif;
-		box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+		box-shadow:
+			0 4px 16px -2px rgba(15, 23, 42, 0.08),
+			0 1px 3px rgba(0, 0, 0, 0.05);
 		border: 1px solid rgba(0, 0, 0, 0.06);
-		transition: transform 140ms ease, box-shadow 140ms ease;
+		transition:
+			transform 140ms ease,
+			box-shadow 140ms ease;
 	}
 	.sticky-note:hover {
 		transform: translateY(-2px);

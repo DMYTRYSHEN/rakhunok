@@ -1,7 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { describe, expect, it, vi } from 'vitest';
 import { createStarterProcessDefinition } from './process-definition';
-import { CorexDraftConflictError, createCorexProcessGateway } from './corex-process-gateway';
+import {
+	COREX_RUN_STATUSES,
+	CorexDraftConflictError,
+	createCorexProcessGateway,
+	isActiveCorexRunStatus,
+	isCorexRunStatus,
+	isTerminalCorexRunStatus
+} from './corex-process-gateway';
 
 function processRow() {
 	return {
@@ -18,13 +25,40 @@ function processRow() {
 	};
 }
 
+function runRow(status: unknown = 'running') {
+	return {
+		id: 'run-1',
+		process_id: 'process-1',
+		process_version_id: 'version-1',
+		workflow_instance_id: 'workflow-1',
+		parent_run_id: null,
+		parent_step_id: null,
+		depth: 0,
+		execution_generation: 1,
+		status,
+		input: {},
+		output: null,
+		error: null,
+		rollback_outcome: null,
+		rollback_error: null,
+		archived_at: null,
+		started_at: null,
+		finished_at: null,
+		created_at: '2026-09-03T10:00:00.000Z'
+	};
+}
+
 function query(result: { data: unknown; error: unknown }) {
 	const builder = {
 		select: vi.fn(() => builder),
 		insert: vi.fn(() => builder),
 		update: vi.fn(() => builder),
 		eq: vi.fn(() => builder),
+		gte: vi.fn(() => builder),
+		lte: vi.fn(() => builder),
+		or: vi.fn(() => builder),
 		order: vi.fn(() => builder),
+		limit: vi.fn(() => builder),
 		single: vi.fn(async () => result),
 		maybeSingle: vi.fn(async () => result),
 		then: (resolve: (value: typeof result) => unknown) => Promise.resolve(result).then(resolve)
@@ -33,6 +67,41 @@ function query(result: { data: unknown; error: unknown }) {
 }
 
 describe('Corex process gateway', () => {
+	it('owns the complete run status vocabulary and rejects unknown persisted states', async () => {
+		expect(COREX_RUN_STATUSES).toEqual([
+			'queued',
+			'running',
+			'waiting',
+			'waiting_for_pause',
+			'paused',
+			'rolling_back',
+			'complete',
+			'errored',
+			'terminated'
+		]);
+		for (const status of COREX_RUN_STATUSES) expect(isCorexRunStatus(status)).toBe(true);
+		expect(isCorexRunStatus('unknown')).toBe(false);
+		expect(COREX_RUN_STATUSES.filter(isActiveCorexRunStatus)).toEqual([
+			'queued',
+			'running',
+			'waiting',
+			'waiting_for_pause',
+			'paused'
+		]);
+		expect(COREX_RUN_STATUSES.filter(isTerminalCorexRunStatus)).toEqual([
+			'complete',
+			'errored',
+			'terminated'
+		]);
+
+		const builder = query({ data: [runRow('unknown')], error: null });
+		const client = { from: vi.fn(() => builder) } as unknown as SupabaseClient;
+
+		await expect(createCorexProcessGateway(client).listRuns('process-1')).rejects.toThrow(
+			'Unknown Corex run status: unknown'
+		);
+	});
+
 	it('lists only the requested owner processes in updated order', async () => {
 		const builder = query({ data: [processRow()], error: null });
 		const client = { from: vi.fn(() => builder) } as unknown as SupabaseClient;
@@ -42,6 +111,41 @@ describe('Corex process gateway', () => {
 		expect(builder.eq).toHaveBeenCalledWith('owner_user_id', 'user-1');
 		expect(builder.order).toHaveBeenCalledWith('updated_at', { ascending: false });
 		expect(result[0]).toMatchObject({ id: 'process-1', ownerUserId: 'user-1', revision: 2 });
+	});
+
+	it('lists a bounded searchable process page with a deterministic cursor', async () => {
+		const rows = [
+			processRow(),
+			{ ...processRow(), id: 'process-0', updated_at: '2026-08-29T12:00:00.000Z' }
+		];
+		const builder = query({ data: rows, error: null });
+		const client = { from: vi.fn(() => builder) } as unknown as SupabaseClient;
+
+		const result = await createCorexProcessGateway(client).listProcessPage('user-1', {
+			limit: 1,
+			lifecycle: 'draft',
+			search: ' Payment_(test), ',
+			cursor: { updatedAt: '2026-08-31T12:00:00.000Z', id: 'process-cursor' }
+		});
+
+		expect(builder.eq).toHaveBeenNthCalledWith(1, 'owner_user_id', 'user-1');
+		expect(builder.eq).toHaveBeenNthCalledWith(2, 'lifecycle', 'draft');
+		expect(builder.or).toHaveBeenNthCalledWith(
+			1,
+			'name.ilike.%Payment\\_test%,slug.ilike.%Payment\\_test%'
+		);
+		expect(builder.or).toHaveBeenNthCalledWith(
+			2,
+			'updated_at.lt.2026-08-31T12:00:00.000Z,and(updated_at.eq.2026-08-31T12:00:00.000Z,id.lt.process-cursor)'
+		);
+		expect(builder.order).toHaveBeenNthCalledWith(1, 'updated_at', { ascending: false });
+		expect(builder.order).toHaveBeenNthCalledWith(2, 'id', { ascending: false });
+		expect(builder.limit).toHaveBeenCalledWith(2);
+		expect(result.processes).toHaveLength(1);
+		expect(result.nextCursor).toEqual({
+			updatedAt: '2026-08-30T12:00:00.000Z',
+			id: 'process-1'
+		});
 	});
 
 	it('creates a draft without privileged lifecycle or revision columns', async () => {
@@ -140,6 +244,77 @@ describe('Corex process gateway', () => {
 			rollbackError: null,
 			archivedAt: '2026-09-01T05:00:00.000Z'
 		});
+	});
+
+	it('lists a bounded run page with deterministic cursor and filters', async () => {
+		const rows = Array.from({ length: 3 }, (_, index) => ({
+			id: `run-${3 - index}`,
+			process_id: 'process-1',
+			process_version_id: 'version-1',
+			workflow_instance_id: `workflow-${3 - index}`,
+			parent_run_id: null,
+			parent_step_id: null,
+			depth: 0,
+			execution_generation: 1,
+			status: 'running',
+			input: {},
+			output: null,
+			error: null,
+			rollback_outcome: null,
+			rollback_error: null,
+			archived_at: null,
+			started_at: null,
+			finished_at: null,
+			created_at: `2026-09-03T10:00:0${3 - index}.000Z`
+		}));
+		const builder = query({ data: rows, error: null });
+		const client = { from: vi.fn(() => builder) } as unknown as SupabaseClient;
+
+		const result = await createCorexProcessGateway(client).listRunPage('process-1', {
+			limit: 2,
+			cursor: { createdAt: '2026-09-03T09:00:00.000Z', id: 'run-cursor' },
+			status: 'running',
+			createdFrom: '2026-09-01T00:00:00.000Z',
+			createdTo: '2026-09-03T23:59:59.999Z',
+			search: ' workflow_50% '
+		});
+
+		expect(builder.eq).toHaveBeenNthCalledWith(1, 'process_id', 'process-1');
+		expect(builder.eq).toHaveBeenNthCalledWith(2, 'status', 'running');
+		expect(builder.gte).toHaveBeenCalledWith('created_at', '2026-09-01T00:00:00.000Z');
+		expect(builder.lte).toHaveBeenCalledWith('created_at', '2026-09-03T23:59:59.999Z');
+		expect(builder.or).toHaveBeenNthCalledWith(
+			1,
+			'id.ilike.%workflow\\_50%,workflow_instance_id.ilike.%workflow\\_50%'
+		);
+		expect(builder.or).toHaveBeenNthCalledWith(
+			2,
+			'created_at.lt.2026-09-03T09:00:00.000Z,and(created_at.eq.2026-09-03T09:00:00.000Z,id.lt.run-cursor)'
+		);
+		expect(builder.order).toHaveBeenNthCalledWith(1, 'created_at', { ascending: false });
+		expect(builder.order).toHaveBeenNthCalledWith(2, 'id', { ascending: false });
+		expect(builder.limit).toHaveBeenCalledWith(3);
+		expect(result.runs).toHaveLength(2);
+		expect(result.nextCursor).toEqual({
+			createdAt: '2026-09-03T10:00:02.000Z',
+			id: 'run-2'
+		});
+	});
+
+	it('uses the matching greater-than cursor for oldest-first pages', async () => {
+		const builder = query({ data: [], error: null });
+		const client = { from: vi.fn(() => builder) } as unknown as SupabaseClient;
+
+		await createCorexProcessGateway(client).listRunPage('process-1', {
+			direction: 'asc',
+			cursor: { createdAt: '2026-09-03T09:00:00.000Z', id: 'run-cursor' }
+		});
+
+		expect(builder.or).toHaveBeenCalledWith(
+			'created_at.gt.2026-09-03T09:00:00.000Z,and(created_at.eq.2026-09-03T09:00:00.000Z,id.gt.run-cursor)'
+		);
+		expect(builder.order).toHaveBeenNthCalledWith(1, 'created_at', { ascending: true });
+		expect(builder.order).toHaveBeenNthCalledWith(2, 'id', { ascending: true });
 	});
 
 	it('lists run events in deterministic generation and sequence order', async () => {

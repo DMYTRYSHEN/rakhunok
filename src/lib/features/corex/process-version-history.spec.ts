@@ -15,7 +15,12 @@ describe('process version history', () => {
 
 		const restored = restoreVersionAsDraft(currentDraft, publishedDefinition);
 
-		expect(restored).toMatchObject({ id: 'active-process', revision: 9, lifecycle: 'draft', name: 'Published v3' });
+		expect(restored).toMatchObject({
+			id: 'active-process',
+			revision: 9,
+			lifecycle: 'draft',
+			name: 'Published v3'
+		});
 		expect(restored).not.toBe(publishedDefinition);
 		expect(restored.nodes).not.toBe(publishedDefinition.nodes);
 	});

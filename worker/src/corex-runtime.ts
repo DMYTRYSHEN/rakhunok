@@ -1,3 +1,9 @@
+type CorexOutputPolicy = {
+	mode: 'metadata' | 'inline' | 'external';
+	maxBytes: number;
+	redactPaths?: string[];
+};
+
 export type CorexHttpStep = {
 	id: string;
 	name: string;
@@ -11,7 +17,7 @@ export type CorexHttpStep = {
 			backoff: 'constant' | 'linear' | 'exponential';
 		};
 		idempotencyKey?: string;
-		outputPolicy?: { mode: 'metadata' | 'inline'; maxBytes: number; redactPaths?: string[] };
+		outputPolicy?: CorexOutputPolicy;
 	};
 	compensation?:
 		| {
@@ -19,13 +25,13 @@ export type CorexHttpStep = {
 				name: string;
 				type?: 'http-request';
 				config: CorexHttpStep['config'];
-			}
+		  }
 		| {
 				id: string;
 				name: string;
 				type: 'transform';
 				config: CorexTransformStep['config'];
-			};
+		  };
 	next: string;
 };
 
@@ -86,6 +92,7 @@ type CorexWaitStep = {
 	name: string;
 	type: 'wait';
 	config: { durationMs: number };
+	compensation?: CorexEventWaitStep['compensation'];
 	next: string;
 };
 type CorexWaitUntilStep = {
@@ -93,20 +100,57 @@ type CorexWaitUntilStep = {
 	name: string;
 	type: 'wait-until';
 	config: { timestamp: string };
+	compensation?: CorexEventWaitStep['compensation'];
 	next: string;
 };
 type CorexEventWaitStep = {
 	id: string;
 	name: string;
 	type: 'wait-event';
-	config: { eventType: string; timeoutMs: number; resultKey: string };
+	config: {
+		eventType: string;
+		timeoutMs: number;
+		resultKey: string;
+		outputPolicy?: CorexOutputPolicy;
+	};
+	compensation?:
+		| {
+				id: string;
+				name: string;
+				type: 'http-request';
+				config: CorexHttpStep['config'];
+		  }
+		| {
+				id: string;
+				name: string;
+				type: 'transform';
+				config: CorexTransformStep['config'];
+		  };
 	next: string;
 };
 type CorexApprovalStep = {
 	id: string;
 	name: string;
 	type: 'approval';
-	config: { assigneeUserId: string; timeoutMs: number; resultKey: string };
+	config: {
+		assigneeUserId: string;
+		timeoutMs: number;
+		resultKey: string;
+		outputPolicy?: CorexOutputPolicy;
+	};
+	compensation?:
+		| {
+				id: string;
+				name: string;
+				type: 'http-request';
+				config: CorexHttpStep['config'];
+		  }
+		| {
+				id: string;
+				name: string;
+				type: 'transform';
+				config: CorexTransformStep['config'];
+		  };
 	next?: string;
 	whenApproved?: string;
 	whenRejected?: string;
@@ -118,26 +162,34 @@ type CorexTransformStep = {
 	config: {
 		mode: 'merge' | 'replace';
 		mappings: Record<string, string>;
-		outputPolicy?: { mode: 'metadata' | 'inline'; maxBytes: number; redactPaths?: string[] };
+		outputPolicy?: CorexOutputPolicy;
 	};
-	compensation?: {
-		id: string;
-		name: string;
-		config: CorexHttpStep['config'];
-		type: 'http-request';
-	} | {
-		id: string;
-		name: string;
-		type: 'transform';
-		config: CorexTransformStep['config'];
-	};
+	compensation?:
+		| {
+				id: string;
+				name: string;
+				config: CorexHttpStep['config'];
+				type: 'http-request';
+		  }
+		| {
+				id: string;
+				name: string;
+				type: 'transform';
+				config: CorexTransformStep['config'];
+		  };
 	next: string;
 };
 export type CorexInvokeProcessStep = {
 	id: string;
 	name: string;
 	type: 'invoke-process';
-	config: { processId: string; inputPath: string; resultKey: string; timeoutMs: number };
+	config: {
+		processId: string;
+		inputPath: string;
+		resultKey: string;
+		timeoutMs: number;
+		outputPolicy?: CorexOutputPolicy;
+	};
 	compensation?: {
 		id: string;
 		name: string;
@@ -168,6 +220,23 @@ type CorexTryStep = {
 	finallyTarget?: string;
 	continuationTarget: string;
 };
+type CorexLocalCallStep = {
+	id: string;
+	name: string;
+	type: 'local-call';
+	config: { inputPath: string; resultKey: string };
+	bodyTarget: string;
+	returnTarget: string;
+	next: string;
+};
+type CorexBlockStep = {
+	id: string;
+	name: string;
+	type: 'block';
+	config: Record<string, never>;
+	bodyTarget: string;
+	continuationTarget: string;
+};
 type CorexExecutionStep =
 	| CorexHttpStep
 	| CorexConditionStep
@@ -182,6 +251,8 @@ type CorexExecutionStep =
 	| CorexTransformStep
 	| CorexInvokeProcessStep
 	| CorexTryStep
+	| CorexLocalCallStep
+	| CorexBlockStep
 	| CorexSuccessStep
 	| CorexFailureStep;
 
@@ -294,8 +365,14 @@ export type CorexStepAttempt = {
 				bytes: number;
 				value?: unknown;
 				truncated?: true;
-			}
-		| { type: 'object'; bytes: number; value?: unknown; truncated?: true }
+		  }
+		| {
+				type: 'object';
+				bytes: number;
+				value?: unknown;
+				truncated?: true;
+				external?: { key: string; bytes: number; contentType: 'application/json' };
+		  }
 		| { type: 'none' | 'redacted' };
 	error?: {
 		code:
@@ -308,6 +385,11 @@ export type CorexStepAttempt = {
 };
 
 export type CorexStepAttemptRecorder = (attempt: CorexStepAttempt) => Promise<unknown>;
+export type CorexOutputStore = (object: {
+	key: string;
+	body: Uint8Array;
+	contentType: 'application/json';
+}) => Promise<void>;
 
 export type CorexActiveWait = {
 	runId: string;
@@ -374,7 +456,10 @@ function describeHttpOutput(
 		contentType: result.contentType,
 		bytes: result.bytes
 	};
-	if (policy?.mode !== 'inline' || !result.contentType?.toLowerCase().includes('application/json')) {
+	if (
+		policy?.mode !== 'inline' ||
+		!result.contentType?.toLowerCase().includes('application/json')
+	) {
 		return descriptor;
 	}
 	const value = redactOutput(result.body, policy.redactPaths);
@@ -385,18 +470,112 @@ function describeHttpOutput(
 	return { ...descriptor, value };
 }
 
+async function describeRecordedHttpOutput(
+	result: CorexHttpResult,
+	policy: CorexHttpStep['config']['outputPolicy'] | undefined,
+	identity: Parameters<typeof createOutputObjectKey>[0],
+	outputStore?: CorexOutputStore
+): Promise<Extract<NonNullable<CorexStepAttempt['output']>, { status: number }>> {
+	if (policy?.mode !== 'external') return describeHttpOutput(result, policy);
+	const descriptor = describeHttpOutput(result);
+	if (!result.contentType?.toLowerCase().includes('application/json') || !outputStore) {
+		return { ...descriptor, truncated: true };
+	}
+	const body = new TextEncoder().encode(
+		JSON.stringify(redactOutput(result.body, policy.redactPaths)) ?? ''
+	);
+	if (body.byteLength > policy.maxBytes) return { ...descriptor, truncated: true };
+	try {
+		const key = await createOutputObjectKey(identity);
+		await outputStore({ key, body, contentType: 'application/json' });
+		return {
+			...descriptor,
+			external: { key, bytes: body.byteLength, contentType: 'application/json' }
+		};
+	} catch {
+		return { ...descriptor, truncated: true };
+	}
+}
+
+async function createOutputObjectKey(identity: {
+	runId: string;
+	ownerUserId: string;
+	executionGeneration: number;
+	stepId: string;
+	visit: number;
+	kind: CorexStepAttempt['kind'];
+}): Promise<string> {
+	const digest = await crypto.subtle.digest(
+		'SHA-256',
+		new TextEncoder().encode(JSON.stringify(identity))
+	);
+	const hash = Array.from(new Uint8Array(digest), (byte) =>
+		byte.toString(16).padStart(2, '0')
+	).join('');
+	return `corex-output/${hash}.json`;
+}
+
 function describeTransformOutput(
-	result: Record<string, unknown>,
-	policy?: CorexTransformStep['config']['outputPolicy']
+	result: unknown,
+	policy?:
+		| CorexTransformStep['config']['outputPolicy']
+		| CorexInvokeProcessStep['config']['outputPolicy']
+		| CorexEventWaitStep['config']['outputPolicy']
+		| CorexApprovalStep['config']['outputPolicy']
 ): Extract<NonNullable<CorexStepAttempt['output']>, { type: 'object' }> {
-	const sourceBytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
+	const sourceBytes = new TextEncoder().encode(JSON.stringify(result) ?? '').byteLength;
 	if (policy?.mode !== 'inline') return { type: 'object', bytes: sourceBytes };
 	const value = redactOutput(result, policy.redactPaths);
-	const storedBytes = new TextEncoder().encode(JSON.stringify(value)).byteLength;
+	const storedBytes = new TextEncoder().encode(JSON.stringify(value) ?? '').byteLength;
 	if (storedBytes > Math.min(policy.maxBytes, MAX_INLINE_OUTPUT_BYTES)) {
 		return { type: 'object', bytes: sourceBytes, truncated: true };
 	}
 	return { type: 'object', bytes: sourceBytes, value };
+}
+
+async function describeRecordedTransformOutput(
+	result: unknown,
+	policy:
+		| CorexTransformStep['config']['outputPolicy']
+		| CorexInvokeProcessStep['config']['outputPolicy']
+		| CorexEventWaitStep['config']['outputPolicy']
+		| CorexApprovalStep['config']['outputPolicy']
+		| undefined,
+	identity: Parameters<typeof createOutputObjectKey>[0],
+	outputStore?: CorexOutputStore
+): Promise<Extract<NonNullable<CorexStepAttempt['output']>, { type: 'object' }>> {
+	if (policy?.mode !== 'external') return describeTransformOutput(result, policy);
+	const sourceBytes = new TextEncoder().encode(JSON.stringify(result) ?? '').byteLength;
+	if (!outputStore) return { type: 'object', bytes: sourceBytes, truncated: true };
+	const body = new TextEncoder().encode(
+		JSON.stringify(redactOutput(result, policy.redactPaths)) ?? ''
+	);
+	if (body.byteLength > policy.maxBytes)
+		return { type: 'object', bytes: sourceBytes, truncated: true };
+	try {
+		const key = await createOutputObjectKey(identity);
+		await outputStore({ key, body, contentType: 'application/json' });
+		return {
+			type: 'object',
+			bytes: sourceBytes,
+			external: { key, bytes: body.byteLength, contentType: 'application/json' }
+		};
+	} catch {
+		return { type: 'object', bytes: sourceBytes, truncated: true };
+	}
+}
+
+function validateApprovalPayload(payload: unknown): Record<string, unknown> {
+	if (
+		typeof payload !== 'object' ||
+		payload === null ||
+		!['approved', 'rejected'].includes(String((payload as Record<string, unknown>).decision)) ||
+		typeof (payload as Record<string, unknown>).actorUserId !== 'string' ||
+		(typeof (payload as Record<string, unknown>).comment !== 'undefined' &&
+			typeof (payload as Record<string, unknown>).comment !== 'string')
+	)
+		throw new Error('Approval event payload is invalid.');
+	return payload as Record<string, unknown>;
 }
 
 async function executeRecordedHttpAction(
@@ -412,7 +591,8 @@ async function executeRecordedHttpAction(
 	stepContext: CorexDurableStepContext,
 	retry: CorexStepAttempt['retry'],
 	recordAttempt?: CorexStepAttemptRecorder,
-	outputPolicy?: CorexHttpStep['config']['outputPolicy']
+	outputPolicy?: CorexHttpStep['config']['outputPolicy'],
+	outputStore?: CorexOutputStore
 ): Promise<CorexHttpResult> {
 	const startedAt = new Date().toISOString();
 	try {
@@ -427,7 +607,12 @@ async function executeRecordedHttpAction(
 					finishedAt: new Date().toISOString(),
 					outcome: 'complete',
 					retry,
-					output: describeHttpOutput(result, outputPolicy)
+					output: await describeRecordedHttpOutput(
+						result,
+						outputPolicy,
+						{ ...identity, kind: 'forward' },
+						outputStore
+					)
 				});
 			} catch {
 				// Observability failures must not replay a completed external side effect.
@@ -468,7 +653,8 @@ async function executeRecordedTransform(
 	stepContext: CorexDurableStepContext,
 	recordAttempt?: CorexStepAttemptRecorder,
 	kind: CorexStepAttempt['kind'] = 'forward',
-	outputPolicy?: CorexTransformStep['config']['outputPolicy']
+	outputPolicy?: CorexTransformStep['config']['outputPolicy'],
+	outputStore?: CorexOutputStore
 ): Promise<Record<string, unknown>> {
 	const startedAt = new Date().toISOString();
 	try {
@@ -483,7 +669,12 @@ async function executeRecordedTransform(
 					finishedAt: new Date().toISOString(),
 					outcome: 'complete',
 					retry: { limit: 0, backoff: 'constant', timeoutMs: 0 },
-					output: describeTransformOutput(result, outputPolicy)
+					output: await describeRecordedTransformOutput(
+						result,
+						outputPolicy,
+						{ ...identity, kind },
+						outputStore
+					)
 				});
 			} catch {
 				// Observability failures must not fail a completed transform.
@@ -589,13 +780,19 @@ async function executeRecordedEventWait<T>(
 	},
 	timeoutMs: number,
 	errorCode: 'wait_event_failed' | 'approval_failed' | 'subprocess_failed',
-	recordAttempt?: CorexStepAttemptRecorder
+	recordAttempt?: CorexStepAttemptRecorder,
+	describeOutput: (
+		result: T
+	) =>
+		| NonNullable<CorexStepAttempt['output']>
+		| Promise<NonNullable<CorexStepAttempt['output']>> = () => ({ type: 'redacted' })
 ): Promise<T> {
 	const startedAt = new Date().toISOString();
 	try {
 		const result = await operation();
 		if (recordAttempt) {
 			try {
+				const output = await describeOutput(result);
 				await recordAttempt({
 					...identity,
 					kind: 'forward',
@@ -604,7 +801,7 @@ async function executeRecordedEventWait<T>(
 					finishedAt: new Date().toISOString(),
 					outcome: 'complete',
 					retry: { limit: 0, backoff: 'constant', timeoutMs },
-					output: { type: 'redacted' }
+					output
 				});
 			} catch {
 				// Observability failures must not alter a completed event wait.
@@ -661,7 +858,8 @@ async function executeSubprocess(
 	startSubprocess: CorexSubprocessStarter,
 	terminateSubprocess: CorexSubprocessTerminator | undefined,
 	fetcher: typeof fetch,
-	recordAttempt: CorexStepAttemptRecorder | undefined
+	recordAttempt: CorexStepAttemptRecorder | undefined,
+	outputStore?: CorexOutputStore
 ): Promise<Record<string, unknown>> {
 	const childInput = resolveJsonPath(step.config.inputPath, context);
 	return executeRecordedEventWait(
@@ -700,7 +898,8 @@ async function executeSubprocess(
 				typeof result !== 'object' ||
 				result === null ||
 				(result as Record<string, unknown>).childRunId !== child.childRunId
-			) throw new Error('Subprocess result payload is invalid.');
+			)
+				throw new Error('Subprocess result payload is invalid.');
 			if ((result as Record<string, unknown>).status === 'errored') {
 				throw new Error('Subprocess failed.');
 			}
@@ -735,7 +934,14 @@ async function executeSubprocess(
 		identity,
 		step.config.timeoutMs,
 		'subprocess_failed',
-		recordAttempt
+		recordAttempt,
+		(result) =>
+			describeRecordedTransformOutput(
+				result.output,
+				step.config.outputPolicy,
+				identity,
+				outputStore
+			)
 	);
 }
 
@@ -760,8 +966,33 @@ export function corexBranchWaitEventType(
 	return `corex-wait-${runId}-${executionGeneration}-${stepId}-${visit}`;
 }
 
+const MAX_DURABLE_STEP_NAME_LENGTH = 500;
+const DURABLE_STEP_NAME_HASH_MARKER = ':sha256:';
+
+export async function corexParallelBranchStepName(
+	branchPath: Array<{ parallelName: string; branchId: string }>,
+	stepName: string,
+	visit: number
+): Promise<string> {
+	const path = branchPath
+		.map(({ parallelName, branchId }) => `${parallelName}:parallel-${branchId}`)
+		.join('/');
+	const canonicalName = `${path}:${stepName}${visit === 0 ? '' : `:visit-${visit}`}`;
+	const canonicalCharacters = Array.from(canonicalName);
+	if (canonicalCharacters.length <= MAX_DURABLE_STEP_NAME_LENGTH) return canonicalName;
+	const hashInput = JSON.stringify({ branchPath, stepName, visit });
+	const digest = Array.from(
+		new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(hashInput))),
+		(byte) => byte.toString(16).padStart(2, '0')
+	).join('');
+	const prefixLength =
+		MAX_DURABLE_STEP_NAME_LENGTH - DURABLE_STEP_NAME_HASH_MARKER.length - digest.length;
+	return `${canonicalCharacters.slice(0, prefixLength).join('')}${DURABLE_STEP_NAME_HASH_MARKER}${digest}`;
+}
+
 const MAX_RESPONSE_BYTES = 64 * 1024;
 const MAX_EXECUTION_TRAVERSALS = 100_000;
+const MAX_LOCAL_CALL_DEPTH = 64;
 const SIMPLE_JSON_PATH = /^\$(?:\.([A-Za-z_][A-Za-z0-9_-]*))*$/;
 
 function resolveJsonPath(path: string, input: unknown): unknown {
@@ -930,7 +1161,14 @@ export async function executeHttpAction(
 }
 
 function createHttpRollbackOptions<T = CorexHttpResult>(
-	step: CorexHttpStep | CorexInvokeProcessStep,
+	step:
+		| CorexHttpStep
+		| CorexTransformStep
+		| CorexInvokeProcessStep
+		| CorexEventWaitStep
+		| CorexApprovalStep
+		| CorexWaitStep
+		| CorexWaitUntilStep,
 	input: unknown,
 	fetcher: typeof fetch,
 	attemptIdentity: {
@@ -1052,7 +1290,13 @@ function createHttpRollbackOptions<T = CorexHttpResult>(
 }
 
 function createTransformRollbackOptions(
-	step: CorexTransformStep | CorexInvokeProcessStep,
+	step:
+		| CorexTransformStep
+		| CorexInvokeProcessStep
+		| CorexEventWaitStep
+		| CorexApprovalStep
+		| CorexWaitStep
+		| CorexWaitUntilStep,
 	input: unknown,
 	attemptIdentity: {
 		runId: string;
@@ -1105,7 +1349,8 @@ export async function executeCorexWorkflow(
 	recordAttempt?: CorexStepAttemptRecorder,
 	registerActiveWait?: CorexActiveWaitRegistrar,
 	completeActiveWait?: CorexActiveWaitCompleter,
-	registerActiveApproval?: CorexActiveApprovalRegistrar
+	registerActiveApproval?: CorexActiveApprovalRegistrar,
+	outputStore?: CorexOutputStore
 ): Promise<unknown> {
 	const event = (details: Omit<CorexRunEvent, 'runId' | 'ownerUserId'>): CorexRunEvent => ({
 		runId: params.runId,
@@ -1131,371 +1376,108 @@ export async function executeCorexWorkflow(
 		pendingError?: unknown;
 		pendingErrorStepId?: string;
 	}> = [];
+	const localCallFrames: Array<{
+		returnTarget: string;
+		next: string;
+		resultKey: string;
+		callerContext: unknown;
+	}> = [];
 	let failedStepId: string | undefined;
 	execution: while (currentNodeId) {
-	try {
-		while (currentNodeId) {
-			currentStep = nodesById.get(currentNodeId);
-			if (!currentStep) throw new Error(`Execution step "${currentNodeId}" does not exist.`);
-			if (currentStep.type === 'end-success') {
-				output = currentStep.config.outputExpression
-					? resolveJsonPath(currentStep.config.outputExpression, context)
-					: context;
-				break;
-			}
-			if (currentStep.type === 'end-failure') {
-				await workflow.do('corex:run-failed', async () =>
+		try {
+			while (currentNodeId) {
+				const localCallFrame = localCallFrames.at(-1);
+				if (localCallFrame?.returnTarget === currentNodeId) {
+					localCallFrames.pop();
+					context = {
+						...(typeof localCallFrame.callerContext === 'object' &&
+						localCallFrame.callerContext !== null
+							? localCallFrame.callerContext
+							: {}),
+						[localCallFrame.resultKey]: context
+					};
+					currentNodeId = localCallFrame.next;
+					continue;
+				}
+				currentStep = nodesById.get(currentNodeId);
+				if (!currentStep) throw new Error(`Execution step "${currentNodeId}" does not exist.`);
+				if (currentStep.type === 'end-success') {
+					output = currentStep.config.outputExpression
+						? resolveJsonPath(currentStep.config.outputExpression, context)
+						: context;
+					break;
+				}
+				if (currentStep.type === 'end-failure') {
+					await workflow.do('corex:run-failed', async () =>
+						recordEvent(
+							event({
+								sequence,
+								status: 'errored',
+								eventType: 'run_failed',
+								stepName: currentStep!.name,
+								payload: { message: currentStep!.config.message },
+								error: { code: currentStep!.config.code, stepId: currentStep!.id }
+							})
+						)
+					);
+					throw new CorexTerminalFailure(currentStep.config.message);
+				}
+				if (traversalIndex >= MAX_EXECUTION_TRAVERSALS)
+					throw new Error('Execution traversal exceeded the runtime safety limit.');
+
+				const step = currentStep;
+				const visit = nodeVisits.get(step.id) ?? 0;
+				nodeVisits.set(step.id, visit + 1);
+				const durableStepName = visit === 0 ? step.name : `${step.name}:visit-${visit}`;
+				const startedSequence = sequence++;
+				const waitEventType =
+					step.type === 'wait-event' || step.type === 'approval'
+						? corexWaitEventType(params.runId, executionGeneration, startedSequence)
+						: undefined;
+				await workflow.do(`corex:step-started:${traversalIndex}`, async () =>
 					recordEvent(
 						event({
-							sequence,
-							status: 'errored',
-							eventType: 'run_failed',
-							stepName: currentStep!.name,
-							payload: { message: currentStep!.config.message },
-							error: { code: currentStep!.config.code, stepId: currentStep!.id }
+							sequence: startedSequence,
+							status:
+								step.type === 'wait' ||
+								step.type === 'wait-until' ||
+								step.type === 'wait-event' ||
+								step.type === 'approval' ||
+								step.type === 'invoke-process'
+									? 'waiting'
+									: 'running',
+							eventType: 'step_started',
+							stepName: step.name,
+							payload: {
+								stepId: step.id,
+								stepType: step.type,
+								...(step.type === 'wait-event'
+									? { eventType: step.config.eventType, waitEventType }
+									: {}),
+								...(step.type === 'approval'
+									? {
+											assigneeUserId: step.config.assigneeUserId,
+											timeoutMs: step.config.timeoutMs,
+											waitEventType
+										}
+									: {})
+							}
 						})
 					)
 				);
-				throw new CorexTerminalFailure(currentStep.config.message);
-			}
-			if (traversalIndex >= MAX_EXECUTION_TRAVERSALS)
-				throw new Error('Execution traversal exceeded the runtime safety limit.');
 
-			const step = currentStep;
-			const visit = nodeVisits.get(step.id) ?? 0;
-			nodeVisits.set(step.id, visit + 1);
-			const durableStepName = visit === 0 ? step.name : `${step.name}:visit-${visit}`;
-			const startedSequence = sequence++;
-			const waitEventType =
-				step.type === 'wait-event' || step.type === 'approval'
-					? corexWaitEventType(params.runId, executionGeneration, startedSequence)
-					: undefined;
-			await workflow.do(`corex:step-started:${traversalIndex}`, async () =>
-				recordEvent(
-					event({
-						sequence: startedSequence,
-						status:
-							step.type === 'wait' ||
-							step.type === 'wait-until' ||
-							step.type === 'wait-event' ||
-							step.type === 'approval' ||
-							step.type === 'invoke-process'
-								? 'waiting'
-								: 'running',
-						eventType: 'step_started',
-						stepName: step.name,
-						payload: {
-							stepId: step.id,
-							stepType: step.type,
-							...(step.type === 'wait-event'
-								? { eventType: step.config.eventType, waitEventType }
-								: {}),
-							...(step.type === 'approval'
-								? {
-										assigneeUserId: step.config.assigneeUserId,
-										timeoutMs: step.config.timeoutMs,
-										waitEventType
-									}
-								: {})
-						}
-					})
-				)
-			);
-
-			let nextNodeId: string;
-			let parallelBranches: string[] | undefined;
-			let parallelStarts: Array<{ id: string; index: number }> | undefined;
-			let parallelResolves: Array<{ id: string; index: number }> | undefined;
-				if (step.type === 'try') {
-					tryFrames.push({ step, phase: 'body' });
+				let nextNodeId: string;
+				let parallelBranches: string[] | undefined;
+				let parallelStarts: Array<{ id: string; index: number }> | undefined;
+				let parallelResolves: Array<{ id: string; index: number }> | undefined;
+				if (step.type === 'block') {
 					nextNodeId = step.bodyTarget;
-				} else if (step.type === 'parallel') {
-				const inputContext = context;
-				parallelStarts = step.config.branches.map((branch, index) => ({ id: branch.id, index }));
-				parallelResolves = [];
-				const runBranch = async (branch: { id: string }): Promise<unknown> => {
-					let branchContext = structuredClone(inputContext);
-					let branchNodeId = step.branchTargets[branch.id];
-					let branchTraversal = 0;
-					const branchLoopIterations = new Map<string, number>();
-					const branchNodeVisits = new Map<string, number>();
-					while (branchNodeId !== step.joinTarget) {
-						if (branchTraversal >= MAX_EXECUTION_TRAVERSALS)
-							throw new Error('Parallel branch traversal exceeded the runtime safety limit.');
-						const branchStep = nodesById.get(branchNodeId);
-						if (
-							!branchStep ||
-							branchStep.type === 'end-success' ||
-							branchStep.type === 'end-failure' ||
-							branchStep.type === 'parallel'
-						)
-							throw new Error(`Parallel branch "${branch.id}" has an invalid execution step.`);
-						const branchVisit = branchNodeVisits.get(branchStep.id) ?? 0;
-						branchNodeVisits.set(branchStep.id, branchVisit + 1);
-						const branchStepName = `${step.name}:parallel-${branch.id}:${branchStep.name}${
-							branchVisit === 0 ? '' : `:visit-${branchVisit}`
-						}`;
-						const branchAttemptIdentity = {
-							runId: params.runId,
-							ownerUserId: params.ownerUserId,
-							executionGeneration,
-							stepId: branchStep.id,
-							visit: branchVisit,
-							durableStepName: branchStepName
-						};
-
-						if (branchStep.type === 'http-request') {
-							const actionInput = structuredClone(branchContext);
-							const result = await workflow.do(
-								branchStepName,
-								{
-									retries: {
-										limit: branchStep.config.retry.limit,
-										delay: 1_000,
-										backoff: branchStep.config.retry.backoff
-									},
-									timeout: branchStep.config.timeoutMs
-								},
-								async (stepContext) =>
-									executeRecordedHttpAction(
-										() => executeHttpAction(branchStep, branchContext, fetcher),
-										{
-											runId: params.runId,
-											ownerUserId: params.ownerUserId,
-											executionGeneration,
-											stepId: branchStep.id,
-											visit: branchVisit,
-											durableStepName: branchStepName
-										},
-										stepContext,
-										{
-											limit: branchStep.config.retry.limit,
-											backoff: branchStep.config.retry.backoff,
-											timeoutMs: branchStep.config.timeoutMs
-										},
-										recordAttempt,
-										branchStep.config.outputPolicy
-									),
-								createHttpRollbackOptions(branchStep, actionInput, fetcher, {
-									runId: params.runId,
-									ownerUserId: params.ownerUserId,
-									executionGeneration,
-									visit: branchVisit,
-									durableStepName: branchStepName,
-									recordAttempt
-								})
-							);
-							branchContext = result.body;
-							branchNodeId = branchStep.next;
-						} else if (branchStep.type === 'transform') {
-							const actionInput = structuredClone(branchContext);
-							branchContext = await workflow.do(
-								branchStepName,
-								{},
-								async (stepContext) => executeRecordedTransform(
-									() => applyTransform(branchStep, branchContext),
-									branchAttemptIdentity,
-									stepContext,
-									recordAttempt,
-									'forward',
-									branchStep.config.outputPolicy
-								),
-								createTransformRollbackOptions(branchStep, actionInput, {
-									...branchAttemptIdentity,
-									recordAttempt
-								})
-							);
-							branchNodeId = branchStep.next;
-						} else if (branchStep.type === 'wait') {
-							await executeRecordedDurableWait(
-								() =>
-									workflow.sleep(
-										branchStepName,
-										`${branchStep.config.durationMs} milliseconds`
-									),
-								branchAttemptIdentity,
-								recordAttempt
-							);
-							branchNodeId = branchStep.next;
-						} else if (branchStep.type === 'wait-until') {
-							await executeRecordedDurableWait(
-								() =>
-									workflow.sleepUntil(
-										branchStepName,
-										new Date(branchStep.config.timestamp)
-									),
-								branchAttemptIdentity,
-								recordAttempt
-							);
-							branchNodeId = branchStep.next;
-						} else if (branchStep.type === 'invoke-process') {
-							if (!startSubprocess) throw new Error('Subprocess execution is unavailable.');
-							const result = await executeSubprocess(
-								branchStep,
-								branchContext,
-								branchAttemptIdentity,
-								{ runId: params.runId, ownerUserId: params.ownerUserId },
-								workflow,
-								startSubprocess,
-								terminateSubprocess,
-								fetcher,
-								recordAttempt
-							);
-							branchContext = {
-								...(typeof branchContext === 'object' && branchContext !== null
-									? branchContext
-									: {}),
-								[branchStep.config.resultKey]: result.output
-							};
-							branchNodeId = branchStep.next;
-						} else if (branchStep.type === 'wait-event' || branchStep.type === 'approval') {
-							if (!registerActiveWait || !completeActiveWait)
-								throw new Error('Parallel durable wait registration is unavailable.');
-							if (branchStep.type === 'approval' && !registerActiveApproval)
-								throw new Error('Parallel approval registration is unavailable.');
-							const branchWaitEventType = corexBranchWaitEventType(
-								params.runId,
-								executionGeneration,
-								branchStep.id,
-								branchVisit
-							);
-							const activeWait = {
-								...branchAttemptIdentity,
-								eventType: branchStep.type === 'wait-event' ? branchStep.config.eventType : 'approval',
-								waitEventType: branchWaitEventType
-							};
-							await workflow.do(`${branchStepName}:register-wait`, async () =>
-								await (branchStep.type === 'approval'
-									? registerActiveApproval!({
-										...activeWait,
-										assigneeUserId: branchStep.config.assigneeUserId,
-										timeoutMs: branchStep.config.timeoutMs
-									})
-									: registerActiveWait(activeWait))
-							);
-							let received: { payload: unknown };
-							try {
-								received = await executeRecordedEventWait(
-									() =>
-										workflow.waitForEvent<unknown>(branchStepName, {
-											type: branchWaitEventType,
-											timeout: `${branchStep.config.timeoutMs} milliseconds`
-										}),
-									branchAttemptIdentity,
-									branchStep.config.timeoutMs,
-									branchStep.type === 'approval' ? 'approval_failed' : 'wait_event_failed',
-									recordAttempt
-								);
-							} finally {
-								await workflow.do(`${branchStepName}:complete-wait`, async () =>
-									await completeActiveWait(activeWait)
-								);
-							}
-							const payload = received.payload;
-							if (branchStep.type === 'approval') {
-								if (
-									typeof payload !== 'object' || payload === null ||
-									!['approved', 'rejected'].includes(String((payload as Record<string, unknown>).decision)) ||
-									typeof (payload as Record<string, unknown>).actorUserId !== 'string' ||
-									(typeof (payload as Record<string, unknown>).comment !== 'undefined' &&
-										typeof (payload as Record<string, unknown>).comment !== 'string')
-								) throw new Error('Approval event payload is invalid.');
-							}
-							branchContext = {
-								...(typeof branchContext === 'object' && branchContext !== null
-									? branchContext
-									: {}),
-								[branchStep.config.resultKey]: payload
-							};
-							branchNodeId = branchStep.type === 'approval'
-								? ((payload as Record<string, unknown>).decision === 'approved'
-									? branchStep.whenApproved ?? branchStep.next!
-									: branchStep.whenRejected ?? branchStep.next!)
-								: branchStep.next;
-						} else if (branchStep.type === 'condition') {
-							const matched = await workflow.do(branchStepName, async (stepContext) =>
-								executeRecordedDeterministicStep(
-									() => evaluateCondition(branchStep, branchContext),
-									branchAttemptIdentity,
-									stepContext,
-									recordAttempt
-								)
-							);
-							branchNodeId = matched ? branchStep.whenTrue : branchStep.whenFalse;
-						} else if (branchStep.type === 'switch') {
-							const selectedCase = await workflow.do(branchStepName, async (stepContext) =>
-								executeRecordedDeterministicStep(
-									() => selectSwitchCase(branchStep, branchContext),
-									branchAttemptIdentity,
-									stepContext,
-									recordAttempt
-								)
-							);
-							branchNodeId = selectedCase
-								? branchStep.targets[selectedCase]
-								: branchStep.defaultTarget;
-						} else if (branchStep.type === 'loop') {
-							const iteration = branchLoopIterations.get(branchStep.id) ?? 0;
-							const enterBody = await workflow.do(branchStepName, async (stepContext) =>
-								executeRecordedDeterministicStep(
-									() => iteration < branchStep.config.maxIterations,
-									branchAttemptIdentity,
-									stepContext,
-									recordAttempt
-								)
-							);
-							if (enterBody) branchLoopIterations.set(branchStep.id, iteration + 1);
-							branchNodeId = enterBody ? branchStep.bodyTarget : branchStep.exitTarget;
-						} else if (branchStep.type === 'break') {
-							await workflow.do(branchStepName, async (stepContext) =>
-								executeRecordedDeterministicStep(
-									() => undefined,
-									branchAttemptIdentity,
-									stepContext,
-									recordAttempt
-								)
-							);
-							branchNodeId = branchStep.exitTarget;
-						} else {
-							throw new Error(
-								`Parallel branch "${branch.id}" contains unsupported durable step "${branchStep.type}".`
-							);
-						}
-						branchTraversal += 1;
-					}
-					return branchContext;
-				};
-				const branchResults = await Promise.all(
-					step.config.branches.map((branch) =>
-						runBranch(branch).then((result) => {
-							parallelResolves!.push({ id: branch.id, index: parallelResolves!.length });
-							return result;
-						})
-					)
-				);
-				parallelBranches = step.config.branches.map((branch) => branch.id);
-				context = {
-					...(typeof inputContext === 'object' && inputContext !== null ? inputContext : {}),
-					[step.config.resultKey]: Object.fromEntries(
-						step.config.branches.map((branch, index) => [branch.id, branchResults[index]])
-					)
-				};
-				nextNodeId = step.continuationTarget;
-			} else if (step.type === 'http-request') {
-				const actionInput = structuredClone(context);
-				const result = await workflow.do(
-					durableStepName,
-					{
-						retries: {
-							limit: step.config.retry.limit,
-							delay: 1_000,
-							backoff: step.config.retry.backoff
-						},
-						timeout: step.config.timeoutMs
-					},
-					async (stepContext) =>
-						executeRecordedHttpAction(
-							() => executeHttpAction(step, context, fetcher),
+				} else if (step.type === 'local-call') {
+					if (localCallFrames.length >= MAX_LOCAL_CALL_DEPTH)
+						throw new Error(`Local function call depth exceeded ${MAX_LOCAL_CALL_DEPTH}.`);
+					await workflow.do(durableStepName, async (stepContext) =>
+						executeRecordedDeterministicStep(
+							() => undefined,
 							{
 								runId: params.runId,
 								ownerUserId: params.ownerUserId,
@@ -1505,274 +1487,849 @@ export async function executeCorexWorkflow(
 								durableStepName
 							},
 							stepContext,
-							{
-								limit: step.config.retry.limit,
-								backoff: step.config.retry.backoff,
-								timeoutMs: step.config.timeoutMs
-							},
-							recordAttempt,
-							step.config.outputPolicy
-						),
-					createHttpRollbackOptions(step, actionInput, fetcher, {
-						runId: params.runId,
-						ownerUserId: params.ownerUserId,
-						executionGeneration,
-						visit,
-						durableStepName,
-						recordAttempt
-					})
-				);
-				context = result.body;
-				nextNodeId = step.next;
-			} else if (step.type === 'transform') {
-				const actionInput = structuredClone(context);
-				context = await workflow.do(
-					durableStepName,
-					{},
-					async (stepContext) => executeRecordedTransform(
-						() => applyTransform(step, context),
-						{
-							runId: params.runId,
-							ownerUserId: params.ownerUserId,
-							executionGeneration,
-							stepId: step.id,
-							visit,
-							durableStepName
-						},
-						stepContext,
-						recordAttempt,
-						'forward',
-						step.config.outputPolicy
-					),
-					createTransformRollbackOptions(step, actionInput, {
-						runId: params.runId,
-						ownerUserId: params.ownerUserId,
-						executionGeneration,
-						visit,
-						durableStepName,
-						recordAttempt
-					})
-				);
-				nextNodeId = step.next;
-			} else if (step.type === 'condition') {
-				const matched = await workflow.do(durableStepName, async (stepContext) =>
-					executeRecordedDeterministicStep(
-						() => evaluateCondition(step, context),
-						{
-							runId: params.runId,
-							ownerUserId: params.ownerUserId,
-							executionGeneration,
-							stepId: step.id,
-							visit,
-							durableStepName
-						},
-						stepContext,
-						recordAttempt
-					)
-				);
-				nextNodeId = matched ? step.whenTrue : step.whenFalse;
-			} else if (step.type === 'switch') {
-				const selectedCase = await workflow.do(durableStepName, async (stepContext) =>
-					executeRecordedDeterministicStep(
-						() => selectSwitchCase(step, context),
-						{
-							runId: params.runId,
-							ownerUserId: params.ownerUserId,
-							executionGeneration,
-							stepId: step.id,
-							visit,
-							durableStepName
-						},
-						stepContext,
-						recordAttempt
-					)
-				);
-				nextNodeId = selectedCase ? step.targets[selectedCase] : step.defaultTarget;
-			} else if (step.type === 'loop') {
-				const iteration = loopIterations.get(step.id) ?? 0;
-				const enterBody = await workflow.do(durableStepName, async (stepContext) =>
-					executeRecordedDeterministicStep(
-						() => iteration < step.config.maxIterations,
-						{
-							runId: params.runId,
-							ownerUserId: params.ownerUserId,
-							executionGeneration,
-							stepId: step.id,
-							visit,
-							durableStepName
-						},
-						stepContext,
-						recordAttempt
-					)
-				);
-				if (enterBody) loopIterations.set(step.id, iteration + 1);
-				nextNodeId = enterBody ? step.bodyTarget : step.exitTarget;
-			} else if (step.type === 'break') {
-				await workflow.do(durableStepName, async (stepContext) =>
-					executeRecordedDeterministicStep(
-						() => undefined,
-						{
-							runId: params.runId,
-							ownerUserId: params.ownerUserId,
-							executionGeneration,
-							stepId: step.id,
-							visit,
-							durableStepName
-						},
-						stepContext,
-						recordAttempt
-					)
-				);
-				nextNodeId = step.exitTarget;
-			} else if (step.type === 'wait') {
-				await executeRecordedDurableWait(
-					() => workflow.sleep(durableStepName, `${step.config.durationMs} milliseconds`),
-					{
-						runId: params.runId,
-						ownerUserId: params.ownerUserId,
-						executionGeneration,
-						stepId: step.id,
-						visit,
-						durableStepName
-					},
-					recordAttempt
-				);
-				nextNodeId = step.next;
-			} else if (step.type === 'wait-until') {
-				await executeRecordedDurableWait(
-					() => workflow.sleepUntil(durableStepName, new Date(step.config.timestamp)),
-					{
-						runId: params.runId,
-						ownerUserId: params.ownerUserId,
-						executionGeneration,
-						stepId: step.id,
-						visit,
-						durableStepName
-					},
-					recordAttempt
-				);
-				nextNodeId = step.next;
-			} else if (step.type === 'wait-event') {
-				const received = await executeRecordedEventWait(
-					() =>
-						workflow.waitForEvent<unknown>(durableStepName, {
-							type: waitEventType!,
-							timeout: `${step.config.timeoutMs} milliseconds`
-						}),
-					{
-						runId: params.runId,
-						ownerUserId: params.ownerUserId,
-						executionGeneration,
-						stepId: step.id,
-						visit,
-						durableStepName
-					},
-					step.config.timeoutMs,
-					'wait_event_failed',
-					recordAttempt
-				);
-				context = {
-					...(typeof context === 'object' && context !== null ? context : {}),
-					[step.config.resultKey]: received.payload
-				};
-				nextNodeId = step.next;
-			} else if (step.type === 'invoke-process') {
-				if (!startSubprocess) throw new Error('Subprocess execution is unavailable.');
-				const result = await executeSubprocess(
-					step,
-					context,
-					{
-						runId: params.runId,
-						ownerUserId: params.ownerUserId,
-						executionGeneration,
-						stepId: step.id,
-						visit,
-						durableStepName
-					},
-					{ runId: params.runId, ownerUserId: params.ownerUserId },
-					workflow,
-					startSubprocess,
-					terminateSubprocess,
-					fetcher,
-					recordAttempt
-				);
-				context = {
-					...(typeof context === 'object' && context !== null ? context : {}),
-					[step.config.resultKey]: result.output
-				};
-				nextNodeId = step.next;
-			} else {
-				const { approval, approvalNextNodeId } = await executeRecordedEventWait(
-					async () => {
-						const received = await workflow.waitForEvent<unknown>(durableStepName, {
-							type: waitEventType!,
-							timeout: `${step.config.timeoutMs} milliseconds`
-						});
-						const approval = received.payload;
-						if (
-							typeof approval !== 'object' ||
-							approval === null ||
-							!['approved', 'rejected'].includes(
-								String((approval as Record<string, unknown>).decision)
-							) ||
-							typeof (approval as Record<string, unknown>).actorUserId !== 'string' ||
-							(typeof (approval as Record<string, unknown>).comment !== 'undefined' &&
-								typeof (approval as Record<string, unknown>).comment !== 'string')
+							recordAttempt
 						)
-							throw new Error('Approval event payload is invalid.');
-						const decision = (approval as Record<string, unknown>).decision;
-						const approvalNextNodeId =
-							decision === 'approved'
-								? (step.whenApproved ?? step.next ?? '')
-								: (step.whenRejected ?? step.next ?? '');
-						if (!approvalNextNodeId)
-							throw new Error(`Approval step "${step.id}" has no ${decision} transition.`);
-						return { approval, approvalNextNodeId };
-					},
-					{
-						runId: params.runId,
-						ownerUserId: params.ownerUserId,
-						executionGeneration,
-						stepId: step.id,
-						visit,
-						durableStepName
-					},
-					step.config.timeoutMs,
-					'approval_failed',
-					recordAttempt
-				);
-				context = {
-					...(typeof context === 'object' && context !== null ? context : {}),
-					[step.config.resultKey]: approval
-				};
-				nextNodeId = approvalNextNodeId;
-			}
+					);
+					localCallFrames.push({
+						returnTarget: step.returnTarget,
+						next: step.next,
+						resultKey: step.config.resultKey,
+						callerContext: context
+					});
+					context = resolveJsonPath(step.config.inputPath, context);
+					nextNodeId = step.bodyTarget;
+				} else if (step.type === 'try') {
+					tryFrames.push({ step, phase: 'body' });
+					nextNodeId = step.bodyTarget;
+				} else if (step.type === 'parallel') {
+					const inputContext = context;
+					parallelStarts = step.config.branches.map((branch, index) => ({ id: branch.id, index }));
+					parallelResolves = [];
+					const runBranch = async (
+						parallelStep: CorexParallelStep,
+						branch: { id: string },
+						branchInput: unknown,
+						parentPath: Array<{ parallelName: string; branchId: string }>
+					): Promise<unknown> => {
+						let branchContext = structuredClone(branchInput);
+						let branchNodeId = parallelStep.branchTargets[branch.id];
+						const branchPath = [
+							...parentPath,
+							{ parallelName: parallelStep.name, branchId: branch.id }
+						];
+						let branchTraversal = 0;
+						const branchLoopIterations = new Map<string, number>();
+						const branchNodeVisits = new Map<string, number>();
+						const branchLocalCallFrames: Array<{
+							returnTarget: string;
+							next: string;
+							resultKey: string;
+							callerContext: unknown;
+						}> = [];
+						while (branchNodeId !== parallelStep.joinTarget) {
+							if (branchTraversal >= MAX_EXECUTION_TRAVERSALS)
+								throw new Error('Parallel branch traversal exceeded the runtime safety limit.');
+							const localCallFrame = branchLocalCallFrames.at(-1);
+							if (localCallFrame?.returnTarget === branchNodeId) {
+								branchLocalCallFrames.pop();
+								branchContext = {
+									...(typeof localCallFrame.callerContext === 'object' &&
+									localCallFrame.callerContext !== null
+										? localCallFrame.callerContext
+										: {}),
+									[localCallFrame.resultKey]: branchContext
+								};
+								branchNodeId = localCallFrame.next;
+								continue;
+							}
+							const branchStep = nodesById.get(branchNodeId);
+							if (
+								!branchStep ||
+								branchStep.type === 'end-success' ||
+								branchStep.type === 'end-failure'
+							)
+								throw new Error(`Parallel branch "${branch.id}" has an invalid execution step.`);
+							const branchVisit = branchNodeVisits.get(branchStep.id) ?? 0;
+							branchNodeVisits.set(branchStep.id, branchVisit + 1);
+							const branchStepName = await corexParallelBranchStepName(
+								branchPath,
+								branchStep.name,
+								branchVisit
+							);
+							const branchAttemptIdentity = {
+								runId: params.runId,
+								ownerUserId: params.ownerUserId,
+								executionGeneration,
+								stepId: branchStep.id,
+								visit: branchVisit,
+								durableStepName: branchStepName
+							};
 
-			const completedSequence = sequence++;
-			await workflow.do(`corex:step-completed:${traversalIndex}`, async () =>
-				recordEvent(
-					event({
-						sequence: completedSequence,
-						status: 'running',
-						eventType: 'step_completed',
-						stepName: step.name,
-						payload: {
-							stepId: step.id,
-							nextNodeId,
-							...(parallelBranches
-								? {
-										branches: parallelBranches,
-										starts: parallelStarts,
-										resolves: parallelResolves
-									}
-								: {}),
-							...(step.type === 'approval'
-								? { decision: (context as Record<string, unknown>)[step.config.resultKey] }
-								: {})
+							if (branchStep.type === 'parallel') {
+								const nestedResults = await Promise.all(
+									branchStep.config.branches.map((nestedBranch) =>
+										runBranch(branchStep, nestedBranch, branchContext, branchPath)
+									)
+								);
+								branchContext = {
+									...(typeof branchContext === 'object' && branchContext !== null
+										? branchContext
+										: {}),
+									[branchStep.config.resultKey]: Object.fromEntries(
+										branchStep.config.branches.map((nestedBranch, index) => [
+											nestedBranch.id,
+											nestedResults[index]
+										])
+									)
+								};
+								branchNodeId = branchStep.continuationTarget;
+							} else if (branchStep.type === 'block') {
+								branchNodeId = branchStep.bodyTarget;
+							} else if (branchStep.type === 'local-call') {
+								if (branchLocalCallFrames.length >= MAX_LOCAL_CALL_DEPTH)
+									throw new Error(`Local function call depth exceeded ${MAX_LOCAL_CALL_DEPTH}.`);
+								await workflow.do(branchStepName, async (stepContext) =>
+									executeRecordedDeterministicStep(
+										() => undefined,
+										branchAttemptIdentity,
+										stepContext,
+										recordAttempt
+									)
+								);
+								branchLocalCallFrames.push({
+									returnTarget: branchStep.returnTarget,
+									next: branchStep.next,
+									resultKey: branchStep.config.resultKey,
+									callerContext: branchContext
+								});
+								branchContext = resolveJsonPath(branchStep.config.inputPath, branchContext);
+								branchNodeId = branchStep.bodyTarget;
+							} else if (branchStep.type === 'http-request') {
+								const actionInput = structuredClone(branchContext);
+								const result = await workflow.do(
+									branchStepName,
+									{
+										retries: {
+											limit: branchStep.config.retry.limit,
+											delay: 1_000,
+											backoff: branchStep.config.retry.backoff
+										},
+										timeout: branchStep.config.timeoutMs
+									},
+									async (stepContext) =>
+										executeRecordedHttpAction(
+											() => executeHttpAction(branchStep, branchContext, fetcher),
+											{
+												runId: params.runId,
+												ownerUserId: params.ownerUserId,
+												executionGeneration,
+												stepId: branchStep.id,
+												visit: branchVisit,
+												durableStepName: branchStepName
+											},
+											stepContext,
+											{
+												limit: branchStep.config.retry.limit,
+												backoff: branchStep.config.retry.backoff,
+												timeoutMs: branchStep.config.timeoutMs
+											},
+											recordAttempt,
+											branchStep.config.outputPolicy,
+											outputStore
+										),
+									createHttpRollbackOptions(branchStep, actionInput, fetcher, {
+										runId: params.runId,
+										ownerUserId: params.ownerUserId,
+										executionGeneration,
+										visit: branchVisit,
+										durableStepName: branchStepName,
+										recordAttempt
+									})
+								);
+								branchContext = result.body;
+								branchNodeId = branchStep.next;
+							} else if (branchStep.type === 'transform') {
+								const actionInput = structuredClone(branchContext);
+								branchContext = await workflow.do(
+									branchStepName,
+									{},
+									async (stepContext) =>
+										executeRecordedTransform(
+											() => applyTransform(branchStep, branchContext),
+											branchAttemptIdentity,
+											stepContext,
+											recordAttempt,
+											'forward',
+											branchStep.config.outputPolicy,
+											outputStore
+										),
+									branchStep.compensation?.type === 'http-request'
+										? createHttpRollbackOptions(branchStep, actionInput, fetcher, {
+												...branchAttemptIdentity,
+												recordAttempt
+											})
+										: createTransformRollbackOptions(branchStep, actionInput, {
+												...branchAttemptIdentity,
+												recordAttempt
+											})
+								);
+								branchNodeId = branchStep.next;
+							} else if (branchStep.type === 'wait') {
+								const actionInput = structuredClone(branchContext);
+								await executeRecordedDurableWait(
+									() =>
+										workflow.sleep(branchStepName, `${branchStep.config.durationMs} milliseconds`),
+									branchAttemptIdentity,
+									recordAttempt
+								);
+								if (branchStep.compensation) {
+									await workflow.do(
+										`${branchStepName}:completed`,
+										{},
+										async () => undefined,
+										branchStep.compensation.type === 'http-request'
+											? createHttpRollbackOptions(branchStep, actionInput, fetcher, {
+													...branchAttemptIdentity,
+													recordAttempt
+												})
+											: createTransformRollbackOptions(branchStep, actionInput, {
+													...branchAttemptIdentity,
+													recordAttempt
+												})
+									);
+								}
+								branchNodeId = branchStep.next;
+							} else if (branchStep.type === 'wait-until') {
+								const actionInput = structuredClone(branchContext);
+								await executeRecordedDurableWait(
+									() => workflow.sleepUntil(branchStepName, new Date(branchStep.config.timestamp)),
+									branchAttemptIdentity,
+									recordAttempt
+								);
+								if (branchStep.compensation) {
+									await workflow.do(
+										`${branchStepName}:completed`,
+										{},
+										async () => undefined,
+										branchStep.compensation.type === 'http-request'
+											? createHttpRollbackOptions(branchStep, actionInput, fetcher, {
+													...branchAttemptIdentity,
+													recordAttempt
+												})
+											: createTransformRollbackOptions(branchStep, actionInput, {
+													...branchAttemptIdentity,
+													recordAttempt
+												})
+									);
+								}
+								branchNodeId = branchStep.next;
+							} else if (branchStep.type === 'invoke-process') {
+								if (!startSubprocess) throw new Error('Subprocess execution is unavailable.');
+								const result = await executeSubprocess(
+									branchStep,
+									branchContext,
+									branchAttemptIdentity,
+									{ runId: params.runId, ownerUserId: params.ownerUserId },
+									workflow,
+									startSubprocess,
+									terminateSubprocess,
+									fetcher,
+									recordAttempt,
+									outputStore
+								);
+								branchContext = {
+									...(typeof branchContext === 'object' && branchContext !== null
+										? branchContext
+										: {}),
+									[branchStep.config.resultKey]: result.output
+								};
+								branchNodeId = branchStep.next;
+							} else if (branchStep.type === 'wait-event' || branchStep.type === 'approval') {
+								if (!registerActiveWait || !completeActiveWait)
+									throw new Error('Parallel durable wait registration is unavailable.');
+								if (branchStep.type === 'approval' && !registerActiveApproval)
+									throw new Error('Parallel approval registration is unavailable.');
+								const branchWaitEventType = corexBranchWaitEventType(
+									params.runId,
+									executionGeneration,
+									branchStep.id,
+									branchVisit
+								);
+								const actionInput = structuredClone(branchContext);
+								const activeWait = {
+									...branchAttemptIdentity,
+									eventType:
+										branchStep.type === 'wait-event' ? branchStep.config.eventType : 'approval',
+									waitEventType: branchWaitEventType
+								};
+								await workflow.do(
+									`${branchStepName}:register-wait`,
+									async () =>
+										await (branchStep.type === 'approval'
+											? registerActiveApproval!({
+													...activeWait,
+													assigneeUserId: branchStep.config.assigneeUserId,
+													timeoutMs: branchStep.config.timeoutMs
+												})
+											: registerActiveWait(activeWait))
+								);
+								let received: { payload: unknown };
+								try {
+									received = await executeRecordedEventWait(
+										async () => {
+											const result = await workflow.waitForEvent<unknown>(branchStepName, {
+												type: branchWaitEventType,
+												timeout: `${branchStep.config.timeoutMs} milliseconds`
+											});
+											if (branchStep.type === 'approval') validateApprovalPayload(result.payload);
+											return result;
+										},
+										branchAttemptIdentity,
+										branchStep.config.timeoutMs,
+										branchStep.type === 'approval' ? 'approval_failed' : 'wait_event_failed',
+										recordAttempt,
+										branchStep.config.outputPolicy
+											? (result) =>
+													describeRecordedTransformOutput(
+														result.payload,
+														branchStep.config.outputPolicy,
+														branchAttemptIdentity,
+														outputStore
+													)
+											: undefined
+									);
+								} finally {
+									await workflow.do(
+										`${branchStepName}:complete-wait`,
+										async () => await completeActiveWait(activeWait)
+									);
+								}
+								const payload = branchStep.compensation
+									? await workflow.do(
+											`${branchStepName}:completed`,
+											{},
+											async () => received.payload,
+											branchStep.compensation.type === 'http-request'
+												? createHttpRollbackOptions(branchStep, actionInput, fetcher, {
+														...branchAttemptIdentity,
+														recordAttempt
+													})
+												: createTransformRollbackOptions(branchStep, actionInput, {
+														...branchAttemptIdentity,
+														recordAttempt
+													})
+										)
+									: received.payload;
+								if (branchStep.type === 'approval') {
+									validateApprovalPayload(payload);
+								}
+								branchContext = {
+									...(typeof branchContext === 'object' && branchContext !== null
+										? branchContext
+										: {}),
+									[branchStep.config.resultKey]: payload
+								};
+								branchNodeId =
+									branchStep.type === 'approval'
+										? (payload as Record<string, unknown>).decision === 'approved'
+											? (branchStep.whenApproved ?? branchStep.next!)
+											: (branchStep.whenRejected ?? branchStep.next!)
+										: branchStep.next;
+							} else if (branchStep.type === 'condition') {
+								const matched = await workflow.do(branchStepName, async (stepContext) =>
+									executeRecordedDeterministicStep(
+										() => evaluateCondition(branchStep, branchContext),
+										branchAttemptIdentity,
+										stepContext,
+										recordAttempt
+									)
+								);
+								branchNodeId = matched ? branchStep.whenTrue : branchStep.whenFalse;
+							} else if (branchStep.type === 'switch') {
+								const selectedCase = await workflow.do(branchStepName, async (stepContext) =>
+									executeRecordedDeterministicStep(
+										() => selectSwitchCase(branchStep, branchContext),
+										branchAttemptIdentity,
+										stepContext,
+										recordAttempt
+									)
+								);
+								branchNodeId = selectedCase
+									? branchStep.targets[selectedCase]
+									: branchStep.defaultTarget;
+							} else if (branchStep.type === 'loop') {
+								const iteration = branchLoopIterations.get(branchStep.id) ?? 0;
+								const enterBody = await workflow.do(branchStepName, async (stepContext) =>
+									executeRecordedDeterministicStep(
+										() => iteration < branchStep.config.maxIterations,
+										branchAttemptIdentity,
+										stepContext,
+										recordAttempt
+									)
+								);
+								if (enterBody) branchLoopIterations.set(branchStep.id, iteration + 1);
+								branchNodeId = enterBody ? branchStep.bodyTarget : branchStep.exitTarget;
+							} else if (branchStep.type === 'break') {
+								await workflow.do(branchStepName, async (stepContext) =>
+									executeRecordedDeterministicStep(
+										() => undefined,
+										branchAttemptIdentity,
+										stepContext,
+										recordAttempt
+									)
+								);
+								branchNodeId = branchStep.exitTarget;
+							} else {
+								throw new Error(
+									`Parallel branch "${branch.id}" contains unsupported durable step "${branchStep.type}".`
+								);
+							}
+							branchTraversal += 1;
 						}
-					})
-				)
-			);
+						return branchContext;
+					};
+					const branchResults = await Promise.all(
+						step.config.branches.map((branch) =>
+							runBranch(step, branch, inputContext, []).then((result) => {
+								parallelResolves!.push({ id: branch.id, index: parallelResolves!.length });
+								return result;
+							})
+						)
+					);
+					parallelBranches = step.config.branches.map((branch) => branch.id);
+					context = {
+						...(typeof inputContext === 'object' && inputContext !== null ? inputContext : {}),
+						[step.config.resultKey]: Object.fromEntries(
+							step.config.branches.map((branch, index) => [branch.id, branchResults[index]])
+						)
+					};
+					nextNodeId = step.continuationTarget;
+				} else if (step.type === 'http-request') {
+					const actionInput = structuredClone(context);
+					const result = await workflow.do(
+						durableStepName,
+						{
+							retries: {
+								limit: step.config.retry.limit,
+								delay: 1_000,
+								backoff: step.config.retry.backoff
+							},
+							timeout: step.config.timeoutMs
+						},
+						async (stepContext) =>
+							executeRecordedHttpAction(
+								() => executeHttpAction(step, context, fetcher),
+								{
+									runId: params.runId,
+									ownerUserId: params.ownerUserId,
+									executionGeneration,
+									stepId: step.id,
+									visit,
+									durableStepName
+								},
+								stepContext,
+								{
+									limit: step.config.retry.limit,
+									backoff: step.config.retry.backoff,
+									timeoutMs: step.config.timeoutMs
+								},
+								recordAttempt,
+								step.config.outputPolicy,
+								outputStore
+							),
+						createHttpRollbackOptions(step, actionInput, fetcher, {
+							runId: params.runId,
+							ownerUserId: params.ownerUserId,
+							executionGeneration,
+							visit,
+							durableStepName,
+							recordAttempt
+						})
+					);
+					context = result.body;
+					nextNodeId = step.next;
+				} else if (step.type === 'transform') {
+					const actionInput = structuredClone(context);
+					context = await workflow.do(
+						durableStepName,
+						{},
+						async (stepContext) =>
+							executeRecordedTransform(
+								() => applyTransform(step, context),
+								{
+									runId: params.runId,
+									ownerUserId: params.ownerUserId,
+									executionGeneration,
+									stepId: step.id,
+									visit,
+									durableStepName
+								},
+								stepContext,
+								recordAttempt,
+								'forward',
+								step.config.outputPolicy,
+								outputStore
+							),
+						step.compensation?.type === 'http-request'
+							? createHttpRollbackOptions(step, actionInput, fetcher, {
+									runId: params.runId,
+									ownerUserId: params.ownerUserId,
+									executionGeneration,
+									visit,
+									durableStepName,
+									recordAttempt
+								})
+							: createTransformRollbackOptions(step, actionInput, {
+									runId: params.runId,
+									ownerUserId: params.ownerUserId,
+									executionGeneration,
+									visit,
+									durableStepName,
+									recordAttempt
+								})
+					);
+					nextNodeId = step.next;
+				} else if (step.type === 'condition') {
+					const matched = await workflow.do(durableStepName, async (stepContext) =>
+						executeRecordedDeterministicStep(
+							() => evaluateCondition(step, context),
+							{
+								runId: params.runId,
+								ownerUserId: params.ownerUserId,
+								executionGeneration,
+								stepId: step.id,
+								visit,
+								durableStepName
+							},
+							stepContext,
+							recordAttempt
+						)
+					);
+					nextNodeId = matched ? step.whenTrue : step.whenFalse;
+				} else if (step.type === 'switch') {
+					const selectedCase = await workflow.do(durableStepName, async (stepContext) =>
+						executeRecordedDeterministicStep(
+							() => selectSwitchCase(step, context),
+							{
+								runId: params.runId,
+								ownerUserId: params.ownerUserId,
+								executionGeneration,
+								stepId: step.id,
+								visit,
+								durableStepName
+							},
+							stepContext,
+							recordAttempt
+						)
+					);
+					nextNodeId = selectedCase ? step.targets[selectedCase] : step.defaultTarget;
+				} else if (step.type === 'loop') {
+					const iteration = loopIterations.get(step.id) ?? 0;
+					const enterBody = await workflow.do(durableStepName, async (stepContext) =>
+						executeRecordedDeterministicStep(
+							() => iteration < step.config.maxIterations,
+							{
+								runId: params.runId,
+								ownerUserId: params.ownerUserId,
+								executionGeneration,
+								stepId: step.id,
+								visit,
+								durableStepName
+							},
+							stepContext,
+							recordAttempt
+						)
+					);
+					if (enterBody) loopIterations.set(step.id, iteration + 1);
+					nextNodeId = enterBody ? step.bodyTarget : step.exitTarget;
+				} else if (step.type === 'break') {
+					await workflow.do(durableStepName, async (stepContext) =>
+						executeRecordedDeterministicStep(
+							() => undefined,
+							{
+								runId: params.runId,
+								ownerUserId: params.ownerUserId,
+								executionGeneration,
+								stepId: step.id,
+								visit,
+								durableStepName
+							},
+							stepContext,
+							recordAttempt
+						)
+					);
+					nextNodeId = step.exitTarget;
+				} else if (step.type === 'wait') {
+					const actionInput = structuredClone(context);
+					await executeRecordedDurableWait(
+						() => workflow.sleep(durableStepName, `${step.config.durationMs} milliseconds`),
+						{
+							runId: params.runId,
+							ownerUserId: params.ownerUserId,
+							executionGeneration,
+							stepId: step.id,
+							visit,
+							durableStepName
+						},
+						recordAttempt
+					);
+					if (step.compensation) {
+						await workflow.do(
+							`${durableStepName}:completed`,
+							{},
+							async () => undefined,
+							step.compensation.type === 'http-request'
+								? createHttpRollbackOptions(step, actionInput, fetcher, {
+										runId: params.runId,
+										ownerUserId: params.ownerUserId,
+										executionGeneration,
+										visit,
+										durableStepName,
+										recordAttempt
+									})
+								: createTransformRollbackOptions(step, actionInput, {
+										runId: params.runId,
+										ownerUserId: params.ownerUserId,
+										executionGeneration,
+										visit,
+										durableStepName,
+										recordAttempt
+									})
+						);
+					}
+					nextNodeId = step.next;
+				} else if (step.type === 'wait-until') {
+					const actionInput = structuredClone(context);
+					await executeRecordedDurableWait(
+						() => workflow.sleepUntil(durableStepName, new Date(step.config.timestamp)),
+						{
+							runId: params.runId,
+							ownerUserId: params.ownerUserId,
+							executionGeneration,
+							stepId: step.id,
+							visit,
+							durableStepName
+						},
+						recordAttempt
+					);
+					if (step.compensation) {
+						await workflow.do(
+							`${durableStepName}:completed`,
+							{},
+							async () => undefined,
+							step.compensation.type === 'http-request'
+								? createHttpRollbackOptions(step, actionInput, fetcher, {
+										runId: params.runId,
+										ownerUserId: params.ownerUserId,
+										executionGeneration,
+										visit,
+										durableStepName,
+										recordAttempt
+									})
+								: createTransformRollbackOptions(step, actionInput, {
+										runId: params.runId,
+										ownerUserId: params.ownerUserId,
+										executionGeneration,
+										visit,
+										durableStepName,
+										recordAttempt
+									})
+						);
+					}
+					nextNodeId = step.next;
+				} else if (step.type === 'wait-event') {
+					const actionInput = structuredClone(context);
+					const received = await executeRecordedEventWait(
+						() =>
+							workflow.waitForEvent<unknown>(durableStepName, {
+								type: waitEventType!,
+								timeout: `${step.config.timeoutMs} milliseconds`
+							}),
+						{
+							runId: params.runId,
+							ownerUserId: params.ownerUserId,
+							executionGeneration,
+							stepId: step.id,
+							visit,
+							durableStepName
+						},
+						step.config.timeoutMs,
+						'wait_event_failed',
+						recordAttempt,
+						(result) =>
+							step.config.outputPolicy
+								? describeRecordedTransformOutput(
+										result.payload,
+										step.config.outputPolicy,
+										{
+											runId: params.runId,
+											ownerUserId: params.ownerUserId,
+											executionGeneration,
+											stepId: step.id,
+											visit,
+											durableStepName
+										},
+										outputStore
+									)
+								: { type: 'redacted' }
+					);
+					const payload = step.compensation
+						? await workflow.do(
+								`${durableStepName}:completed`,
+								{},
+								async () => received.payload,
+								step.compensation.type === 'http-request'
+									? createHttpRollbackOptions(step, actionInput, fetcher, {
+											runId: params.runId,
+											ownerUserId: params.ownerUserId,
+											executionGeneration,
+											visit,
+											durableStepName,
+											recordAttempt
+										})
+									: createTransformRollbackOptions(step, actionInput, {
+											runId: params.runId,
+											ownerUserId: params.ownerUserId,
+											executionGeneration,
+											visit,
+											durableStepName,
+											recordAttempt
+										})
+							)
+						: received.payload;
+					context = {
+						...(typeof context === 'object' && context !== null ? context : {}),
+						[step.config.resultKey]: payload
+					};
+					nextNodeId = step.next;
+				} else if (step.type === 'invoke-process') {
+					if (!startSubprocess) throw new Error('Subprocess execution is unavailable.');
+					const result = await executeSubprocess(
+						step,
+						context,
+						{
+							runId: params.runId,
+							ownerUserId: params.ownerUserId,
+							executionGeneration,
+							stepId: step.id,
+							visit,
+							durableStepName
+						},
+						{ runId: params.runId, ownerUserId: params.ownerUserId },
+						workflow,
+						startSubprocess,
+						terminateSubprocess,
+						fetcher,
+						recordAttempt,
+						outputStore
+					);
+					context = {
+						...(typeof context === 'object' && context !== null ? context : {}),
+						[step.config.resultKey]: result.output
+					};
+					nextNodeId = step.next;
+				} else {
+					const actionInput = structuredClone(context);
+					const approvalResult = await executeRecordedEventWait(
+						async () => {
+							const received = await workflow.waitForEvent<unknown>(durableStepName, {
+								type: waitEventType!,
+								timeout: `${step.config.timeoutMs} milliseconds`
+							});
+							const approval = validateApprovalPayload(received.payload);
+							const decision = (approval as Record<string, unknown>).decision;
+							const approvalNextNodeId =
+								decision === 'approved'
+									? (step.whenApproved ?? step.next ?? '')
+									: (step.whenRejected ?? step.next ?? '');
+							if (!approvalNextNodeId)
+								throw new Error(`Approval step "${step.id}" has no ${decision} transition.`);
+							return { approval, approvalNextNodeId };
+						},
+						{
+							runId: params.runId,
+							ownerUserId: params.ownerUserId,
+							executionGeneration,
+							stepId: step.id,
+							visit,
+							durableStepName
+						},
+						step.config.timeoutMs,
+						'approval_failed',
+						recordAttempt,
+						(result) =>
+							step.config.outputPolicy
+								? describeRecordedTransformOutput(
+										result.approval,
+										step.config.outputPolicy,
+										{
+											runId: params.runId,
+											ownerUserId: params.ownerUserId,
+											executionGeneration,
+											stepId: step.id,
+											visit,
+											durableStepName
+										},
+										outputStore
+									)
+								: { type: 'redacted' }
+					);
+					const { approval, approvalNextNodeId } = step.compensation
+						? await workflow.do(
+								`${durableStepName}:completed`,
+								{},
+								async () => approvalResult,
+								step.compensation.type === 'http-request'
+									? createHttpRollbackOptions(step, actionInput, fetcher, {
+											runId: params.runId,
+											ownerUserId: params.ownerUserId,
+											executionGeneration,
+											visit,
+											durableStepName,
+											recordAttempt
+										})
+									: createTransformRollbackOptions(step, actionInput, {
+											runId: params.runId,
+											ownerUserId: params.ownerUserId,
+											executionGeneration,
+											visit,
+											durableStepName,
+											recordAttempt
+										})
+							)
+						: approvalResult;
+					context = {
+						...(typeof context === 'object' && context !== null ? context : {}),
+						[step.config.resultKey]: approval
+					};
+					nextNodeId = approvalNextNodeId;
+				}
+
+				const completedSequence = sequence++;
+				await workflow.do(`corex:step-completed:${traversalIndex}`, async () =>
+					recordEvent(
+						event({
+							sequence: completedSequence,
+							status: 'running',
+							eventType: 'step_completed',
+							stepName: step.name,
+							payload: {
+								stepId: step.id,
+								nextNodeId,
+								...(parallelBranches
+									? {
+											branches: parallelBranches,
+											starts: parallelStarts,
+											resolves: parallelResolves
+										}
+									: {}),
+								...(step.type === 'approval'
+									? { decision: (context as Record<string, unknown>)[step.config.resultKey] }
+									: {})
+							}
+						})
+					)
+				);
 				const tryFrame = tryFrames.at(-1);
 				if (tryFrame && nextNodeId === tryFrame.step.continuationTarget) {
 					if (tryFrame.phase !== 'finally' && tryFrame.step.finallyTarget) {
@@ -1788,12 +2345,12 @@ export async function executeCorexWorkflow(
 				} else if (tryFrame?.step.finallyTarget === nextNodeId) {
 					tryFrame.phase = 'finally';
 				}
-			currentNodeId = nextNodeId;
-			traversalIndex += 1;
-		}
+				currentNodeId = nextNodeId;
+				traversalIndex += 1;
+			}
 			break execution;
-	} catch (error) {
-		if (error instanceof CorexTerminalFailure) throw error;
+		} catch (error) {
+			if (error instanceof CorexTerminalFailure) throw error;
 			const errorStepId = failedStepId ?? currentStep?.id;
 			while (tryFrames.length > 0) {
 				const tryFrame = tryFrames.at(-1)!;
@@ -1812,19 +2369,19 @@ export async function executeCorexWorkflow(
 				}
 				tryFrames.pop();
 			}
-		await workflow.do('corex:run-failed', async () =>
-			recordEvent(
-				event({
-					sequence,
-					status: 'errored',
-					eventType: 'run_failed',
-					payload: {},
+			await workflow.do('corex:run-failed', async () =>
+				recordEvent(
+					event({
+						sequence,
+						status: 'errored',
+						eventType: 'run_failed',
+						payload: {},
 						error: { code: 'process_step_failed', stepId: errorStepId }
-				})
-			)
-		);
-		throw error;
-	}
+					})
+				)
+			);
+			throw error;
+		}
 	}
 
 	await workflow.do('corex:run-completed', async () =>

@@ -27,7 +27,9 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "npm run generate:processes && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"lint": "prettier --check . && eslint .",
+		"lint": "npm run lint:format && npm run lint:eslint",
+		"lint:format": "prettier --check .",
+		"lint:eslint": "eslint .",
 		"format": "prettier --write .",
 		"test:unit": "vitest run --passWithNoTests",
 		"test:invoice-db": "node scripts/invoice-db-scenarios.mjs",
@@ -71,6 +73,7 @@
 		"@lucide/svelte": "^1.34.0",
 		"@supabase/supabase-js": "^2.112.4",
 		"@xyflow/svelte": "^1.6.5",
+		"mermaid": "^11.17.2",
 		"webgl-fluid": "^0.4.0"
 	}
 }
