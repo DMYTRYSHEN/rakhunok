@@ -106,6 +106,9 @@
 	let memo = $state('');
 	let terminalId = $state('');
 	let allowTips = $state(true);
+	let allowLoyalty = $state(true);
+	let allowPromo = $state(true);
+	let allowRoundUp = $state(true);
 	let deliveryCity = $state('Київ');
 	let deliveryBranch = $state('Відділення №24');
 	let terminalDialogOpen = $state(false);
@@ -225,7 +228,14 @@
 					scenario === 'table'
 						? Number.parseInt(selectedTerminal?.code.match(/\d+/)?.[0] || '', 10) || undefined
 						: undefined,
-				terminalId: scenario === 'table' ? selectedTerminal?.id : undefined
+				terminalId: scenario === 'table' ? selectedTerminal?.id : undefined,
+				scenario_config: {
+					allow_loyalty: allowLoyalty,
+					allow_promo: allowPromo,
+					allow_roundup: allowRoundUp,
+					allow_tips: scenario === 'table' ? allowTips : false,
+					allow_split: scenario === 'table'
+				}
 			});
 			invoiceRules = { ...invoiceRules, nextNumber: invoiceRules.nextNumber + 1 };
 			saveInvoiceRules(invoiceRules);
@@ -522,6 +532,33 @@
 							class="w-full resize-none rounded-md border border-zinc-200 p-3 text-sm outline-none focus:border-blue-600"
 						></textarea>
 					</label>
+
+					<div class="sm:col-span-2 pt-2 border-t border-zinc-100">
+						<span class="mb-3 block text-xs font-bold uppercase tracking-wider text-zinc-500">Опції екрана платника (UX)</span>
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+							<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
+								<div>
+									<strong class="block text-xs font-semibold text-zinc-900">Картка лояльності</strong>
+									<span class="text-[11px] text-zinc-500">Сканер Apple Pass & бонуси</span>
+								</div>
+								<input type="checkbox" bind:checked={allowLoyalty} class="size-4.5 accent-blue-600 rounded" />
+							</label>
+							<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
+								<div>
+									<strong class="block text-xs font-semibold text-zinc-900">Промокод / знижка</strong>
+									<span class="text-[11px] text-zinc-500">Поле введення купона</span>
+								</div>
+								<input type="checkbox" bind:checked={allowPromo} class="size-4.5 accent-blue-600 rounded" />
+							</label>
+							<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
+								<div>
+									<strong class="block text-xs font-semibold text-zinc-900">Округлення на ЗСУ</strong>
+									<span class="text-[11px] text-zinc-500">Благодійний внесок решти</span>
+								</div>
+								<input type="checkbox" bind:checked={allowRoundUp} class="size-4.5 accent-blue-600 rounded" />
+							</label>
+						</div>
+					</div>
 				</div>
 			</section>
 		</div>

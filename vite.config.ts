@@ -70,6 +70,21 @@ export default defineConfig({
 			'/dashboard/api': {
 				target: 'http://localhost:8787',
 				rewrite: (path) => path.slice('/dashboard'.length)
+			},
+			'/pay': {
+				target: 'http://localhost:8787'
+			},
+			'/o': {
+				target: 'http://localhost:8787'
+			},
+			'/t': {
+				target: 'http://localhost:8787'
+			},
+			'/pos': {
+				target: 'http://localhost:8787'
+			},
+			'/tag': {
+				target: 'http://localhost:8787'
 			}
 		}
 	},

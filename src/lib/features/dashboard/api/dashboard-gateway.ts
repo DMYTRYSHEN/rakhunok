@@ -579,22 +579,105 @@ export function createDashboardGateway(
 		},
 
 		async createInvoice(input) {
-			const response = await workerRequest('/api/v1/orders', {
-				method: 'POST',
-				body: JSON.stringify({
-					type: input.type,
-					order_number: input.reference,
-					title: input.title,
-					description: input.description,
-					amount: input.amount,
-					delivery_fee: input.deliveryFee ?? 0,
-					table_number: input.tableNumber,
-					terminal_id: input.terminalId
-				})
-			});
-			const payload = (await response.json()) as { order?: { id?: string } };
-			if (!payload.order?.id) throw new Error('Worker не повернув створений рахунок.');
-			return { id: payload.order.id };
+			let orderId: string | null = null;
+			let workerError: unknown = null;
+			try {
+				const response = await workerRequest('/api/v1/orders', {
+					method: 'POST',
+					body: JSON.stringify({
+						type: input.type,
+						order_number: input.reference,
+						title: input.title,
+						description: input.description,
+						amount: input.amount,
+						delivery_fee: input.deliveryFee ?? 0,
+						table_number: input.tableNumber,
+						terminal_id: input.terminalId,
+						scenario_config: input.scenario_config
+					})
+				});
+				const payload = (await response.json().catch(() => null)) as { order?: { id?: string } } | null;
+				if (payload?.order?.id) orderId = payload.order.id;
+			} catch (err) {
+				workerError = err;
+				if (
+					err instanceof Error &&
+					err.message !== 'Запит не виконано.' &&
+					!err.message.includes('недоступне')
+				) {
+					throw err;
+				}
+			}
+
+			if (orderId) {
+				return { id: orderId };
+			}
+
+			// Fallback directly to Supabase client if Worker API is not reachable or returned 404
+			const userRes = client.auth?.getUser
+				? await client.auth.getUser().catch(() => ({ data: { user: null } }))
+				: { data: { user: null } };
+			const userId = userRes.data?.user?.id;
+			if (!userId) {
+				if (workerError) throw workerError;
+				throw new Error('Користувач не авторизований.');
+			}
+
+			const merchantRes = client.from
+				? await client
+						.from('merchants')
+						.select('id')
+						.eq('user_id', userId)
+						.maybeSingle<{ id: string }>()
+				: { data: null };
+
+			if (!merchantRes.data?.id) {
+				if (workerError) throw workerError;
+				throw new Error('Профіль мерчанта не знайдено.');
+			}
+			const merchantId = merchantRes.data.id;
+
+			const totalAmount = input.amount + (input.deliveryFee ?? 0);
+			const insertPayload: Record<string, unknown> = {
+				merchant_id: merchantId,
+				order_number: input.reference,
+				title: input.title,
+				description: input.description ?? null,
+				type: input.type,
+				base_amount: input.amount,
+				delivery_fee: input.deliveryFee ?? 0,
+				total_amount: totalAmount,
+				status: input.type === 'table' ? 'preparing' : 'pending',
+				table_number: input.tableNumber ?? null,
+				terminal_id: input.terminalId ?? null,
+				currency: 'UAH'
+			};
+			if (input.scenario_config) {
+				insertPayload.scenario_config = input.scenario_config;
+			}
+
+			const { data: inserted, error: insertErr } = await client
+				.from('orders')
+				.insert(insertPayload)
+				.select('id')
+				.single<{ id: string }>();
+
+			if (insertErr || !inserted?.id) {
+				if (insertErr && insertPayload.scenario_config) {
+					delete insertPayload.scenario_config;
+					const retryRes = await client
+						.from('orders')
+						.insert(insertPayload)
+						.select('id')
+						.single<{ id: string }>();
+					if (retryRes.data?.id) {
+						return { id: retryRes.data.id };
+					}
+				}
+				throw insertErr ? new Error(insertErr.message) : (workerError ?? new Error('Не вдалося створити рахунок.'));
+			}
+
+			return { id: inserted.id };
 		},
 
 		async cancelInvoice(invoiceId) {
@@ -787,7 +870,12 @@ export function createDashboardGateway(
 				.eq('id', invoiceId)
 				.maybeSingle<OrderRow>();
 
-			if (result.error) throw new Error('Не вдалося завантажити рахунок.');
+			if (result.error) {
+				if ((result.error as { code?: string }).code === '22P02') {
+					return null;
+				}
+				throw new Error('Не вдалося завантажити рахунок.');
+			}
 			return result.data ? mapInvoiceRecord(result.data) : null;
 		},
 

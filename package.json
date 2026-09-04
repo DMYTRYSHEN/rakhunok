@@ -5,7 +5,8 @@
 	"type": "module",
 	"workspaces": [
 		"apps/merchant-app",
-		"apps/checkout"
+		"apps/checkout",
+		"apps/pay"
 	],
 	"engines": {
 		"node": ">=22.13 <23 || >=24"
@@ -14,13 +15,17 @@
 		"dev": "vite dev",
 		"dev:worker": "npm --prefix worker run dev",
 		"dev:app": "npm --prefix apps/merchant-app run dev",
+		"dev:pay": "npm --prefix apps/pay run dev",
 		"dev:api": "npm --prefix ../core/worker run dev",
 		"build:app": "npm --prefix apps/merchant-app run build",
-		"build:checkout": "npm --prefix apps/checkout run build",
+		"build:checkout": "npm --prefix apps/pay run build",
+		"build:pay": "npm --prefix apps/pay run build",
 		"check:app": "npm --prefix apps/merchant-app run check",
-		"check:checkout": "npm --prefix apps/checkout run check",
+		"check:checkout": "npm --prefix apps/pay run check",
+		"check:pay": "npm --prefix apps/pay run check",
 		"test:app": "npm --prefix apps/merchant-app run test",
 		"test:checkout": "npm --prefix apps/checkout run test",
+		"test:pay": "npm --prefix apps/pay run test",
 		"generate:processes": "node --experimental-strip-types scripts/generate-process-manifest.ts",
 		"build": "npm run generate:processes && vite build && npm run build:docs",
 		"build:docs": "node scripts/copy-api-docs.mjs",

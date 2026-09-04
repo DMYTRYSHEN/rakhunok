@@ -41,7 +41,9 @@
 	let cancelError = $state<string | null>(null);
 	let shareLinks = $derived(getInvoiceShareLinks(invoice));
 	let cancellation = $derived(buildLegacyInvoiceCancellation(invoice));
-	let checkoutPath = $derived(shareLinks[0].path);
+	let checkoutPath = $derived(
+		shareLinks.find((l) => l.path.startsWith('/pay/'))?.path || shareLinks[0].path
+	);
 	let checkoutUrl = $derived(`${browser ? window.location.origin : ''}${checkoutPath}`);
 	let qrUrl = $derived(
 		`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(checkoutUrl)}`

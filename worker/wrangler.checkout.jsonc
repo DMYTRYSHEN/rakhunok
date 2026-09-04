@@ -7,10 +7,13 @@
 	"workers_dev": true,
 	"preview_urls": true,
 	"assets": {
-		"directory": "../apps/checkout/dist",
+		"directory": "../apps/pay/dist",
 		"binding": "ASSETS",
 		"run_worker_first": true
 	},
+	"kv_namespaces": [
+		{ "binding": "ORDERS_KV", "id": "0c5bedeab0064a54882319a5f810306c" }
+	],
 	"services": [
 		{ "binding": "API", "service": "rahunok" }
 	],
@@ -25,6 +28,9 @@
 			"preview_urls": false,
 			"services": [
 				{ "binding": "API", "service": "rahunok" }
+			],
+			"kv_namespaces": [
+				{ "binding": "ORDERS_KV", "id": "0c5bedeab0064a54882319a5f810306c" }
 			],
 			"routes": [
 				{ "pattern": "letsrealtalk.com/checkout*", "zone_name": "letsrealtalk.com" },

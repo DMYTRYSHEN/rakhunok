@@ -1,0 +1,121 @@
+{
+  "version": "1.0",
+  "defaultScenario": "fixed",
+  "scenarios": {
+    "fixed": {
+      "id": "fixed",
+      "name": "Фіксований рахунок",
+      "screen": "order",
+      "aliases": ["fixed", "invoice", "1"],
+      "requiresAmount": true,
+      "config": {
+        "showPromo": true,
+        "showBreakdown": true,
+        "promoDiscount": 4.0,
+        "ctaText": "Перейти до оплати"
+      }
+    },
+    "open_amount": {
+      "id": "open_amount",
+      "name": "Оплата на касі",
+      "screen": "amount",
+      "aliases": ["open_amount", "amount", "2"],
+      "requiresAmount": false,
+      "config": {
+        "hint": "Введіть суму до сплати",
+        "currency": "₴",
+        "ctaText": "Перейти до оплати",
+        "quickAmounts": [50, 100, 200, 500]
+      }
+    },
+    "table": {
+      "id": "table",
+      "name": "Рахунок за столиком",
+      "screen": "order",
+      "pendingScreen": "waiting",
+      "aliases": ["table", "3"],
+      "requiresAmount": true,
+      "config": {
+        "showTtlBar": true,
+        "defaultTtlMinutes": 30,
+        "waitingTitle": "Готуємо рахунок",
+        "waitingSub": "Сума з'явиться автоматично, щойно заклад додасть замовлення до столика.",
+        "waitingStatus": "Каса формує чек",
+        "waitingDetail": "Статус оновлюється автоматично",
+        "ctaText": "Перейти до оплати"
+      }
+    },
+    "delivery": {
+      "id": "delivery",
+      "name": "Замовлення з доставкою",
+      "screen": "delivery",
+      "aliases": ["delivery", "4"],
+      "requiresAmount": true,
+      "config": {
+        "provider": "nova_poshta",
+        "methods": [
+          {
+            "id": "branch",
+            "name": "У відділення",
+            "short": "Відділення",
+            "price": 70.0,
+            "eta": "1–2 дні",
+            "addrLabel": "Відділення",
+            "addrPh": "Відділення №1"
+          },
+          {
+            "id": "locker",
+            "name": "У поштомат",
+            "short": "Поштомат",
+            "price": 65.0,
+            "eta": "1–2 дні",
+            "addrLabel": "Поштомат",
+            "addrPh": "Поштомат №5231"
+          },
+          {
+            "id": "courier",
+            "name": "Кур'єром за адресою",
+            "short": "Кур'єр",
+            "price": 120.0,
+            "eta": "1–3 дні",
+            "addrLabel": "Адреса",
+            "addrPh": "вул. Хрещатик, 1, кв. 5"
+          }
+        ]
+      }
+    },
+    "profile": {
+      "id": "profile",
+      "name": "Профіль / Міні-сторінка",
+      "screen": "profile",
+      "aliases": ["profile", "mini", "slug", "krapka", "sofia", "student", "taxi", "bondar", "5"],
+      "requiresAmount": false,
+      "config": {
+        "ctaText": "Перейти до оплати"
+      }
+    },
+    "tips": {
+      "id": "tips",
+      "name": "Чайові офіціанту / кур'єру",
+      "screen": "tips",
+      "aliases": ["tips", "waiter", "tea", "gratuity", "alex_waiter"],
+      "requiresAmount": false,
+      "config": {
+        "ctaText": "Подякувати",
+        "quickAmounts": [20, 50, 100, 200],
+        "percentages": [10, 15, 20]
+      }
+    },
+    "donation": {
+      "id": "donation",
+      "name": "Волонтерський збір / Банка",
+      "screen": "donation",
+      "aliases": ["donation", "donate", "banc", "jar", "army"],
+      "requiresAmount": false,
+      "config": {
+        "ctaText": "Задонатити",
+        "quickAmounts": [100, 200, 500, 1000]
+      }
+    }
+  }
+}

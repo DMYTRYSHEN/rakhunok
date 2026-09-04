@@ -30,6 +30,14 @@ export type MerchantOnboardingInput = {
 	bankName: string;
 };
 
+export type ScenarioConfig = {
+	allow_loyalty?: boolean;
+	allow_promo?: boolean;
+	allow_tips?: boolean;
+	allow_roundup?: boolean;
+	allow_split?: boolean;
+};
+
 export type InvoiceCreateInput = {
 	type: PersistedInvoiceType;
 	reference: string;
@@ -39,6 +47,7 @@ export type InvoiceCreateInput = {
 	deliveryFee?: number;
 	tableNumber?: number;
 	terminalId?: string;
+	scenario_config?: ScenarioConfig;
 };
 
 export type InvoiceSummary = {

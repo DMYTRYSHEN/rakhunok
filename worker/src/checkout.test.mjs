@@ -103,3 +103,78 @@ test('follows the asset canonical redirect internally before hydration', async (
 	assert.equal(response.headers.get('X-Edge-Hydration'), 'HIT');
 	assert.deepEqual(calls.assets, ['/checkout/index.html', '/checkout/']);
 });
+
+test('hydrates /pay/ route with Early Hints Link header and initial order', async () => {
+	const order = { id: 'demo-sc1', total_amount: 1240.0, title: 'Замовлення Rozetka' };
+	const { env, calls } = createEnv(Response.json(order));
+	env.ASSETS.fetch = async (request) => {
+		const pathname = new URL(request.url).pathname;
+		calls.assets.push(pathname);
+		return new Response(
+			'<html><head><link rel="stylesheet" href="/pay/assets/index.css"></head><body><script src="/pay/assets/index.js"></script></body></html>',
+			{ headers: { 'Content-Type': 'text/html' } }
+		);
+	};
+
+	const response = await routeCheckoutRequest(
+		new Request('https://example.com/pay/?id=demo-sc1'),
+		env
+	);
+
+	assert.equal(response.status, 200);
+	assert.equal(response.headers.get('X-Edge-Hydration'), 'HIT');
+	const linkHeader = response.headers.get('Link');
+	assert.ok(linkHeader);
+	assert.ok(linkHeader.includes('</pay/assets/index.js>; rel=modulepreload; as=script'));
+	assert.ok(linkHeader.includes('</pay/assets/index.css>; rel=preload; as=style'));
+	const html = await response.text();
+	assert.ok(html.includes('window.__INITIAL_ORDER__='));
+	assert.ok(html.includes('Замовлення Rozetka'));
+});
+
+test('uses ORDERS_KV for sub-5ms edge cache HIT without calling backend API', async () => {
+	const order = { id: 'order-fast', total_amount: 500, title: 'Edge Fast Order' };
+	const { env, calls } = createEnv(new Response('', { status: 500 })); // API would fail
+	const kvStore = new Map([['order:order-fast', JSON.stringify(order)]]);
+	env.ORDERS_KV = {
+		async get(key, type) {
+			const val = kvStore.get(key);
+			if (!val) return null;
+			return type === 'json' ? JSON.parse(val) : val;
+		},
+		async put(key, value) {
+			kvStore.set(key, value);
+		}
+	};
+
+	const response = await routeCheckoutRequest(new Request('https://example.com/pay/order-fast'), env);
+	assert.equal(response.status, 200);
+	assert.equal(response.headers.get('X-Edge-Hydration'), 'HIT');
+	assert.equal(response.headers.get('X-Edge-Cache'), 'HIT');
+	assert.equal(calls.api.length, 0); // No API calls made!
+	const html = await response.text();
+	assert.ok(html.includes('Edge Fast Order'));
+});
+
+test('populates ORDERS_KV on cache MISS for subsequent ultra-fast requests', async () => {
+	const order = { id: 'order-populate', total_amount: 750, title: 'Populated Order' };
+	const { env, calls } = createEnv(Response.json(order));
+	const kvStore = new Map();
+	env.ORDERS_KV = {
+		async get(key, type) {
+			const val = kvStore.get(key);
+			if (!val) return null;
+			return type === 'json' ? JSON.parse(val) : val;
+		},
+		async put(key, value) {
+			kvStore.set(key, value);
+		}
+	};
+
+	const response = await routeCheckoutRequest(new Request('https://example.com/pay/order-populate'), env);
+	assert.equal(response.status, 200);
+	assert.equal(response.headers.get('X-Edge-Hydration'), 'HIT');
+	assert.equal(response.headers.get('X-Edge-Cache'), 'MISS');
+	assert.equal(calls.api.length, 1);
+	assert.ok(kvStore.has('order:order-populate'));
+});

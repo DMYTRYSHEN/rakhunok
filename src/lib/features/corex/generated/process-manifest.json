@@ -17,23 +17,128 @@
 					"source": "worker/src/index.ts"
 				},
 				{
-					"method": "ANY",
+					"method": "OPTIONS",
 					"path": "/",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
 				},
 				{
-					"method": "ANY",
+					"method": "POST",
+					"path": "/",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/checkout/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/checkout/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/orders",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/orders",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/orders",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/orders",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/checkout",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/checkout",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
 					"path": "/docs",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
 				},
 				{
-					"method": "ANY",
+					"method": "POST",
+					"path": "/docs",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
 					"path": "/docs/",
 					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/docs/",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/pay",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/pay",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/pay/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/pay/",
+					"match": "prefix",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
 				}
@@ -174,12 +279,26 @@
 			],
 			"bindings": [
 				{ "name": "API", "type": "service", "target": "rahunok" },
-				{ "name": "ASSETS", "type": "assets", "target": "../apps/checkout/dist" }
+				{ "name": "ASSETS", "type": "assets", "target": "../apps/pay/dist" }
 			],
 			"routes": [
 				{
 					"method": "ANY",
 					"path": "/checkout/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/checkout.js"
+				},
+				{
+					"method": "GET",
+					"path": "/pay",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/checkout.js"
+				},
+				{
+					"method": "ANY",
+					"path": "/pay/",
 					"match": "prefix",
 					"status": "implemented",
 					"source": "worker/src/checkout.js"

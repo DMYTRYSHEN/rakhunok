@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="color-scheme" content="dark light">
+    <meta name="theme-color" content="#0d0e13" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <title>Rahunok — App Clip Checkout</title>
+    <link rel="icon" type="image/svg+xml" href="./logo.svg">
+    <link rel="preload" href="./src/assets/fonts/manrope-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="./src/assets/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <style>
+        :root {
+            --font-stack: 'Manrope', system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            --sk-bg: #0d0e13;
+            --sk-card: rgba(255, 255, 255, 0.06);
+            --sk-bone: rgba(255, 255, 255, 0.1);
+            --sk-bone-hi: rgba(255, 255, 255, 0.18);
+        }
+        @media (prefers-color-scheme: light) {
+            :root {
+                --sk-bg: #f5f6f8;
+                --sk-card: rgba(0, 0, 0, 0.04);
+                --sk-bone: rgba(0, 0, 0, 0.08);
+                --sk-bone-hi: rgba(0, 0, 0, 0.14);
+            }
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--sk-bg);
+            font-family: var(--font-stack);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+            overflow-x: hidden;
+        }
+        #app {
+            min-height: 100vh;
+            min-height: 100dvh;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
