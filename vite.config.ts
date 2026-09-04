@@ -67,7 +67,10 @@ export default defineConfig({
 			allow: ['.']
 		},
 		proxy: {
-			'/api': 'http://localhost:8787'
+			'/dashboard/api': {
+				target: 'http://localhost:8787',
+				rewrite: (path) => path.slice('/dashboard'.length)
+			}
 		}
 	},
 	test: {

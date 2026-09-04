@@ -14,7 +14,7 @@
 		"dev": "vite dev",
 		"dev:worker": "npm --prefix worker run dev",
 		"dev:app": "npm --prefix apps/merchant-app run dev",
-		"dev:checkout": "npm --prefix apps/checkout run dev",
+		"dev:api": "npm --prefix ../core/worker run dev",
 		"build:app": "npm --prefix apps/merchant-app run build",
 		"build:checkout": "npm --prefix apps/checkout run build",
 		"check:app": "npm --prefix apps/merchant-app run check",

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { PosTerminal } from '../types';
 import { createPosDraft, type PosDraft } from './pos-drafts';
-import { buildLegacyPosOrderInsert, decideLegacyPosOrderCreation } from './pos-order-contract';
+import {
+	buildLegacyPosOrderInsert,
+	decideLegacyPosOrderCreation
+} from './pos-order-contract';
 
 const terminal: PosTerminal = {
 	id: 'terminal-1',
@@ -34,9 +37,50 @@ describe('legacy POS order contract', () => {
 				currency: 'UAH',
 				status: 'pending',
 				created_at: '2026-08-26T09:30:00.000Z',
+				expires_at: '2026-08-26T10:00:00.000Z',
 				terminal_id: 'terminal-1'
 			}
 		});
+	});
+
+	it('uses the configured TABLE TTL in seconds for the canonical expiry timestamp', () => {
+		const draft = { ...createPosDraft(), inputAmount: '100' };
+
+		expect(
+			buildLegacyPosOrderInsert(
+				'merchant-1',
+				terminal,
+				draft,
+				new Date('2026-08-26T09:30:00.000Z'),
+				7_200
+			)
+		).toMatchObject({
+			ok: true,
+			payload: { expires_at: '2026-08-26T11:30:00.000Z' }
+		});
+	});
+
+	it('uses five minutes for NFC tags and no expiry for KSO', () => {
+		const draft = { ...createPosDraft(), inputAmount: '100' };
+
+		expect(
+			buildLegacyPosOrderInsert(
+				'merchant-1',
+				{ ...terminal, type: 'nfc_tag' },
+				draft,
+				new Date('2026-08-26T09:30:00.000Z'),
+				7_200
+			)
+		).toMatchObject({ payload: { expires_at: '2026-08-26T09:35:00.000Z' } });
+		expect(
+			buildLegacyPosOrderInsert(
+				'merchant-1',
+				{ ...terminal, type: 'kasa' },
+				draft,
+				new Date('2026-08-26T09:30:00.000Z'),
+				7_200
+			)
+		).toMatchObject({ payload: { expires_at: null } });
 	});
 
 	it('rejects empty drafts before any write can be attempted', () => {
@@ -89,14 +133,16 @@ describe('legacy POS order contract', () => {
 				terminal,
 				draft,
 				[],
-				new Date('2026-08-26T09:30:00.000Z')
+				new Date('2026-08-26T09:30:00.000Z'),
+				3_600
 			)
 		).toMatchObject({
 			status: 'ready',
 			payload: {
 				merchant_id: 'merchant-1',
 				terminal_id: terminal.id,
-				total_amount: 100
+				total_amount: 100,
+				expires_at: '2026-08-26T10:30:00.000Z'
 			}
 		});
 	});

@@ -79,6 +79,9 @@ function createClient(options?: { merchantError?: Error; merchantMissing?: boole
 	const client = {
 		auth: {
 			getSession: vi.fn(async () => ({ data: { session }, error: null })),
+			onAuthStateChange: vi.fn(() => ({
+				data: { subscription: { unsubscribe: vi.fn() } }
+			})),
 			signInWithIdToken: vi.fn(async () => ({ data: { session }, error: null })),
 			signOut: vi.fn()
 		},
@@ -97,6 +100,30 @@ afterEach(() => {
 });
 
 describe('dashboard gateway', () => {
+	it('forwards relevant Supabase auth events and unsubscribes', () => {
+		const { client } = createClient();
+		const onChange = vi.fn();
+		const unsubscribe = vi.fn();
+		vi.mocked(client.auth.onAuthStateChange).mockImplementation((callback) => {
+			callback('INITIAL_SESSION', session);
+			callback('TOKEN_REFRESHED', session);
+			callback('SIGNED_IN', session);
+			callback('USER_UPDATED', session);
+			callback('SIGNED_OUT', null);
+			return { data: { subscription: { id: 'auth', callback, unsubscribe } } };
+		});
+
+		const stop = createDashboardGateway(client).subscribeAuthChanges(onChange);
+
+		expect(onChange.mock.calls.map(([event]) => event)).toEqual([
+			'signed-in',
+			'user-updated',
+			'signed-out'
+		]);
+		stop();
+		expect(unsubscribe).toHaveBeenCalledOnce();
+	});
+
 	it('persists only a hash when creating a merchant API key', async () => {
 		let insertedPayload: Record<string, unknown> | null = null;
 		const createdRow = {
@@ -273,7 +300,8 @@ describe('dashboard gateway', () => {
 				title: 'Оплата замовлення',
 				description: 'Київ, відділення 24',
 				amount: 100,
-				deliveryFee: 20
+				deliveryFee: 20,
+				terminalId: 'terminal-1'
 			})
 		).resolves.toEqual({ id: 'invoice-new' });
 		await gateway.cancelInvoice('invoice-new');
@@ -284,13 +312,45 @@ describe('dashboard gateway', () => {
 			'https://api.example.com/api/v1/orders',
 			expect.objectContaining({
 				method: 'POST',
-				body: expect.stringContaining('"delivery_fee":20')
+					body: expect.stringContaining('"terminal_id":"terminal-1"')
 			})
 		);
 		expect(fetcher).toHaveBeenNthCalledWith(
 			2,
 			'https://api.example.com/api/v1/orders/invoice-new',
 			expect.objectContaining({ method: 'PATCH', body: '{"status":"cancelled"}' })
+		);
+	});
+
+	it('loads and saves merchant settings through an owner-keyed row', async () => {
+		const filters: Array<[string, unknown]> = [];
+		const settingsQuery = {
+			select: vi.fn(() => settingsQuery),
+			eq: vi.fn((column: string, value: unknown) => {
+				filters.push([column, value]);
+				return settingsQuery;
+			}),
+			maybeSingle: vi.fn(async () => ({
+				data: { table_order_ttl_seconds: 7_200 },
+				error: null
+			})),
+			upsert: vi.fn(async () => ({ error: null }))
+		};
+		const client = {
+			auth: { getSession: vi.fn() },
+			from: vi.fn(() => settingsQuery)
+		} as unknown as SupabaseClient;
+		const gateway = createDashboardGateway(client);
+
+		await expect(gateway.getMerchantSettings('merchant-1')).resolves.toEqual({
+			tableOrderTtlSeconds: 7_200
+		});
+		await gateway.saveMerchantSettings('merchant-1', { tableOrderTtlSeconds: 18_000 });
+
+		expect(filters).toEqual([['merchant_id', 'merchant-1']]);
+		expect(settingsQuery.upsert).toHaveBeenCalledWith(
+			{ merchant_id: 'merchant-1', table_order_ttl_seconds: 18_000 },
+			{ onConflict: 'merchant_id' }
 		);
 	});
 
@@ -348,19 +408,21 @@ describe('dashboard gateway', () => {
 	});
 
 	it('writes each POS mutation once and scopes updates by immutable order ID', async () => {
-		const insert = vi.fn(async () => ({ error: null }));
-		const updateFilters: Array<[string, unknown]> = [];
-		const update = vi.fn(() => ({
-			eq: vi.fn(async (column: string, value: unknown) => {
-				updateFilters.push([column, value]);
-				return { error: null };
+		const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+			new Response(JSON.stringify({ success: true, order: { id: 'order-1' } }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
 			})
-		}));
+		);
 		const client = {
-			auth: { getSession: vi.fn() },
-			from: vi.fn(() => ({ insert, update }))
+			auth: {
+				getSession: vi.fn(async () => ({
+					data: { session: { ...session, access_token: 'access-token' } },
+					error: null
+				}))
+			}
 		} as unknown as SupabaseClient;
-		const gateway = createDashboardGateway(client);
+		const gateway = createDashboardGateway(client, { fetcher });
 		const payload = {
 			merchant_id: 'merchant-1',
 			type: 'table' as const,
@@ -371,6 +433,7 @@ describe('dashboard gateway', () => {
 			currency: 'UAH' as const,
 			status: 'pending' as const,
 			created_at: '2026-08-26T00:00:00.000Z',
+			expires_at: '2026-08-26T00:30:00.000Z',
 			terminal_id: 'terminal-1'
 		};
 
@@ -378,13 +441,15 @@ describe('dashboard gateway', () => {
 		await gateway.markPosOrderPaid('order-1');
 		await gateway.cancelPosOrder('order-2');
 
-		expect(insert).toHaveBeenCalledTimes(1);
-		expect(insert).toHaveBeenCalledWith(payload);
-		expect(update).toHaveBeenCalledTimes(2);
-		expect(updateFilters).toEqual([
-			['id', 'order-1'],
-			['id', 'order-2']
-		]);
+		expect(fetcher).toHaveBeenCalledTimes(3);
+		expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/orders');
+		expect(fetcher.mock.calls[0]?.[1]?.body).toContain('"status":"pending"');
+		expect(fetcher.mock.calls[0]?.[1]?.body).toContain('"terminal_id":"terminal-1"');
+		expect(fetcher.mock.calls[0]?.[1]?.body).toContain('"expires_at":"2026-08-26T00:30:00.000Z"');
+		expect(fetcher.mock.calls[1]?.[0]).toBe('/api/v1/orders/order-1');
+		expect(fetcher.mock.calls[1]?.[1]?.body).toContain('"paid_bank_code":"CASH"');
+		expect(fetcher.mock.calls[2]?.[0]).toBe('/api/v1/orders/order-2');
+		expect(fetcher.mock.calls[2]?.[1]?.body).toBe('{"status":"cancelled"}');
 	});
 
 	it('writes each structure mutation once and scopes deletes by user and immutable ID', async () => {

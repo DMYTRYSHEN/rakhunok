@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { ArrowUpRight, CircleAlert, Plus } from '@lucide/svelte';
+	import { CircleAlert, Plus } from '@lucide/svelte';
 	import type { OverviewSnapshot } from '../types';
 	import MetricCard from '../components/MetricCard.svelte';
 	import RecentInvoices from '../components/RecentInvoices.svelte';
@@ -15,23 +15,13 @@
 			<h1 class="mt-2 text-2xl font-semibold text-zinc-950 sm:text-3xl">Фінансовий огляд</h1>
 			<p class="mt-2 text-sm text-zinc-500">Платежі та операційний стан бізнесу сьогодні.</p>
 		</div>
-		<div class="flex gap-2">
-			<button
-				type="button"
-				disabled
-				class="inline-flex h-10 items-center gap-2 rounded-md border border-zinc-200 bg-white px-4 text-sm font-bold text-zinc-400"
-			>
-				<ArrowUpRight size={16} aria-hidden="true" />
-				Експорт
-			</button>
-			<a
-				href={resolve(demo ? '/dashboard/invoices/new?demo=1' : '/dashboard/invoices/new')}
-				class="inline-flex h-10 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
-			>
-				<Plus size={16} aria-hidden="true" />
-				Новий рахунок
-			</a>
-		</div>
+		<a
+			href={resolve(demo ? '/dashboard/invoices/new?demo=1' : '/dashboard/invoices/new')}
+			class="inline-flex h-10 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
+		>
+			<Plus size={16} aria-hidden="true" />
+			Новий рахунок
+		</a>
 	</section>
 
 	{#if demo}

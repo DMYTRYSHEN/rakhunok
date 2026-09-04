@@ -1,3 +1,10 @@
+<script module lang="ts">
+	import type { DashboardSessionState } from './types';
+
+	let cachedSessionState: Extract<DashboardSessionState, { status: 'ready' }> | null = null;
+	let cachedTableOrderTtlSeconds = 1_800;
+</script>
+
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -9,12 +16,16 @@
 	import { demoInvoices } from './data/invoices';
 	import { overviewSnapshot } from './data/overview';
 	import { demoPosBoard } from './data/pos';
+	import { selectExpiredPendingInvoices } from './notifications/invoice-attention';
 	import { getDashboardGateway } from './api/supabase-browser';
-	import type { DashboardRealtimeResource, DashboardRealtimeScope } from './api/dashboard-gateway';
+	import {
+		DEFAULT_TABLE_ORDER_TTL_SECONDS,
+		type DashboardRealtimeResource,
+		type DashboardRealtimeScope
+	} from './api/dashboard-gateway';
 	import type {
 		BusinessEntityInput,
 		BusinessStructureData,
-		DashboardSessionState,
 		InvoiceEvent,
 		InvoiceRecord,
 		PosBoard as PosBoardData,
@@ -86,17 +97,21 @@
 		return loaders[view]();
 	}
 
-	let sessionState = $state<DashboardSessionState>({ status: 'loading' });
+	let sessionState = $state<DashboardSessionState>(cachedSessionState ?? { status: 'loading' });
 	let gateway = $state<ReturnType<typeof getDashboardGateway>>(null);
 	let invoices = $state<InvoiceRecord[]>([]);
+	let attentionInvoices = $state<InvoiceRecord[]>([]);
+	let attentionError = $state<string | null>(null);
 	let contentError = $state<string | null>(null);
 	let contentLoading = $state(false);
 	let invoiceEvents = $state<InvoiceEvent[]>([]);
 	let eventsLoading = $state(false);
 	let eventsError = $state<string | null>(null);
 	let posBoard = $state<PosBoardData>({ terminals: [], activeOrders: [] });
+	let tableOrderTtlSeconds = $state(cachedTableOrderTtlSeconds);
 	let structureData = $state<BusinessStructureData>({ entities: [], terminals: [] });
 	let stopRealtimeSync = () => {};
+	let stopAuthSync = () => {};
 	let destroyed = false;
 	let posRefreshPromise: Promise<void> | null = null;
 	let posRefreshQueued = false;
@@ -105,11 +120,12 @@
 	let lastInvoiceId = $state<string | undefined>();
 	let selectedInvoice = $derived(invoices.find((invoice) => invoice.id === invoiceId));
 
-	async function restore() {
-		sessionState = { status: 'loading' };
+	async function restore(showLoading = sessionState.status !== 'ready') {
+		if (showLoading) sessionState = { status: 'loading' };
 
 		if (new URLSearchParams(window.location.search).get('demo') === '1') {
 			invoices = demoInvoices;
+			attentionInvoices = selectExpiredPendingInvoices(demoInvoices);
 			invoiceEvents = demoInvoiceEvents;
 			posBoard = demoPosBoard;
 			structureData = {
@@ -141,6 +157,7 @@
 				},
 				snapshot: overviewSnapshot
 			};
+			cachedSessionState = sessionState;
 			return;
 		}
 
@@ -152,7 +169,24 @@
 
 		const restoredState = await gateway.restore();
 		if (destroyed) return;
+		if (restoredState.status === 'ready') {
+			try {
+				const settings = await gateway.getMerchantSettings(restoredState.merchant.id);
+				if (destroyed) return;
+				tableOrderTtlSeconds = settings.tableOrderTtlSeconds;
+				cachedTableOrderTtlSeconds = settings.tableOrderTtlSeconds;
+			} catch (error) {
+				console.error('Не вдалося завантажити налаштування замовлень.', error);
+				tableOrderTtlSeconds = DEFAULT_TABLE_ORDER_TTL_SECONDS;
+				cachedTableOrderTtlSeconds = DEFAULT_TABLE_ORDER_TTL_SECONDS;
+			}
+		}
 		sessionState = restoredState;
+		cachedSessionState = restoredState.status === 'ready' ? restoredState : null;
+		if (restoredState.status !== 'ready') {
+			tableOrderTtlSeconds = DEFAULT_TABLE_ORDER_TTL_SECONDS;
+			cachedTableOrderTtlSeconds = DEFAULT_TABLE_ORDER_TTL_SECONDS;
+		}
 		if (view === 'overview' && sessionState.status === 'ready') {
 			contentLoading = true;
 			contentError = null;
@@ -167,8 +201,24 @@
 				contentLoading = false;
 			}
 		}
-		await loadInvoices();
+		await Promise.all([loadInvoices(), loadAttentionInvoices()]);
 		startRealtimeSync();
+	}
+
+	async function loadAttentionInvoices() {
+		if (sessionState.status !== 'ready' || !gateway) return;
+		try {
+			const nextInvoices = await gateway.listInvoices(sessionState.merchant.id);
+			if (!destroyed) {
+				attentionInvoices = selectExpiredPendingInvoices(nextInvoices);
+				attentionError = null;
+			}
+		} catch (error) {
+			if (!destroyed) {
+				attentionError =
+					error instanceof Error ? error.message : 'Не вдалося завантажити сповіщення.';
+			}
+		}
 	}
 
 	async function loadInvoices() {
@@ -265,6 +315,28 @@
 		};
 	}
 
+	function startAuthSync() {
+		stopAuthSync();
+		if (!gateway || destroyed) return;
+		const unsubscribe = gateway.subscribeAuthChanges((event) => {
+			if (destroyed) return;
+			if (event === 'signed-out') {
+				cachedSessionState = null;
+				cachedTableOrderTtlSeconds = DEFAULT_TABLE_ORDER_TTL_SECONDS;
+				sessionState = { status: 'guest' };
+				stopRealtimeSync();
+				return;
+			}
+			setTimeout(() => {
+				if (!destroyed) void restore(false);
+			}, 0);
+		});
+		stopAuthSync = () => {
+			unsubscribe();
+			stopAuthSync = () => {};
+		};
+	}
+
 	function queueRealtimeRefresh(resource: DashboardRealtimeResource) {
 		pendingRealtimeResources.add(resource);
 		if (!document.hidden) void flushRealtimeRefreshes();
@@ -277,6 +349,14 @@
 				const resources = [...pendingRealtimeResources];
 				pendingRealtimeResources.clear();
 				try {
+					if (
+						resources.includes('overview') ||
+						resources.includes('invoices') ||
+						resources.includes('invoice') ||
+						resources.includes('pos')
+					) {
+						await loadAttentionInvoices();
+					}
 					if (resources.includes('overview')) await refreshOverview();
 					if (resources.includes('invoices')) await refreshInvoiceList();
 					if (resources.includes('invoice')) await refreshInvoiceDetail();
@@ -304,6 +384,8 @@
 	async function refreshInvoiceList() {
 		if (!gateway || sessionState.status !== 'ready') return;
 		const nextInvoices = await gateway.listInvoices(sessionState.merchant.id);
+		attentionInvoices = selectExpiredPendingInvoices(nextInvoices);
+		attentionError = null;
 		if (!destroyed && view === 'invoices') invoices = nextInvoices;
 	}
 
@@ -349,6 +431,8 @@
 
 	async function signOut() {
 		stopRealtimeSync();
+		cachedSessionState = null;
+		cachedTableOrderTtlSeconds = DEFAULT_TABLE_ORDER_TTL_SECONDS;
 		if (sessionState.status === 'ready' && sessionState.user.id === 'demo-user') {
 			window.location.href = '/';
 			return;
@@ -372,13 +456,28 @@
 	async function cancelInvoice(invoiceId: string) {
 		if (!gateway) throw new Error('Dashboard API недоступний.');
 		await gateway.cancelInvoice(invoiceId);
-		await loadInvoices();
+		attentionInvoices = attentionInvoices.filter((invoice) => invoice.id !== invoiceId);
+		await Promise.all([loadInvoices(), loadAttentionInvoices()]);
 	}
 
 	async function createPosOrder(payload: import('./pos/pos-order-contract').LegacyPosOrderInsert) {
 		if (!gateway) throw new Error('Dashboard API недоступний.');
 		await gateway.createPosOrder(payload);
 		await refreshPosBoard();
+	}
+
+	async function saveTableOrderTtlSeconds(nextTableOrderTtlSeconds: number) {
+		if (sessionState.status !== 'ready') throw new Error('Dashboard API недоступний.');
+		if (sessionState.user.id === 'demo-user') {
+			tableOrderTtlSeconds = nextTableOrderTtlSeconds;
+			return;
+		}
+		if (!gateway) throw new Error('Dashboard API недоступний.');
+		await gateway.saveMerchantSettings(sessionState.merchant.id, {
+			tableOrderTtlSeconds: nextTableOrderTtlSeconds
+		});
+		tableOrderTtlSeconds = nextTableOrderTtlSeconds;
+		cachedTableOrderTtlSeconds = nextTableOrderTtlSeconds;
 	}
 
 	async function markPosOrderPaid(orderId: string) {
@@ -439,11 +538,13 @@
 		destroyed = false;
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 		void preloadActiveView();
+		startAuthSync();
 		void restore();
 		return () => {
 			destroyed = true;
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 			stopRealtimeSync();
+			stopAuthSync();
 			pendingRealtimeResources.clear();
 		};
 	});
@@ -495,6 +596,9 @@
 												? 'structure'
 												: 'invoices'}
 		demo={sessionState.user.id === 'demo-user'}
+		attentionInvoices={attentionInvoices}
+		attentionError={attentionError}
+		onCancelAttentionInvoice={cancelInvoice}
 		onSignOut={signOut}
 	>
 		{#if view === 'overview' && contentLoading}
@@ -521,6 +625,7 @@
 				<module.default
 					board={posBoard}
 					merchantId={sessionState.merchant.id}
+					{tableOrderTtlSeconds}
 					onCreate={createPosOrder}
 					onMarkPaid={markPosOrderPaid}
 					onCancel={cancelPosOrder}
@@ -548,7 +653,9 @@
 				/>
 			{/await}
 		{:else if view === 'settings'}
-			{#await loadDashboardSettings() then module}<module.default />{/await}
+			{#await loadDashboardSettings() then module}
+				<module.default {tableOrderTtlSeconds} onSave={saveTableOrderTtlSeconds} />
+			{/await}
 		{:else if view === 'invoice-rules'}
 			{#await loadInvoiceRulesSettings() then module}<module.default />{/await}
 		{:else if view === 'payment-methods'}

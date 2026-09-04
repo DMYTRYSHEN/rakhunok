@@ -12,6 +12,7 @@ import type {
 	InvoiceStatus,
 	InvoiceSummary,
 	InvoiceType,
+	MerchantSettings,
 	MerchantOnboardingInput,
 	OverviewSnapshot,
 	PosActiveOrder,
@@ -23,6 +24,7 @@ import { formatMoney } from '../utils/format';
 import type { LegacyPosOrderInsert } from '../pos/pos-order-contract';
 
 const AUTH_TIMEOUT_MS = 5_000;
+export const DEFAULT_TABLE_ORDER_TTL_SECONDS = 1_800;
 
 type MerchantRow = {
 	id: string;
@@ -97,6 +99,7 @@ const INVOICE_FIELDS =
 
 export type DashboardGateway = {
 	restore(): Promise<DashboardSessionState>;
+	subscribeAuthChanges(onChange: (event: DashboardAuthEvent) => void): () => void;
 	getDeveloperSession(): Promise<DeveloperSession>;
 	listMerchantApiKeys(merchantId: string): Promise<MerchantApiKey[]>;
 	createMerchantApiKey(
@@ -104,6 +107,8 @@ export type DashboardGateway = {
 		input: MerchantApiKeyInput
 	): Promise<{ apiKey: string; record: MerchantApiKey }>;
 	revokeMerchantApiKey(merchantId: string, apiKeyId: string): Promise<void>;
+	getMerchantSettings(merchantId: string): Promise<MerchantSettings>;
+	saveMerchantSettings(merchantId: string, settings: MerchantSettings): Promise<void>;
 	getOverview(userId: string, merchant: DashboardMerchant): Promise<OverviewSnapshot>;
 	onboardMerchant(input: MerchantOnboardingInput): Promise<void>;
 	createInvoice(input: InvoiceCreateInput): Promise<{ id: string }>;
@@ -130,6 +135,8 @@ export type DashboardGateway = {
 	signInWithGoogleIdToken(token: string, nonce: string): Promise<void>;
 	signOut(): Promise<void>;
 };
+
+export type DashboardAuthEvent = 'signed-in' | 'signed-out' | 'user-updated';
 
 export type DeveloperSession = {
 	accessToken: string;
@@ -463,6 +470,15 @@ export function createDashboardGateway(
 			};
 		},
 
+		subscribeAuthChanges(onChange) {
+			const { data } = client.auth.onAuthStateChange((event) => {
+				if (event === 'SIGNED_IN') onChange('signed-in');
+				if (event === 'SIGNED_OUT') onChange('signed-out');
+				if (event === 'USER_UPDATED') onChange('user-updated');
+			});
+			return () => data.subscription.unsubscribe();
+		},
+
 		async getDeveloperSession() {
 			const result = await client.auth.getSession();
 			const session = result.data.session;
@@ -572,7 +588,8 @@ export function createDashboardGateway(
 					description: input.description,
 					amount: input.amount,
 					delivery_fee: input.deliveryFee ?? 0,
-					table_number: input.tableNumber
+					table_number: input.tableNumber,
+					terminal_id: input.terminalId
 				})
 			});
 			const payload = (await response.json()) as { order?: { id?: string } };
@@ -588,25 +605,61 @@ export function createDashboardGateway(
 		},
 
 		async createPosOrder(payload) {
-			const result = await client.from('orders').insert(payload);
-			if (result.error) throw new Error('Не вдалося створити POS-замовлення.');
+			await workerRequest('/api/v1/orders', {
+				method: 'POST',
+				body: JSON.stringify({
+					type: payload.type,
+					order_number: payload.order_number,
+					title: payload.title,
+					amount: payload.base_amount,
+					status: payload.status,
+					terminal_id: payload.terminal_id,
+					expires_at: payload.expires_at
+				})
+			});
 		},
 
 		async markPosOrderPaid(orderId) {
-			const result = await client
-				.from('orders')
-				.update({
+			await workerRequest(`/api/v1/orders/${encodeURIComponent(orderId)}`, {
+				method: 'PATCH',
+				body: JSON.stringify({
 					status: 'paid',
 					paid_at: new Date().toISOString(),
 					paid_bank_code: 'CASH'
 				})
-				.eq('id', orderId);
-			if (result.error) throw new Error('Не вдалося підтвердити готівкову оплату.');
+			});
 		},
 
 		async cancelPosOrder(orderId) {
-			const result = await client.from('orders').update({ status: 'cancelled' }).eq('id', orderId);
-			if (result.error) throw new Error('Не вдалося скасувати POS-замовлення.');
+			await workerRequest(`/api/v1/orders/${encodeURIComponent(orderId)}`, {
+				method: 'PATCH',
+				body: JSON.stringify({ status: 'cancelled' })
+			});
+		},
+
+		async getMerchantSettings(merchantId) {
+			const result = await client
+				.from('merchant_settings')
+				.select('table_order_ttl_seconds')
+				.eq('merchant_id', merchantId)
+				.maybeSingle();
+			if (result.error) throw new Error('Не вдалося завантажити налаштування замовлень.');
+			return {
+				tableOrderTtlSeconds:
+					(result.data as { table_order_ttl_seconds?: number } | null)
+						?.table_order_ttl_seconds ?? DEFAULT_TABLE_ORDER_TTL_SECONDS
+			};
+		},
+
+		async saveMerchantSettings(merchantId, settings) {
+			const result = await client.from('merchant_settings').upsert(
+				{
+					merchant_id: merchantId,
+					table_order_ttl_seconds: settings.tableOrderTtlSeconds
+				},
+				{ onConflict: 'merchant_id' }
+			);
+			if (result.error) throw new Error('Не вдалося зберегти налаштування замовлень.');
 		},
 
 		async getBusinessStructure(userId) {

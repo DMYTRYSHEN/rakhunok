@@ -4,11 +4,19 @@
 	let {
 		loading = false,
 		message = '',
+		loadingTitle = 'Завантажуємо дані',
+		loadingMessage = 'Оновлюємо вміст робочого простору.',
 		onRetry
-	}: { loading?: boolean; message?: string; onRetry?: () => void } = $props();
+	}: {
+		loading?: boolean;
+		message?: string;
+		loadingTitle?: string;
+		loadingMessage?: string;
+		onRetry?: () => void;
+	} = $props();
 </script>
 
-<main class="grid min-h-screen place-items-center bg-[#f6f7f8] px-5 text-zinc-950">
+<main class="dashboard-root grid min-h-screen w-full place-items-center bg-[#f6f7f8] px-5 text-zinc-950">
 	<div class="max-w-sm text-center">
 		<div
 			class="mx-auto grid size-11 place-items-center rounded-md border border-zinc-200 bg-white text-zinc-700"
@@ -20,10 +28,10 @@
 			{/if}
 		</div>
 		<h1 class="mt-5 text-lg font-bold">
-			{loading ? 'Відновлюємо сесію' : 'Не вдалося відкрити dashboard'}
+			{loading ? loadingTitle : 'Не вдалося відкрити dashboard'}
 		</h1>
 		<p class="mt-2 text-sm leading-6 text-zinc-500">
-			{loading ? 'Перевіряємо доступ до вашого бізнесу.' : message}
+			{loading ? loadingMessage : message}
 		</p>
 		{#if !loading && onRetry}
 			<button

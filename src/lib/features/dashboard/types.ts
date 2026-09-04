@@ -11,6 +11,10 @@ export type DashboardMerchant = {
 	displayName: string;
 };
 
+export type MerchantSettings = {
+	tableOrderTtlSeconds: number;
+};
+
 export type DashboardUser = {
 	id: string;
 	email: string | null;
@@ -34,6 +38,7 @@ export type InvoiceCreateInput = {
 	amount: number;
 	deliveryFee?: number;
 	tableNumber?: number;
+	terminalId?: string;
 };
 
 export type InvoiceSummary = {

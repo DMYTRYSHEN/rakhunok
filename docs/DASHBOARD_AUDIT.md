@@ -2,6 +2,10 @@
 
 This document defines the behavioral and UX baseline for migrating the merchant dashboard from `../core/dashboard` to Svelte 5. The legacy backend, Supabase schema, RLS policies, Worker routes, and production deployment remain unchanged during the frontend migration.
 
+Reviewed process invariants and approval boundaries are maintained in
+[`DASHBOARD_PROCESS_REGISTRY.md`](DASHBOARD_PROCESS_REGISTRY.md). A process marked `LOCKED` there
+must not be changed as part of another module or process without separate explicit approval.
+
 ## Source Of Truth
 
 The active dashboard is the inline application in `../core/dashboard/index.html`. It loads `../core/dashboard/dashboard.css` and the Supabase browser SDK. The files under `../core/dashboard/js`, `../core/dashboard/css`, and `../core/dashboard/test.js` are not loaded by the active page and must not be treated as behavioral authority.

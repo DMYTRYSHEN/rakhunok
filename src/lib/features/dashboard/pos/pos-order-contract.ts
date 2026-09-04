@@ -1,6 +1,9 @@
 import type { PosActiveOrder, PosTerminal } from '../types';
 import { getPosDraftTotal, type PosDraft } from './pos-drafts';
 
+export const DEFAULT_TABLE_ORDER_TTL_SECONDS = 1_800;
+export const TAG_ORDER_TTL_SECONDS = 300;
+
 export type LegacyPosOrderInsert = {
 	merchant_id: string;
 	type: 'table';
@@ -11,6 +14,7 @@ export type LegacyPosOrderInsert = {
 	currency: 'UAH';
 	status: 'pending';
 	created_at: string;
+	expires_at: string | null;
 	terminal_id: string;
 };
 
@@ -27,12 +31,24 @@ export function buildLegacyPosOrderInsert(
 	merchantId: string,
 	terminal: PosTerminal,
 	draft: PosDraft,
-	createdAt = new Date()
+	createdAt = new Date(),
+	tableOrderTtlSeconds = DEFAULT_TABLE_ORDER_TTL_SECONDS
 ): PosOrderContractResult {
 	if (!terminal.isActive) return { ok: false, reason: 'inactive-terminal' };
 
 	const amount = getPosDraftTotal(draft);
 	if (!Number.isFinite(amount) || amount <= 0) return { ok: false, reason: 'empty-order' };
+	const normalizedTableTtlSeconds =
+		Number.isFinite(tableOrderTtlSeconds) && tableOrderTtlSeconds > 0
+			? tableOrderTtlSeconds
+			: DEFAULT_TABLE_ORDER_TTL_SECONDS;
+	const ttlSeconds =
+		terminal.type === 'kasa'
+			? null
+			: terminal.type === 'nfc_tag'
+				? TAG_ORDER_TTL_SECONDS
+				: normalizedTableTtlSeconds;
+	const expiresAt = ttlSeconds === null ? null : new Date(createdAt.getTime() + ttlSeconds * 1_000);
 
 	return {
 		ok: true,
@@ -46,6 +62,7 @@ export function buildLegacyPosOrderInsert(
 			currency: 'UAH',
 			status: 'pending',
 			created_at: createdAt.toISOString(),
+			expires_at: expiresAt?.toISOString() ?? null,
 			terminal_id: terminal.id
 		}
 	};
@@ -56,7 +73,8 @@ export function decideLegacyPosOrderCreation(
 	terminal: PosTerminal,
 	draft: PosDraft,
 	activeOrders: PosActiveOrder[],
-	createdAt = new Date()
+	createdAt = new Date(),
+	tableOrderTtlSeconds = DEFAULT_TABLE_ORDER_TTL_SECONDS
 ): PosOrderCreationDecision {
 	const existingOrder = activeOrders
 		.filter((order) => order.terminalId === terminal.id && order.status === 'pending')
@@ -64,7 +82,13 @@ export function decideLegacyPosOrderCreation(
 
 	if (existingOrder) return { status: 'blocked', reason: 'active-order', order: existingOrder };
 
-	const contract = buildLegacyPosOrderInsert(merchantId, terminal, draft, createdAt);
+	const contract = buildLegacyPosOrderInsert(
+		merchantId,
+		terminal,
+		draft,
+		createdAt,
+		tableOrderTtlSeconds
+	);
 	if (!contract.ok) return { status: 'invalid', reason: contract.reason };
 
 	return { status: 'ready', payload: contract.payload };

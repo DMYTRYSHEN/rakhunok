@@ -3,17 +3,26 @@
 	import { Check, Clock3, Moon, Save, Sun } from '@lucide/svelte';
 
 	type DashboardTheme = 'light' | 'dark';
+	let {
+		tableOrderTtlSeconds,
+		onSave
+	}: {
+		tableOrderTtlSeconds: number;
+		onSave: (tableOrderTtlSeconds: number) => Promise<void>;
+	} = $props();
 
 	let theme = $state<DashboardTheme>('light');
-	let tableTtl = $state('30');
-	let savedTtl = $state('30');
+	let tableTtl = $derived(String(tableOrderTtlSeconds));
+	let savedTtl = $derived(String(tableOrderTtlSeconds));
 	let saved = $state(false);
+	let saving = $state(false);
+	let saveError = $state<string | null>(null);
 
 	const ttlOptions = [
-		{ value: '30', label: '30 хвилин', detail: 'Стандарт' },
-		{ value: '60', label: '1 година', detail: 'Для довгих сесій' },
-		{ value: '120', label: '2 години', detail: 'Збалансований режим' },
-		{ value: '300', label: '5 годин', detail: 'Тривале обслуговування' }
+		{ value: '1800', label: '30 хвилин', detail: 'Стандарт' },
+		{ value: '3600', label: '1 година', detail: 'Для довгих сесій' },
+		{ value: '7200', label: '2 години', detail: 'Збалансований режим' },
+		{ value: '18000', label: '5 годин', detail: 'Тривале обслуговування' }
 	];
 
 	function applyTheme(nextTheme: DashboardTheme) {
@@ -22,21 +31,23 @@
 		localStorage.setItem('rahunok_theme', nextTheme);
 	}
 
-	function saveTtl() {
-		localStorage.setItem('rahunok_table_ttl', tableTtl);
-		savedTtl = tableTtl;
-		saved = true;
-		window.setTimeout(() => (saved = false), 2400);
+	async function saveTtl() {
+		saving = true;
+		saveError = null;
+		try {
+			await onSave(Number(tableTtl));
+			saved = true;
+			window.setTimeout(() => (saved = false), 2400);
+		} catch (error) {
+			saveError = error instanceof Error ? error.message : 'Не вдалося зберегти налаштування.';
+		} finally {
+			saving = false;
+		}
 	}
 
 	onMount(() => {
 		const storedTheme = localStorage.getItem('rahunok_theme');
-		const storedTtl = localStorage.getItem('rahunok_table_ttl');
 		applyTheme(storedTheme === 'dark' ? 'dark' : 'light');
-		if (storedTtl && ttlOptions.some((option) => option.value === storedTtl)) {
-			tableTtl = storedTtl;
-			savedTtl = storedTtl;
-		}
 	});
 </script>
 
@@ -197,17 +208,21 @@
 				<div
 					class="mt-6 flex flex-col gap-3 border-t border-zinc-200 pt-5 sm:flex-row sm:items-center sm:justify-between"
 				>
-					<p class="text-xs text-zinc-500">
-						Поточне значення: {savedTtl} хвилин. Застосовується до нових рахунків за столиком.
-					</p>
+					<div>
+						<p class="text-xs text-zinc-500">
+							Поточне значення: {ttlOptions.find((option) => option.value === savedTtl)?.label ??
+								`${Number(savedTtl) / 60} хвилин`}. Застосовується до нових рахунків за столиком.
+						</p>
+						{#if saveError}<p class="mt-2 text-xs font-semibold text-red-600">{saveError}</p>{/if}
+					</div>
 					<button
 						type="button"
-						disabled={tableTtl === savedTtl}
+						disabled={tableTtl === savedTtl || saving}
 						onclick={saveTtl}
 						class="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-blue-600 px-5 text-sm font-extrabold text-white hover:bg-blue-700 disabled:bg-zinc-200 disabled:text-zinc-500"
 					>
 						<Save size={17} aria-hidden="true" />
-						{saved ? 'Збережено' : 'Зберегти'}
+						{saving ? 'Збереження...' : saved ? 'Збережено' : 'Зберегти'}
 					</button>
 				</div>
 			</div>

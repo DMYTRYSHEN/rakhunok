@@ -224,7 +224,8 @@
 				tableNumber:
 					scenario === 'table'
 						? Number.parseInt(selectedTerminal?.code.match(/\d+/)?.[0] || '', 10) || undefined
-						: undefined
+						: undefined,
+				terminalId: scenario === 'table' ? selectedTerminal?.id : undefined
 			});
 			invoiceRules = { ...invoiceRules, nextNumber: invoiceRules.nextNumber + 1 };
 			saveInvoiceRules(invoiceRules);

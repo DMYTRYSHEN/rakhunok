@@ -15,6 +15,7 @@
 	let {
 		board,
 		merchantId,
+		tableOrderTtlSeconds,
 		onCreate,
 		onMarkPaid,
 		onCancel,
@@ -22,6 +23,7 @@
 	}: {
 		board: PosBoardData;
 		merchantId: string;
+		tableOrderTtlSeconds: number;
 		onCreate?: (payload: LegacyPosOrderInsert) => Promise<void>;
 		onMarkPaid?: (orderId: string) => Promise<void>;
 		onCancel?: (orderId: string) => Promise<void>;
@@ -63,7 +65,9 @@
 			merchantId,
 			draftTerminal,
 			getPosDraft(draftState),
-			board.activeOrders
+			board.activeOrders,
+			new Date(),
+			tableOrderTtlSeconds
 		);
 		if (decision.status !== 'ready') {
 			throw new Error(

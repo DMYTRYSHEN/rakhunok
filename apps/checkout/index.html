@@ -1270,6 +1270,7 @@ body.light-mode .bank-search-input { background: rgba(0,0,0,0.05); color: #000; 
     <!-- Production App Logic matching rahunok_app_clip_checkout.html -->
     <script type="module">
         import { fetchCheckoutOrder } from '/checkout/js/checkout-api.js';
+        import { formatRemainingTime, getOrderRemainingSeconds, getOrderTotalTtlSeconds, isOrderFresh } from '/checkout/js/order-expiry.js';
         import { resolveScenario } from '/checkout/js/scenarios.js';
 
         function detectOS() {
@@ -1418,28 +1419,10 @@ body.light-mode .bank-search-input { background: rgba(0,0,0,0.05); color: #000; 
         let checkoutLoadReason = null;
         if (window.__INITIAL_TERMINAL__) activeTerminal = window.__INITIAL_TERMINAL__;
         if (currentOrder?._terminal) activeTerminal = currentOrder._terminal;
-        const ttlSeconds = parseInt(params.get('ttl')) || 30;
-
-        function isOrderFresh(order) {
-            if (!order) return false;
-            if (activeTerminal && (order.order_number === activeTerminal.code || order.id === 'term-' + activeTerminal.code)) return true;
-            const timeVal = order.created_at || order.createdAt;
-            if (!timeVal) return false;
-            const createdAt = typeof timeVal === 'number' ? timeVal : new Date(timeVal).getTime();
-            if (isNaN(createdAt)) return false;
-            const diff = (Date.now() - createdAt) / 1000;
-            return diff < ttlSeconds;
-        }
-
-        function getOrderRemainingTTL(order) {
-            if (!order) return 0;
-            const timeVal = order.created_at || order.createdAt;
-            if (!timeVal) return 0;
-            const createdAt = typeof timeVal === 'number' ? timeVal : new Date(timeVal).getTime();
-            if (isNaN(createdAt)) return 0;
-            const diff = (Date.now() - createdAt) / 1000;
-            return Math.max(0, Math.floor(ttlSeconds - diff));
-        }
+        const requestedLegacyTtl = Number(params.get('ttl'));
+        const legacyTtlMinutes = Number.isFinite(requestedLegacyTtl) && requestedLegacyTtl > 0
+            ? requestedLegacyTtl
+            : 30;
 
         let tableCountdownInterval = null;
                 function startTableCountdown(order, terminal) {
@@ -1457,27 +1440,25 @@ body.light-mode .bank-search-input { background: rgba(0,0,0,0.05); color: #000; 
                 return;
             }
 
+            if (!Number.isFinite(getOrderRemainingSeconds(order, Date.now(), legacyTtlMinutes))) {
+                wrap.style.display = 'none';
+                return;
+            }
+
             wrap.style.display = 'inline-flex';
 
             function tick() {
-                const remaining = getOrderRemainingTTL(order);
+                const remaining = getOrderRemainingSeconds(order, Date.now(), legacyTtlMinutes);
                 if (remaining <= 0) {
                     clearInterval(tableCountdownInterval);
                     wrap.style.display = 'none';
-                    currentOrder = {
-                        ...order,
-                        status: 'preparing',
-                        title: 'Рахунок скасовано',
-                        total_amount: 0,
-                        base_amount: 0
-                    };
                     vib(10);
                     showScreen('waiting');
                     return;
                 }
-                const secStr = remaining < 10 ? '0' + remaining : String(remaining);
-                timerEl.textContent = '00:' + secStr;
-                const pct = (remaining / ttlSeconds) * 100;
+                timerEl.textContent = formatRemainingTime(remaining);
+                const totalTtl = getOrderTotalTtlSeconds(order, legacyTtlMinutes);
+                const pct = totalTtl > 0 ? (remaining / totalTtl) * 100 : 0;
                 barEl.style.width = Math.max(0, Math.min(100, pct)) + '%';
             }
 
@@ -1703,7 +1684,7 @@ body.light-mode .bank-search-input { background: rgba(0,0,0,0.05); color: #000; 
 
             // 4. Safe Polling Interval (every 800ms)
             const pollTimer = setInterval(async () => {
-                if (currentOrder && currentOrder.status !== 'preparing' && Number(currentOrder.total_amount) > 0 && isOrderFresh(currentOrder)) {
+                if (currentOrder && currentOrder.status !== 'preparing' && Number(currentOrder.total_amount) > 0 && isOrderFresh(currentOrder, Date.now(), legacyTtlMinutes)) {
                     return;
                 }
 
@@ -1712,7 +1693,7 @@ body.light-mode .bank-search-input { background: rgba(0,0,0,0.05); color: #000; 
                 if (stored) {
                     try {
                         const parsed = JSON.parse(stored);
-                        if (parsed && Number(parsed.total_amount) > 0 && isOrderFresh(parsed)) {
+                        if (parsed && Number(parsed.total_amount) > 0 && isOrderFresh(parsed, Date.now(), legacyTtlMinutes)) {
                             onTableReady(parsed);
                             return;
                         }
@@ -1730,7 +1711,7 @@ body.light-mode .bank-search-input { background: rgba(0,0,0,0.05); color: #000; 
                             .limit(1)
                             .maybeSingle();
 
-                        if (data && Number(data.total_amount) > 0 && isOrderFresh(data)) {
+                        if (data && Number(data.total_amount) > 0 && isOrderFresh(data, Date.now(), legacyTtlMinutes)) {
                             onTableReady(data);
                             return;
                         }
@@ -1755,7 +1736,7 @@ body.light-mode .bank-search-input { background: rgba(0,0,0,0.05); color: #000; 
             document.getElementById('waitTableNum').textContent = activeTerminal ? activeTerminal.name : (currentOrder.title || 'Термінал');
             if (activeTerminal) startTableLiveListener(activeTerminal);
 
-            if (currentOrder.status !== 'preparing' && Number(currentOrder.total_amount) > 0 && isOrderFresh(currentOrder)) {
+            if (currentOrder.status !== 'preparing' && Number(currentOrder.total_amount) > 0 && isOrderFresh(currentOrder, Date.now(), legacyTtlMinutes)) {
                 document.getElementById('orderLabel').textContent = currentOrder.title || currentOrder.order_number || (activeTerminal ? activeTerminal.name : 'Термінал');
                 document.getElementById('rowBase').textContent = numStr(baseAmount) + ' ₴';
                 document.getElementById('summaryTotal').textContent = numStr(total) + ' ₴';

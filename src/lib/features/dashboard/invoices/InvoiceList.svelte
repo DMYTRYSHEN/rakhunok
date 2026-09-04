@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { ChevronLeft, ChevronRight, Plus, ReceiptText, Search } from '@lucide/svelte';
+	import { ArrowUpRight, ChevronLeft, ChevronRight, Plus, ReceiptText, Search } from '@lucide/svelte';
 	import StatusBadge from '../components/StatusBadge.svelte';
 	import type { InvoiceRecord, InvoiceStatus, InvoiceType } from '../types';
 	import { formatInvoiceDate, formatMoney } from '../utils/format';
@@ -65,12 +65,21 @@
 			<h1 class="mt-2 text-2xl font-semibold sm:text-3xl">Рахунки</h1>
 			<p class="mt-2 text-sm text-zinc-500">Пошук і контроль усіх платежів бізнесу.</p>
 		</div>
-		<a
-			href={resolve(demo ? '/dashboard/invoices/new?demo=1' : '/dashboard/invoices/new')}
-			class="inline-flex h-10 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
-		>
-			<Plus size={16} aria-hidden="true" /> Новий рахунок
-		</a>
+		<div class="flex gap-2">
+			<button
+				type="button"
+				disabled
+				class="inline-flex h-10 items-center gap-2 rounded-md border border-zinc-200 bg-white px-4 text-sm font-bold text-zinc-400"
+			>
+				<ArrowUpRight size={16} aria-hidden="true" /> Експорт
+			</button>
+			<a
+				href={resolve(demo ? '/dashboard/invoices/new?demo=1' : '/dashboard/invoices/new')}
+				class="inline-flex h-10 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
+			>
+				<Plus size={16} aria-hidden="true" /> Новий рахунок
+			</a>
+		</div>
 	</header>
 
 	<section class="rounded-lg border border-zinc-200 bg-white" aria-label="Реєстр рахунків">

@@ -4,6 +4,8 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import logoUrl from '../../../../../logo.svg?url';
+	import type { InvoiceRecord } from '../types';
+	import { formatInvoiceDate, formatMoney } from '../utils/format';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import {
 		ArrowDown01Icon,
@@ -35,6 +37,9 @@
 		merchantName,
 		activeSection = 'overview',
 		demo = false,
+		attentionInvoices = [],
+		attentionError = null,
+		onCancelAttentionInvoice,
 		onSignOut
 	}: {
 		children: Snippet;
@@ -52,6 +57,9 @@
 			| 'team'
 			| 'developer-api';
 		demo?: boolean;
+		attentionInvoices?: InvoiceRecord[];
+		attentionError?: string | null;
+		onCancelAttentionInvoice?: (invoiceId: string) => Promise<void>;
 		onSignOut: () => Promise<void>;
 	} = $props();
 	let menuOpen = $state(false);
@@ -61,8 +69,25 @@
 	let mobileNavigation: HTMLElement;
 	let signingOut = $state(false);
 	let signOutError = $state(false);
+	let notificationsOpen = $state(false);
+	let cancellingAttentionId = $state<string | null>(null);
+	let notificationError = $state<string | null>(null);
 	let invoicesExpanded = $state(true);
 	const isPosMode = $derived(activeSection === 'pos');
+	const attentionCount = $derived(attentionInvoices.length);
+
+	async function cancelAttentionInvoice(invoiceId: string) {
+		if (!onCancelAttentionInvoice || cancellingAttentionId || demo) return;
+		cancellingAttentionId = invoiceId;
+		notificationError = null;
+		try {
+			await onCancelAttentionInvoice(invoiceId);
+		} catch (error) {
+			notificationError = error instanceof Error ? error.message : 'Не вдалося скасувати рахунок.';
+		} finally {
+			cancellingAttentionId = null;
+		}
+	}
 
 	const invoiceScenarios = [
 		{
@@ -470,15 +495,75 @@
 					<span class="size-1.5 rounded-full bg-zinc-400"></span>
 					{demo ? 'Ознайомчий режим' : 'Supabase'}
 				</span>
-				<button
-					type="button"
-					disabled
-					title="Сповіщення ще не підключені"
-					class="relative grid size-10 place-items-center rounded-md border border-zinc-200 bg-zinc-50 text-zinc-400"
-					aria-label="Сповіщення ще не підключені"
-				>
-					<HugeiconsIcon icon={Notification02Icon} size={18} aria-hidden="true" />
-				</button>
+				<div class="relative">
+					<button
+						type="button"
+						class="relative grid size-10 place-items-center rounded-md border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+						aria-label={attentionCount > 0
+							? `Рахунки, що потребують уваги: ${attentionCount}`
+							: 'Рахунки, що потребують уваги'}
+						aria-expanded={notificationsOpen}
+						aria-controls="dashboard-attention-panel"
+						onclick={() => {
+							notificationsOpen = !notificationsOpen;
+							notificationError = null;
+						}}
+					>
+						<HugeiconsIcon icon={Notification02Icon} size={18} aria-hidden="true" />
+						{#if attentionCount > 0}
+							<span
+								class="absolute -top-1 -right-1 grid min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[0.625rem] leading-5 font-bold text-white"
+								aria-hidden="true"
+							>
+								{attentionCount > 99 ? '99+' : attentionCount}
+							</span>
+						{/if}
+					</button>
+
+					{#if notificationsOpen}
+						<section
+							id="dashboard-attention-panel"
+							class="absolute top-12 right-0 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-md border border-zinc-200 bg-white shadow-xl"
+							aria-label="Рахунки, що потребують уваги"
+						>
+							<header class="border-b border-zinc-200 px-4 py-3">
+								<h2 class="text-sm font-bold text-zinc-950">Потребують уваги</h2>
+								<p class="mt-1 text-xs text-zinc-500">Прострочені рахунки, які ще очікують оплати.</p>
+							</header>
+
+							{#if notificationError || attentionError}
+								<p class="border-b border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800" role="alert">
+									{notificationError || attentionError}
+								</p>
+							{/if}
+
+							{#if attentionCount === 0}
+								<p class="px-4 py-8 text-center text-sm text-zinc-500">Немає рахунків, що потребують уваги.</p>
+							{:else}
+								<ul class="max-h-[min(28rem,70vh)] divide-y divide-zinc-100 overflow-y-auto">
+									{#each attentionInvoices as invoice (invoice.id)}
+										<li class="p-4">
+											<div class="flex items-start justify-between gap-3">
+												<div class="min-w-0">
+													<p class="truncate text-sm font-bold text-zinc-950">{invoice.title}</p>
+													<p class="mt-1 text-xs text-zinc-500">{invoice.reference} · {formatMoney(invoice.amount)}</p>
+													<p class="mt-1 text-xs font-semibold text-red-700">Прострочено {formatInvoiceDate(invoice.expiresAt!)}</p>
+												</div>
+												<HugeiconsIcon icon={Invoice01Icon} size={18} className="shrink-0 text-red-600" aria-hidden="true" />
+											</div>
+											<div class="mt-3 flex justify-end gap-2">
+												<a href={resolve(`/dashboard/invoices/${invoice.id}` as '/')} class="inline-flex h-8 items-center rounded-md border border-zinc-200 px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-50">Переглянути</a>
+												<button type="button" disabled={demo || !onCancelAttentionInvoice || Boolean(cancellingAttentionId)} onclick={() => cancelAttentionInvoice(invoice.id)} class="inline-flex h-8 items-center rounded-md bg-red-600 px-3 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50">
+													{cancellingAttentionId === invoice.id ? 'Скасовуємо…' : 'Скасувати'}
+												</button>
+											</div>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</section>
+					{/if}
+				</div>
 			</div>
 		</header>
 

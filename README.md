@@ -27,10 +27,10 @@ npm run deploy:production
 The command validates the public configuration, builds once, checks both Worker packages, and
 deploys the root Worker before the Dashboard Worker so their HTML and `/_app` assets stay aligned.
 
-Dashboard invoice and onboarding requests use the same-origin `/api` path. During local development, run the existing Worker in a second terminal so Vite can proxy those requests to port `8787`:
+Dashboard invoice and onboarding requests use the same-origin `/dashboard/api` path. During local development, run the existing API Worker in a second terminal so Vite can proxy those requests to port `8787` and strip the `/dashboard` prefix:
 
 ```powershell
-npm run dev:worker
+npm run dev:api
 ```
 
 Keep Worker secrets in its ignored local secret file or Wrangler secret storage. Never place service-role keys or telemetry tokens in a tracked Wrangler configuration.
