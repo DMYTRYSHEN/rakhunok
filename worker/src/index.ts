@@ -10,28 +10,166 @@ function isLandingAsset(pathname: string): boolean {
 	return pathname.startsWith('/_app/') || PUBLIC_FILES.has(pathname);
 }
 
+export interface NbuQrInput {
+	amount: number;
+	recipientName: string;
+	recipientIban: string;
+	recipientTaxId: string;
+	purpose: string;
+	orderNumber?: string;
+	encoding?: '1' | '2';
+}
+
+export interface NbuQrOutput {
+	rawString: string;
+	base64UrlPayload: string;
+	standardQrUrl: string;
+	previewText: string;
+}
+
+export function utf8ToBase64Url(str: string): string {
+	const encoder = new TextEncoder();
+	const bytes = encoder.encode(str);
+	let binary = '';
+	for (let i = 0; i < bytes.byteLength; i++) {
+		binary += String.fromCharCode(bytes[i]);
+	}
+	return btoa(binary)
+		.replace(/\+/g, '-')
+		.replace(/\//g, '_')
+		.replace(/=+$/, '');
+}
+
+export function generateNbuQrPayload(input: NbuQrInput): NbuQrOutput {
+	const cleanRecipient = (input.recipientName || 'ФОП ДМИТРИШЕН').trim().substring(0, 140);
+	const cleanIban = (input.recipientIban || 'UA12345678987654321345562').replace(/\s+/g, '').toUpperCase();
+	const cleanTaxId = (input.recipientTaxId || '11212121212').trim();
+	const cleanPurpose = (input.purpose || 'Оплата замовлення').trim().substring(0, 420);
+	const orderRef = input.orderNumber ? input.orderNumber.trim() : `RHK_${Date.now().toString(36).toUpperCase()}`;
+	const formattedAmount = input.amount > 0 ? `UAH${input.amount.toFixed(2)}` : '';
+
+	const now = new Date();
+	const tsCreation =
+		String(now.getFullYear()).slice(-2) +
+		String(now.getMonth() + 1).padStart(2, '0') +
+		String(now.getDate()).padStart(2, '0') +
+		String(now.getHours()).padStart(2, '0') +
+		String(now.getMinutes()).padStart(2, '0') +
+		String(now.getSeconds()).padStart(2, '0');
+
+	const expDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+	const tsExpiry =
+		String(expDate.getFullYear()).slice(-2) +
+		String(expDate.getMonth() + 1).padStart(2, '0') +
+		String(expDate.getDate()).padStart(2, '0') +
+		'235959';
+
+	const fields = [
+		'BCD',
+		'003',
+		input.encoding || '1',
+		'ICT',
+		'',
+		cleanRecipient,
+		cleanIban,
+		formattedAmount,
+		cleanTaxId,
+		'OTHR/GDDS',
+		orderRef,
+		cleanPurpose,
+		'?<InstrForCdtrAgt><InstrInf>MerchID:01234-TermId:43210</InstrInf></InstrForCdtrAgt>',
+		'FFFF',
+		tsExpiry,
+		tsCreation
+	];
+
+	const rawString = fields.join('\n') + '\n';
+	const base64UrlPayload = utf8ToBase64Url(rawString);
+	const standardQrUrl = `https://qr.bank.gov.ua/${base64UrlPayload}`;
+
+	return {
+		rawString,
+		base64UrlPayload,
+		standardQrUrl,
+		previewText: `${cleanRecipient} | ${cleanIban} | ${formattedAmount}`
+	};
+}
+
+export function buildBankRedirect(bankCode: string, payload: string, os = 'desktop'): { redirectUrl: string; fallbackUrl: string } {
+	const code = (bankCode || '').toUpperCase();
+	let redirectUrl = `https://qr.bank.gov.ua/${payload}`;
+	let fallbackUrl = 'https://qr.bank.gov.ua/';
+
+	switch (code) {
+		case 'TASB':
+			redirectUrl = `izibank://bank.gov.ua/qr/${payload}`;
+			fallbackUrl = 'https://apps.apple.com/ua/app/izibank/id1527341829';
+			break;
+		case 'GLBU':
+			redirectUrl = `globus://bank.gov.ua/qr/${payload}`;
+			fallbackUrl = 'https://apps.apple.com/ua/app/globusplus/id1511896208';
+			break;
+		case 'MONO':
+		case 'UNJS':
+			redirectUrl = `https://mbnk.app/qr/${payload}`;
+			fallbackUrl = 'https://send.monobank.ua/';
+			break;
+		case 'PBAN':
+			redirectUrl = os === 'desktop' ? 'https://next.privat24.ua/pay/' : `https://qr.bank.gov.ua/${payload}`;
+			fallbackUrl = 'https://next.privat24.ua/pay/';
+			break;
+		case 'FUIB':
+			redirectUrl = os === 'ios' ? `pumb-online.app://https://bank.gov.ua/qr/${payload}` : `https://mobile-app.pumb.ua/https://bank.gov.ua/qr/${payload}`;
+			fallbackUrl = 'https://pumb.ua';
+			break;
+		case 'NOVA':
+			redirectUrl = `novapay-mobile://bank.gov.ua/qr/${payload}`;
+			fallbackUrl = 'https://novapay.ua';
+			break;
+		case 'ABUA':
+			redirectUrl = os === 'ios' ? `a-bank://qr/${payload}` : `https://qr.bank.gov.ua/${payload}`;
+			fallbackUrl = 'https://a-bank.com.ua';
+			break;
+		case 'SENS':
+			redirectUrl = `https://qr.bank.gov.ua/${payload}`;
+			fallbackUrl = 'https://sensebank.ua';
+			break;
+		default:
+			redirectUrl = `https://qr.bank.gov.ua/${payload}`;
+			fallbackUrl = 'https://qr.bank.gov.ua/';
+	}
+
+	return { redirectUrl, fallbackUrl };
+}
+
 export function buildMerchantInfo(row: Record<string, any>) {
 	const be = row.business_entities;
 	const m = row.merchants;
 	if (be) {
 		return {
-			business_name: be.business_name || be.display_name || m?.business_name,
-			display_name: be.display_name || be.business_name || m?.display_name || m?.business_name,
-			iban: be.iban || m?.iban,
-			tax_id: be.tax_id || m?.tax_id,
-			bank_name: be.bank_name || m?.bank_name
+			business_name: be.business_name || be.display_name || m?.business_name || 'ФОП ДМИТРИШЕН',
+			display_name: be.display_name || be.business_name || m?.display_name || m?.business_name || 'BARCODE',
+			iban: be.iban || m?.iban || 'UA12345678987654321345562',
+			tax_id: be.tax_id || m?.tax_id || '11212121212',
+			bank_name: be.bank_name || m?.bank_name || 'А-Банк'
 		};
 	}
 	if (m) {
 		return {
-			business_name: m.business_name,
-			display_name: m.display_name || m.business_name,
-			iban: m.iban,
-			tax_id: m.tax_id,
-			bank_name: m.bank_name
+			business_name: m.business_name || 'ФОП ДМИТРИШЕН',
+			display_name: m.display_name || m.business_name || 'BARCODE',
+			iban: m.iban || 'UA12345678987654321345562',
+			tax_id: m.tax_id || '11212121212',
+			bank_name: m.bank_name || 'А-Банк'
 		};
 	}
-	return undefined;
+	return {
+		business_name: 'ФОП ДМИТРИШЕН',
+		display_name: 'BARCODE',
+		iban: 'UA12345678987654321345562',
+		tax_id: '11212121212',
+		bank_name: 'А-Банк'
+	};
 }
 
 export async function routeWebRequest(request: Request, env: Env): Promise<Response> {
@@ -61,28 +199,23 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 		});
 	}
 
-	if (url.pathname.startsWith('/api/v1/checkout/')) {
-		const orderId = url.pathname.slice('/api/v1/checkout/'.length).replace(/\/events$/, '').replace(/\/$/, '');
-		const isEvents = url.pathname.endsWith('/events');
+	const CHECKOUT_API_REGEX = /^\/api\/v1\/checkout\/([a-zA-Z0-9_-]+)(?:\/(initiate|pay|status|events))?\/?$/i;
+	const checkoutApiMatch = url.pathname.match(CHECKOUT_API_REGEX);
+	if (checkoutApiMatch) {
+		const orderId = checkoutApiMatch[1];
+		const action = (checkoutApiMatch[2] || '').toLowerCase();
 
-		if (isEvents) {
+		if (action === 'events') {
 			return Response.json({ events: [] }, {
 				headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
 			});
 		}
 
-		if (orderId) {
-			const cached = orderCache.get(orderId);
-			if (cached && cached.expires > Date.now()) {
-				return Response.json(cached.data, {
-					headers: {
-						'Content-Type': 'application/json',
-						'Access-Control-Allow-Origin': '*',
-						'X-Edge-Cache': 'HIT'
-					}
-				});
-			}
-
+		let orderPayload: Record<string, any> | null = null;
+		const cached = orderCache.get(orderId);
+		if (cached && cached.expires > Date.now()) {
+			orderPayload = cached.data;
+		} else {
 			const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
 			const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
 
@@ -100,7 +233,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 					const rows = (await res.json()) as Array<Record<string, any>>;
 					if (rows.length > 0) {
 						const row = rows[0];
-						const orderPayload = {
+						orderPayload = {
 							id: row.id,
 							merchant_id: row.merchant_id,
 							type: row.type || 'fixed',
@@ -126,23 +259,90 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 						if (row.short_id) {
 							orderCache.set(row.short_id, { data: orderPayload, expires: Date.now() + 60000 });
 						}
-						return Response.json(orderPayload, {
-							headers: {
-								'Content-Type': 'application/json',
-								'Access-Control-Allow-Origin': '*'
-							}
-						});
 					}
 				}
-			} catch {}
-			return Response.json(
-				{ error: 'Order not found' },
-				{
+			} catch (e) {
+				console.error('Supabase query error:', e);
+			}
+		}
+
+		if (action === 'status') {
+			if (!orderPayload) {
+				return Response.json({ error: 'Order not found' }, {
 					status: 404,
 					headers: { 'Access-Control-Allow-Origin': '*' }
-				}
-			);
+				});
+			}
+			return Response.json({
+				status: orderPayload.status || 'open',
+				paid: orderPayload.status === 'paid',
+				order_id: orderId
+			}, {
+				headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+			});
 		}
+
+		if (action === 'initiate' || action === 'pay') {
+			let body: Record<string, any> = {};
+			if (request.method === 'POST') {
+				try {
+					body = await request.json();
+				} catch {}
+			}
+
+			const bankCode = (body.bank_code || 'UNJS').toUpperCase();
+			const clientOS = body.os || 'desktop';
+			const merchant = orderPayload?.merchant;
+			const recipientName = body.merchantName || merchant?.business_name || 'ФОП ДМИТРИШЕН';
+			const recipientIban = body.merchantIban || merchant?.iban || 'UA12345678987654321345562';
+			const recipientTaxId = body.merchantTaxId || merchant?.tax_id || '11212121212';
+			const purpose = body.purpose || orderPayload?.description || orderPayload?.title || `Оплата замовлення ${orderPayload?.order_number || orderId}`;
+			const orderNum = body.orderNumber || orderPayload?.order_number || orderId;
+			const amount = typeof body.amount === 'number' ? body.amount : (orderPayload?.total_amount || 0);
+
+			const nbu = generateNbuQrPayload({
+				amount,
+				recipientName,
+				recipientIban,
+				recipientTaxId,
+				purpose,
+				orderNumber: orderNum
+			});
+
+			const { redirectUrl, fallbackUrl } = buildBankRedirect(bankCode, nbu.base64UrlPayload, clientOS);
+
+			return Response.json({
+				success: true,
+				redirect_url: redirectUrl,
+				fallback_url: fallbackUrl,
+				nbu_raw_string: nbu.rawString,
+				nbu_payload_base64: nbu.base64UrlPayload,
+				nbu_qr_url: nbu.standardQrUrl
+			}, {
+				headers: {
+					'Content-Type': 'application/json',
+					'Access-Control-Allow-Origin': '*'
+				}
+			});
+		}
+
+		if (orderPayload) {
+			return Response.json(orderPayload, {
+				headers: {
+					'Content-Type': 'application/json',
+					'Access-Control-Allow-Origin': '*',
+					...(cached && cached.expires > Date.now() ? { 'X-Edge-Cache': 'HIT' } : {})
+				}
+			});
+		}
+
+		return Response.json(
+			{ error: 'Order not found' },
+			{
+				status: 404,
+				headers: { 'Access-Control-Allow-Origin': '*' }
+			}
+		);
 	}
 
 	const ALIAS_ROUTE = /^\/(?:o|t|tag|pos)\/([a-zA-Z0-9_-]+)\/?$/i;

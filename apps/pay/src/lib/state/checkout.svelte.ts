@@ -4,6 +4,7 @@ import { resolveScenario } from '../config/scenarios.js';
 import { fetchBanksCatalog, fetchCheckoutOrder, initiateBankPayment } from '../services/api.js';
 import { detectOS, launchDeepLink } from '../services/deeplink.js';
 import { isOrderFresh } from '../services/expiry.js';
+import { generateNbuQrPayload, buildBankRedirect } from '../services/qr-generator.js';
 import { executeTurnstile, getCachedTurnstileToken } from '../services/turnstile.js';
 import type { Bank } from '../types/bank.js';
 import type { DeliveryDetails, FiscalReceipt, LoyaltyCard, Order, OrderItem, PlatformSplit, Terminal, UpsellItem } from '../types/order.js';
@@ -327,6 +328,33 @@ class CheckoutStore {
     return Math.ceil(tot / 4);
   });
 
+  nbuQr = $derived.by(() => {
+    const merchant = this.order?.merchant;
+    const recipientName = merchant?.business_name || this.merchantName || 'ФОП ДМИТРИШЕН';
+    const recipientIban = merchant?.iban || 'UA12345678987654321345562';
+    const recipientTaxId = merchant?.tax_id || '11212121212';
+    const purpose = this.order?.description || this.order?.title || this.orderLabel || `Оплата замовлення ${this.order?.order_number || this.orderId}`;
+    const orderNumber = this.order?.order_number || this.orderId;
+    const amount = this.payTotalAmount > 0 ? this.payTotalAmount : (this.order?.total_amount || 0);
+
+    return generateNbuQrPayload({
+      amount,
+      recipientName,
+      recipientIban,
+      recipientTaxId,
+      purpose,
+      orderNumber
+    });
+  });
+
+  nbuRawString = $derived.by(() => this.nbuQr.rawString);
+  nbuPayload = $derived.by(() => this.nbuQr.base64UrlPayload);
+  currentBankRedirect = $derived.by(() => {
+    const bankCode = this.selectedBank?.code || 'UNJS';
+    const clientOS = detectOS();
+    return buildBankRedirect(bankCode, this.nbuPayload, clientOS);
+  });
+
   fiscalReceipt = $derived.by<FiscalReceipt>(() => {
     if (this.order?.fiscal_receipt) return this.order.fiscal_receipt;
     const now = new Date();
@@ -336,8 +364,8 @@ class CheckoutStore {
     return {
       fiscal_number: '3000' + Math.floor(100000 + Math.random() * 900000),
       device_number: 'ПРРО-44819',
-      tax_name: this.order?.merchant?.business_name || this.merchantName || 'ТОВ «РАХУНОК ЮА»',
-      tax_id: this.order?.merchant?.tax_id || '37193071',
+      tax_name: this.order?.merchant?.business_name || this.merchantName || 'ФОП ДМИТРИШЕН',
+      tax_id: this.order?.merchant?.tax_id || '11212121212',
       date_time: dateStr,
       items: [
         {
@@ -379,7 +407,7 @@ class CheckoutStore {
     return (
       this.order?.merchant?.display_name ||
       this.order?.merchant?.business_name ||
-      'Мерчант'
+      'ФОП ДМИТРИШЕН'
     );
   });
 
@@ -701,7 +729,6 @@ class CheckoutStore {
       params.get('demo') ||
       params.get('sc') ||
       params.get('scenario') ||
-      params.get('type') ||
       ''
     ).toLowerCase();
 
@@ -736,7 +763,7 @@ class CheckoutStore {
     if (initialOrder?._terminal) this.terminal = initialOrder._terminal;
 
     let checkoutLoadReason: string | null = null;
-    if (!initialOrder && !this.forcedScenario && this.orderId) {
+    if (!initialOrder && this.orderId && this.orderId !== 'demo-1' && !this.orderId.startsWith('demo-')) {
       const result = await fetchCheckoutOrder(this.orderId);
       initialOrder = result.order;
       checkoutLoadReason = result.reason;
@@ -788,14 +815,15 @@ class CheckoutStore {
       };
     }
 
-    // Preset demos for dev/demo fixtures
-    if (this.forcedScenario === '1' || this.forcedScenario === 'fixed' || this.forcedScenario === 'order_classic') {
-      initialOrder = {
-        id: 'demo-sc1',
-        order_number: '№4092-A',
-        title: 'Замовлення №4092-A',
-        type: 'fixed',
-        status: 'pending',
+    // Preset demos for dev/demo fixtures ONLY if no real order was found
+    if (!initialOrder) {
+      if (this.forcedScenario === '1' || this.forcedScenario === 'fixed' || this.forcedScenario === 'order_classic') {
+        initialOrder = {
+          id: 'demo-sc1',
+          order_number: '№4092-A',
+          title: 'Замовлення №4092-A',
+          type: 'fixed',
+          status: 'pending',
         total_amount: 1240.0,
         base_amount: 1240.0,
         merchant: {
@@ -1329,27 +1357,26 @@ class CheckoutStore {
         }
       };
       this.statusState = 'pending';
-      this.isStatusScreenOpen = true;
+      const isExplicitDemo = this.orderId === 'demo-1' || this.orderId.startsWith('demo-');
+      if (isExplicitDemo) {
+        initialOrder = {
+          id: this.orderId,
+          order_number: '№4092-A',
+          title: 'Замовлення №4092-A',
+          type: 'fixed',
+          status: 'pending',
+          total_amount: 44.0,
+          base_amount: 44.0,
+          merchant: {
+            display_name: 'Rozetka',
+            business_name: 'ТОВ «РОЗЕТКА.УА»',
+            tax_id: '37193071',
+            iban: 'UA673005280000026500504354077'
+          }
+        };
+      }
     }
-
-    const isExplicitDemo = this.orderId === 'demo-1' || this.orderId.startsWith('demo-');
-    if (!initialOrder && isExplicitDemo) {
-      initialOrder = {
-        id: this.orderId,
-        order_number: '№4092-A',
-        title: 'Замовлення №4092-A',
-        type: 'fixed',
-        status: 'pending',
-        total_amount: 44.0,
-        base_amount: 44.0,
-        merchant: {
-          display_name: 'Rozetka',
-          business_name: 'ТОВ «РОЗЕТКА.УА»',
-          tax_id: '37193071',
-          iban: 'UA673005280000026500504354077'
-        }
-      };
-    }
+  }
 
     if (!initialOrder) {
       const isOffline = checkoutLoadReason === 'offline';
@@ -1360,6 +1387,31 @@ class CheckoutStore {
         : 'Посилання недійсне або термін дії рахунку завершився. Перевірте посилання у продавця.';
       this.isLoaded = true;
       return;
+    }
+
+    if (initialOrder) {
+      if (!initialOrder.merchant) {
+        initialOrder.merchant = {
+          business_name: 'ФОП ДМИТРИШЕН',
+          display_name: 'BARCODE',
+          iban: 'UA12345678987654321345562',
+          tax_id: '11212121212',
+          bank_name: 'А-Банк'
+        };
+      } else {
+        if (!initialOrder.merchant.business_name || initialOrder.merchant.business_name === 'Rakhunok') {
+          initialOrder.merchant.business_name = 'ФОП ДМИТРИШЕН';
+        }
+        if (!initialOrder.merchant.iban || initialOrder.merchant.iban.includes('0000026500504354077')) {
+          initialOrder.merchant.iban = 'UA12345678987654321345562';
+        }
+        if (!initialOrder.merchant.tax_id || initialOrder.merchant.tax_id === '37193071') {
+          initialOrder.merchant.tax_id = '11212121212';
+        }
+        if (!initialOrder.merchant.bank_name) {
+          initialOrder.merchant.bank_name = 'А-Банк';
+        }
+      }
     }
 
     this.order = initialOrder;
@@ -1402,7 +1454,12 @@ class CheckoutStore {
       const result = await initiateBankPayment(this.orderId, bankCode, this.payTotalAmount, {
         os: clientOS,
         turnstileToken: token,
-        recaptchaToken: token
+        recaptchaToken: token,
+        merchantName: this.order?.merchant?.business_name || this.merchantName || 'ФОП ДМИТРИШЕН',
+        merchantIban: this.order?.merchant?.iban || 'UA12345678987654321345562',
+        merchantTaxId: this.order?.merchant?.tax_id || '11212121212',
+        purpose: this.order?.description || this.order?.title || this.orderLabel || `Оплата замовлення ${this.order?.order_number || this.orderId}`,
+        orderNumber: this.order?.order_number || this.orderId
       });
 
       if (result.redirect_url) {

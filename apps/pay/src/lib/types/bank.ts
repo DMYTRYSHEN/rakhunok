@@ -18,5 +18,8 @@ export interface BankPaymentInitiateResult {
   success: boolean;
   redirect_url?: string;
   fallback_url?: string;
+  nbu_raw_string?: string;
+  nbu_payload_base64?: string;
+  nbu_qr_url?: string;
   error?: string;
 }

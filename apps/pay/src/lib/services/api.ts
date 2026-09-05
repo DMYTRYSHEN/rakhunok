@@ -182,6 +182,11 @@ export async function initiateBankPayment(
     turnstileToken?: string;
     apiBase?: string;
     fetchImpl?: typeof fetch;
+    merchantName?: string;
+    merchantIban?: string;
+    merchantTaxId?: string;
+    purpose?: string;
+    orderNumber?: string;
   } = {}
 ): Promise<BankPaymentInitiateResult> {
   const fetchImpl = options.fetchImpl || fetch;
@@ -203,30 +208,43 @@ export async function initiateBankPayment(
 
     if (res.ok) {
       const data = await res.json();
-      if (data && data.success) {
-        return data;
-      }
-      if (data && data.redirect_url) {
+      if (data && (data.success || data.redirect_url)) {
+        if (data.nbu_payload_base64 && !data.nbu_raw_string) {
+          try {
+            const b64 = data.nbu_payload_base64.replace(/-/g, '+').replace(/_/g, '/');
+            const bin = atob(b64);
+            const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+            data.nbu_raw_string = new TextDecoder('utf-8').decode(bytes);
+          } catch {
+            // fallback
+          }
+        }
         return { success: true, ...data };
       }
     }
   } catch (err) {
-    console.warn('API initiate failed, using fallback deep link:', err);
+    console.warn('API initiate failed, using client-side NBU QR fallback:', err);
   }
 
-  // Fallback client-side scheme map
-  const schemeMap: Record<string, string> = {
-    TASB: 'izibank://bank.gov.ua/qr/',
-    GLBU: 'globus://bank.gov.ua/qr/',
-    UNJS: 'https://send.monobank.ua/',
-    PBAN: 'https://next.privat24.ua/pay/',
-    FUIB: 'pumb-online.app://',
-    NOVA: 'novapay-mobile://'
-  };
+  // Client-side ISO NBU 003 generator fallback
+  const { generateNbuQrPayload, buildBankRedirect } = await import('./qr-generator.js');
+  const nbuQr = generateNbuQrPayload({
+    amount,
+    recipientName: options.merchantName || 'ФОП ДМИТРИШЕН',
+    recipientIban: options.merchantIban || 'UA12345678987654321345562',
+    recipientTaxId: options.merchantTaxId || '11212121212',
+    purpose: options.purpose || `Оплата замовлення ${options.orderNumber || orderId}`,
+    orderNumber: options.orderNumber || orderId
+  });
+
+  const redirectInfo = buildBankRedirect(bankCode, nbuQr.base64UrlPayload, options.os || 'desktop');
 
   return {
     success: true,
-    redirect_url: schemeMap[bankCode] || 'https://qr.bank.gov.ua/',
-    fallback_url: 'https://qr.bank.gov.ua/'
+    redirect_url: redirectInfo.redirectUrl,
+    fallback_url: redirectInfo.fallbackUrl,
+    nbu_raw_string: nbuQr.rawString,
+    nbu_payload_base64: nbuQr.base64UrlPayload,
+    nbu_qr_url: nbuQr.standardQrUrl
   };
 }

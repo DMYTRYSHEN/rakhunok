@@ -15,6 +15,26 @@
   let couponCode = $state<string>('');
   let couponApplied = $state<boolean>(false);
 
+  // NBU spec copy state
+  let copiedRaw = $state<boolean>(false);
+  let copiedPayload = $state<boolean>(false);
+
+  async function copyText(text: string, type: 'raw' | 'payload'): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (type === 'raw') {
+        copiedRaw = true;
+        setTimeout(() => (copiedRaw = false), 2000);
+      } else {
+        copiedPayload = true;
+        setTimeout(() => (copiedPayload = false), 2000);
+      }
+      checkout.showToast('Скопійовано в буфер обміну');
+    } catch {
+      checkout.showToast('Не вдалося скопіювати');
+    }
+  }
+
   function toggleSubView(view: 'info' | 'search' | 'methods'): void {
     if (currentSubView === view) {
       currentSubView = null;
@@ -433,38 +453,98 @@
 
     <!-- Info View Sub-modal -->
     <div class="sub-view" class:active={currentSubView === 'info'}>
-      <h3 class="view-title">Деталі платежу</h3>
+      <div class="sub-view-header">
+        <h3 class="view-title" style="margin-bottom: 0;">Деталі платежу</h3>
+        <button
+          type="button"
+          class="sub-close-btn"
+          onclick={() => (currentSubView = null)}
+          aria-label="Закрити"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
       <div class="info-list">
         <div class="info-row">
           <span class="info-label">Отримувач</span>
           <span class="info-value">
-            {checkout.order?.merchant?.business_name || checkout.merchantName}
+            {checkout.order?.merchant?.business_name || checkout.merchantName || 'ФОП ДМИТРИШЕН'}
           </span>
         </div>
-        {#if checkout.order?.merchant?.bank_name}
+        {#if checkout.order?.merchant?.display_name && checkout.order.merchant.display_name !== (checkout.order?.merchant?.business_name || checkout.merchantName)}
           <div class="info-row">
-            <span class="info-label">Банк</span>
-            <span class="info-value">{checkout.order.merchant.bank_name}</span>
+            <span class="info-label">Бренд / Назва</span>
+            <span class="info-value">{checkout.order.merchant.display_name}</span>
           </div>
         {/if}
         <div class="info-row">
-          <span class="info-label">IBAN</span>
-          <span class="info-value">{checkout.order?.merchant?.iban || 'Не вказано'}</span>
+          <span class="info-label">Банк</span>
+          <span class="info-value">{checkout.order?.merchant?.bank_name || 'А-Банк'}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">ЄДРПОУ</span>
-          <span class="info-value">{checkout.order?.merchant?.tax_id || 'Не вказано'}</span>
+          <span class="info-label">IBAN</span>
+          <span class="info-value">{checkout.order?.merchant?.iban || 'UA12345678987654321345562'}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">ЄДРПОУ / ІПН</span>
+          <span class="info-value">{checkout.order?.merchant?.tax_id || '11212121212'}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Сума</span>
+          <span class="info-value">{formatNumber(checkout.payTotalAmount)} ₴</span>
         </div>
         <div class="info-row">
           <span class="info-label">Призначення</span>
-          <span class="info-value">{checkout.orderLabel}</span>
+          <span class="info-value">{checkout.order?.description || checkout.order?.title || checkout.orderLabel}</span>
         </div>
+      </div>
+
+      <div class="nbu-section">
+        <div class="nbu-title-row">
+          <span class="nbu-label">Строка ініціалізації NBU 003 ICT</span>
+          <button type="button" class="copy-raw-btn" onclick={() => copyText(checkout.nbuRawString, 'raw')}>
+            {copiedRaw ? 'Скопійовано ✓' : 'Копіювати'}
+          </button>
+        </div>
+        <pre class="nbu-box">{checkout.nbuRawString}</pre>
+
+        <div class="nbu-title-row" style="margin-top: 10px;">
+          <span class="nbu-label">Base64URL Payload для банку</span>
+          <button type="button" class="copy-raw-btn" onclick={() => copyText(checkout.nbuPayload, 'payload')}>
+            {copiedPayload ? 'Скопійовано ✓' : 'Копіювати'}
+          </button>
+        </div>
+        <pre class="nbu-box payload-box">{checkout.nbuPayload}</pre>
+
+        {#if checkout.currentBankRedirect}
+          <div class="nbu-title-row" style="margin-top: 10px;">
+            <span class="nbu-label">Deep link ({checkout.selectedBank?.name || 'Банк'})</span>
+          </div>
+          <div class="nbu-deeplink-text">{checkout.currentBankRedirect.redirectUrl}</div>
+        {/if}
       </div>
     </div>
 
     <!-- Search View Sub-modal -->
     <div class="sub-view" class:active={currentSubView === 'search'}>
-      <h3 class="view-title">Оберіть банк</h3>
+      <div class="sub-view-header">
+        <h3 class="view-title" style="margin-bottom: 0;">Оберіть банк</h3>
+        <button
+          type="button"
+          class="sub-close-btn"
+          onclick={() => (currentSubView = null)}
+          aria-label="Закрити"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
       <div class="search-input-wrapper">
         <svg
           viewBox="0 0 24 24"
@@ -544,18 +624,31 @@
 
     <!-- Other Methods & Promo Sub-modal -->
     <div class="sub-view" class:active={currentSubView === 'methods'}>
-      <div class="sub-view-nav">
+      <div class="sub-view-nav" style="justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button
+            type="button"
+            class="sub-back-btn"
+            onclick={() => (currentSubView = null)}
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.5" fill="none">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+            <span>Pay by Bank</span>
+          </button>
+          <h3 class="view-title" style="margin-bottom: 0;">Інші варіанти</h3>
+        </div>
         <button
           type="button"
-          class="sub-back-btn"
+          class="sub-close-btn"
           onclick={() => (currentSubView = null)}
+          aria-label="Закрити"
         >
-          <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.5" fill="none">
-            <polyline points="15 18 9 12 15 6"></polyline>
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
-          <span>Pay by Bank</span>
         </button>
-        <h3 class="view-title" style="margin-bottom: 0;">Інші варіанти</h3>
       </div>
 
       <!-- Promo / Coupon Code Section -->
