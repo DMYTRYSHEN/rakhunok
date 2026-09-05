@@ -496,6 +496,34 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 		} catch {}
 	}
 
+	if (url.pathname === '/conf' || url.pathname.startsWith('/conf/')) {
+		if (url.pathname === '/conf') {
+			return Response.redirect(`${url.origin}/conf/`, 301);
+		}
+		try {
+			const targetUrl = new URL(request.url);
+			targetUrl.protocol = 'http:';
+			targetUrl.hostname = 'localhost';
+			targetUrl.port = '5176';
+
+			const reqHeaders = new Headers(request.headers);
+			reqHeaders.delete('host');
+
+			const confDevRes = await fetch(targetUrl.toString(), {
+				method: request.method,
+				headers: reqHeaders,
+				body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
+				redirect: 'manual'
+			});
+
+			if (confDevRes.ok || confDevRes.status !== 404) {
+				return confDevRes;
+			}
+		} catch {}
+
+		return env.ASSETS.fetch(request);
+	}
+
 	if (url.pathname === '/api/v1/orders' || url.pathname.startsWith('/api/v1/orders')) {
 		if (request.method === 'POST') {
 			try {
@@ -613,7 +641,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 		}
 	}
 
-	if (url.pathname === DOCS_SPEC_PATH || isLandingAsset(url.pathname)) {
+	if (url.pathname === DOCS_SPEC_PATH || isLandingAsset(url.pathname) || url.pathname.startsWith('/conf')) {
 		return env.ASSETS.fetch(request);
 	}
 

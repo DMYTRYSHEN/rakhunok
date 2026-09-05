@@ -6,7 +6,8 @@
 	"workspaces": [
 		"apps/merchant-app",
 		"apps/checkout",
-		"apps/pay"
+		"apps/pay",
+		"apps/conf"
 	],
 	"engines": {
 		"node": ">=22.13 <23 || >=24"
@@ -16,16 +17,20 @@
 		"dev:worker": "npm --prefix worker run dev",
 		"dev:app": "npm --prefix apps/merchant-app run dev",
 		"dev:pay": "npm --prefix apps/pay run dev",
+		"dev:conf": "npm --prefix apps/conf run dev",
 		"dev:api": "npm --prefix ../core/worker run dev",
 		"build:app": "npm --prefix apps/merchant-app run build",
 		"build:checkout": "npm --prefix apps/pay run build",
 		"build:pay": "npm --prefix apps/pay run build",
+		"build:conf": "npm --prefix apps/conf run build",
 		"check:app": "npm --prefix apps/merchant-app run check",
 		"check:checkout": "npm --prefix apps/pay run check",
 		"check:pay": "npm --prefix apps/pay run check",
+		"check:conf": "npm --prefix apps/conf run check",
 		"test:app": "npm --prefix apps/merchant-app run test",
 		"test:checkout": "npm --prefix apps/checkout run test",
 		"test:pay": "npm --prefix apps/pay run test",
+		"test:conf": "npm --prefix apps/conf run test",
 		"generate:processes": "node --experimental-strip-types scripts/generate-process-manifest.ts",
 		"build": "npm run generate:processes && vite build && npm run build:docs",
 		"build:docs": "node scripts/copy-api-docs.mjs",
@@ -45,9 +50,11 @@
 		"worker:check:production": "npm --prefix worker run check:production",
 		"worker:check:dashboard:production": "npm --prefix worker run check:dashboard:production",
 		"worker:check:corex:production": "npm --prefix worker run check:corex:production",
+		"worker:check:conf:production": "npm --prefix worker run check:conf:production",
 		"worker:deploy:production": "npm --prefix worker run deploy:production",
 		"worker:deploy:dashboard:production": "npm --prefix worker run deploy:dashboard:production",
 		"worker:deploy:corex:production": "npm --prefix worker run deploy:corex:production",
+		"worker:deploy:conf:production": "npm --prefix worker run deploy:conf:production",
 		"deploy:production": "node scripts/deploy-production.mjs"
 	},
 	"devDependencies": {

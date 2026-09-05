@@ -38,7 +38,8 @@
 				{ "pattern": "letsrealtalk.com/t/*", "zone_name": "letsrealtalk.com" },
 				{ "pattern": "letsrealtalk.com/tag/*", "zone_name": "letsrealtalk.com" },
 				{ "pattern": "letsrealtalk.com/pos/*", "zone_name": "letsrealtalk.com" },
-				{ "pattern": "letsrealtalk.com/pay/*", "zone_name": "letsrealtalk.com" },
+					{ "pattern": "letsrealtalk.com/pay", "zone_name": "letsrealtalk.com" },
+					{ "pattern": "letsrealtalk.com/pay/*", "zone_name": "letsrealtalk.com" },
 				{ "pattern": "letsrealtalk.com/api/v1/checkout*", "zone_name": "letsrealtalk.com" },
 				{ "pattern": "letsrealtalk.com/api/v1/banks*", "zone_name": "letsrealtalk.com" },
 				{ "pattern": "letsrealtalk.com/api/v1/logos*", "zone_name": "letsrealtalk.com" }
