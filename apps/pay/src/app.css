@@ -687,8 +687,8 @@ body.light-mode .search-trigger { background: rgba(0,0,0,0.05); color: #555; }
 .d-row-chevron { color: var(--text-tertiary); flex-shrink: 0; }
 
 .sub-view {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    background: #18181b; z-index: 50; padding: 22px 20px 20px;
+    position: absolute; top: 52px; left: 0; right: 0; bottom: 0;
+    background: #18181b; z-index: 20; padding: 0 20px 20px;
     transform: translateY(20px); opacity: 0; pointer-events: none; transition: all 0.4s var(--ease-spring);
     display: flex; flex-direction: column; overflow-y: auto; border-radius: 38px 38px 0 0;
 }

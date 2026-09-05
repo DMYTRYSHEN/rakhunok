@@ -118,17 +118,20 @@ test('generateNbuQrPayload creates standard 17-line NBU 003 string and payload',
 	assert.ok(qr.standardQrUrl.startsWith('https://qr.bank.gov.ua/'));
 });
 
-test('buildBankRedirect generates valid deep link schemes for Monobank and IziBank', async () => {
+test('buildBankRedirect generates valid deep link schemes for Monobank, IziBank, and ABank', async () => {
 	const { buildBankRedirect } = await import('./index.ts');
 
 	const mono = buildBankRedirect('MONO', 'dummyPayload', 'ios');
 	assert.equal(mono.redirectUrl, 'https://mbnk.app/qr/dummyPayload');
 
-	const izi = buildBankRedirect('TASB', 'dummyPayload', 'android');
-	assert.equal(izi.redirectUrl, 'izibank://bank.gov.ua/qr/dummyPayload');
+	const iziIos = buildBankRedirect('TASB', 'dummyPayload', 'ios');
+	assert.equal(iziIos.redirectUrl, 'izibank://bank.gov.ua/qr/dummyPayload');
+
+	const iziAndroid = buildBankRedirect('TASB', 'dummyPayload', 'android');
+	assert.ok(iziAndroid.redirectUrl.startsWith('intent://bank.gov.ua/qr/dummyPayload'));
 
 	const abank = buildBankRedirect('ABUA', 'dummyPayload', 'ios');
-	assert.equal(abank.redirectUrl, 'a-bank://qr/dummyPayload');
+	assert.equal(abank.redirectUrl, 'https://abank24.page.link/qr/dummyPayload');
 });
 
 test('routeWebRequest handles POST /api/v1/checkout/:id/initiate', async () => {

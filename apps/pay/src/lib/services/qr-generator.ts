@@ -106,38 +106,48 @@ export function buildBankRedirect(bankCode: string, payload: string, os = 'deskt
   let fallbackUrl = 'https://qr.bank.gov.ua/';
 
   switch (code) {
-    case 'TASB':
-      redirectUrl = `izibank://bank.gov.ua/qr/${payload}`;
-      fallbackUrl = 'https://apps.apple.com/ua/app/izibank/id1527341829';
-      break;
-    case 'GLBU':
-      redirectUrl = `globus://bank.gov.ua/qr/${payload}`;
-      fallbackUrl = 'https://apps.apple.com/ua/app/globusplus/id1511896208';
-      break;
     case 'MONO':
     case 'UNJS':
       redirectUrl = `https://mbnk.app/qr/${payload}`;
       fallbackUrl = 'https://send.monobank.ua/';
       break;
     case 'PBAN':
-      redirectUrl = os === 'desktop' ? 'https://next.privat24.ua/pay/' : `https://qr.bank.gov.ua/${payload}`;
+      redirectUrl = `https://www.privat24.ua/rd/send_qr/nbu/${payload}`;
       fallbackUrl = 'https://next.privat24.ua/pay/';
       break;
-    case 'FUIB':
-      redirectUrl = os === 'ios' ? `pumb-online.app://https://bank.gov.ua/qr/${payload}` : `https://mobile-app.pumb.ua/https://bank.gov.ua/qr/${payload}`;
-      fallbackUrl = 'https://pumb.ua';
-      break;
-    case 'NOVA':
-      redirectUrl = `novapay-mobile://bank.gov.ua/qr/${payload}`;
-      fallbackUrl = 'https://novapay.ua';
-      break;
-    case 'ABUA':
-      redirectUrl = os === 'ios' ? `a-bank://qr/${payload}` : `https://qr.bank.gov.ua/${payload}`;
-      fallbackUrl = 'https://a-bank.com.ua';
+    case 'TASB':
+      redirectUrl =
+        os === 'android'
+          ? `intent://bank.gov.ua/qr/${payload}#Intent;scheme=https;package=ua.izibank.app;end`
+          : `izibank://bank.gov.ua/qr/${payload}`;
+      fallbackUrl = 'https://apps.apple.com/ua/app/izibank/id1527341829';
       break;
     case 'SENS':
-      redirectUrl = `https://qr.bank.gov.ua/${payload}`;
+      redirectUrl = `https://app.sensebank.ua/gkR4?code=${payload}`;
       fallbackUrl = 'https://sensebank.ua';
+      break;
+    case 'ABUA':
+      redirectUrl = `https://abank24.page.link/qr/${payload}`;
+      fallbackUrl = 'https://a-bank.com.ua';
+      break;
+    case 'FUIB':
+      redirectUrl = `https://mobile-app.pumb.ua/qr.bank.gov.ua/${payload}`;
+      fallbackUrl = 'https://pumb.ua';
+      break;
+    case 'AVAL':
+      redirectUrl = `https://my-raif.apps.raiffeisen.ua/qr?payload=${payload}`;
+      fallbackUrl = 'https://raiffeisen.ua';
+      break;
+    case 'GLBU':
+      redirectUrl = `https://gpls.app/qr/${payload}`;
+      fallbackUrl = 'https://globusplus.com.ua';
+      break;
+    case 'NOVA':
+      redirectUrl =
+        os === 'android'
+          ? `intent://bank.gov.ua/qr/${payload}#Intent;scheme=https;package=ua.novapay.novapaymobile;end`
+          : `novapay-mobile://bank.gov.ua/qr/${payload}`;
+      fallbackUrl = 'https://novapay.ua';
       break;
     default:
       redirectUrl = `https://qr.bank.gov.ua/${payload}`;

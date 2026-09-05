@@ -15,26 +15,6 @@
   let couponCode = $state<string>('');
   let couponApplied = $state<boolean>(false);
 
-  // NBU spec copy state
-  let copiedRaw = $state<boolean>(false);
-  let copiedPayload = $state<boolean>(false);
-
-  async function copyText(text: string, type: 'raw' | 'payload'): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(text);
-      if (type === 'raw') {
-        copiedRaw = true;
-        setTimeout(() => (copiedRaw = false), 2000);
-      } else {
-        copiedPayload = true;
-        setTimeout(() => (copiedPayload = false), 2000);
-      }
-      checkout.showToast('Скопійовано в буфер обміну');
-    } catch {
-      checkout.showToast('Не вдалося скопіювати');
-    }
-  }
-
   function toggleSubView(view: 'info' | 'search' | 'methods'): void {
     if (currentSubView === view) {
       currentSubView = null;
@@ -501,31 +481,6 @@
           <span class="info-label">Призначення</span>
           <span class="info-value">{checkout.order?.description || checkout.order?.title || checkout.orderLabel}</span>
         </div>
-      </div>
-
-      <div class="nbu-section">
-        <div class="nbu-title-row">
-          <span class="nbu-label">Строка ініціалізації NBU 003 ICT</span>
-          <button type="button" class="copy-raw-btn" onclick={() => copyText(checkout.nbuRawString, 'raw')}>
-            {copiedRaw ? 'Скопійовано ✓' : 'Копіювати'}
-          </button>
-        </div>
-        <pre class="nbu-box">{checkout.nbuRawString}</pre>
-
-        <div class="nbu-title-row" style="margin-top: 10px;">
-          <span class="nbu-label">Base64URL Payload для банку</span>
-          <button type="button" class="copy-raw-btn" onclick={() => copyText(checkout.nbuPayload, 'payload')}>
-            {copiedPayload ? 'Скопійовано ✓' : 'Копіювати'}
-          </button>
-        </div>
-        <pre class="nbu-box payload-box">{checkout.nbuPayload}</pre>
-
-        {#if checkout.currentBankRedirect}
-          <div class="nbu-title-row" style="margin-top: 10px;">
-            <span class="nbu-label">Deep link ({checkout.selectedBank?.name || 'Банк'})</span>
-          </div>
-          <div class="nbu-deeplink-text">{checkout.currentBankRedirect.redirectUrl}</div>
-        {/if}
       </div>
     </div>
 
