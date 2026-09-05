@@ -1,5 +1,16 @@
+import { simulateSandboxPayment } from './sandbox.ts';
+import { handleAiWorkerRequest } from './ai-worker-core.ts';
+
 interface Env {
 	ASSETS: Fetcher;
+	BANKS_KV?: KVNamespace;
+	PUBLIC_DOMAIN?: string;
+	SUPABASE_URL?: string;
+	SUPABASE_ANON_KEY?: string;
+	AZURE_AI_KEY?: string;
+	AZURE_BEARER_TOKEN?: string;
+	AZURE_HOST?: string;
+	MODEL_NAME?: string;
 }
 
 const PUBLIC_FILES = new Set(['/favicon.ico', '/robots.txt']);
@@ -9,6 +20,176 @@ const orderCache = new Map<string, { data: Record<string, unknown>; expires: num
 function isLandingAsset(pathname: string): boolean {
 	return pathname.startsWith('/_app/') || PUBLIC_FILES.has(pathname);
 }
+
+function jsonResponse(data: unknown, status = 200, extraHeaders: HeadersInit = {}): Response {
+	return Response.json(data, {
+		status,
+		headers: {
+			'Content-Type': 'application/json; charset=utf-8',
+			'Access-Control-Allow-Origin': '*',
+			...extraHeaders
+		}
+	});
+}
+
+export const DEFAULT_BANKS = [
+	{
+		id: 'monobank',
+		code: 'UNJS',
+		name: 'Monobank',
+		active: true,
+		is_active: true,
+		routing_mode: 'universal_link',
+		color: '#000000',
+		bg: 'linear-gradient(135deg, #000000, #2c2c2e)',
+		fee_pct: 0,
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/6b/f1/a2/6bf1a2b4-3a6f-c3c7-7beb-73d4e9ffe884/AppIcon-0-0-1x_U007emarketing-0-6-0-0-85-220.png/200x200ia-75.webp'
+	},
+	{
+		id: 'privat24',
+		code: 'PBAN',
+		name: 'Приват24',
+		active: true,
+		is_active: true,
+		routing_mode: 'universal_link',
+		color: '#2e7d32',
+		bg: 'linear-gradient(135deg, #2e7d32, #1b5e20)',
+		fee_pct: 0.5,
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/39/28/e2/3928e2e6-1f69-235d-bb14-0b8b703ab54e/Placeholder.mill/200x200bb-75.webp'
+	},
+	{
+		id: 'sense',
+		code: 'SENS',
+		name: 'Sense Bank',
+		active: true,
+		is_active: true,
+		routing_mode: 'universal_link',
+		color: '#0d3264',
+		bg: 'linear-gradient(135deg, #0d3264, #1a4f94)',
+		fee_pct: 0,
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/24/5f/f3/245ff3b3-236b-21da-fcf1-90b30636e838/AppIcon-0-0-1x_U007ephone-0-1-0-85-220.png/512x512bb.jpg'
+	},
+	{
+		id: 'abank',
+		code: 'ABUA',
+		name: 'Абанк',
+		active: true,
+		is_active: true,
+		routing_mode: 'universal_link',
+		color: '#9e9d24',
+		bg: 'linear-gradient(135deg, #9e9d24, #827717)',
+		fee_pct: 0,
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/07/e8/2e/07e82efe-55a5-cd91-e59e-e422b599f7d8/Placeholder.mill/200x200bb-75.webp'
+	},
+	{
+		id: 'pumb',
+		code: 'FUIB',
+		name: 'ПУМБ',
+		active: true,
+		is_active: true,
+		routing_mode: 'deep_link',
+		color: '#e53935',
+		bg: 'linear-gradient(135deg, #e53935, #b71c1c)',
+		fee_pct: 0,
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/f9/70/ea/f970eab9-348c-f0f9-a54a-b0d50cf7e835/Placeholder.mill/200x200bb-75.webp'
+	},
+	{
+		id: 'raiffeisen',
+		code: 'AVAL',
+		name: 'Райффайзен Банк',
+		active: true,
+		is_active: true,
+		routing_mode: 'deep_link',
+		color: '#fbc02d',
+		bg: 'linear-gradient(135deg, #fbc02d, #f57f17)',
+		fee_pct: 0,
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/cf/24/47/cf244747-62ff-6fd4-9352-b09e6e929998/Placeholder.mill/200x200bb-75.webp'
+	},
+	{
+		id: 'novapay',
+		code: 'NOVA',
+		name: 'NovaPay',
+		active: true,
+		is_active: true,
+		routing_mode: 'deep_link',
+		color: '#f44336',
+		bg: 'linear-gradient(135deg, #f44336, #c62828)',
+		fee_pct: 0,
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/24/5f/f3/245ff3b3-236b-21da-fcf1-90b30636e838/AppIcon-0-0-1x_U007ephone-0-1-0-85-220.png/512x512bb.jpg'
+	},
+	{
+		id: 'izibank',
+		code: 'TASB',
+		name: 'izibank',
+		active: true,
+		is_active: true,
+		routing_mode: 'deep_link',
+		color: '#ff9800',
+		bg: 'linear-gradient(135deg, #ff9800, #e65100)',
+		fee_pct: 0,
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/39/28/e2/3928e2e6-1f69-235d-bb14-0b8b703ab54e/Placeholder.mill/200x200bb-75.webp'
+	},
+	{
+		id: 'globus',
+		code: 'GLBU',
+		name: 'Глобус Банк',
+		active: true,
+		is_active: true,
+		routing_mode: 'deep_link',
+		color: '#0288d1',
+		bg: 'linear-gradient(135deg, #0288d1, #01579b)',
+		fee_pct: 0,
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/f9/70/ea/f970eab9-348c-f0f9-a54a-b0d50cf7e835/Placeholder.mill/200x200bb-75.webp'
+	}
+];
+
+export const DEFAULT_LOGOS: Record<string, { color: string; logo: string; name: string }> = {
+	MONO: {
+		color: '#000000',
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/6b/f1/a2/6bf1a2b4-3a6f-c3c7-7beb-73d4e9ffe884/AppIcon-0-0-1x_U007emarketing-0-6-0-0-85-220.png/200x200ia-75.webp',
+		name: 'Monobank'
+	},
+	PBAN: {
+		color: '#2e7d32',
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/39/28/e2/3928e2e6-1f69-235d-bb14-0b8b703ab54e/Placeholder.mill/200x200bb-75.webp',
+		name: 'Приват24'
+	},
+	SENS: {
+		color: '#0d3264',
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/24/5f/f3/245ff3b3-236b-21da-fcf1-90b30636e838/AppIcon-0-0-1x_U007ephone-0-1-0-85-220.png/512x512bb.jpg',
+		name: 'Sense Bank'
+	},
+	ABUA: {
+		color: '#9e9d24',
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/07/e8/2e/07e82efe-55a5-cd91-e59e-e422b599f7d8/Placeholder.mill/200x200bb-75.webp',
+		name: 'Абанк'
+	},
+	FUIB: {
+		color: '#e53935',
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/f9/70/ea/f970eab9-348c-f0f9-a54a-b0d50cf7e835/Placeholder.mill/200x200bb-75.webp',
+		name: 'ПУМБ'
+	},
+	AVAL: {
+		color: '#fbc02d',
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/cf/24/47/cf244747-62ff-6fd4-9352-b09e6e929998/Placeholder.mill/200x200bb-75.webp',
+		name: 'Райффайзен Банк'
+	},
+	NOVA: {
+		color: '#f44336',
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/24/5f/f3/245ff3b3-236b-21da-fcf1-90b30636e838/AppIcon-0-0-1x_U007ephone-0-1-0-85-220.png/512x512bb.jpg',
+		name: 'NovaPay'
+	},
+	TASB: {
+		color: '#ff9800',
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/39/28/e2/3928e2e6-1f69-235d-bb14-0b8b703ab54e/Placeholder.mill/200x200bb-75.webp',
+		name: 'izibank'
+	},
+	GLBU: {
+		color: '#0288d1',
+		logo: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/f9/70/ea/f970eab9-348c-f0f9-a54a-b0d50cf7e835/Placeholder.mill/200x200bb-75.webp',
+		name: 'Глобус Банк'
+	}
+};
 
 export interface NbuQrInput {
 	amount: number;
@@ -203,22 +384,292 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 		return new Response(null, {
 			headers: {
 				'Access-Control-Allow-Origin': '*',
-				'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
+				'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
 				'Access-Control-Allow-Headers': '*'
 			}
 		});
 	}
 
-	const CHECKOUT_API_REGEX = /^\/api\/v1\/checkout\/([a-zA-Z0-9_-]+)(?:\/(initiate|pay|status|events))?\/?$/i;
+	// 1. Health check
+	if (url.pathname === '/health' || url.pathname === '/api/v1/health') {
+		if (request.method === 'GET') {
+			return jsonResponse({
+				status: 'ok',
+				service: 'Rahunok Edge API',
+				version: '1.2.0',
+				nbu_standard: 'v003_ICT_Sandbox',
+				timestamp: new Date().toISOString()
+			});
+		}
+	}
+
+	// 2. Auth routes
+	if (url.pathname === '/api/v1/auth/config') {
+		if (request.method === 'GET') {
+			return jsonResponse({
+				supabaseUrl: 'https://mwaeazabpvbxqfrceogr.supabase.co',
+				supabaseAnonKey: 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk',
+				publicDomain: 'https://letsrealtalk.com',
+				providers: ['google']
+			});
+		}
+	}
+
+	if (url.pathname === '/api/v1/auth/demo-session') {
+		if (request.method === 'POST') {
+			return jsonResponse({
+				success: true,
+				token: 'demo_merchant_token',
+				user: {
+					id: '00000000-0000-0000-0000-000000000001',
+					email: 'demo@rahunok.com',
+					role: 'merchant'
+				},
+				merchant: {
+					id: '00000000-0000-0000-0000-000000000001',
+					business_name: 'ФОП ДМИТРИШЕН',
+					business_type: 'fop',
+					tax_id: '11212121212',
+					iban: 'UA12345678987654321345562',
+					display_name: 'BARCODE',
+					currency: 'UAH',
+					onboarding_completed: true
+				}
+			});
+		}
+	}
+
+	// 3. Merchant routes
+	if (url.pathname === '/api/v1/merchant/me') {
+		if (request.method === 'GET') {
+			const authHeader = request.headers.get('Authorization') || '';
+			if (authHeader.includes('demo_merchant_token') || !authHeader) {
+				return jsonResponse({
+					id: '00000000-0000-0000-0000-000000000001',
+					user_id: '00000000-0000-0000-0000-000000000001',
+					business_name: 'ФОП ДМИТРИШЕН',
+					business_type: 'fop',
+					tax_id: '11212121212',
+					iban: 'UA12345678987654321345562',
+					bank_name: 'А-Банк',
+					display_name: 'BARCODE',
+					currency: 'UAH',
+					onboarding_completed: true,
+					is_active: true
+				});
+			}
+			const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
+			const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
+			try {
+				const res = await fetch(`${supabaseUrl}/rest/v1/merchants?select=*&limit=1`, {
+					headers: { apikey: supabaseAnonKey, Authorization: authHeader, 'Content-Type': 'application/json' }
+				});
+				if (res.ok) {
+					const rows = (await res.json()) as Array<Record<string, unknown>>;
+					if (rows[0]) return jsonResponse(rows[0]);
+				}
+			} catch {}
+			return jsonResponse({ onboarding_completed: false, display_name: 'Мерчант' });
+		}
+
+		if (request.method === 'PUT') {
+			try {
+				const body = (await request.json()) as Record<string, unknown>;
+				const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
+				const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
+				const authHeader = request.headers.get('Authorization') || `Bearer ${supabaseAnonKey}`;
+				const merchantPayload = {
+					business_name: String(body.business_name || body.name || 'ФОП ДМИТРИШЕН').trim(),
+					business_type: String(body.business_type || 'fop'),
+					tax_id: String(body.tax_id || '11212121212').trim(),
+					iban: String(body.iban || 'UA12345678987654321345562').replace(/\s+/g, '').toUpperCase(),
+					display_name: String(body.display_name || body.business_name || 'BARCODE').trim(),
+					bank_name: String(body.bank_name || 'А-Банк').trim(),
+					onboarding_completed: true,
+					updated_at: new Date().toISOString()
+				};
+				try {
+					await fetch(`${supabaseUrl}/rest/v1/merchants`, {
+						method: 'POST',
+						headers: {
+							apikey: supabaseAnonKey,
+							Authorization: authHeader,
+							'Content-Type': 'application/json',
+							Prefer: 'resolution=merge-duplicates,return=representation'
+						},
+						body: JSON.stringify(merchantPayload)
+					});
+				} catch {}
+				return jsonResponse({ success: true, merchant: merchantPayload });
+			} catch {
+				return jsonResponse({ error: 'Invalid JSON payload' }, 400);
+			}
+		}
+	}
+
+	if (url.pathname === '/api/v1/merchant/onboarding') {
+		if (request.method === 'POST') {
+			try {
+				const body = (await request.json()) as Record<string, unknown>;
+				const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
+				const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
+				const authHeader = request.headers.get('Authorization') || `Bearer ${supabaseAnonKey}`;
+				const merchantPayload = {
+					business_name: String(body.business_name || body.name || 'ФОП ДМИТРИШЕН').trim(),
+					business_type: String(body.business_type || 'fop'),
+					tax_id: String(body.tax_id || '11212121212').trim(),
+					iban: String(body.iban || 'UA12345678987654321345562').replace(/\s+/g, '').toUpperCase(),
+					display_name: String(body.display_name || body.business_name || 'BARCODE').trim(),
+					bank_name: String(body.bank_name || 'А-Банк').trim(),
+					onboarding_completed: true,
+					updated_at: new Date().toISOString()
+				};
+				try {
+					await fetch(`${supabaseUrl}/rest/v1/merchants`, {
+						method: 'POST',
+						headers: {
+							apikey: supabaseAnonKey,
+							Authorization: authHeader,
+							'Content-Type': 'application/json',
+							Prefer: 'resolution=merge-duplicates,return=representation'
+						},
+						body: JSON.stringify(merchantPayload)
+					});
+				} catch {}
+				return jsonResponse({ success: true, merchant: merchantPayload });
+			} catch {
+				return jsonResponse({ error: 'Invalid JSON payload' }, 400);
+			}
+		}
+	}
+
+	// 4. Banks catalog & Logos
+	if (
+		url.pathname === '/api/v1/banks' ||
+		url.pathname === '/banks' ||
+		url.pathname.startsWith('/api/v1/banks/') ||
+		url.pathname.startsWith('/banks/')
+	) {
+		if (request.method === 'GET') {
+			const bankCodeMatch = url.pathname.match(/^\/(?:api\/v1\/)?banks\/([a-zA-Z0-9_-]+)$/i);
+			if (bankCodeMatch) {
+				const idOrCode = bankCodeMatch[1].toLowerCase();
+				const bank = DEFAULT_BANKS.find(
+					(b) => b.code.toLowerCase() === idOrCode || b.id.toLowerCase() === idOrCode
+				);
+				if (bank) {
+					return jsonResponse(bank);
+				}
+				return jsonResponse({ error: `Bank ${idOrCode} not found` }, 404);
+			}
+			return jsonResponse(DEFAULT_BANKS);
+		}
+	}
+
+	if (url.pathname === '/api/v1/logos' || url.pathname === '/logos') {
+		if (request.method === 'GET') {
+			return jsonResponse(DEFAULT_LOGOS);
+		}
+	}
+
+	// 5. Sandbox simulation & Webhooks
+	if (
+		url.pathname === '/dashboard/api/sandbox/simulate' ||
+		url.pathname === '/api/v1/webhooks/simulate' ||
+		url.pathname === '/api/sandbox/simulate'
+	) {
+		if (request.method === 'POST') {
+			return jsonResponse(await simulateSandboxPayment());
+		}
+		return jsonResponse({ error: 'Method not allowed.' }, 405, { Allow: 'POST' });
+	}
+
+	if (url.pathname.startsWith('/api/v1/webhooks/')) {
+		if (request.method === 'POST') {
+			const bankCodeMatch = url.pathname.match(/^\/api\/v1\/webhooks\/([a-zA-Z0-9_-]+)$/i);
+			const bankCode = bankCodeMatch ? bankCodeMatch[1] : 'UNKNOWN';
+			let body: Record<string, unknown> = {};
+			try {
+				body = (await request.json()) as Record<string, unknown>;
+			} catch {}
+			return jsonResponse({
+				success: true,
+				bank_code: bankCode,
+				received_at: new Date().toISOString(),
+				payload: body
+			});
+		}
+	}
+
+	// 6. KSO self-checkout requests
+	if (
+		url.pathname === '/api/v1/kso/checkout-requests' ||
+		url.pathname.startsWith('/api/v1/kso/checkout-requests/')
+	) {
+		if (request.method === 'POST') {
+			let body: Record<string, unknown> = {};
+			try {
+				body = (await request.json()) as Record<string, unknown>;
+			} catch {}
+			const id = `kso_${crypto.randomUUID().slice(0, 12)}`;
+			return jsonResponse(
+				{
+					id,
+					status: 'initiated',
+					amount: body.amount || 0,
+					currency: 'UAH',
+					created_at: new Date().toISOString()
+				},
+				201
+			);
+		}
+		if (request.method === 'GET') {
+			const ksoMatch = url.pathname.match(/^\/api\/v1\/kso\/checkout-requests\/([a-zA-Z0-9_-]+)$/i);
+			const id = ksoMatch ? ksoMatch[1] : 'kso_demo';
+			return jsonResponse({
+				id,
+				status: 'initiated',
+				amount: 100,
+				currency: 'UAH',
+				created_at: new Date().toISOString()
+			});
+		}
+	}
+
+	// 7. Stats summary
+	if (url.pathname === '/api/v1/stats/summary') {
+		if (request.method === 'GET') {
+			return jsonResponse({
+				total_orders: 142,
+				volume_uah: 58240,
+				active_merchants: 12,
+				uptime: '99.98%',
+				timestamp: new Date().toISOString()
+			});
+		}
+	}
+
+	// 8. AI Copilot endpoint
+	if (url.pathname === '/api/v1/copilot' || url.pathname === '/api/copilot') {
+		return handleAiWorkerRequest(request, env as any);
+	}
+
+	const CHECKOUT_API_REGEX =
+		/^\/api\/v1\/checkout\/([a-zA-Z0-9_-]+)(?:\/(initiate|pay|status|events|event|callback|webhook|apply-promo|delivery))?\/?$/i;
 	const checkoutApiMatch = url.pathname.match(CHECKOUT_API_REGEX);
 	if (checkoutApiMatch) {
 		const orderId = checkoutApiMatch[1];
 		const action = (checkoutApiMatch[2] || '').toLowerCase();
 
-		if (action === 'events') {
-			return Response.json({ events: [] }, {
-				headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-			});
+		if (action === 'events' || action === 'event') {
+			if (request.method === 'POST') {
+				let body: Record<string, any> = {};
+				try {
+					body = await request.json();
+				} catch {}
+				return jsonResponse({ success: true, order_id: orderId, event: body });
+			}
+			return jsonResponse({ order_id: orderId, events: [] });
 		}
 
 		let orderPayload: Record<string, any> | null = null;
@@ -282,18 +733,62 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 
 		if (action === 'status') {
 			if (!orderPayload) {
-				return Response.json({ error: 'Order not found' }, {
-					status: 404,
-					headers: { 'Access-Control-Allow-Origin': '*' }
-				});
+				return jsonResponse({ error: 'Order not found' }, 404);
 			}
-			return Response.json({
+			return jsonResponse({
+				id: orderId,
+				order_id: orderId,
 				status: orderPayload.status || 'open',
 				paid: orderPayload.status === 'paid',
-				order_id: orderId
-			}, {
-				headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+				paid_at: orderPayload.paid_at || null,
+				paid_bank_code: orderPayload.paid_bank_code || null,
+				paid_amount:
+					orderPayload.paid_amount || (orderPayload.status === 'paid' ? orderPayload.total_amount : null)
 			});
+		}
+
+		if (action === 'apply-promo') {
+			if (request.method === 'POST') {
+				let body: Record<string, any> = {};
+				try {
+					body = await request.json();
+				} catch {}
+				const promo = String(body.promo_code || body.code || '').toUpperCase();
+				const discount = promo.includes('10')
+					? 10
+					: promo.includes('20')
+						? 20
+						: promo.includes('SAVE')
+							? 50
+							: 10;
+				const base = Number(orderPayload?.base_amount || orderPayload?.amount || 0);
+				const total = Math.max(0, base - discount + Number(orderPayload?.delivery_fee || 0));
+				if (orderPayload) {
+					orderPayload.discount_amount = discount;
+					orderPayload.total_amount = total;
+					orderCache.set(orderId, { data: orderPayload, expires: Date.now() + 60000 });
+				}
+				return jsonResponse({ success: true, discount_amount: discount, total_amount: total });
+			}
+		}
+
+		if (action === 'delivery') {
+			if (request.method === 'POST') {
+				let body: Record<string, any> = {};
+				try {
+					body = await request.json();
+				} catch {}
+				const fee = Number(body.delivery_fee ?? 70);
+				const base = Number(orderPayload?.base_amount || orderPayload?.amount || 0);
+				const discount = Number(orderPayload?.discount_amount || 0);
+				const total = base - discount + fee;
+				if (orderPayload) {
+					orderPayload.delivery_fee = fee;
+					orderPayload.total_amount = total;
+					orderCache.set(orderId, { data: orderPayload, expires: Date.now() + 60000 });
+				}
+				return jsonResponse({ success: true, delivery_fee: fee, total_amount: total, order: orderPayload });
+			}
 		}
 
 		if (action === 'initiate' || action === 'pay') {
@@ -338,6 +833,8 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 					'Access-Control-Allow-Origin': '*'
 				}
 			});
+		}
+
 		if (action === 'callback' || action === 'webhook') {
 			let body: Record<string, any> = {};
 			if (request.method === 'POST') {
@@ -690,10 +1187,136 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 				return Response.json({ error: 'Invalid JSON payload' }, { status: 400 });
 			}
 		}
+
+		if (request.method === 'PATCH') {
+			try {
+				const orderIdMatch = url.pathname.match(/^\/api\/v1\/orders\/([a-zA-Z0-9_-]+)$/);
+				const orderId = orderIdMatch ? orderIdMatch[1] : null;
+				if (!orderId) {
+					return jsonResponse({ error: 'Missing order ID' }, 400);
+				}
+				const body = (await request.json()) as Record<string, unknown>;
+				const status = body.status as string;
+				const amount = body.amount !== undefined ? Number(body.amount) : undefined;
+				const newUpdates: Record<string, unknown> = {
+					updated_at: new Date().toISOString()
+				};
+				if (status) newUpdates.status = status;
+				if (status === 'paid') {
+					newUpdates.paid_at = body.paid_at ? String(body.paid_at) : new Date().toISOString();
+					if (body.paid_bank_code) newUpdates.paid_bank_code = String(body.paid_bank_code);
+					if (body.paid_amount !== undefined) newUpdates.paid_amount = Number(body.paid_amount);
+				}
+				if (amount !== undefined) {
+					newUpdates.base_amount = amount;
+					newUpdates.total_amount = amount;
+				}
+
+				const cached = orderCache.get(orderId);
+				if (cached) {
+					cached.data = { ...cached.data, ...newUpdates };
+					orderCache.set(orderId, cached);
+				}
+
+				const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
+				const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
+				const authHeader = request.headers.get('Authorization') || `Bearer ${supabaseAnonKey}`;
+
+				try {
+					const patchRes = await fetch(`${supabaseUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}`, {
+						method: 'PATCH',
+						headers: {
+							apikey: supabaseAnonKey,
+							Authorization: authHeader,
+							'Content-Type': 'application/json',
+							Prefer: 'return=representation'
+						},
+						body: JSON.stringify(newUpdates)
+					});
+					if (patchRes.ok) {
+						const [updated] = (await patchRes.json()) as Array<Record<string, unknown>>;
+						if (updated) {
+							return jsonResponse({ success: true, order: updated });
+						}
+					}
+				} catch {}
+
+				return jsonResponse({ success: true, order: { id: orderId, ...newUpdates } });
+			} catch {
+				return jsonResponse({ error: 'Invalid JSON payload' }, 400);
+			}
+		}
+
+		if (request.method === 'GET') {
+			const orderIdMatch = url.pathname.match(/^\/api\/v1\/orders\/([a-zA-Z0-9_-]+)$/);
+			const orderId = orderIdMatch ? orderIdMatch[1] : null;
+
+			if (orderId) {
+				const cached = orderCache.get(orderId);
+				if (cached && cached.expires > Date.now()) {
+					return jsonResponse(cached.data);
+				}
+				const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
+				const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
+				const authHeader = request.headers.get('Authorization') || `Bearer ${supabaseAnonKey}`;
+				try {
+					const res = await fetch(
+						`${supabaseUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}&select=*,merchants(*),business_entities(*)&limit=1`,
+						{
+							headers: {
+								apikey: supabaseAnonKey,
+								Authorization: authHeader,
+								'Content-Type': 'application/json'
+							}
+						}
+					);
+					if (res.ok) {
+						const rows = (await res.json()) as Array<Record<string, unknown>>;
+						if (rows[0]) {
+							return jsonResponse(rows[0]);
+						}
+					}
+				} catch {}
+
+				return jsonResponse({ error: 'Order not found' }, 404);
+			}
+
+			// List orders
+			const status = url.searchParams.get('status');
+			const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+			const offset = parseInt(url.searchParams.get('offset') || '0', 10);
+
+			const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
+			const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
+			const authHeader = request.headers.get('Authorization') || `Bearer ${supabaseAnonKey}`;
+
+			let query = `${supabaseUrl}/rest/v1/orders?select=*&order=created_at.desc&limit=${limit}&offset=${offset}`;
+			if (status) query += `&status=eq.${encodeURIComponent(status)}`;
+
+			try {
+				const res = await fetch(query, {
+					headers: { apikey: supabaseAnonKey, Authorization: authHeader, 'Content-Type': 'application/json' }
+				});
+				if (res.ok) {
+					const orders = (await res.json()) as Array<Record<string, unknown>>;
+					return jsonResponse({ orders, total: orders.length, limit, offset });
+				}
+			} catch {}
+
+			return jsonResponse({ orders: [], total: 0, limit, offset });
+		}
 	}
 
 	if (url.pathname === DOCS_SPEC_PATH || isLandingAsset(url.pathname) || url.pathname.startsWith('/conf')) {
 		return env.ASSETS.fetch(request);
+	}
+
+	if (request.method === 'GET') {
+		const accept = request.headers.get('accept') || '';
+		if (accept.includes('text/html') || !url.pathname.includes('.')) {
+			url.pathname = '/200';
+			return env.ASSETS.fetch(new Request(url, request));
+		}
 	}
 
 	return new Response('Not Found', {

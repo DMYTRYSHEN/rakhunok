@@ -160,3 +160,138 @@ test('routeWebRequest handles POST /api/v1/checkout/:id/initiate', async () => {
 	assert.ok(body.nbu_raw_string.includes('UA12345678987654321345562'));
 	assert.ok(body.nbu_payload_base64);
 });
+
+test('routeWebRequest handles health check', async () => {
+	const { routeWebRequest } = await import('./index.ts');
+	const res = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/health'),
+		{ ASSETS: { fetch: async () => new Response('mock') } }
+	);
+	assert.equal(res.status, 200);
+	const data = await res.json();
+	assert.equal(data.status, 'ok');
+	assert.equal(data.service, 'Rahunok Edge API');
+});
+
+test('routeWebRequest handles banks catalog and logos', async () => {
+	const { routeWebRequest } = await import('./index.ts');
+	const banksRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/banks'),
+		{ ASSETS: { fetch: async () => new Response('mock') } }
+	);
+	assert.equal(banksRes.status, 200);
+	const banks = await banksRes.json();
+	assert.ok(Array.isArray(banks));
+	assert.ok(banks.some((b) => b.code === 'UNJS'));
+
+	const singleBankRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/banks/pban'),
+		{ ASSETS: { fetch: async () => new Response('mock') } }
+	);
+	assert.equal(singleBankRes.status, 200);
+	const singleBank = await singleBankRes.json();
+	assert.equal(singleBank.code, 'PBAN');
+
+	const logosRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/logos'),
+		{ ASSETS: { fetch: async () => new Response('mock') } }
+	);
+	assert.equal(logosRes.status, 200);
+	const logos = await logosRes.json();
+	assert.ok(logos.MONO);
+	assert.ok(logos.PBAN);
+});
+
+test('routeWebRequest handles auth and merchant onboarding', async () => {
+	const { routeWebRequest } = await import('./index.ts');
+	const authRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/auth/config'),
+		{ ASSETS: { fetch: async () => new Response('mock') } }
+	);
+	assert.equal(authRes.status, 200);
+
+	const demoRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/auth/demo-session', { method: 'POST' }),
+		{ ASSETS: { fetch: async () => new Response('mock') } }
+	);
+	assert.equal(demoRes.status, 200);
+	const demo = await demoRes.json();
+	assert.equal(demo.success, true);
+
+	const onboardRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/merchant/onboarding', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				business_name: 'ФОП Тест',
+				business_type: 'fop',
+				tax_id: '1234567890',
+				iban: 'UA123456789012345678901234567',
+				display_name: 'Тестова Кав’ярня'
+			})
+		}),
+		{ ASSETS: { fetch: async () => new Response('mock') } }
+	);
+	assert.equal(onboardRes.status, 200);
+	const onboard = await onboardRes.json();
+	assert.equal(onboard.success, true);
+	assert.equal(onboard.merchant.business_name, 'ФОП Тест');
+});
+
+test('routeWebRequest handles sandbox simulation', async () => {
+	const { routeWebRequest } = await import('./index.ts');
+	const res = await routeWebRequest(
+		new Request('https://letsrealtalk.com/dashboard/api/sandbox/simulate', { method: 'POST' }),
+		{ ASSETS: { fetch: async () => new Response('mock') } }
+	);
+	assert.equal(res.status, 200);
+	const result = await res.json();
+	assert.equal(result.verified, true);
+	assert.equal(result.event.eventType, 'payment.succeeded');
+});
+
+test('routeWebRequest handles PATCH /api/v1/orders/:id and promo/delivery/callback', async () => {
+	const { routeWebRequest } = await import('./index.ts');
+
+	// 1. PATCH order (cancel)
+	const patchRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/orders/ord-test-123', {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ status: 'cancelled' })
+		}),
+		{ ASSETS: { fetch: async () => new Response('mock') } }
+	);
+	assert.equal(patchRes.status, 200);
+	const patchData = await patchRes.json();
+	assert.equal(patchData.success, true);
+	assert.equal(patchData.order.status, 'cancelled');
+
+	// 2. Callback
+	const callbackRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/checkout/ord-test-123/callback', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ status: 'paid' })
+		}),
+		{ ASSETS: { fetch: async () => new Response('mock') } }
+	);
+	assert.equal(callbackRes.status, 200);
+	const callbackData = await callbackRes.json();
+	assert.equal(callbackData.success, true);
+	assert.equal(callbackData.status, 'paid');
+
+	// 3. Promo
+	const promoRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/checkout/ord-test-123/apply-promo', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ promo_code: 'SALE10' })
+		}),
+		{ ASSETS: { fetch: async () => new Response('mock') } }
+	);
+	assert.equal(promoRes.status, 200);
+	const promoData = await promoRes.json();
+	assert.equal(promoData.success, true);
+	assert.equal(promoData.discount_amount, 10);
+});

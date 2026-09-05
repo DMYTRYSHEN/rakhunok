@@ -1,6 +1,6 @@
 {
   "contract": "docs/openapi.yaml",
-  "generatedAt": "2026-09-05T23:07:46.055Z",
+  "generatedAt": "2026-09-05T23:25:14.313Z",
   "summary": {
     "openApiOperations": 24,
     "implementedOperations": 24,
@@ -121,129 +121,129 @@
     {
       "method": "GET",
       "path": "/api/v1/health",
-      "source": "../core/worker/src/index.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "GET",
       "path": "/api/v1/auth/config",
-      "source": "../core/worker/src/routes/auth.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "POST",
       "path": "/api/v1/auth/demo-session",
-      "source": "../core/worker/src/routes/auth.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "GET",
       "path": "/api/v1/merchant/me",
-      "source": "../core/worker/src/routes/merchants.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "PUT",
       "path": "/api/v1/merchant/me",
-      "source": "../core/worker/src/routes/merchants.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "POST",
       "path": "/api/v1/merchant/onboarding",
-      "source": "../core/worker/src/routes/merchants.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "GET",
       "path": "/api/v1/orders",
-      "source": "../core/worker/src/routes/orders.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "POST",
       "path": "/api/v1/orders",
-      "source": "../core/worker/src/routes/orders.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "GET",
       "path": "/api/v1/orders/{id}",
-      "source": "../core/worker/src/routes/orders.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "PATCH",
       "path": "/api/v1/orders/{id}",
-      "source": "../core/worker/src/routes/orders.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "GET",
       "path": "/api/v1/checkout/{id}",
-      "source": "../core/worker/src/routes/checkout.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "POST",
       "path": "/api/v1/checkout/{id}/event",
-      "source": "../core/worker/src/routes/checkout.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "GET",
       "path": "/api/v1/checkout/{id}/events",
-      "source": "../core/worker/src/routes/checkout.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "POST",
       "path": "/api/v1/checkout/{id}/initiate",
-      "source": "../core/worker/src/routes/checkout.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "GET",
       "path": "/api/v1/checkout/{id}/status",
-      "source": "../core/worker/src/routes/checkout.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "POST",
       "path": "/api/v1/checkout/{id}/apply-promo",
-      "source": "../core/worker/src/routes/checkout.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "POST",
       "path": "/api/v1/checkout/{id}/delivery",
-      "source": "../core/worker/src/routes/checkout.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "GET",
       "path": "/api/v1/banks",
-      "source": "../core/worker/src/routes/banks.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "GET",
       "path": "/api/v1/banks/{idOrCode}",
-      "source": "../core/worker/src/routes/banks.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "GET",
       "path": "/api/v1/logos",
-      "source": "../core/worker/src/routes/logos.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "POST",
       "path": "/api/v1/kso/checkout-requests",
-      "source": "../core/worker/src/routes/kso.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "GET",
       "path": "/api/v1/kso/checkout-requests/{id}",
-      "source": "../core/worker/src/routes/kso.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "POST",
       "path": "/api/v1/webhooks/{bankCode}",
-      "source": "../core/worker/src/routes/webhooks.ts"
+      "source": "worker/src/index.ts"
     },
     {
       "method": "GET",
       "path": "/api/v1/stats/summary",
-      "source": "../core/worker/src/routes/stats.ts"
+      "source": "worker/src/index.ts"
     }
   ],
   "developmentOnlyOperations": [
     {
       "method": "POST",
       "path": "/api/v1/webhooks/simulate",
-      "source": "../core/worker/src/routes/webhooks.ts",
+      "source": "worker/src/index.ts",
       "availability": "development-only"
     }
   ],
@@ -254,7 +254,7 @@
       "method": "POST",
       "path": "/api/v1/checkout/{id}/pay",
       "canonicalOperation": "POST /api/v1/checkout/{id}/initiate",
-      "source": "../core/worker/src/routes/checkout.ts"
+      "source": "worker/src/index.ts"
     }
   ],
   "openApiOnlyOperations": [

@@ -28,7 +28,13 @@ export class BankCarousel {
 
   async init() {
     try {
-      const res = await fetch('/api/v1/banks');
+      const apiBase =
+        typeof window !== 'undefined' &&
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+        window.location.port !== '8787'
+          ? 'http://localhost:8787'
+          : '';
+      const res = await fetch(`${apiBase}/api/v1/banks`);
       if (res.ok) {
         const list = await res.json();
         if (list && list.length > 0) {

@@ -17,7 +17,21 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "GET",
+					"path": "/",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "OPTIONS",
+					"path": "/",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
 					"path": "/",
 					"match": "exact",
 					"status": "implemented",
@@ -31,6 +45,482 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "PUT",
+					"path": "/",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/copilot",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/copilot",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/copilot",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/copilot",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/copilot",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/auth/config",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/auth/config",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/auth/config",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/auth/config",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/auth/config",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/auth/demo-session",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/auth/demo-session",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/auth/demo-session",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/auth/demo-session",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/auth/demo-session",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/banks",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/banks",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/banks",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/banks",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/banks",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/banks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/banks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/banks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/banks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/banks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/copilot",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/copilot",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/copilot",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/copilot",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/copilot",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/health",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/health",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/health",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/health",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/health",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/kso/checkout-requests",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/kso/checkout-requests",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/kso/checkout-requests",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/kso/checkout-requests",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/kso/checkout-requests",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/kso/checkout-requests/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/kso/checkout-requests/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/kso/checkout-requests/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/kso/checkout-requests/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/kso/checkout-requests/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/logos",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/logos",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/logos",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/logos",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/logos",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/merchant/me",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/merchant/me",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/merchant/me",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/merchant/me",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/merchant/me",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/merchant/onboarding",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/merchant/onboarding",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/merchant/onboarding",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/merchant/onboarding",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/merchant/onboarding",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/orders",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/orders",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "OPTIONS",
 					"path": "/api/v1/orders",
 					"match": "exact",
@@ -39,6 +529,20 @@
 				},
 				{
 					"method": "OPTIONS",
+					"path": "/api/v1/orders",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/orders",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
 					"path": "/api/v1/orders",
 					"match": "prefix",
 					"status": "implemented",
@@ -59,7 +563,210 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "PUT",
+					"path": "/api/v1/orders",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/orders",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/stats/summary",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "OPTIONS",
+					"path": "/api/v1/stats/summary",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/stats/summary",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/stats/summary",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/stats/summary",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/webhooks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/webhooks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/webhooks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/webhooks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/webhooks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/webhooks/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/webhooks/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/webhooks/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/webhooks/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/webhooks/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/banks",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/banks",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/banks",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/banks",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/banks",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/banks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/banks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/banks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/banks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/banks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/checkout",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/checkout",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
 					"path": "/checkout",
 					"match": "prefix",
 					"status": "implemented",
@@ -73,6 +780,27 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "PUT",
+					"path": "/checkout",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/conf",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/conf",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "OPTIONS",
 					"path": "/conf",
 					"match": "exact",
@@ -81,6 +809,20 @@
 				},
 				{
 					"method": "OPTIONS",
+					"path": "/conf",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/conf",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
 					"path": "/conf",
 					"match": "prefix",
 					"status": "implemented",
@@ -101,7 +843,35 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "PUT",
+					"path": "/conf",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/conf",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/conf/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "OPTIONS",
+					"path": "/conf/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
 					"path": "/conf/",
 					"match": "prefix",
 					"status": "implemented",
@@ -115,7 +885,63 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "PUT",
+					"path": "/conf/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/dashboard/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "OPTIONS",
+					"path": "/dashboard/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/dashboard/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/dashboard/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/dashboard/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/docs",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/docs",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
 					"path": "/docs",
 					"match": "exact",
 					"status": "implemented",
@@ -129,7 +955,28 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "PUT",
+					"path": "/docs",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/docs/",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "OPTIONS",
+					"path": "/docs/",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
 					"path": "/docs/",
 					"match": "exact",
 					"status": "implemented",
@@ -143,7 +990,98 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "PUT",
+					"path": "/docs/",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/health",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "OPTIONS",
+					"path": "/health",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/health",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/health",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/health",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/logos",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/logos",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/logos",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/logos",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/logos",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/pay",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/pay",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
 					"path": "/pay",
 					"match": "exact",
 					"status": "implemented",
@@ -153,6 +1091,20 @@
 					"method": "POST",
 					"path": "/pay",
 					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/pay",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/pay/",
+					"match": "prefix",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
 				},
@@ -164,7 +1116,21 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "PATCH",
+					"path": "/pay/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "POST",
+					"path": "/pay/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
 					"path": "/pay/",
 					"match": "prefix",
 					"status": "implemented",
@@ -350,8 +1316,8 @@
 			"title": "Rahunok Edge API & Mobile SDK Specification",
 			"version": "1.2.0",
 			"servers": [
+				"https://letsrealtalk.com/api/v1",
 				"https://rakhunok.com/api/v1",
-				"https://rahunok.dmitrishen.workers.dev/api/v1",
 				"http://localhost:8787/api/v1"
 			],
 			"routes": [

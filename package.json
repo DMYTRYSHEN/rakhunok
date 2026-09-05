@@ -18,7 +18,7 @@
 		"dev:app": "npm --prefix apps/merchant-app run dev",
 		"dev:pay": "npm --prefix apps/pay run dev",
 		"dev:conf": "npm --prefix apps/conf run dev",
-		"dev:api": "npm --prefix ../core/worker run dev",
+		"dev:api": "npm --prefix worker run dev",
 		"build:app": "npm --prefix apps/merchant-app run build",
 		"build:checkout": "npm --prefix apps/pay run build",
 		"build:pay": "npm --prefix apps/pay run build",
