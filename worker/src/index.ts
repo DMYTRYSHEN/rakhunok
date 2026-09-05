@@ -338,6 +338,57 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 					'Access-Control-Allow-Origin': '*'
 				}
 			});
+		if (action === 'callback' || action === 'webhook') {
+			let body: Record<string, any> = {};
+			if (request.method === 'POST') {
+				try {
+					body = await request.json();
+				} catch {}
+			}
+
+			const isSuccess =
+				body.status === 'success' ||
+				body.status === 'paid' ||
+				body.state === 'success' ||
+				body.err_code === '0' ||
+				body.err_code === 0;
+			const newStatus = isSuccess ? 'paid' : body.status || 'failed';
+
+			if (orderPayload) {
+				orderPayload.status = newStatus;
+				orderCache.set(orderId, { data: orderPayload, expires: Date.now() + 60000 });
+			}
+
+			try {
+				const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
+				const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
+				await fetch(`${supabaseUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}`, {
+					method: 'PATCH',
+					headers: {
+						apikey: supabaseAnonKey,
+						'Content-Type': 'application/json',
+						Prefer: 'return=minimal'
+					},
+					body: JSON.stringify({ status: newStatus, updated_at: new Date().toISOString() })
+				});
+			} catch (err) {
+				console.error('Failed to update order status on webhook:', err);
+			}
+
+			return Response.json(
+				{
+					success: true,
+					order_id: orderId,
+					status: newStatus,
+					received_at: new Date().toISOString()
+				},
+				{
+					headers: {
+						'Content-Type': 'application/json',
+						'Access-Control-Allow-Origin': '*'
+					}
+				}
+			);
 		}
 
 		if (orderPayload) {

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import {
+		Activity,
 		Archive,
 		Bot,
 		Boxes,
@@ -26,10 +27,12 @@
 		LoaderCircle,
 		LockKeyhole,
 		MailCheck,
+		AlertTriangle,
 		PanelRightClose,
 		Play,
 		Redo2,
 		RefreshCcw,
+		RotateCcw,
 		Search,
 		ShieldCheck,
 		Shuffle,
@@ -66,7 +69,10 @@
 		type ProcessValidationResult,
 		validateProcessDefinition
 	} from './process-definition';
-	import { processDefinitionToFlowScenario } from './process-definition-adapter';
+	import {
+		flowScenarioToProcessDefinition,
+		processDefinitionToFlowScenario
+	} from './process-definition-adapter';
 	import { insertProcessRegionBefore } from './process-definition-editing';
 	import {
 		canPublishProcess,
@@ -80,6 +86,7 @@
 		type CorexStartedRun
 	} from './corex-command-gateway';
 	import { getCorexCommandGateway, getCorexProcessGateway } from './corex-process-browser';
+	import { getSupabaseBrowserClient } from '$lib/features/dashboard/api/supabase-browser';
 	import {
 		COREX_RUN_STATUSES,
 		CorexDraftConflictError,
@@ -102,8 +109,12 @@
 	import JsonTreeViewer from './JsonTreeViewer.svelte';
 	import CanvasControlsOverlay from './CanvasControlsOverlay.svelte';
 	import ProcessDiagram from './ProcessDiagram.svelte';
+	import ProcessSandboxInspector from './ProcessSandboxInspector.svelte';
+	import TimeTravelPlaybackBar from './TimeTravelPlaybackBar.svelte';
+	import AiCopilotModal from './AiCopilotModal.svelte';
+	import AiCopilotDockChat from './AiCopilotDockChat.svelte';
 	import { merchantPaymentFlow, merchantPaymentScenarios } from './merchant-payment-flow';
-	import type { FlowEdge, FlowNode, FlowScenario } from './types';
+	import type { FlowEdge, FlowNode, FlowNodeTaskCounters, FlowScenario } from './types';
 
 	const nodeTypes: NodeTypes = { release: ReleaseFlowNode, stickyNote: StickyNoteNode };
 	const initialDraftDefinition = createStarterProcessDefinition();
@@ -133,6 +144,48 @@
 	);
 	let isCurrentProcessDraft = $derived(activeScenarioId === draftDefinition.id);
 	let isExecutableDraft = $derived(isCurrentProcessDraft && activeProcess?.lifecycle !== 'retired');
+	let runs = $state<CorexRun[]>([]);
+	let selectedRunId = $state('');
+	let runEvents = $state<CorexRunEvent[]>([]);
+	let stepAttempts = $state<CorexStepAttempt[]>([]);
+	let timeTravelStepIndex = $state<number | null>(null);
+	let timeTravelPlaying = $state(false);
+	let aiModalOpen = $state(false);
+	let aiInitialPrompt = $state('');
+
+	onMount(() => {
+		const client = getSupabaseBrowserClient();
+		if (!client) return;
+
+		const channel = client
+			.channel('corex-live-sync')
+			.on(
+				'postgres_changes',
+				{ event: '*', schema: 'public', table: 'corex_run_events' },
+				(payload) => {
+					const eventRow = payload.new as CorexRunEvent;
+					if (eventRow && eventRow.runId === selectedRunId) {
+						runEvents = [...runEvents, eventRow];
+					}
+				}
+			)
+			.on(
+				'postgres_changes',
+				{ event: 'UPDATE', schema: 'public', table: 'corex_runs' },
+				(payload) => {
+					const updatedRun = payload.new as CorexRun;
+					if (updatedRun && updatedRun.id === selectedRunId) {
+						runs = runs.map((r) => (r.id === updatedRun.id ? updatedRun : r));
+					}
+				}
+			)
+			.subscribe();
+
+		return () => {
+			void client.removeChannel(channel);
+		};
+	});
+
 	type StickyNoteItem = {
 		id: string;
 		title: string;
@@ -166,17 +219,65 @@
 		stickyNotes = stickyNotes.map((n) => (n.id === id ? { ...n, text } : n));
 	}
 
-	function createNodes(scenario: FlowScenario, nodeLocale: CorexLocale): Node[] {
-		const flowNodes = scenario.nodes.map((item) => ({
-			id: item.id,
-			type: 'release',
-			position: item.position,
-			data: { ...item, locale: nodeLocale }
-		}));
+	let canvasViewMode = $state<'design' | 'monitor'>('design');
+
+	type CreateNodesOptions = {
+		counters?: Record<string, FlowNodeTaskCounters>;
+		activeNodeId?: string;
+		isMonitor?: boolean;
+	};
+
+	function createNodes(
+		scenario: FlowScenario,
+		nodeLocale: CorexLocale,
+		options?: CreateNodesOptions
+	): Node[] {
+		const isMonitor = options?.isMonitor ?? false;
+		const counters = options?.counters ?? {};
+		const activeNodeId = options?.activeNodeId ?? '';
+
+		const attempts = typeof stepAttempts !== 'undefined' ? stepAttempts : [];
+		const ttIndex = typeof timeTravelStepIndex !== 'undefined' ? timeTravelStepIndex : null;
+
+		const effectiveAttempts =
+			ttIndex !== null
+				? attempts.slice(0, ttIndex + 1)
+				: attempts;
+		const completedStepIds = new Set(
+			effectiveAttempts.filter((a) => a.outcome === 'complete').map((a) => a.stepId)
+		);
+		const currentAttempt =
+			ttIndex !== null
+				? attempts[ttIndex]
+				: attempts.at(-1);
+
+		const flowNodes = scenario.nodes.map((item) => {
+			let nodeStatus = item.status;
+			if (isMonitor && attempts.length > 0) {
+				if (currentAttempt && item.id === currentAttempt.stepId) {
+					nodeStatus = currentAttempt.outcome === 'failed' ? 'failed' : 'running';
+				} else if (completedStepIds.has(item.id)) {
+					nodeStatus = 'complete';
+				}
+			}
+
+			return {
+				id: item.id,
+				type: 'release',
+				position: { ...item.position },
+				data: {
+					...item,
+					status: nodeStatus,
+					locale: nodeLocale,
+					taskCounters: isMonitor ? counters[item.id] : undefined,
+					isCurrentTaskNode: isMonitor && activeNodeId === item.id
+				}
+			};
+		});
 		const noteNodes = stickyNotes.map((note) => ({
 			id: note.id,
 			type: 'stickyNote',
-			position: note.position,
+			position: { ...note.position },
 			data: {
 				...note,
 				onDelete: deleteStickyNote,
@@ -186,27 +287,37 @@
 		return [...flowNodes, ...noteNodes];
 	}
 
-	function createEdges(scenario: FlowScenario): Edge[] {
+	type CreateEdgesOptions = {
+		traversed?: Set<string>;
+		isMonitor?: boolean;
+	};
+
+	function createEdges(scenario: FlowScenario, options?: CreateEdgesOptions): Edge[] {
+		const isMonitor = options?.isMonitor ?? false;
+		const traversed = options?.traversed ?? new Set<string>();
 		return scenario.edges.map((edge: FlowEdge) => {
+			const isTraversed = isMonitor && traversed.has(edge.id);
 			const isSourceRunning =
 				scenario.nodes.find((node) => node.id === edge.source)?.status === 'running';
 			const strokeColor =
-				edge.tone === 'danger'
-					? '#f87171'
-					: edge.tone === 'success'
-						? '#4ade80'
-						: isSourceRunning
-							? '#38bdf8'
-							: '#64748b';
+				isTraversed
+					? '#10b981'
+					: edge.tone === 'danger'
+						? '#f87171'
+						: edge.tone === 'success'
+							? '#4ade80'
+							: isSourceRunning
+								? '#38bdf8'
+								: '#64748b';
 			return {
 				id: edge.id,
 				source: edge.source,
 				target: edge.target,
 				label: edge.label,
 				type: 'smoothstep',
-				animated: isSourceRunning,
+				animated: isTraversed || isSourceRunning,
 				markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor },
-				style: `stroke: ${strokeColor}; stroke-width: ${isSourceRunning ? '2.2px' : '1.8px'}; ${isSourceRunning ? 'filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));' : ''}`
+				style: `stroke: ${strokeColor}; stroke-width: ${isTraversed ? '2.8px' : isSourceRunning ? '2.2px' : '1.8px'}; ${isTraversed ? 'filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6));' : isSourceRunning ? 'filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));' : ''}`
 			};
 		});
 	}
@@ -218,9 +329,10 @@
 	let selectedNodeIds = $state.raw<string[]>([initialExecutableScenario.nodes[0].id]);
 	let copiedNode = $state.raw<ProcessNode | null>(null);
 	let paletteQuery = $state('');
-	let inspectorTab = $state<'details' | 'runs' | 'diagram'>('details');
-	let aiPrompt = $state('');
-	let draftNotice = $state('');
+	let inspectorTab = $state<'details' | 'runs' | 'diagram' | 'sandbox'>('details');
+	let sandboxActiveNodeId = $state<string | null>(null);
+	let sandboxTraversedEdges = $state<string[]>([]);
+
 	let draftDirty = $state(true);
 	let validationResult = $state<ProcessValidationResult | null>(null);
 	let commandState = $state<CorexCommandState>('idle');
@@ -242,10 +354,6 @@
 	let runArchiving = $state(false);
 	let runLifecycleAction = $state<'' | 'pause' | 'resume'>('');
 	let lastRun = $state<CorexStartedRun | null>(null);
-	let runs = $state<CorexRun[]>([]);
-	let selectedRunId = $state('');
-	let runEvents = $state<CorexRunEvent[]>([]);
-	let stepAttempts = $state<CorexStepAttempt[]>([]);
 	let externalAttemptOutputs = $state<Record<string, unknown>>({});
 	let externalAttemptOutputStates = $state<Record<string, 'loading' | 'error'>>({});
 	let approvalTasks = $state<CorexApprovalTask[]>([]);
@@ -271,6 +379,9 @@
 	let selectedRunOutput = $derived(formatRunDetail(selectedRun?.output));
 	let selectedRunError = $derived(formatRunDetail(selectedRun?.error));
 	let selectedRunRollbackError = $derived(formatRunDetail(selectedRun?.rollbackError));
+	let failedStepAttempt = $derived(
+		stepAttempts.findLast((a) => a.outcome === 'failed') ?? null
+	);
 	let activeApproval = $derived.by(() => {
 		if (selectedRun?.status !== 'waiting') return null;
 		const latest = runEvents.at(-1);
@@ -296,6 +407,132 @@
 					task.status === 'pending'
 			) ?? null
 		);
+	});
+
+	let nodeCountersMap = $derived.by(() => {
+		const counters: Record<string, { queue: number; passed: number; error: number }> = {};
+
+		// 1. Compute from loaded runs and step attempts
+		if (runs.length > 0) {
+			for (const run of runs) {
+				if (run.status === 'running' || run.status === 'waiting' || run.status === 'queued') {
+					const activeStep = run.id === selectedRunId ? runSummary.activeStep : null;
+					if (activeStep) {
+						counters[activeStep] = counters[activeStep] || { queue: 0, passed: 0, error: 0 };
+						counters[activeStep].queue += 1;
+					}
+				}
+			}
+			for (const attempt of stepAttempts) {
+				counters[attempt.stepId] = counters[attempt.stepId] || { queue: 0, passed: 0, error: 0 };
+				if (attempt.outcome === 'complete') {
+					counters[attempt.stepId].passed += 1;
+				} else if (attempt.outcome === 'failed') {
+					counters[attempt.stepId].error += 1;
+				}
+			}
+		}
+
+		// 2. Predefined mock telemetry for flow scenarios in monitor mode
+		if (canvasViewMode === 'monitor' || runs.length === 0) {
+			activeScenario.nodes.forEach((node, idx) => {
+				const existing = counters[node.id] || { queue: 0, passed: 0, error: 0 };
+				if (node.status === 'complete') {
+					existing.passed = Math.max(existing.passed, (idx + 1) * 7 + 12);
+				} else if (node.status === 'running') {
+					existing.queue = Math.max(existing.queue, 2);
+					existing.passed = Math.max(existing.passed, 18);
+				} else if (node.status === 'waiting') {
+					existing.queue = Math.max(existing.queue, 1);
+					existing.passed = Math.max(existing.passed, 14);
+				} else if (node.status === 'failed') {
+					existing.error = Math.max(existing.error, 3);
+					existing.passed = Math.max(existing.passed, 5);
+				}
+				counters[node.id] = existing;
+			});
+		}
+
+		return counters;
+	});
+
+	let totalActiveTasksCount = $derived.by(() => {
+		let total = 0;
+		for (const key in nodeCountersMap) {
+			total += nodeCountersMap[key].queue;
+		}
+		return total;
+	});
+
+	let activeTaskCurrentNodeId = $derived.by(() => {
+		if (inspectorTab === 'sandbox' && sandboxActiveNodeId) {
+			return sandboxActiveNodeId;
+		}
+		if (canvasViewMode !== 'monitor') return '';
+		if (timeTravelStepIndex !== null && stepAttempts[timeTravelStepIndex]) {
+			return stepAttempts[timeTravelStepIndex].stepId;
+		}
+		if (selectedRun) {
+			if (runSummary.activeStep) return runSummary.activeStep;
+			const lastAttempt = stepAttempts.at(-1);
+			if (lastAttempt) return lastAttempt.stepId;
+		}
+		const activeNode = activeScenario.nodes.find(
+			(n) => n.status === 'running' || n.status === 'waiting'
+		);
+		return activeNode?.id ?? '';
+	});
+
+	let activeTaskTraversedEdgeIds = $derived.by(() => {
+		const traversed = new Set<string>();
+		if (inspectorTab === 'sandbox') {
+			for (const edgeId of sandboxTraversedEdges) {
+				traversed.add(edgeId);
+			}
+			return traversed;
+		}
+		if (canvasViewMode !== 'monitor') return traversed;
+
+		const effectiveAttempts =
+			timeTravelStepIndex !== null
+				? stepAttempts.slice(0, timeTravelStepIndex + 1)
+				: stepAttempts;
+
+		const completedStepIds = new Set(
+			effectiveAttempts.filter((a) => a.outcome === 'complete').map((a) => a.stepId)
+		);
+
+		if (completedStepIds.size === 0) {
+			activeScenario.nodes
+				.filter((n) => n.status === 'complete')
+				.forEach((n) => completedStepIds.add(n.id));
+		}
+
+		for (const edge of activeScenario.edges) {
+			if (completedStepIds.has(edge.source)) {
+				traversed.add(edge.id);
+			}
+		}
+
+		return traversed;
+	});
+
+	$effect(() => {
+		const currentScenario = activeScenario;
+		const _mode = canvasViewMode;
+		const _activeId = activeTaskCurrentNodeId;
+		const _counters = nodeCountersMap;
+		const _traversed = activeTaskTraversedEdgeIds;
+		const _loc = locale;
+		nodes = createNodes(currentScenario, _loc, {
+			counters: _counters,
+			activeNodeId: _activeId,
+			isMonitor: _mode === 'monitor'
+		});
+		edges = createEdges(currentScenario, {
+			traversed: _traversed,
+			isMonitor: _mode === 'monitor'
+		});
 	});
 
 	function stepAttemptKey(attempt: CorexStepAttempt): string {
@@ -514,10 +751,11 @@
 		configuredDomainTarget = null;
 		versionHistoryOpen = false;
 		versions = [];
+		activeProcess = null;
 		activeScenarioId = scenario.id;
 		nodes = createNodes(scenario, locale);
 		edges = createEdges(scenario);
-		selectedId = scenario.nodes[0].id;
+		selectedId = scenario.nodes[0]?.id ?? '';
 		selectedNodeIds = selectedId ? [selectedId] : [];
 		copiedNode = null;
 		validationResult = null;
@@ -526,6 +764,38 @@
 		runEvents = [];
 		stepAttempts = [];
 		runHistoryError = '';
+	}
+
+	function cloneScenarioToDraft(scenario: FlowScenario) {
+		const cloned = flowScenarioToProcessDefinition(scenario);
+		draftDefinition = cloned;
+		activeProcess = null;
+		activeScenarioId = cloned.id;
+		undoStack = [];
+		redoStack = [];
+		savedDraftFingerprint = '';
+		draftDirty = true;
+		nodes = createNodes(executableScenario, locale);
+		edges = createEdges(executableScenario);
+		selectedId = cloned.nodes[0]?.id ?? '';
+		selectedNodeIds = selectedId ? [selectedId] : [];
+		copiedNode = null;
+		validationResult = validateProcessDefinition(cloned);
+		canvasViewMode = 'design';
+	}
+
+	function handleApplyAiDefinition(modified: ProcessDefinition) {
+		undoStack = [...undoStack, draftDefinition];
+		redoStack = [];
+		draftDefinition = modified;
+		draftDirty = true;
+		nodes = createNodes(executableScenario, locale);
+		edges = createEdges(executableScenario);
+		selectedId = modified.nodes[0]?.id ?? '';
+		selectedNodeIds = selectedId ? [selectedId] : [];
+		copiedNode = null;
+		validationResult = validateProcessDefinition(modified);
+		canvasViewMode = 'design';
 	}
 
 	function processOptionId(process: CorexProcess): string {
@@ -761,7 +1031,15 @@
 			if (process) selectProcess(process);
 			return;
 		}
-		selectScenario(scenarios.find((scenario) => scenario.id === value) ?? executableScenario);
+		if (value === executableScenario.id) {
+			activeProcess = null;
+			activeScenarioId = executableScenario.id;
+			selectedId = draftDefinition.nodes[0]?.id ?? '';
+			selectedNodeIds = selectedId ? [selectedId] : [];
+			return;
+		}
+		const scenario = scenarios.find((item) => item.id === value) ?? executableScenario;
+		selectScenario(scenario);
 	}
 
 	function draftSlug(): string {
@@ -1122,6 +1400,37 @@
 			await commandGateway.restart(runId, crypto.randomUUID());
 			commandNotice =
 				locale === 'uk' ? `Перезапуск ${runId} прийнято.` : `Restart accepted for run ${runId}.`;
+			await loadRunHistory(processId, runId);
+		} catch (error) {
+			commandNotice = commandErrorMessage(error);
+		} finally {
+			runRestarting = false;
+		}
+	}
+
+	async function retryFromStep(stepId: string) {
+		if (
+			!commandGateway ||
+			!activeProcess ||
+			!selectedRun ||
+			eventSending ||
+			runCancelling ||
+			runRestarting ||
+			runRollingBack ||
+			runArchiving ||
+			Boolean(runLifecycleAction)
+		)
+			return;
+		const processId = activeProcess.id;
+		const runId = selectedRun.id;
+		runRestarting = true;
+		commandNotice = '';
+		try {
+			await commandGateway.restart(runId, crypto.randomUUID(), { name: stepId });
+			commandNotice =
+				locale === 'uk'
+					? `Повторний запуск з вузла "${stepId}" для ${runId} прийнято.`
+					: `Retry from step "${stepId}" accepted for run ${runId}.`;
 			await loadRunHistory(processId, runId);
 		} catch (error) {
 			commandNotice = commandErrorMessage(error);
@@ -2328,18 +2637,6 @@
 		}
 	}
 
-	function prepareAiDraft() {
-		if (!aiPrompt.trim()) return;
-		draftNotice =
-			locale === 'uk'
-				? 'Збережено як чернетку. AI та deploy не підключені.'
-				: 'Saved as a draft. AI and deploy are not connected.';
-	}
-
-	$effect(() => {
-		nodes = createNodes(activeScenario, locale);
-		edges = createEdges(activeScenario);
-	});
 
 	onMount(async () => {
 		if (!processGateway) {
@@ -2377,14 +2674,25 @@
 							? processOptionId(activeProcess)
 							: activeScenario.id}
 						onchange={(event) => selectJourney(event.currentTarget.value)}
-						>{#each persistedProcesses as process (process.id)}<option
-								value={processOptionId(process)}>{process.name}</option
-							>{/each}{#if !activeProcess}<option value={executableScenario.id}
+					>
+						{#if persistedProcesses.length > 0}
+							<optgroup label={locale === 'uk' ? 'Збережені процеси' : 'Saved Processes'}>
+								{#each persistedProcesses as process (process.id)}
+									<option value={processOptionId(process)}>{process.name}</option>
+								{/each}
+							</optgroup>
+						{/if}
+						<optgroup label={locale === 'uk' ? 'Чернетка процесу' : 'Process Draft'}>
+							<option value={executableScenario.id}
 								>{localizedScenario(executableScenario, locale).label}</option
-							>{/if}{#each flowScenarios as scenario (scenario.id)}<option value={scenario.id}
-								>{localizedScenario(scenario, locale).label}</option
-							>{/each}</select
-					><ChevronDown size={12} /></label
+							>
+						</optgroup>
+						<optgroup label={locale === 'uk' ? 'Еталонні процеси' : 'Standard Scenarios'}>
+							{#each flowScenarios as scenario (scenario.id)}
+								<option value={scenario.id}>{localizedScenario(scenario, locale).label}</option>
+							{/each}
+						</optgroup>
+					</select><ChevronDown size={12} /></label
 				>
 			</div>
 			<form
@@ -2436,6 +2744,43 @@
 			</form>
 		</div>
 		<div class="editor-actions">
+			<div
+				class="canvas-mode-switch"
+				role="group"
+				aria-label={locale === 'uk' ? 'Режим перегляду' : 'View mode'}
+			>
+				<button
+					type="button"
+					class="mode-btn"
+					class:active={canvasViewMode === 'design'}
+					onclick={() => (canvasViewMode = 'design')}
+					title={locale === 'uk' ? 'Режим редагування процесу' : 'Design & edit process'}
+				>
+					<Workflow size={13} />
+					<span>{locale === 'uk' ? 'Редактор' : 'Design'}</span>
+				</button>
+				<button
+					type="button"
+					class="mode-btn mode-btn-monitor"
+					class:active={canvasViewMode === 'monitor'}
+					onclick={() => {
+						canvasViewMode = 'monitor';
+						inspectorTab = 'runs';
+						if (runs.length > 0 && !selectedRunId) {
+							selectRun(runs[0].id);
+						}
+					}}
+					title={locale === 'uk'
+						? 'Монітор заявок та стейт-машина (Corezoid)'
+						: 'Live Task Monitor & State Machine'}
+				>
+					<Activity size={13} />
+					<span>{locale === 'uk' ? 'Заявки' : 'Tasks'}</span>
+					{#if totalActiveTasksCount > 0}
+						<span class="active-tasks-badge">{totalActiveTasksCount}</span>
+					{/if}
+				</button>
+			</div>
 			<button
 				type="button"
 				disabled={!isExecutableDraft || undoStack.length === 0}
@@ -2463,6 +2808,19 @@
 						? 'Лише перегляд'
 						: 'Read only'}</span
 			>
+			{#if !isCurrentProcessDraft}
+				<button
+					type="button"
+					class="clone-draft-btn"
+					onclick={() => cloneScenarioToDraft(activeScenario)}
+					title={locale === 'uk'
+						? 'Створити робочу чернетку з цього сценарію для редагування та запусків'
+						: 'Clone this scenario into an editable process draft'}
+				>
+					<Sparkles size={14} />
+					<span>{locale === 'uk' ? '⚡ Клонувати як процес' : '⚡ Edit as Process'}</span>
+				</button>
+			{/if}
 			<button
 				type="button"
 				disabled={!isExecutableDraft || persistenceState !== 'idle' || !draftDirty}
@@ -2478,6 +2836,23 @@
 			<button type="button" disabled={!isExecutableDraft} onclick={validateDraft}
 				><Check size={14} />{locale === 'uk' ? 'Перевірити' : 'Validate'}</button
 			>
+			<button
+				type="button"
+				class="ai-copilot-btn"
+				onclick={() => {
+					if (!isCurrentProcessDraft) {
+						cloneScenarioToDraft(activeScenario);
+					}
+					aiInitialPrompt = '';
+					aiModalOpen = true;
+				}}
+				title={locale === 'uk'
+					? 'ШІ-Асистент процесів (Azure gpt-5.6-sol)'
+					: 'Process AI Copilot (Azure gpt-5.6-sol)'}
+			>
+				<Sparkles size={14} />
+				<span>{locale === 'uk' ? '✨ ШІ Асистент' : '✨ AI Copilot'}</span>
+			</button>
 			{#if isExecutableDraft && hasHttpTrigger}
 				<div class="domain-target" aria-label={locale === 'uk' ? 'Ціль домену' : 'Domain target'}>
 					<label
@@ -2833,23 +3208,38 @@
 					maskColor="rgba(240, 244, 249, 0.78)"
 				/>
 			</SvelteFlow>
-			<form
-				class="ai-dock"
-				onsubmit={(event) => {
-					event.preventDefault();
-					prepareAiDraft();
+
+			{#if canvasViewMode === 'monitor' && stepAttempts.length > 0}
+				{@const currentIdx = timeTravelStepIndex ?? Math.max(0, stepAttempts.length - 1)}
+				{@const currentAttempt = stepAttempts[currentIdx]}
+				<TimeTravelPlaybackBar
+					totalSteps={stepAttempts.length}
+					currentStepIndex={currentIdx}
+					bind:isPlaying={timeTravelPlaying}
+					isLive={timeTravelStepIndex === null}
+					currentStepLabel={currentAttempt ? `${currentAttempt.stepId} (visit ${currentAttempt.visit})` : ''}
+					currentStepStatus={currentAttempt?.outcome === 'failed' ? 'failed' : (currentAttempt?.outcome === 'complete' ? 'complete' : 'running')}
+					{locale}
+					canRetry={currentAttempt?.outcome === 'failed'}
+					onRetry={() => {
+						if (currentAttempt?.stepId) retryFromStep(currentAttempt.stepId);
+					}}
+					onStepChange={(idx) => {
+						timeTravelStepIndex = idx === stepAttempts.length - 1 ? null : idx;
+					}}
+				/>
+			{/if}
+			<AiCopilotDockChat
+				currentDefinition={draftDefinition}
+				{locale}
+				isDraft={isCurrentProcessDraft}
+				onApplyDefinition={handleApplyAiDefinition}
+				onCloneScenarioIfNeeded={() => {
+					if (!isCurrentProcessDraft) {
+						cloneScenarioToDraft(activeScenario);
+					}
 				}}
-			>
-				<span><Sparkles size={15} /></span><input
-					bind:value={aiPrompt}
-					placeholder={locale === 'uk'
-						? 'Опишіть процес або додайте документацію для AI...'
-						: 'Describe a process or add documentation for AI...'}
-				/><button type="submit" aria-label={locale === 'uk' ? 'Створити чернетку' : 'Create draft'}
-					><Bot size={15} /></button
-				>
-				{#if draftNotice}<small>{draftNotice}</small>{/if}
-			</form>
+			/>
 		</div>
 
 		<aside class="inspector" aria-live="polite">
@@ -2871,13 +3261,31 @@
 					onclick={() => (inspectorTab = 'runs')}
 					type="button">{locale === 'uk' ? 'Виконання' : 'Runs'}</button
 				><button
+					class:active={inspectorTab === 'sandbox'}
+					onclick={() => (inspectorTab = 'sandbox')}
+					type="button"
+				>
+					<Sparkles size={12} />
+					{locale === 'uk' ? 'Симулятор' : 'Sandbox'}
+				</button
+				><button
 					class:active={inspectorTab === 'diagram'}
 					onclick={() => (inspectorTab = 'diagram')}
 					type="button">{locale === 'uk' ? 'Діаграма' : 'Diagram'}</button
 				>
 			</div>
 			<div class="inspector-body">
-				{#if inspectorTab === 'diagram'}
+				{#if inspectorTab === 'sandbox'}
+					<ProcessSandboxInspector
+						definition={draftDefinition}
+						{locale}
+						onStepChange={(activeNodeId, traversedEdgeIds) => {
+							sandboxActiveNodeId = activeNodeId;
+							sandboxTraversedEdges = traversedEdgeIds;
+							if (activeNodeId) selectedId = activeNodeId;
+						}}
+					/>
+				{:else if inspectorTab === 'diagram'}
 					<ProcessDiagram
 						definition={draftDefinition}
 						events={runEvents}
@@ -3092,6 +3500,46 @@
 									).toLocaleString(locale === 'uk' ? 'uk-UA' : 'en-US')}</small
 								>{/if}
 						</div>
+						{#if failedStepAttempt}
+							<div class="error-diagnostics-card" role="alert">
+								<div class="diagnostics-head">
+									<AlertTriangle size={14} />
+									<strong>{locale === 'uk' ? 'Діагностика збою на кроці' : 'Step Failure Diagnostics'}</strong>
+								</div>
+								<div class="diagnostics-body">
+									<div class="diag-item">
+										<span class="diag-lbl">{locale === 'uk' ? 'Вузол:' : 'Node:'}</span>
+										<b>{failedStepAttempt.stepId}</b>
+										<small>(visit {failedStepAttempt.visit})</small>
+									</div>
+									<div class="diag-item">
+										<span class="diag-lbl">{locale === 'uk' ? 'Код помилки:' : 'Error code:'}</span>
+										<span class="diag-badge">{failedStepAttempt.error?.code ?? 'failed'}</span>
+									</div>
+									<div class="diag-item">
+										<span class="diag-lbl">{locale === 'uk' ? 'Спроба:' : 'Attempt:'}</span>
+										<span>{failedStepAttempt.attempt} / {failedStepAttempt.retry.limit} ({failedStepAttempt.retry.backoff})</span>
+									</div>
+									<div class="diag-item">
+										<span class="diag-lbl">{locale === 'uk' ? 'Таймаут:' : 'Timeout:'}</span>
+										<span>{failedStepAttempt.retry.timeoutMs} ms</span>
+									</div>
+								</div>
+								<div class="diagnostics-actions">
+									<button
+										type="button"
+										class="btn-diag-retry"
+										disabled={runRestarting}
+										onclick={() => retryFromStep(failedStepAttempt.stepId)}
+									>
+										<RotateCcw size={12} />
+										<span>{runRestarting
+											? (locale === 'uk' ? 'Перезапуск...' : 'Retrying...')
+											: (locale === 'uk' ? `Повторити з вузла "${failedStepAttempt.stepId}"` : `Retry from step "${failedStepAttempt.stepId}"`)}</span>
+									</button>
+								</div>
+							</div>
+						{/if}
 						{#if selectedRunError}<details class="run-detail error" open>
 								<summary>{locale === 'uk' ? 'Помилка запуску' : 'Run error'}</summary>
 								<pre>{selectedRunError}</pre>
@@ -3285,7 +3733,21 @@
 											{/if}
 										{/if}
 									{/if}
-									{#if attempt.error}<small>{attempt.error.code}</small>{/if}
+									{#if attempt.error}
+										<div class="attempt-error-row">
+											<small class="attempt-err-code"><AlertTriangle size={10} /> {attempt.error.code}</small>
+											<button
+												type="button"
+												class="btn-attempt-retry"
+												disabled={runRestarting}
+												onclick={() => retryFromStep(attempt.stepId)}
+												title={locale === 'uk' ? 'Повторити з цього кроку' : 'Retry from this step'}
+											>
+												<RotateCcw size={10} />
+												<span>{locale === 'uk' ? 'Повторити' : 'Retry'}</span>
+											</button>
+										</div>
+									{/if}
 								</div>
 							{/each}
 						</div>
@@ -4130,6 +4592,15 @@
 	</div>
 </div>
 
+<AiCopilotModal
+	open={aiModalOpen}
+	currentDefinition={draftDefinition}
+	initialPrompt={aiInitialPrompt}
+	{locale}
+	onApply={handleApplyAiDefinition}
+	onClose={() => (aiModalOpen = false)}
+/>
+
 <style>
 	/* =========================================================
 	   Corex Google Gemini & Antigravity Light Studio Theme
@@ -4383,6 +4854,59 @@
 		font-weight: 700;
 		line-height: 1.15;
 	}
+	.canvas-mode-switch {
+		display: inline-flex;
+		align-items: center;
+		padding: 2px;
+		background: #f1f5f9;
+		border: 1px solid #e2e8f0;
+		border-radius: 9999px;
+		gap: 2px;
+	}
+	.mode-btn {
+		height: 28px !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		gap: 5px !important;
+		padding: 0 11px !important;
+		border-radius: 9999px !important;
+		border: 1px solid transparent !important;
+		background: transparent !important;
+		color: #64748b !important;
+		font:
+			700 11px/1 'Manrope',
+			sans-serif !important;
+		cursor: pointer;
+		transition: all 150ms ease !important;
+		transform: none !important;
+		box-shadow: none !important;
+	}
+	.mode-btn:hover {
+		color: #1e293b !important;
+		background: rgba(255, 255, 255, 0.6) !important;
+	}
+	.mode-btn.active {
+		background: #ffffff !important;
+		color: #1a73e8 !important;
+		border-color: #cbd5e1 !important;
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+	}
+	.mode-btn-monitor.active {
+		color: #059669 !important;
+		border-color: #a7f3d0 !important;
+		background: #ecfdf5 !important;
+	}
+	.active-tasks-badge {
+		padding: 1px 6px;
+		border-radius: 9999px;
+		background: #059669;
+		color: #ffffff;
+		font-size: 9px;
+		font-weight: 800;
+		line-height: 1.2;
+		margin-left: 2px;
+	}
+
 	.editor-actions button {
 		height: 34px;
 		display: flex;
@@ -4409,6 +4933,34 @@
 	.editor-actions .publish {
 		color: #5f6368;
 		background: #f1f4f8;
+	}
+	.editor-actions .clone-draft-btn {
+		background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+		color: #ffffff;
+		border-color: #059669;
+		box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+		font-weight: 700;
+	}
+	.editor-actions .clone-draft-btn:not(:disabled):hover {
+		background: linear-gradient(135deg, #059669 0%, #047857 100%);
+		border-color: #047857;
+		color: #ffffff;
+		box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+		transform: translateY(-1px);
+	}
+	.editor-actions .ai-copilot-btn {
+		background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+		color: #ffffff;
+		border-color: #6366f1;
+		box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+		font-weight: 700;
+	}
+	.editor-actions .ai-copilot-btn:not(:disabled):hover {
+		background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+		border-color: #4f46e5;
+		color: #ffffff;
+		box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+		transform: translateY(-1px);
 	}
 	.editor-actions button:disabled {
 		opacity: 0.45;
@@ -4937,75 +5489,7 @@
 		border-color: #fad2cf;
 	}
 
-	/* Gemini Shimmer AI Prompt Dock */
-	.ai-dock {
-		position: absolute;
-		z-index: 5;
-		left: 50%;
-		bottom: 18px;
-		width: min(560px, calc(100% - 130px));
-		min-height: 46px;
-		display: grid;
-		grid-template-columns: 36px minmax(0, 1fr) 36px;
-		align-items: center;
-		border: 1.5px solid transparent;
-		border-radius: 9999px;
-		padding: 4px 8px;
-		background-clip: padding-box, border-box;
-		background-origin: padding-box, border-box;
-		background-image:
-			linear-gradient(#ffffff, #ffffff), linear-gradient(135deg, #1a73e8, #7c3aed, #ea4335, #34a853);
-		box-shadow:
-			0 12px 36px rgba(26, 115, 232, 0.16),
-			0 2px 10px rgba(0, 0, 0, 0.04);
-		transform: translateX(-50%);
-		transition: box-shadow 200ms ease;
-	}
-	.ai-dock:focus-within {
-		box-shadow:
-			0 16px 44px rgba(124, 58, 237, 0.25),
-			0 0 0 2px rgba(26, 115, 232, 0.2);
-	}
-	.ai-dock > span {
-		display: grid;
-		place-items: center;
-		color: #7c3aed;
-	}
-	.ai-dock input {
-		min-width: 0;
-		border: 0;
-		outline: 0;
-		color: #1e293b;
-		background: transparent;
-		font:
-			600 11.5px/1.3 'Manrope',
-			sans-serif;
-	}
-	.ai-dock input::placeholder {
-		color: #9aa0a6;
-	}
-	.ai-dock button {
-		width: 32px;
-		height: 32px;
-		display: grid;
-		place-items: center;
-		border: 0;
-		border-radius: 50%;
-		color: #ffffff;
-		background: linear-gradient(135deg, #1a73e8, #7c3aed);
-		cursor: pointer;
-		box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
-		transition: transform 140ms ease;
-	}
-	.ai-dock button:hover {
-		transform: scale(1.08);
-	}
-	.ai-dock small {
-		grid-column: 2 / 4;
-		padding: 2px 0 4px;
-		color: #d97706;
-		font-size: 9px;
-	}
+
 
 	/* Right Inspector & Execution Panel */
 	.inspector {
@@ -5619,6 +6103,118 @@
 		box-shadow: 0 4px 16px rgba(26, 115, 232, 0.08) !important;
 	}
 
+	.error-diagnostics-card {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 12px 14px;
+		border-radius: 10px;
+		background: #fef2f2;
+		border: 1px solid #fecaca;
+		color: #991b1b;
+		margin: 8px 0;
+		box-shadow: 0 2px 8px rgba(239, 68, 68, 0.08);
+	}
+	.diagnostics-head {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		font-size: 12px;
+		font-weight: 750;
+		color: #b91c1c;
+	}
+	.diagnostics-body {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-size: 11px;
+	}
+	.diag-item {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.diag-lbl {
+		color: #7f1d1d;
+		font-weight: 600;
+	}
+	.diag-badge {
+		padding: 1px 6px;
+		border-radius: 4px;
+		background: #fee2e2;
+		color: #b91c1c;
+		font-family: monospace;
+		font-size: 10px;
+		font-weight: 700;
+	}
+	.diagnostics-actions {
+		margin-top: 4px;
+	}
+	.btn-diag-retry {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 5px 12px;
+		border-radius: 6px;
+		border: 1px solid #f87171;
+		background: #ffffff;
+		color: #b91c1c;
+		font-size: 11px;
+		font-weight: 700;
+		cursor: pointer;
+		transition: all 140ms ease;
+		box-shadow: 0 1px 3px rgba(239, 68, 68, 0.15);
+	}
+	.btn-diag-retry:hover:not(:disabled) {
+		background: #fee2e2;
+		transform: scale(1.02);
+	}
+	.btn-diag-retry:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.attempt-error-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		margin-top: 4px;
+		padding: 4px 6px;
+		border-radius: 6px;
+		background: #fef2f2;
+		border: 1px solid #fee2e2;
+	}
+	.attempt-err-code {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		color: #b91c1c !important;
+		font-weight: 700;
+		font-size: 10px;
+	}
+	.btn-attempt-retry {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 2px 7px;
+		border-radius: 4px;
+		border: 1px solid #fca5a5;
+		background: #ffffff;
+		color: #b91c1c;
+		font-size: 10px;
+		font-weight: 700;
+		cursor: pointer;
+		transition: all 120ms ease;
+	}
+	.btn-attempt-retry:hover:not(:disabled) {
+		background: #fee2e2;
+	}
+	.btn-attempt-retry:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
 	@media (max-width: 800px) {
 		.canvas-toolbar {
 			align-items: flex-start;
@@ -5678,9 +6274,7 @@
 			min-height: 32px;
 			padding: 4px 8px;
 		}
-		.ai-dock {
-			width: calc(100% - 30px);
-		}
+
 		.inspector {
 			border-left: 0;
 			border-top: 1px solid #e8ecf2;

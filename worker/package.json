@@ -31,9 +31,10 @@
 		"dev:app": "npm --prefix .. run build:app && wrangler dev --config wrangler.app.jsonc --env=\"\"",
 		"dev:conf": "npm --prefix .. run build:conf && wrangler dev --config wrangler.conf.jsonc --env=\"\"",
 		"dev:checkout": "npm --prefix .. run build:checkout && wrangler dev --config wrangler.checkout.jsonc --env=\"\"",
-		"dev:corex": "npm --prefix .. run build && wrangler dev --config wrangler.corex.jsonc --env=\"\""
+		"dev:corex": "npm --prefix .. run build && wrangler dev --config wrangler.corex.jsonc --env=\"\"",
+		"dev:ai": "node scripts/start-ai-dev.mjs"
 	},
 	"devDependencies": {
-		"wrangler": "^4.0.0"
+		"wrangler": "^4.129.0"
 	}
 }

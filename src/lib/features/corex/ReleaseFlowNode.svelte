@@ -20,6 +20,7 @@
 	class:selected
 	class:running={node.status === 'running'}
 	class:decision={node.kind === 'decision'}
+	class:current-task={Boolean(node.isCurrentTaskNode)}
 	class="flow-node"
 	data-status={node.status}
 	data-layer={node.layer}
@@ -36,12 +37,30 @@
 				></span>{/if}
 		</span>
 		<span class="eyebrow">{node.eyebrow}</span>
+		{#if node.isCurrentTaskNode}
+			<span
+				class="task-active-badge"
+				class:task-failed={node.status === 'failed'}
+				title={node.status === 'failed'
+					? (node.locale === 'uk' ? 'Збій на цьому кроці процесу' : 'Process failed at this step')
+					: (node.locale === 'uk' ? 'Вибрана заявка зараз на цьому кроці' : 'Selected task is at this step')}
+			>
+				<span class="pulse-beacon" class:beacon-failed={node.status === 'failed'}></span>
+				{node.status === 'failed'
+					? (node.locale === 'uk' ? 'Помилка' : 'Failed')
+					: (node.locale === 'uk' ? 'Заявка' : 'Active')}
+			</span>
+		{/if}
 		<span class="state" data-status={node.status}>
 			{#if node.status === 'complete'}<Check
 					size={11}
 				/>{:else if node.status === 'running'}<LoaderCircle
 					size={11}
-				/>{:else if node.status === 'waiting'}<CirclePause size={11} />{:else}<LockKeyhole
+				/>{:else if node.status === 'waiting'}<CirclePause
+					size={11}
+				/>{:else if node.status === 'failed'}<OctagonX
+					size={11}
+				/>{:else}<LockKeyhole
 					size={11}
 				/>{/if}
 			{statusText[node.locale][node.status]}
@@ -53,6 +72,34 @@
 	</div>
 	<footer>
 		<span class="meta-badge">{node.meta}</span>
+		{#if node.taskCounters && (node.taskCounters.queue !== undefined || node.taskCounters.passed !== undefined || node.taskCounters.error !== undefined)}
+			<div class="task-counters" aria-label="Task counters">
+				{#if node.taskCounters.queue !== undefined && node.taskCounters.queue > 0}
+					<span
+						class="cnt-badge cnt-queue"
+						title={node.locale === 'uk' ? `В черзі / очікують: ${node.taskCounters.queue}` : `In queue: ${node.taskCounters.queue}`}
+					>
+						<span class="dot-amber"></span>{node.taskCounters.queue}
+					</span>
+				{/if}
+				{#if node.taskCounters.passed !== undefined && node.taskCounters.passed > 0}
+					<span
+						class="cnt-badge cnt-passed"
+						title={node.locale === 'uk' ? `Успішно пройдено: ${node.taskCounters.passed}` : `Passed: ${node.taskCounters.passed}`}
+					>
+						✓ {node.taskCounters.passed}
+					</span>
+				{/if}
+				{#if node.taskCounters.error !== undefined && node.taskCounters.error > 0}
+					<span
+						class="cnt-badge cnt-error"
+						title={node.locale === 'uk' ? `Помилок: ${node.taskCounters.error}` : `Errors: ${node.taskCounters.error}`}
+					>
+						✕ {node.taskCounters.error}
+					</span>
+				{/if}
+			</div>
+		{/if}
 	</footer>
 	{#if node.workflow?.type === 'switch' || node.workflow?.type === 'loop' || (node.workflow?.type === 'parallel' && (node.workflow?.branches?.length ?? 0) > 0)}
 		{#each node.workflow.branches ?? [] as branch, index (branch)}
@@ -123,6 +170,46 @@
 			0 0 0 4px rgba(26, 115, 232, 0.35),
 			0 14px 36px rgba(124, 58, 237, 0.18);
 		animation: geminiAura 3s ease-in-out infinite alternate;
+	}
+	.flow-node.current-task {
+		border-color: #1a73e8;
+		box-shadow:
+			0 0 0 3px rgba(26, 115, 232, 0.35),
+			0 12px 32px -4px rgba(26, 115, 232, 0.25);
+		animation: currentTaskGlow 2s ease-in-out infinite alternate;
+	}
+	@keyframes currentTaskGlow {
+		0% {
+			box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.3), 0 8px 24px rgba(26, 115, 232, 0.15);
+		}
+		100% {
+			box-shadow: 0 0 0 4.5px rgba(26, 115, 232, 0.5), 0 16px 36px rgba(26, 115, 232, 0.3);
+		}
+	}
+	.flow-node[data-status='failed'] {
+		border-color: #ef4444;
+		box-shadow: 0 0 0 1.5px rgba(239, 68, 68, 0.4), 0 8px 24px rgba(239, 68, 68, 0.12);
+	}
+	.flow-node.current-task[data-status='failed'] {
+		border-color: #dc2626;
+		animation: failedTaskGlow 1.8s ease-in-out infinite alternate;
+	}
+	@keyframes failedTaskGlow {
+		0% {
+			box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.4), 0 8px 24px rgba(239, 68, 68, 0.18);
+		}
+		100% {
+			box-shadow: 0 0 0 4.5px rgba(239, 68, 68, 0.6), 0 16px 36px rgba(239, 68, 68, 0.35);
+		}
+	}
+	.task-active-badge.task-failed {
+		background: #fef2f2;
+		color: #b91c1c;
+		border-color: #fca5a5;
+	}
+	.pulse-beacon.beacon-failed {
+		background: #ef4444;
+		box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
 	}
 	.flow-node[data-status='blocked'] {
 		opacity: 0.7;
@@ -255,7 +342,12 @@
 	}
 
 	footer {
-		padding: 8px 14px 9px;
+		min-height: 32px;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		padding: 6px 12px 8px;
 		border-bottom-left-radius: 13px;
 		border-bottom-right-radius: 13px;
 		border-top: 1px solid #f1f4f8;
@@ -263,13 +355,76 @@
 	}
 	.meta-badge {
 		display: inline-block;
-		max-width: 100%;
+		max-width: 110px;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		color: #64748b;
 		font: 700 9px/1.2 monospace;
 		letter-spacing: 0.03em;
+	}
+	.task-active-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 2px 7px;
+		border-radius: 9999px;
+		background: #e8f0fe;
+		color: #1a73e8;
+		font-size: 8.5px;
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+	.pulse-beacon {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: #1a73e8;
+		box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.3);
+		animation: beaconPulse 1.2s infinite ease-in-out;
+	}
+	@keyframes beaconPulse {
+		0%, 100% { transform: scale(1); opacity: 1; }
+		50% { transform: scale(1.4); opacity: 0.7; }
+	}
+	.task-counters {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		margin-left: auto;
+	}
+	.cnt-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		padding: 2px 6px;
+		border-radius: 6px;
+		font-size: 9px;
+		font-weight: 800;
+		line-height: 1;
+		letter-spacing: 0.02em;
+	}
+	.cnt-queue {
+		background: #fef7e0;
+		color: #b06000;
+		border: 1px solid #feefc3;
+	}
+	.dot-amber {
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		background: #f59e0b;
+	}
+	.cnt-passed {
+		background: #e6f4ea;
+		color: #137333;
+		border: 1px solid #ceead6;
+	}
+	.cnt-error {
+		background: #fce8e6;
+		color: #c5221f;
+		border: 1px solid #fad2cf;
 	}
 
 	:global(.port) {

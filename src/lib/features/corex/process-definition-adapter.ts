@@ -1,7 +1,9 @@
 import type { FlowNode, FlowScenario } from './types';
 import {
+	PROCESS_DEFINITION_SCHEMA_VERSION,
 	isProcessTriggerNode,
 	type ProcessDefinition,
+	type ProcessEdge,
 	type ProcessNode
 } from './process-definition';
 
@@ -523,5 +525,389 @@ export function processDefinitionToFlowScenario(definition: ProcessDefinition): 
 												tone: edge.when ? ('success' as const) : ('danger' as const)
 											})
 		}))
+	};
+}
+
+function slugify(text: string): string {
+	return (
+		text
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '-')
+			.replace(/^-|-$/g, '') || 'node'
+	);
+}
+
+function safeIdentifier(text: string, fallback = 'item'): string {
+	const cleaned = text.replace(/[^A-Za-z0-9_-]/g, '_').replace(/^[^A-Za-z_]+/, '_');
+	return cleaned || fallback;
+}
+
+function parseMethodAndPath(
+	raw?: string,
+	defaultPath = '/api/v1/resource'
+): { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; path: string } {
+	if (!raw) return { method: 'POST', path: defaultPath };
+	const parts = raw.trim().split(/\s+/);
+	const validMethods: Array<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'> = [
+		'GET',
+		'POST',
+		'PUT',
+		'PATCH',
+		'DELETE'
+	];
+	if (parts.length >= 2 && validMethods.includes(parts[0].toUpperCase() as any)) {
+		const method = parts[0].toUpperCase() as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+		const cleanPath = parts[1].split('?')[0].replace(/\|.*/, '');
+		return { method, path: cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}` };
+	}
+	return { method: 'POST', path: raw.startsWith('/') ? raw : defaultPath };
+}
+
+export function flowScenarioToProcessDefinition(scenario: FlowScenario): ProcessDefinition {
+	const rawNodes = scenario.nodes;
+	const rawEdges = scenario.edges;
+
+	const incomingCounts = new Map<string, number>();
+	for (const edge of rawEdges) {
+		incomingCounts.set(edge.target, (incomingCounts.get(edge.target) ?? 0) + 1);
+	}
+	let triggerNode =
+		rawNodes.find((n) => (incomingCounts.get(n.id) ?? 0) === 0 && n.kind === 'trigger') ||
+		rawNodes.find((n) => (incomingCounts.get(n.id) ?? 0) === 0) ||
+		rawNodes.find((n) => n.kind === 'trigger') ||
+		rawNodes[0];
+
+	if (!triggerNode && rawNodes.length > 0) {
+		triggerNode = rawNodes[0];
+	}
+
+	const adjacency = new Map<string, string[]>();
+	for (const edge of rawEdges) {
+		if (edge.target === triggerNode.id) continue;
+		const list = adjacency.get(edge.source) ?? [];
+		list.push(edge.target);
+		adjacency.set(edge.source, list);
+	}
+
+	const reachable = new Set<string>();
+	if (triggerNode) {
+		const queue = [triggerNode.id];
+		while (queue.length > 0) {
+			const current = queue.shift()!;
+			if (reachable.has(current)) continue;
+			reachable.add(current);
+			const neighbors = adjacency.get(current) ?? [];
+			for (const next of neighbors) {
+				if (!reachable.has(next)) queue.push(next);
+			}
+		}
+	}
+
+	const activeNodes = rawNodes.filter((n) => reachable.has(n.id));
+	const activeNodeIds = new Set(activeNodes.map((n) => n.id));
+
+	const visited = new Set<string>();
+	const inStack = new Set<string>();
+	const safeEdges: Array<{ id: string; source: string; target: string; label?: string; tone?: string }> = [];
+
+	function dfs(nodeId: string) {
+		visited.add(nodeId);
+		inStack.add(nodeId);
+		const outList = rawEdges.filter(
+			(e) => e.source === nodeId && activeNodeIds.has(e.target) && e.target !== triggerNode.id
+		);
+		for (const edge of outList) {
+			if (!visited.has(edge.target)) {
+				safeEdges.push(edge);
+				dfs(edge.target);
+			} else if (!inStack.has(edge.target)) {
+				safeEdges.push(edge);
+			}
+		}
+		inStack.delete(nodeId);
+	}
+
+	if (triggerNode) {
+		dfs(triggerNode.id);
+	}
+
+	const edgesBySource = new Map<string, typeof safeEdges>();
+	for (const edge of safeEdges) {
+		const list = edgesBySource.get(edge.source) ?? [];
+		list.push(edge);
+		edgesBySource.set(edge.source, list);
+	}
+
+	const usedNames = new Set<string>();
+	function uniqueName(title: string, id: string): string {
+		let base = slugify(title) || slugify(id) || 'step';
+		if (!usedNames.has(base)) {
+			usedNames.add(base);
+			return base;
+		}
+		let index = 2;
+		while (usedNames.has(`${base}-${index}`)) {
+			index++;
+		}
+		const unique = `${base}-${index}`;
+		usedNames.add(unique);
+		return unique;
+	}
+
+	const processNodes: ProcessNode[] = [];
+	const processEdges: ProcessEdge[] = [];
+
+	const entrypointParsed = parseMethodAndPath(scenario.entrypoint, `/api/v1/${slugify(scenario.id)}`);
+
+	for (const node of activeNodes) {
+		const nodeName = uniqueName(node.title, node.id);
+		const out = edgesBySource.get(node.id) ?? [];
+
+		if (node.id === triggerNode.id) {
+			processNodes.push({
+				id: node.id,
+				name: nodeName,
+				type: 'trigger-http',
+				position: { ...node.position },
+				config: {
+					method: entrypointParsed.method,
+					path: entrypointParsed.path
+				}
+			});
+
+			if (out.length === 0) {
+				const successId = `${node.id}-success`;
+				processNodes.push({
+					id: successId,
+					name: uniqueName('success', successId),
+					type: 'end-success',
+					position: { x: node.position.x + 300, y: node.position.y },
+					config: { outputExpression: '$.result' }
+				});
+				processEdges.push({
+					id: `${node.id}-${successId}`,
+					source: node.id,
+					target: successId
+				});
+			} else {
+				for (const edge of out) {
+					processEdges.push({
+						id: edge.id || `${edge.source}-${edge.target}`,
+						source: edge.source,
+						target: edge.target
+					});
+				}
+			}
+			continue;
+		}
+
+		if (out.length === 0) {
+			const isFailure =
+				node.status === 'failed' ||
+				node.eyebrow?.toLowerCase().includes('error') ||
+				node.id.toLowerCase().includes('fail') ||
+				node.id.toLowerCase().includes('invalid') ||
+				node.id.toLowerCase().includes('missing') ||
+				node.id.toLowerCase().includes('denied');
+
+			if (isFailure) {
+				processNodes.push({
+					id: node.id,
+					name: nodeName,
+					type: 'end-failure',
+					position: { ...node.position },
+					config: {
+						code: safeIdentifier(node.meta || 'PROCESS_FAILED', 'PROCESS_FAILED'),
+						message: node.detail || node.title
+					}
+				});
+			} else {
+				processNodes.push({
+					id: node.id,
+					name: nodeName,
+					type: 'end-success',
+					position: { ...node.position },
+					config: {
+						outputExpression: '$.result'
+					}
+				});
+			}
+			continue;
+		}
+
+		if (out.length === 1) {
+			const edge = out[0];
+			processEdges.push({
+				id: edge.id || `${edge.source}-${edge.target}`,
+				source: edge.source,
+				target: edge.target
+			});
+
+			const isWaitEvent =
+				node.title.toLowerCase().includes('wait') ||
+				node.title.toLowerCase().includes('webhook') ||
+				node.detail?.toLowerCase().includes('webhook') ||
+				node.operation?.toLowerCase().includes('wait');
+
+			if (isWaitEvent) {
+				processNodes.push({
+					id: node.id,
+					name: nodeName,
+					type: 'wait-event',
+					position: { ...node.position },
+					config: {
+						eventType: safeIdentifier(node.id, 'event'),
+						resultKey: 'event_result',
+						timeoutMs: 300_000
+					}
+				});
+			} else if (
+				node.request ||
+				node.layer === 'worker' ||
+				node.layer === 'external' ||
+				node.eyebrow?.toLowerCase().includes('worker') ||
+				node.eyebrow?.toLowerCase().includes('api')
+			) {
+				const req = parseMethodAndPath(node.request, `/api/v1/${slugify(node.id)}`);
+				processNodes.push({
+					id: node.id,
+					name: nodeName,
+					type: 'http-request',
+					position: { ...node.position },
+					config: {
+						method: req.method,
+						url: req.path.startsWith('http') ? req.path : `https://api.letsrealtalk.com${req.path}`,
+						timeoutMs: 30_000,
+						retry: { limit: 3, backoff: 'exponential' }
+					}
+				});
+			} else {
+				processNodes.push({
+					id: node.id,
+					name: nodeName,
+					type: 'transform',
+					position: { ...node.position },
+					config: {
+						mode: 'merge',
+						mappings: {
+							result: '$.input'
+						}
+					}
+				});
+			}
+			continue;
+		}
+
+		if (out.length === 2) {
+			processNodes.push({
+				id: node.id,
+				name: nodeName,
+				type: 'condition',
+				position: { ...node.position },
+				config: {
+					path: '$.valid',
+					operator: 'equals',
+					value: true
+				}
+			});
+
+			const isNegativeLabel = (label?: string, tone?: string) => {
+				const l = (label || '').toLowerCase();
+				return (
+					tone === 'danger' ||
+					l === 'no' ||
+					l === 'false' ||
+					l === 'invalid' ||
+					l === 'failed' ||
+					l === 'denied' ||
+					l === 'missing' ||
+					l === '404' ||
+					l === '400' ||
+					l === '422' ||
+					l === 'network'
+				);
+			};
+
+			const [e0, e1] = out;
+			if (isNegativeLabel(e0.label, e0.tone)) {
+				processEdges.push({
+					id: e1.id || `${e1.source}-${e1.target}-true`,
+					source: e1.source,
+					target: e1.target,
+					when: true
+				});
+				processEdges.push({
+					id: e0.id || `${e0.source}-${e0.target}-false`,
+					source: e0.source,
+					target: e0.target,
+					when: false
+				});
+			} else {
+				processEdges.push({
+					id: e0.id || `${e0.source}-${e0.target}-true`,
+					source: e0.source,
+					target: e0.target,
+					when: true
+				});
+				processEdges.push({
+					id: e1.id || `${e1.source}-${e1.target}-false`,
+					source: e1.source,
+					target: e1.target,
+					when: false
+				});
+			}
+			continue;
+		}
+
+		const caseIds: string[] = [];
+		const cases: Array<{ id: string; value: string }> = [];
+		for (let i = 0; i < out.length - 1; i++) {
+			const label = out[i].label || `branch_${i + 1}`;
+			let caseId = safeIdentifier(label, `branch_${i + 1}`);
+			if (caseId === 'default' || caseIds.includes(caseId)) {
+				caseId = `branch_${i + 1}`;
+			}
+			caseIds.push(caseId);
+			cases.push({ id: caseId, value: label });
+		}
+
+		processNodes.push({
+			id: node.id,
+			name: nodeName,
+			type: 'switch',
+			position: { ...node.position },
+			config: {
+				path: '$.route',
+				cases
+			}
+		});
+
+		for (let i = 0; i < out.length - 1; i++) {
+			const edge = out[i];
+			processEdges.push({
+				id: edge.id || `${edge.source}-${edge.target}-${cases[i].id}`,
+				source: edge.source,
+				target: edge.target,
+				case: cases[i].id
+			});
+		}
+		const defaultEdge = out[out.length - 1];
+		processEdges.push({
+			id: defaultEdge.id || `${defaultEdge.source}-${defaultEdge.target}-default`,
+			source: defaultEdge.source,
+			target: defaultEdge.target,
+			case: 'default'
+		});
+	}
+
+	return {
+		schemaVersion: PROCESS_DEFINITION_SCHEMA_VERSION,
+		id: `draft-${slugify(scenario.id)}`,
+		name: scenario.label || scenario.title,
+		description: scenario.description,
+		revision: 1,
+		lifecycle: 'draft',
+		nodes: processNodes,
+		edges: processEdges
 	};
 }

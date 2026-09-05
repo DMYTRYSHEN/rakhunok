@@ -1,0 +1,31 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "letsrealtalk-ai-preview",
+	"main": "src/ai-worker.ts",
+	"compatibility_date": "2026-08-28",
+	"workers_dev": true,
+	"vars": {
+		"AZURE_HOST": "rahunok-0252-resource.services.ai.azure.com",
+		"MODEL_NAME": "gpt-5.6-sol"
+	},
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
+	"env": {
+		"production": {
+			"name": "letsrealtalk-ai",
+			"workers_dev": false,
+			"vars": {
+				"AZURE_HOST": "rahunok-0252-resource.services.ai.azure.com",
+				"MODEL_NAME": "gpt-5.6-sol"
+			},
+			"routes": [
+				{
+					"pattern": "ai.letsrealtalk.com/*",
+					"zone_name": "letsrealtalk.com"
+				}
+			]
+		}
+	}
+}

@@ -32,20 +32,6 @@
 				},
 				{
 					"method": "OPTIONS",
-					"path": "/api/v1/checkout/",
-					"match": "prefix",
-					"status": "implemented",
-					"source": "worker/src/index.ts"
-				},
-				{
-					"method": "POST",
-					"path": "/api/v1/checkout/",
-					"match": "prefix",
-					"status": "implemented",
-					"source": "worker/src/index.ts"
-				},
-				{
-					"method": "OPTIONS",
 					"path": "/api/v1/orders",
 					"match": "exact",
 					"status": "implemented",
@@ -82,6 +68,48 @@
 				{
 					"method": "POST",
 					"path": "/checkout",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/conf",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/conf",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/conf",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/conf",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/conf/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/conf/",
 					"match": "prefix",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
@@ -272,6 +300,7 @@
 				"letsrealtalk.com/api/v1/logos*",
 				"letsrealtalk.com/checkout*",
 				"letsrealtalk.com/o/*",
+				"letsrealtalk.com/pay",
 				"letsrealtalk.com/pay/*",
 				"letsrealtalk.com/pos/*",
 				"letsrealtalk.com/t/*",

@@ -84,6 +84,12 @@ export type WorkflowStepConfig = {
 	warnings?: string[];
 };
 
+export type FlowNodeTaskCounters = {
+	queue?: number;
+	passed?: number;
+	error?: number;
+};
+
 export type FlowNode = {
 	id: string;
 	eyebrow: string;
@@ -99,6 +105,8 @@ export type FlowNode = {
 	input?: string;
 	output?: string;
 	workflow?: WorkflowStepConfig;
+	taskCounters?: FlowNodeTaskCounters;
+	isCurrentTaskNode?: boolean;
 };
 
 export type FlowEdge = {
