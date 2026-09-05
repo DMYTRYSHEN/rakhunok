@@ -1399,13 +1399,13 @@ class CheckoutStore {
           bank_name: 'А-Банк'
         };
       } else {
-        if (!initialOrder.merchant.business_name || initialOrder.merchant.business_name === 'Rakhunok') {
+        if (!initialOrder.merchant.business_name) {
           initialOrder.merchant.business_name = 'ФОП ДМИТРИШЕН';
         }
-        if (!initialOrder.merchant.iban || initialOrder.merchant.iban.includes('0000026500504354077')) {
+        if (!initialOrder.merchant.iban) {
           initialOrder.merchant.iban = 'UA12345678987654321345562';
         }
-        if (!initialOrder.merchant.tax_id || initialOrder.merchant.tax_id === '37193071') {
+        if (!initialOrder.merchant.tax_id) {
           initialOrder.merchant.tax_id = '11212121212';
         }
         if (!initialOrder.merchant.bank_name) {

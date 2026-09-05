@@ -107,7 +107,79 @@ async function fetchCheckoutShell(request, env, url) {
 				env.ORDERS_KV.put(`order:${orderId}`, JSON.stringify(order), {
 					expirationTtl: Math.min(Math.max(ttl, 300), 604800)
 				}).catch(() => {});
+				if (order.short_id && order.short_id !== orderId) {
+					env.ORDERS_KV.put(`order:${order.short_id}`, JSON.stringify(order), {
+						expirationTtl: Math.min(Math.max(ttl, 300), 604800)
+					}).catch(() => {});
+				}
 			}
+		}
+	}
+
+	// 3. Resilient fallback: direct Supabase query if service binding was cold/missed
+	if (!order) {
+		try {
+			const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
+			const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
+			const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+			const query = isUuid
+				? `id=eq.${encodeURIComponent(orderId)}`
+				: `or=(short_id.eq.${encodeURIComponent(orderId)},order_number.eq.${encodeURIComponent(orderId)})`;
+			const sbRes = await fetch(
+				`${supabaseUrl}/rest/v1/orders?${query}&select=*,merchants(*),business_entities(*)&limit=1`,
+				{ headers: { apikey: supabaseAnonKey, 'Content-Type': 'application/json' } }
+			);
+			if (sbRes.ok) {
+				const rows = await sbRes.json();
+				if (rows && rows.length > 0) {
+					const row = rows[0];
+					const be = row.business_entities;
+					const m = row.merchants;
+					order = {
+						id: row.id,
+						short_id: row.short_id,
+						merchant_id: row.merchant_id,
+						type: row.type || 'fixed',
+						order_number: row.order_number,
+						title: row.title,
+						description: row.description,
+						amount: row.base_amount,
+						base_amount: row.base_amount,
+						discount_amount: row.discount_amount || 0,
+						delivery_fee: row.delivery_fee || 0,
+						total_amount: row.total_amount,
+						currency: row.currency || 'UAH',
+						status: row.status,
+						table_number: row.table_number,
+						terminal_id: row.terminal_id,
+						scenario_config: row.scenario_config || {},
+						share_url: row.share_url,
+						merchant: be ? {
+							business_name: be.business_name || be.display_name || m?.business_name || 'ФОП ДМИТРИШЕН',
+							display_name: be.display_name || be.business_name || m?.display_name || m?.business_name || 'BARCODE',
+							iban: be.iban || m?.iban || 'UA12345678987654321345562',
+							tax_id: be.tax_id || m?.tax_id || '11212121212',
+							bank_name: be.bank_name || m?.bank_name || 'А-Банк'
+						} : (m ? {
+							business_name: m.business_name || 'ФОП ДМИТРИШЕН',
+							display_name: m.display_name || m.business_name || 'BARCODE',
+							iban: m.iban || 'UA12345678987654321345562',
+							tax_id: m.tax_id || '11212121212',
+							bank_name: m.bank_name || 'А-Банк'
+						} : null),
+						created_at: row.created_at,
+						expires_at: row.expires_at
+					};
+					if (env.ORDERS_KV && order) {
+						env.ORDERS_KV.put(`order:${orderId}`, JSON.stringify(order), { expirationTtl: 300 }).catch(() => {});
+						if (row.short_id && row.short_id !== orderId) {
+							env.ORDERS_KV.put(`order:${row.short_id}`, JSON.stringify(order), { expirationTtl: 300 }).catch(() => {});
+						}
+					}
+				}
+			}
+		} catch (e) {
+			console.warn('Direct Supabase order fallback failed:', e);
 		}
 	}
 

@@ -230,8 +230,12 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 			const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
 
 			try {
+				const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+				const query = isUuid
+					? `id=eq.${encodeURIComponent(orderId)}`
+					: `or=(short_id.eq.${encodeURIComponent(orderId)},order_number.eq.${encodeURIComponent(orderId)})`;
 				const res = await fetch(
-					`${supabaseUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}&select=*,merchants(*),business_entities(*)`,
+					`${supabaseUrl}/rest/v1/orders?${query}&select=*,merchants(*),business_entities(*)&limit=1`,
 					{
 						headers: {
 							apikey: supabaseAnonKey,

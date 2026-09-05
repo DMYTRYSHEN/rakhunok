@@ -185,23 +185,40 @@
 
       <button
         class="header-btn"
+        class:active-view={currentSubView === 'info'}
         onclick={() => toggleSubView('info')}
-        aria-label="Деталі платежу"
+        aria-label={currentSubView === 'info' ? 'Закрити деталі платежу' : 'Деталі платежу'}
       >
-        <svg
-          viewBox="0 0 24 24"
-          width="15"
-          height="15"
-          stroke="currentColor"
-          stroke-width="2"
-          fill="none"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="16" x2="12" y2="12"></line>
-          <line x1="12" y1="8" x2="12.01" y2="8"></line>
-        </svg>
+        {#if currentSubView === 'info'}
+          <svg
+            viewBox="0 0 24 24"
+            width="15"
+            height="15"
+            stroke="currentColor"
+            stroke-width="2.5"
+            fill="none"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        {:else}
+          <svg
+            viewBox="0 0 24 24"
+            width="15"
+            height="15"
+            stroke="currentColor"
+            stroke-width="2"
+            fill="none"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+        {/if}
       </button>
     </header>
 

@@ -687,14 +687,14 @@ body.light-mode .search-trigger { background: rgba(0,0,0,0.05); color: #555; }
 .d-row-chevron { color: var(--text-tertiary); flex-shrink: 0; }
 
 .sub-view {
-    position: absolute; top: 52px; left: 0; right: 0; bottom: 0;
-    background: #18181b; z-index: 20; padding: 0 20px 20px;
-    transform: translateY(20px); opacity: 0; pointer-events: none; transition: all 0.4s var(--ease-spring);
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: #18181b; z-index: 25; padding: 18px 20px 20px;
+    transform: translateY(20px); opacity: 0; pointer-events: none; transition: all 0.35s var(--ease-spring);
     display: flex; flex-direction: column; overflow-y: auto; border-radius: 38px 38px 0 0;
 }
 body.light-mode .sub-view { background: #ffffff; }
 .sub-view.active { transform: translateY(0); opacity: 1; pointer-events: auto; }
-.view-title { font-size: 19px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.015em; }
+.view-title { font-size: 19px; font-weight: 700; margin-bottom: 0; letter-spacing: -0.015em; }
 
 .sub-view-header {
     display: flex;
@@ -716,6 +716,7 @@ body.light-mode .sub-view { background: #ffffff; }
     cursor: pointer;
     transition: all 0.2s var(--ease-apple);
     flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
 }
 body.light-mode .sub-close-btn {
     background: rgba(0, 0, 0, 0.06);
