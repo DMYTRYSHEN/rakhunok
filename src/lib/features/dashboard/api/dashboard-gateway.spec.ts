@@ -434,7 +434,8 @@ describe('dashboard gateway', () => {
 			status: 'pending' as const,
 			created_at: '2026-08-26T00:00:00.000Z',
 			expires_at: '2026-08-26T00:30:00.000Z',
-			terminal_id: 'terminal-1'
+			terminal_id: 'terminal-1',
+			table_number: 1
 		};
 
 		await gateway.createPosOrder(payload);
