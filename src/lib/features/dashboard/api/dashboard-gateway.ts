@@ -593,6 +593,7 @@ export function createDashboardGateway(
 						delivery_fee: input.deliveryFee ?? 0,
 						table_number: input.tableNumber,
 						terminal_id: input.terminalId,
+						entity_id: input.entityId ?? null,
 						scenario_config: input.scenario_config
 					})
 				});
@@ -640,6 +641,7 @@ export function createDashboardGateway(
 			const totalAmount = input.amount + (input.deliveryFee ?? 0);
 			const insertPayload: Record<string, unknown> = {
 				merchant_id: merchantId,
+				entity_id: input.entityId ?? null,
 				order_number: input.reference,
 				title: input.title,
 				description: input.description ?? null,

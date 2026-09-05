@@ -45,3 +45,57 @@ test('serves only the canonical OpenAPI file below /docs', async () => {
 	);
 	assert.equal(missing.status, 404);
 });
+
+test('buildMerchantInfo prioritizes business_entities over merchants', async () => {
+	const { buildMerchantInfo } = await import('./index.ts');
+
+	const rowWithEntity = {
+		merchants: {
+			business_name: 'ТОВ Рахунок',
+			display_name: 'Кав’ярня Рахунок',
+			iban: 'UA000000000000000000000000000',
+			tax_id: '12345678',
+			bank_name: 'ПриватБанк'
+		},
+		business_entities: {
+			business_name: 'ФОП ДМИТРИШЕН',
+			display_name: 'BARCODE',
+			iban: 'UA12345678987654321345562',
+			tax_id: '11212121212',
+			bank_name: 'А-Банк'
+		}
+	};
+
+	const result = buildMerchantInfo(rowWithEntity);
+	assert.deepEqual(result, {
+		business_name: 'ФОП ДМИТРИШЕН',
+		display_name: 'BARCODE',
+		iban: 'UA12345678987654321345562',
+		tax_id: '11212121212',
+		bank_name: 'А-Банк'
+	});
+});
+
+test('buildMerchantInfo falls back to merchants if business_entities is null', async () => {
+	const { buildMerchantInfo } = await import('./index.ts');
+
+	const rowWithoutEntity = {
+		merchants: {
+			business_name: 'ТОВ Рахунок',
+			display_name: 'Кав’ярня Рахунок',
+			iban: 'UA000000000000000000000000000',
+			tax_id: '12345678',
+			bank_name: 'ПриватБанк'
+		},
+		business_entities: null
+	};
+
+	const result = buildMerchantInfo(rowWithoutEntity);
+	assert.deepEqual(result, {
+		business_name: 'ТОВ Рахунок',
+		display_name: 'Кав’ярня Рахунок',
+		iban: 'UA000000000000000000000000000',
+		tax_id: '12345678',
+		bank_name: 'ПриватБанк'
+	});
+});

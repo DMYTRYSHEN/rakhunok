@@ -10,6 +10,30 @@ function isLandingAsset(pathname: string): boolean {
 	return pathname.startsWith('/_app/') || PUBLIC_FILES.has(pathname);
 }
 
+export function buildMerchantInfo(row: Record<string, any>) {
+	const be = row.business_entities;
+	const m = row.merchants;
+	if (be) {
+		return {
+			business_name: be.business_name || be.display_name || m?.business_name,
+			display_name: be.display_name || be.business_name || m?.display_name || m?.business_name,
+			iban: be.iban || m?.iban,
+			tax_id: be.tax_id || m?.tax_id,
+			bank_name: be.bank_name || m?.bank_name
+		};
+	}
+	if (m) {
+		return {
+			business_name: m.business_name,
+			display_name: m.display_name || m.business_name,
+			iban: m.iban,
+			tax_id: m.tax_id,
+			bank_name: m.bank_name
+		};
+	}
+	return undefined;
+}
+
 export async function routeWebRequest(request: Request, env: Env): Promise<Response> {
 	const url = new URL(request.url);
 
@@ -64,7 +88,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 
 			try {
 				const res = await fetch(
-					`${supabaseUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}&select=*,merchants(*)`,
+					`${supabaseUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}&select=*,merchants(*),business_entities(*)`,
 					{
 						headers: {
 							apikey: supabaseAnonKey,
@@ -76,7 +100,6 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 					const rows = (await res.json()) as Array<Record<string, any>>;
 					if (rows.length > 0) {
 						const row = rows[0];
-						const merchant = row.merchants;
 						const orderPayload = {
 							id: row.id,
 							merchant_id: row.merchant_id,
@@ -95,14 +118,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 							terminal_id: row.terminal_id,
 							scenario_config: row.scenario_config || {},
 							share_url: row.share_url,
-							merchant: merchant
-								? {
-										business_name: merchant.business_name,
-										display_name: merchant.display_name || merchant.business_name,
-										iban: merchant.iban,
-										tax_id: merchant.tax_id
-									}
-								: undefined,
+							merchant: buildMerchantInfo(row),
 							created_at: row.created_at,
 							expires_at: row.expires_at
 						};
@@ -195,7 +211,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 						: `or=(short_id.eq.${encodeURIComponent(orderId)},order_number.eq.${encodeURIComponent(orderId)})`;
 
 					orderPromise = fetch(
-						`${supabaseUrl}/rest/v1/orders?${query}&select=*,merchants(*)&limit=1`,
+						`${supabaseUrl}/rest/v1/orders?${query}&select=*,merchants(*),business_entities(*)&limit=1`,
 						{ headers: { apikey: supabaseAnonKey, 'Content-Type': 'application/json' } }
 					)
 						.then(async (res) => {
@@ -203,7 +219,6 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 							const rows = (await res.json()) as Array<Record<string, any>>;
 							if (!rows.length) return null;
 							const row = rows[0];
-							const merchant = row.merchants;
 							const payload = {
 								id: row.id,
 								merchant_id: row.merchant_id,
@@ -222,14 +237,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 								terminal_id: row.terminal_id,
 								scenario_config: row.scenario_config || {},
 								share_url: row.share_url,
-								merchant: merchant
-									? {
-											business_name: merchant.business_name,
-											display_name: merchant.display_name || merchant.business_name,
-											iban: merchant.iban,
-											tax_id: merchant.tax_id
-										}
-									: undefined,
+								merchant: buildMerchantInfo(row),
 								created_at: row.created_at,
 								expires_at: row.expires_at
 							};
@@ -314,6 +322,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 					const insertPayload: Record<string, unknown> = {
 						id: newOrderId,
 						merchant_id: merchantId,
+						entity_id: body.entity_id ? String(body.entity_id) : null,
 						type,
 						order_number: orderNumber,
 						title,

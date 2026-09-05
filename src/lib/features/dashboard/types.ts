@@ -47,6 +47,7 @@ export type InvoiceCreateInput = {
 	deliveryFee?: number;
 	tableNumber?: number;
 	terminalId?: string;
+	entityId?: string;
 	scenario_config?: ScenarioConfig;
 };
 

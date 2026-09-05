@@ -120,22 +120,40 @@
 		window.setTimeout(() => (endpointCopied = false), 1500);
 	}
 
+	function selectDefaultEntity(id: string) {
+		selectedEntityId = id;
+		if (typeof window !== 'undefined') {
+			localStorage.setItem('rahunok_default_entity_id', id);
+		}
+	}
+
 	$effect(() => {
-		const nextEntities = initialEntities.map((entity, index) => ({
+		const savedDefaultId =
+			typeof window !== 'undefined' ? localStorage.getItem('rahunok_default_entity_id') : null;
+		const currentEntityId = untrack(() => selectedEntityId) || savedDefaultId;
+		const activeId = initialEntities.some((entity) => entity.id === currentEntityId)
+			? currentEntityId!
+			: (initialEntities.find((e) => e.taxId && e.taxId !== '-')?.id ??
+				initialEntities[0]?.id ??
+				'');
+
+		selectedEntityId = activeId;
+		if (activeId && typeof window !== 'undefined' && !savedDefaultId) {
+			localStorage.setItem('rahunok_default_entity_id', activeId);
+		}
+
+		const nextEntities = initialEntities.map((entity) => ({
 			id: entity.id,
 			name: entity.displayName,
 			legalName: entity.businessName,
 			edrpou: entity.taxId,
 			city: entity.bankName,
-			isPrimary: index === 0,
+			isPrimary: entity.id === activeId,
 			local: false
 		}));
 		entities = nextEntities;
 		accounts = [];
 		terminals = [...initialTerminals];
-		const currentEntityId = untrack(() => selectedEntityId);
-		if (!nextEntities.some((entity) => entity.id === currentEntityId))
-			selectedEntityId = nextEntities[0]?.id ?? '';
 		if (!untrack(() => merchantName)) merchantName = merchant.displayName;
 	});
 
@@ -330,6 +348,7 @@
 				<p class="text-xs font-bold tracking-[0.12em] text-zinc-500 uppercase">Активний бізнес</p>
 				<select
 					bind:value={selectedEntityId}
+					onchange={(e) => selectDefaultEntity((e.target as HTMLSelectElement).value)}
 					class="mt-3 h-11 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-600"
 					aria-label="Активний бізнес"
 				>
@@ -456,8 +475,9 @@
 											class="font-bold text-zinc-600">Редагувати</button
 										><button
 											type="button"
-											onclick={() => (selectedEntityId = entity.id)}
-											class="font-bold text-blue-700">Обрати</button
+											onclick={() => selectDefaultEntity(entity.id)}
+											class="font-bold {entity.isPrimary ? 'text-emerald-700' : 'text-blue-700'}"
+											>{entity.isPrimary ? 'Обрано' : 'Обрати'}</button
 										>
 									</div>
 								</div>

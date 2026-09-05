@@ -3,6 +3,7 @@ export interface Merchant {
   business_name?: string;
   iban?: string;
   tax_id?: string;
+  bank_name?: string;
   phone?: string;
   google_maps_url?: string;
 }

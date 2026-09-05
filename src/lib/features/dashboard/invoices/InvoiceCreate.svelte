@@ -32,7 +32,7 @@
 		saveInvoiceRules,
 		type InvoiceRules
 	} from '../invoice-rules/invoice-rules';
-	import type { InvoiceCreateInput, InvoiceType, PosTerminal } from '../types';
+	import type { BusinessEntity, InvoiceCreateInput, InvoiceType, PosTerminal } from '../types';
 	import { formatMoney } from '../utils/format';
 
 	type Scenario = {
@@ -44,10 +44,12 @@
 
 	let {
 		terminals: initialTerminals,
+		entities = [],
 		onCreate,
 		demo = false
 	}: {
 		terminals: PosTerminal[];
+		entities?: BusinessEntity[];
 		onCreate?: (input: InvoiceCreateInput) => Promise<{ id: string }>;
 		demo?: boolean;
 	} = $props();
@@ -120,6 +122,44 @@
 	let submitting = $state(false);
 	let submitError = $state<string | null>(null);
 	let appliedScenarioParam = $state<string | null>(null);
+
+	let selectedEntityId = $state<string>('');
+
+	$effect(() => {
+		if (!entities || entities.length === 0) return;
+		if (selectedEntityId && entities.some((e) => e.id === selectedEntityId)) return;
+
+		const savedId = typeof window !== 'undefined' ? localStorage.getItem('rahunok_default_entity_id') : null;
+		if (savedId && entities.some((e) => e.id === savedId)) {
+			selectedEntityId = savedId;
+		} else {
+			const candidate = entities.find((e) => e.taxId && e.iban) || entities[0];
+			if (candidate) {
+				selectedEntityId = candidate.id;
+			}
+		}
+	});
+
+	const selectedEntity = $derived(
+		(entities && entities.find((e) => e.id === selectedEntityId)) ||
+		(entities && entities.find((e) => e.taxId && e.iban)) ||
+		(entities && entities[0]) ||
+		null
+	);
+
+	$effect(() => {
+		if (selectedEntity) {
+			const form = selectedEntity.businessType === 'fop' ? 'fop' : 'tov';
+			if (invoiceRules.legalForm !== form) {
+				invoiceRules = {
+					...invoiceRules,
+					legalForm: form,
+					vatStatus: form === 'fop' ? 'no-vat' : invoiceRules.vatStatus,
+					taxId: selectedEntity.taxId || invoiceRules.taxId
+				};
+			}
+		}
+	});
 
 	const terminals = $derived([...initialTerminals, ...localTerminals]);
 	const selectedScenario = $derived(scenarios.find((item) => item.id === scenario) ?? scenarios[0]);
@@ -229,6 +269,7 @@
 						? Number.parseInt(selectedTerminal?.code.match(/\d+/)?.[0] || '', 10) || undefined
 						: undefined,
 				terminalId: scenario === 'table' ? selectedTerminal?.id : undefined,
+				entityId: selectedEntity?.id,
 				scenario_config: {
 					allow_loyalty: allowLoyalty,
 					allow_promo: allowPromo,
@@ -326,15 +367,66 @@
 				</div>
 
 				<div class="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
-					<label class="sm:col-span-2">
-						<span class="mb-2 block text-xs font-bold text-zinc-600">Отримувач</span>
-						<div
-							class="flex h-12 items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3"
-						>
-							<Building2 size={17} class="text-zinc-500" aria-hidden="true" />
-							<span class="text-sm font-semibold">Rahunok Coffee · основний рахунок</span>
+					<div class="sm:col-span-2 space-y-2">
+						<div class="flex items-center justify-between">
+							<label for="entity-select" class="block text-xs font-bold text-zinc-600">
+								Отримувач коштів
+							</label>
+							<a
+								href={resolve(demo ? '/dashboard/structure?demo=1' : '/dashboard/structure')}
+								class="text-xs font-medium text-blue-600 hover:text-blue-800"
+							>
+								Структура бізнесу →
+							</a>
 						</div>
-					</label>
+
+						{#if entities && entities.length > 0}
+							<div class="relative">
+								<select
+									id="entity-select"
+									bind:value={selectedEntityId}
+									class="h-12 w-full appearance-none rounded-md border border-zinc-200 bg-white px-3 pr-10 text-sm font-semibold text-zinc-900 outline-none focus:border-blue-600"
+								>
+									{#each entities as ent (ent.id)}
+										<option value={ent.id}>
+											{ent.businessName} {ent.displayName ? `(${ent.displayName})` : ''} · {ent.bankName || 'Банк'}
+										</option>
+									{/each}
+								</select>
+								<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-zinc-400">
+									<Building2 size={18} />
+								</div>
+							</div>
+						{:else}
+							<div class="flex h-12 items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3">
+								<Building2 size={17} class="text-zinc-500" aria-hidden="true" />
+								<span class="text-sm font-semibold text-zinc-800">
+									ФОП ДМИТРИШЕН · А-Банк
+								</span>
+							</div>
+						{/if}
+
+						{#if selectedEntity}
+							<div class="rounded-lg border border-zinc-200/80 bg-zinc-50/80 p-3.5 text-xs text-zinc-600 space-y-1.5">
+								<div class="flex flex-wrap items-center justify-between gap-2">
+									<span class="font-medium text-zinc-500">Юридична назва:</span>
+									<span class="font-bold text-zinc-900">{selectedEntity.businessName}</span>
+								</div>
+								<div class="flex flex-wrap items-center justify-between gap-2">
+									<span class="font-medium text-zinc-500">{selectedEntity.businessType === 'tov' ? 'ЄДРПОУ' : 'ЄДРПОУ / РНОКПП'}:</span>
+									<span class="font-mono font-semibold text-zinc-900">{selectedEntity.taxId || '—'}</span>
+								</div>
+								<div class="flex flex-wrap items-center justify-between gap-2">
+									<span class="font-medium text-zinc-500">Банк:</span>
+									<span class="font-semibold text-zinc-900">{selectedEntity.bankName || '—'}</span>
+								</div>
+								<div class="flex flex-wrap items-center justify-between gap-2">
+									<span class="font-medium text-zinc-500">IBAN:</span>
+									<span class="font-mono font-semibold text-blue-900 tracking-tight">{selectedEntity.iban || '—'}</span>
+								</div>
+							</div>
+						{/if}
+					</div>
 
 					<label>
 						<span class="mb-2 block text-xs font-bold text-zinc-600">Номер рахунку</span>
@@ -730,6 +822,12 @@
 				<QrCode size={112} strokeWidth={1.2} aria-hidden="true" />
 				<p class="mt-4 text-sm font-bold">{title}</p>
 				<strong class="mt-2 text-3xl tabular-nums">{formatMoney(total)}</strong>
+				{#if selectedEntity}
+					<div class="mt-4 w-full rounded-md bg-zinc-900 p-3 text-left text-xs border border-zinc-800">
+						<div class="text-zinc-400">Отримувач: <span class="text-white font-bold">{selectedEntity.businessName}</span></div>
+						<div class="text-zinc-400 mt-1">IBAN: <span class="font-mono text-zinc-200">{selectedEntity.iban}</span></div>
+					</div>
+				{/if}
 			</div>
 			{#if scenario === 'recurring' || scenario === 'rtp'}
 				<div

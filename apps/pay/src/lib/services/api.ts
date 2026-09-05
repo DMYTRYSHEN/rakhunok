@@ -56,7 +56,7 @@ export async function fetchCheckoutOrder(
       : `or=(short_id.eq.${encodeURIComponent(orderId)},order_number.eq.${encodeURIComponent(orderId)})`;
 
     const res = await fetchImpl(
-      `${supabaseUrl}/rest/v1/orders?${query}&select=*,merchants(*)&limit=1`,
+      `${supabaseUrl}/rest/v1/orders?${query}&select=*,merchants(*),business_entities(*)&limit=1`,
       { headers: { apikey: supabaseAnonKey, 'Content-Type': 'application/json' } }
     );
     if (res.ok) {
@@ -64,6 +64,24 @@ export async function fetchCheckoutOrder(
       if (rows.length > 0) {
         const row = rows[0];
         const merchant = row.merchants;
+        const be = row.business_entities;
+        const merchantPayload = be
+          ? {
+              business_name: be.business_name || be.display_name || merchant?.business_name,
+              display_name: be.display_name || be.business_name || merchant?.display_name || merchant?.business_name,
+              iban: be.iban || merchant?.iban,
+              tax_id: be.tax_id || merchant?.tax_id,
+              bank_name: be.bank_name || merchant?.bank_name
+            }
+          : merchant
+            ? {
+                business_name: merchant.business_name,
+                display_name: merchant.display_name || merchant.business_name,
+                iban: merchant.iban,
+                tax_id: merchant.tax_id,
+                bank_name: merchant.bank_name
+              }
+            : undefined;
         return {
           order: {
             id: row.id,
@@ -83,14 +101,7 @@ export async function fetchCheckoutOrder(
             terminal_id: row.terminal_id,
             scenario_config: row.scenario_config || {},
             share_url: row.share_url,
-            merchant: merchant
-              ? {
-                  business_name: merchant.business_name,
-                  display_name: merchant.display_name || merchant.business_name,
-                  iban: merchant.iban,
-                  tax_id: merchant.tax_id
-                }
-              : undefined,
+            merchant: merchantPayload,
             created_at: row.created_at,
             expires_at: row.expires_at
           } as Order,

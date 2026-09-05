@@ -441,6 +441,12 @@
             {checkout.order?.merchant?.business_name || checkout.merchantName}
           </span>
         </div>
+        {#if checkout.order?.merchant?.bank_name}
+          <div class="info-row">
+            <span class="info-label">Банк</span>
+            <span class="info-value">{checkout.order.merchant.bank_name}</span>
+          </div>
+        {/if}
         <div class="info-row">
           <span class="info-label">IBAN</span>
           <span class="info-value">{checkout.order?.merchant?.iban || 'Не вказано'}</span>

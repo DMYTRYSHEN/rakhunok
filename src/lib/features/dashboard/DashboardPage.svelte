@@ -241,7 +241,9 @@
 		try {
 			if (view === 'structure') {
 				await refreshStructure();
-			} else if (view === 'pos' || view === 'invoice-create') {
+			} else if (view === 'invoice-create') {
+				await Promise.all([refreshPosBoard(), refreshStructure()]);
+			} else if (view === 'pos') {
 				await refreshPosBoard();
 			} else if (view === 'invoice' && invoiceId) {
 				const requestedInvoiceId = invoiceId;
@@ -648,6 +650,7 @@
 			{:then module}
 				<module.default
 					terminals={posBoard.terminals}
+					entities={structureData.entities}
 					onCreate={createInvoice}
 					demo={sessionState.user.id === 'demo-user'}
 				/>
