@@ -38,7 +38,8 @@ describe('legacy POS order contract', () => {
 				status: 'pending',
 				created_at: '2026-08-26T09:30:00.000Z',
 				expires_at: '2026-08-26T10:00:00.000Z',
-				terminal_id: 'terminal-1'
+				terminal_id: 'terminal-1',
+				table_number: 1
 			}
 		});
 	});

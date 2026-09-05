@@ -16,6 +16,7 @@ export type LegacyPosOrderInsert = {
 	created_at: string;
 	expires_at: string | null;
 	terminal_id: string;
+	table_number: number | null;
 };
 
 export type PosOrderContractResult =
@@ -50,6 +51,9 @@ export function buildLegacyPosOrderInsert(
 				: normalizedTableTtlSeconds;
 	const expiresAt = ttlSeconds === null ? null : new Date(createdAt.getTime() + ttlSeconds * 1_000);
 
+	const tableNumberMatch = terminal.type === 'table' ? terminal.code.match(/\d+/) : null;
+	const tableNumber = tableNumberMatch ? parseInt(tableNumberMatch[0], 10) : null;
+
 	return {
 		ok: true,
 		payload: {
@@ -63,7 +67,8 @@ export function buildLegacyPosOrderInsert(
 			status: 'pending',
 			created_at: createdAt.toISOString(),
 			expires_at: expiresAt?.toISOString() ?? null,
-			terminal_id: terminal.id
+			terminal_id: terminal.id,
+			table_number: tableNumber
 		}
 	};
 }

@@ -699,6 +699,7 @@ export function createDashboardGateway(
 					amount: payload.base_amount,
 					status: payload.status,
 					terminal_id: payload.terminal_id,
+					table_number: payload.table_number,
 					expires_at: payload.expires_at
 				})
 			});
