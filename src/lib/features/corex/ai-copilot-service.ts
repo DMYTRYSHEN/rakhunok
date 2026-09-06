@@ -42,7 +42,12 @@ export interface CopilotChatResponse {
 	errorMessage?: string;
 }
 
-export const DEFAULT_AI_WORKER_URL = 'http://localhost:8787';
+export const DEFAULT_AI_WORKER_URL =
+	typeof window !== 'undefined' &&
+	window.location.hostname === 'localhost' &&
+	window.location.port !== '8787'
+		? 'http://localhost:8787'
+		: '';
 
 export async function requestAiProcessModification(
 	options: RequestAiCopilotOptions
