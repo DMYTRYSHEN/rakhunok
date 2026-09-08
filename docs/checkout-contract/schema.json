@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Proposed checkout contract v1 (not a live API schema)",
+  "oneOf": [
+    { "$ref": "#/definitions/catalog" },
+    { "$ref": "#/definitions/snapshot" },
+    { "$ref": "#/definitions/change" }
+  ],
+  "definitions": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "revision": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "text": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "state": { "enum": ["idle", "preparing", "payable", "paid", "cancelled", "expired", "failed"] },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "renderer", "amountMode", "features", "texts"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$" },
+        "renderer": { "enum": ["receipt", "table", "amount-entry", "delivery"] },
+        "amountMode": { "enum": ["server", "customer-input"] },
+        "features": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tips", "splitBill", "promo", "loyalty", "delivery"],
+          "properties": {
+            "tips": { "type": "boolean" },
+            "splitBill": { "type": "boolean" },
+            "promo": { "type": "boolean" },
+            "loyalty": { "type": "boolean" },
+            "delivery": { "type": "boolean" }
+          }
+        },
+        "texts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title", "payAction"],
+          "properties": {
+            "title": { "$ref": "#/definitions/text" },
+            "payAction": { "$ref": "#/definitions/text" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "renderer": { "const": "amount-entry" } } },
+          "then": { "properties": { "amountMode": { "const": "customer-input" } } },
+          "else": { "properties": { "amountMode": { "const": "server" } } }
+        }
+      ]
+    },
+    "sync": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transport", "pollIntervalMs", "heartbeatMs", "maxBackoffMs", "maxStaleMs", "requestTimeoutMs", "jitterRatio", "reconcileOnSubscribe", "reconcileOnReconnect", "reconcileOnForeground", "revalidateBeforePayment"],
+      "properties": {
+        "transport": { "enum": ["polling", "private-broadcast-with-polling"] },
+        "pollIntervalMs": { "type": "integer", "minimum": 2000, "maximum": 30000 },
+        "heartbeatMs": { "type": "integer", "minimum": 10000, "maximum": 60000 },
+        "maxBackoffMs": { "type": "integer", "minimum": 5000, "maximum": 60000 },
+        "maxStaleMs": { "type": "integer", "minimum": 5000, "maximum": 30000 },
+        "requestTimeoutMs": { "type": "integer", "minimum": 1000, "maximum": 15000 },
+        "jitterRatio": { "type": "number", "minimum": 0.1, "maximum": 0.5 },
+        "reconcileOnSubscribe": { "const": true },
+        "reconcileOnReconnect": { "const": true },
+        "reconcileOnForeground": { "const": true },
+        "revalidateBeforePayment": { "const": true }
+      }
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentType", "schemaVersion", "sync", "stateLabels", "scenarios"],
+      "properties": {
+        "documentType": { "const": "catalog" },
+        "schemaVersion": { "const": 1 },
+        "sync": { "$ref": "#/definitions/sync" },
+        "stateLabels": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["idle", "preparing", "payable", "paid", "cancelled", "expired", "failed"],
+          "properties": {
+            "idle": { "$ref": "#/definitions/text" },
+            "preparing": { "$ref": "#/definitions/text" },
+            "payable": { "$ref": "#/definitions/text" },
+            "paid": { "$ref": "#/definitions/text" },
+            "cancelled": { "$ref": "#/definitions/text" },
+            "expired": { "$ref": "#/definitions/text" },
+            "failed": { "$ref": "#/definitions/text" }
+          }
+        },
+        "scenarios": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "$ref": "#/definitions/scenario" } }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "enum": ["invoice", "terminal"] },
+        "id": { "$ref": "#/definitions/uuid" }
+      }
+    },
+    "order": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "revision", "amountMinor", "currency", "expiresAt"],
+      "properties": {
+        "id": { "$ref": "#/definitions/uuid" },
+        "revision": { "$ref": "#/definitions/revision" },
+        "amountMinor": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "currency": { "const": "UAH" },
+        "expiresAt": { "anyOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }] }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentType", "schemaVersion", "resource", "revision", "source", "observedAt", "state", "order", "canInitiate"],
+      "properties": {
+        "documentType": { "const": "snapshot" },
+        "schemaVersion": { "const": 1 },
+        "resource": { "$ref": "#/definitions/resource" },
+        "revision": { "$ref": "#/definitions/revision" },
+        "source": { "enum": ["cache", "authoritative"] },
+        "observedAt": { "type": "string", "format": "date-time" },
+        "state": { "$ref": "#/definitions/state" },
+        "order": { "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/order" }] },
+        "canInitiate": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "idle" } } },
+          "then": { "properties": { "resource": { "properties": { "kind": { "const": "terminal" } } }, "order": { "type": "null" } } },
+          "else": { "properties": { "order": { "$ref": "#/definitions/order" } } }
+        },
+        {
+          "if": { "properties": { "canInitiate": { "const": true } } },
+          "then": { "properties": { "source": { "const": "authoritative" }, "state": { "const": "payable" }, "order": { "$ref": "#/definitions/order" } } }
+        }
+      ]
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentType", "schemaVersion", "eventId", "resource", "revision"],
+      "properties": {
+        "documentType": { "const": "change" },
+        "schemaVersion": { "const": 1 },
+        "eventId": { "$ref": "#/definitions/uuid" },
+        "resource": { "$ref": "#/definitions/resource" },
+        "revision": { "$ref": "#/definitions/revision" }
+      }
+    }
+  }
+}

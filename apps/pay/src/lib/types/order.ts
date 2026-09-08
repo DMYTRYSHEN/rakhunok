@@ -115,6 +115,7 @@ export interface Order {
   id: string;
   order_number: string;
   title?: string;
+  description?: string | null;
   type?: string;
   status: 'pending' | 'preparing' | 'paid' | 'cancelled' | 'new' | string;
   base_amount?: number;

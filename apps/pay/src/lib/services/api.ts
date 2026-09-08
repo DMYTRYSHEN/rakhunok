@@ -27,93 +27,32 @@ export async function fetchCheckoutOrder(
   const fetchImpl = options.fetchImpl || fetch;
   const apiBase = options.apiBase ?? getApiBase(options.location);
 
-  // 1. Try local/configured API with a 1.2s timeout to avoid hanging LCP
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
   try {
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), 1200) : null;
     const response = await fetchImpl(
       `${apiBase}/api/v1/checkout/${encodeURIComponent(orderId)}`,
       {
         headers: { Accept: 'application/json' },
-        ...(controller ? { signal: controller.signal } : {})
+        cache: 'no-store',
+        redirect: 'error',
+        signal: controller.signal
       }
     );
-    if (timeoutId) clearTimeout(timeoutId);
     if (response.status === 404) return { order: null, reason: 'not-found' };
-    if (response.ok) {
+    if (!response.ok) return { order: null, reason: 'server-error', status: response.status };
+    try {
       const order = await response.json();
       return { order, reason: null };
-    }
-  } catch {}
-
-  // 2. Direct fast Supabase fallback if local API is unreachable or times out
-  try {
-    const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
-    const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
-    const query = isUuid
-      ? `id=eq.${encodeURIComponent(orderId)}`
-      : `or=(short_id.eq.${encodeURIComponent(orderId)},order_number.eq.${encodeURIComponent(orderId)})`;
-
-    const res = await fetchImpl(
-      `${supabaseUrl}/rest/v1/orders?${query}&select=*,merchants(*),business_entities(*)&limit=1`,
-      { headers: { apikey: supabaseAnonKey, 'Content-Type': 'application/json' } }
-    );
-    if (res.ok) {
-      const rows = (await res.json()) as Array<Record<string, any>>;
-      if (rows.length > 0) {
-        const row = rows[0];
-        const merchant = row.merchants;
-        const be = row.business_entities;
-        const merchantPayload = be
-          ? {
-              business_name: be.business_name || be.display_name || merchant?.business_name,
-              display_name: be.display_name || be.business_name || merchant?.display_name || merchant?.business_name,
-              iban: be.iban || merchant?.iban,
-              tax_id: be.tax_id || merchant?.tax_id,
-              bank_name: be.bank_name || merchant?.bank_name
-            }
-          : merchant
-            ? {
-                business_name: merchant.business_name,
-                display_name: merchant.display_name || merchant.business_name,
-                iban: merchant.iban,
-                tax_id: merchant.tax_id,
-                bank_name: merchant.bank_name
-              }
-            : undefined;
-        return {
-          order: {
-            id: row.id,
-            merchant_id: row.merchant_id,
-            type: row.type || 'fixed',
-            order_number: row.order_number,
-            title: row.title,
-            description: row.description,
-            amount: row.base_amount,
-            base_amount: row.base_amount,
-            discount_amount: row.discount_amount || 0,
-            delivery_fee: row.delivery_fee || 0,
-            total_amount: row.total_amount,
-            currency: row.currency || 'UAH',
-            status: row.status,
-            table_number: row.table_number,
-            terminal_id: row.terminal_id,
-            scenario_config: row.scenario_config || {},
-            share_url: row.share_url,
-            merchant: merchantPayload,
-            created_at: row.created_at,
-            expires_at: row.expires_at
-          } as Order,
-          reason: null
-        };
-      }
+    } catch (error) {
+      if (controller.signal.aborted) return { order: null, reason: 'offline', error };
+      return { order: null, reason: 'server-error', status: response.status, error };
     }
   } catch (error) {
     return { order: null, reason: 'offline', error };
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  return { order: null, reason: 'not-found' };
 }
 
 export async function fetchBanksCatalog(
@@ -172,6 +111,25 @@ export async function fetchBanksCatalog(
   return banks;
 }
 
+function isSafeBankRedirect(value: unknown): value is string {
+  if (typeof value !== 'string' || !value || /[\s\u0000-\u001f\u007f\\]/u.test(value)) return false;
+  if (!/^[a-z][a-z0-9+.-]*:\/\/[^/?#]+/i.test(value)) return false;
+
+  try {
+    const url = new URL(value);
+    if (!url.hostname || url.username || url.password || /^[^:]+:\/\/[^/?#]*@/.test(value)) return false;
+    if (url.protocol === 'https:') return true;
+    // Custom schemes already supported by the local bank router.
+    if (url.protocol === 'izibank:' || url.protocol === 'novapay-mobile:') return true;
+    // Android intents must target a known bank, without arbitrary intent extras.
+    return url.protocol === 'intent:' && url.host === 'bank.gov.ua' &&
+      url.pathname.startsWith('/qr/') &&
+      /^#Intent;scheme=https;package=(?:ua\.izibank\.app|ua\.novapay\.novapaymobile);end$/.test(url.hash);
+  } catch {
+    return false;
+  }
+}
+
 export async function initiateBankPayment(
   orderId: string,
   bankCode: string,
@@ -191,10 +149,15 @@ export async function initiateBankPayment(
 ): Promise<BankPaymentInitiateResult> {
   const fetchImpl = options.fetchImpl || fetch;
   const apiBase = options.apiBase ?? getApiBase();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
 
   try {
     const res = await fetchImpl(`${apiBase}/api/v1/checkout/${encodeURIComponent(orderId)}/initiate`, {
       method: 'POST',
+      cache: 'no-store',
+      redirect: 'error',
+      signal: controller.signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         bank: bankCode,
@@ -206,45 +169,35 @@ export async function initiateBankPayment(
       })
     });
 
-    if (res.ok) {
-      const data = await res.json();
-      if (data && (data.success || data.redirect_url)) {
-        if (data.nbu_payload_base64 && !data.nbu_raw_string) {
-          try {
-            const b64 = data.nbu_payload_base64.replace(/-/g, '+').replace(/_/g, '/');
-            const bin = atob(b64);
-            const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
-            data.nbu_raw_string = new TextDecoder('utf-8').decode(bytes);
-          } catch {
-            // fallback
-          }
-        }
-        return { success: true, ...data };
+    if (!res.ok) return { success: false, error: `Payment initiation failed (HTTP ${res.status})` };
+
+    const data = await res.json();
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return { success: false, error: 'Invalid payment response' };
+    }
+    if (data.success === false) {
+      return { success: false, error: typeof data.error === 'string' && data.error ? data.error : 'Payment initiation failed' };
+    }
+    if (!isSafeBankRedirect(data.redirect_url)) {
+      return { success: false, error: 'Invalid payment redirect URL' };
+    }
+    if (data.fallback_url != null && !isSafeBankRedirect(data.fallback_url)) {
+      return { success: false, error: 'Invalid payment fallback URL' };
+    }
+    if (typeof data.nbu_payload_base64 === 'string' && !data.nbu_raw_string) {
+      try {
+        const b64 = data.nbu_payload_base64.replace(/-/g, '+').replace(/_/g, '/');
+        const bin = atob(b64);
+        const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+        data.nbu_raw_string = new TextDecoder('utf-8').decode(bytes);
+      } catch {
+        // Optional server-provided QR metadata must not invalidate a valid redirect.
       }
     }
-  } catch (err) {
-    console.warn('API initiate failed, using client-side NBU QR fallback:', err);
+    return { ...data, success: true };
+  } catch {
+    return { success: false, error: controller.signal.aborted ? 'Payment initiation timed out' : 'Payment initiation request failed' };
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  // Client-side ISO NBU 003 generator fallback
-  const { generateNbuQrPayload, buildBankRedirect } = await import('./qr-generator.js');
-  const nbuQr = generateNbuQrPayload({
-    amount,
-    recipientName: options.merchantName || 'ФОП ДМИТРИШЕН',
-    recipientIban: options.merchantIban || 'UA12345678987654321345562',
-    recipientTaxId: options.merchantTaxId || '11212121212',
-    purpose: options.purpose || `Оплата замовлення ${options.orderNumber || orderId}`,
-    orderNumber: options.orderNumber || orderId
-  });
-
-  const redirectInfo = buildBankRedirect(bankCode, nbuQr.base64UrlPayload, options.os || 'desktop');
-
-  return {
-    success: true,
-    redirect_url: redirectInfo.redirectUrl,
-    fallback_url: redirectInfo.fallbackUrl,
-    nbu_raw_string: nbuQr.rawString,
-    nbu_payload_base64: nbuQr.base64UrlPayload,
-    nbu_qr_url: nbuQr.standardQrUrl
-  };
 }

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { checkout, formatNumber, vibrate } from '../state/checkout.svelte.js';
-  import Odometer from '../components/Odometer.svelte';
+  import InvoiceFrame from '../components/InvoiceFrame.svelte';
 
   let promoInput = $state('');
   let isItemsExpanded = $state(true);
@@ -18,8 +18,22 @@
   }
 </script>
 
-<div class="screen-content">
-  <nav class="order-nav">
+<InvoiceFrame
+  merchantName={checkout.merchantName}
+  orderLabel={checkout.orderLabel}
+  amount={checkout.totalAmount}
+  baseAmount={checkout.baseAmount}
+  statusText={checkout.order?.status === 'paid'
+    ? 'Оплачено'
+    : checkout.order?.status === 'preparing'
+      ? 'Готується'
+      : 'Очікує на оплату'}
+  paid={checkout.order?.status === 'paid'}
+  preparing={checkout.order?.status === 'preparing'}
+  ctaText={checkout.resolvedScenario.config?.ctaText || 'Перейти до оплати'}
+  onpay={() => checkout.openPaymentSheet()}
+>
+  {#snippet navigation(merchant)}
     <button class="order-nav-btn back-btn" onclick={handleBack} aria-label="Назад">
       <svg
         viewBox="0 0 24 24"
@@ -35,12 +49,7 @@
       </svg>
     </button>
 
-    <div class="order-merchant">
-      <div class="merchant-avatar">
-        <img src="./logo.svg" alt="" />
-      </div>
-      <span class="order-merchant-name">{checkout.merchantName}</span>
-    </div>
+    {@render merchant()}
 
     <button
       class="order-nav-btn more-btn"
@@ -62,33 +71,9 @@
         <circle cx="5" cy="12" r="1"></circle>
       </svg>
     </button>
-  </nav>
+  {/snippet}
 
-  <section class="order-hero">
-    <div class="order-hero-label">{checkout.orderLabel}</div>
-    <div class="order-hero-amount">
-      <Odometer value={formatNumber(checkout.totalAmount)} suffix=" ₴" suffixClass="currency-glyph" />
-    </div>
-
-    <div>
-      <div
-        class="pay-status"
-        class:paid={checkout.order?.status === 'paid'}
-        class:preparing={checkout.order?.status === 'preparing'}
-      >
-        <span class="st-dot"></span>
-        <span>
-          {#if checkout.order?.status === 'paid'}
-            Оплачено
-          {:else if checkout.order?.status === 'preparing'}
-            Готується
-          {:else}
-            Очікує на оплату
-          {/if}
-        </span>
-      </div>
-    </div>
-
+  {#snippet heroExtras()}
     {#if checkout.totalAmount >= 1000}
       <button class="bnpl-badge" onclick={() => checkout.openBnplSheet()}>
         <span class="bnpl-badge-pill">0%</span>
@@ -98,8 +83,9 @@
         </svg>
       </button>
     {/if}
-  </section>
+  {/snippet}
 
+  {#snippet beforeSummary()}
   <!-- Line Items List (Feature 1: Cart Breakdown) -->
   {#if checkout.orderItems.length > 0}
     <div class="table-items-card">
@@ -136,7 +122,7 @@
 
       {#if isItemsExpanded}
         <div class="table-items-list">
-          {#each checkout.orderItems as item}
+          {#each checkout.orderItems as item, index (index)}
             <div class="table-item-row">
               <div class="table-item-info">
                 <span class="table-item-name">{item.name}</span>
@@ -157,7 +143,7 @@
         <span>Рекомендуємо до замовлення:</span>
       </div>
       <div class="upsell-chips-scroll">
-        {#each checkout.upsellItems as up}
+        {#each checkout.upsellItems as up, index (index)}
           <button class="upsell-chip" onclick={() => checkout.addUpsell(up)}>
             <span class="upsell-name">{up.name}</span>
             <span class="upsell-price">+{up.price} ₴</span>
@@ -217,12 +203,9 @@
     </div>
   {/if}
 
-  <div class="order-card">
-    <div class="summary-row">
-      <span class="summary-label">Сума замовлення</span>
-      <span class="summary-value">{formatNumber(checkout.baseAmount)} ₴</span>
-    </div>
+  {/snippet}
 
+  {#snippet summaryExtras()}
     {#if checkout.promoApplied}
       <div class="summary-row discount-row visible">
         <span class="summary-label">Знижка за промокодом</span>
@@ -244,12 +227,9 @@
       </div>
     {/if}
 
-    <div class="summary-row total">
-      <span class="summary-label">До сплати</span>
-      <span class="summary-value">{formatNumber(checkout.totalAmount)} ₴</span>
-    </div>
-  </div>
+  {/snippet}
 
+  {#snippet afterSummary()}
   <!-- Loyalty Card Scanner Trigger / Connected Badge -->
   {#if checkout.resolvedScenario.config?.showPromo !== false && checkout.allowLoyalty}
     {#if !checkout.loyaltyCard}
@@ -343,24 +323,5 @@
       </button>
     </div>
   {/if}
-
-
-  <button
-    class="order-cta"
-    onclick={() => checkout.openPaymentSheet()}
-  >
-    <span>{checkout.resolvedScenario.config?.ctaText || 'Перейти до оплати'} {formatNumber(checkout.totalAmount)} ₴</span>
-    <svg
-      viewBox="0 0 24 24"
-      width="16"
-      height="16"
-      stroke="currentColor"
-      stroke-width="2.5"
-      fill="none"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <polyline points="9 18 15 12 9 6"></polyline>
-    </svg>
-  </button>
-</div>
+  {/snippet}
+</InvoiceFrame>

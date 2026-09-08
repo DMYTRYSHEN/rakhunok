@@ -1,0 +1,56 @@
+{
+  "documentType": "catalog",
+  "schemaVersion": 1,
+  "sync": {
+    "transport": "polling",
+    "pollIntervalMs": 5000,
+    "heartbeatMs": 10000,
+    "maxBackoffMs": 30000,
+    "maxStaleMs": 15000,
+    "requestTimeoutMs": 8000,
+    "jitterRatio": 0.2,
+    "reconcileOnSubscribe": true,
+    "reconcileOnReconnect": true,
+    "reconcileOnForeground": true,
+    "revalidateBeforePayment": true
+  },
+  "stateLabels": {
+    "idle": "Вільно · Активного рахунку немає",
+    "preparing": "Рахунок формується",
+    "payable": "Очікує на оплату",
+    "paid": "Сплачено",
+    "cancelled": "Скасовано",
+    "expired": "Термін дії завершився",
+    "failed": "Не вдалося обробити рахунок"
+  },
+  "scenarios": [
+    {
+      "id": "fixed",
+      "renderer": "receipt",
+      "amountMode": "server",
+      "features": { "tips": false, "splitBill": false, "promo": false, "loyalty": false, "delivery": false },
+      "texts": { "title": "Рахунок", "payAction": "Перейти до оплати" }
+    },
+    {
+      "id": "table",
+      "renderer": "table",
+      "amountMode": "server",
+      "features": { "tips": false, "splitBill": false, "promo": false, "loyalty": false, "delivery": false },
+      "texts": { "title": "Рахунок столу", "payAction": "Перейти до оплати" }
+    },
+    {
+      "id": "open_amount",
+      "renderer": "amount-entry",
+      "amountMode": "customer-input",
+      "features": { "tips": false, "splitBill": false, "promo": false, "loyalty": false, "delivery": false },
+      "texts": { "title": "Введіть суму", "payAction": "Перевірити суму та продовжити" }
+    },
+    {
+      "id": "delivery",
+      "renderer": "delivery",
+      "amountMode": "server",
+      "features": { "tips": false, "splitBill": false, "promo": false, "loyalty": false, "delivery": true },
+      "texts": { "title": "Замовлення з доставкою", "payAction": "Перейти до оплати" }
+    }
+  ]
+}

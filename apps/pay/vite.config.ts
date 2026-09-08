@@ -5,11 +5,14 @@ export default defineConfig({
   base: process.env.BASE_URL || '/pay/',
   envDir: '../..',
   envPrefix: ['VITE_', 'PUBLIC_'],
+  define: {
+    'import.meta.env.VITE_CHECKOUT_SYNTHETIC': JSON.stringify(process.env.CHECKOUT_LOCAL_HARNESS === '1' ? '1' : '0')
+  },
   plugins: [svelte()],
   server: {
     port: 5174,
     proxy: {
-      '/api': 'http://localhost:8787'
+      ...(process.env.CHECKOUT_LOCAL_HARNESS === '1' ? {} : { '/api': 'http://localhost:8787' })
     }
   },
   build: {

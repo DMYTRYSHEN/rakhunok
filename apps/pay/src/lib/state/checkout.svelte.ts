@@ -4,8 +4,7 @@ import { resolveScenario } from '../config/scenarios.js';
 import { fetchBanksCatalog, fetchCheckoutOrder, initiateBankPayment } from '../services/api.js';
 import { detectOS, launchDeepLink } from '../services/deeplink.js';
 import { isOrderFresh } from '../services/expiry.js';
-import { generateNbuQrPayload, buildBankRedirect } from '../services/qr-generator.js';
-import { executeTurnstile, getCachedTurnstileToken } from '../services/turnstile.js';
+import { executeTurnstile } from '../services/turnstile.js';
 import type { Bank } from '../types/bank.js';
 import type { DeliveryDetails, FiscalReceipt, LoyaltyCard, Order, OrderItem, PlatformSplit, Terminal, UpsellItem } from '../types/order.js';
 import type { ResolvedScenario, ScenarioDefinition } from '../types/scenario.js';
@@ -129,6 +128,9 @@ class CheckoutStore {
   selectedBankIndex = $state<number>(0);
   isProcessingPayment = $state<boolean>(false);
   statusPollingInterval: ReturnType<typeof setInterval> | null = null;
+  private session = 0;
+  private paymentAttempt = 0;
+  private stopPolling: (() => void) | null = null;
 
   // Derived Values
   itemsTotal = $derived.by(() => {
@@ -328,59 +330,7 @@ class CheckoutStore {
     return Math.ceil(tot / 4);
   });
 
-  nbuQr = $derived.by(() => {
-    const merchant = this.order?.merchant;
-    const recipientName = merchant?.business_name || this.merchantName || 'ФОП ДМИТРИШЕН';
-    const recipientIban = merchant?.iban || 'UA12345678987654321345562';
-    const recipientTaxId = merchant?.tax_id || '11212121212';
-    const purpose = this.order?.description || this.order?.title || this.orderLabel || `Оплата замовлення ${this.order?.order_number || this.orderId}`;
-    const orderNumber = this.order?.order_number || this.orderId;
-    const amount = this.payTotalAmount > 0 ? this.payTotalAmount : (this.order?.total_amount || 0);
-
-    return generateNbuQrPayload({
-      amount,
-      recipientName,
-      recipientIban,
-      recipientTaxId,
-      purpose,
-      orderNumber
-    });
-  });
-
-  nbuRawString = $derived.by(() => this.nbuQr.rawString);
-  nbuPayload = $derived.by(() => this.nbuQr.base64UrlPayload);
-  currentBankRedirect = $derived.by(() => {
-    const bankCode = this.selectedBank?.code || 'UNJS';
-    const clientOS = detectOS();
-    return buildBankRedirect(bankCode, this.nbuPayload, clientOS);
-  });
-
-  fiscalReceipt = $derived.by<FiscalReceipt>(() => {
-    if (this.order?.fiscal_receipt) return this.order.fiscal_receipt;
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('uk-UA') + ' ' + now.toLocaleTimeString('uk-UA');
-    const tot = this.payTotalAmount > 0 ? this.payTotalAmount : 1240.0;
-    const vat = round2((tot * 20) / 120);
-    return {
-      fiscal_number: '3000' + Math.floor(100000 + Math.random() * 900000),
-      device_number: 'ПРРО-44819',
-      tax_name: this.order?.merchant?.business_name || this.merchantName || 'ФОП ДМИТРИШЕН',
-      tax_id: this.order?.merchant?.tax_id || '11212121212',
-      date_time: dateStr,
-      items: [
-        {
-          name: this.order?.title || this.orderLabel || 'Оплата замовлення',
-          quantity: 1,
-          price: tot,
-          total: tot,
-          tax_rate: '20% (А)'
-        }
-      ],
-      vat_amount: vat,
-      total_amount: tot,
-      verification_url: 'https://cabinet.tax.gov.ua/cashregs/check'
-    };
-  });
+  fiscalReceipt = $derived.by<FiscalReceipt | null>(() => this.order?.fiscal_receipt ?? null);
 
   resolvedScenario = $derived.by<ResolvedScenario>(() => {
     return resolveScenario(
@@ -407,7 +357,7 @@ class CheckoutStore {
     return (
       this.order?.merchant?.display_name ||
       this.order?.merchant?.business_name ||
-      'ФОП ДМИТРИШЕН'
+      'Отримувач не вказаний'
     );
   });
 
@@ -561,6 +511,10 @@ class CheckoutStore {
   }
 
   openFiscalReceipt(): void {
+    if (!this.fiscalReceipt) {
+      this.showToast('Фіскальний чек ще не надано');
+      return;
+    }
     this.isFiscalReceiptOpen = true;
     vibrate(8);
   }
@@ -716,13 +670,35 @@ class CheckoutStore {
 
   async init(): Promise<void> {
     if (typeof window === 'undefined') return;
+    const session = ++this.session;
+    this.paymentAttempt++;
+    this.stopPolling?.();
+    this.isProcessingPayment = false;
+    this.order = null;
+    this.terminal = null;
+    this.isLoaded = false;
+    this.isStatusScreenOpen = false;
+    this.isFiscalReceiptOpen = false;
+    this.statusState = 'pending';
+    this.orderItems = [];
+    this.upsellItems = [];
+    this.keypadValue = '';
+    this.tipAmount = 0;
+    this.tipPercentage = null;
+    this.isRoundUpActive = false;
+    this.useBonuses = false;
+    this.loyaltyCard = null;
+    this.promoApplied = false;
+    this.promoDiscount = 0;
+    this.splitMode = 'none';
+    this.delivery = { name: '', phone: '', method: 'branch', city: '', branch: '', price: 0 };
 
     // Load banks catalog in background
     fetchBanksCatalog().then((list) => {
-      if (list && list.length > 0) {
+      if (session === this.session && list && list.length > 0) {
         this.banks = list;
       }
-    });
+    }).catch(() => { /* Keep bundled catalog on failure. */ });
 
     const params = new URLSearchParams(window.location.search);
     this.forcedScenario = (
@@ -741,12 +717,11 @@ class CheckoutStore {
       const hashMatch = window.location.hash.match(/([a-zA-Z0-9-]{3,36})/i);
       if (hashMatch) id = hashMatch[1];
     }
-    if (!id && !this.forcedScenario) {
-      id = localStorage.getItem('rahunok_last_order_id') || '';
-    } else if (!id) {
-      id = 'demo-1';
-    }
+    if (!id) id = this.forcedScenario ? 'demo-1' : '';
     this.orderId = id;
+    // Query parameters must never replace a real failed invoice with demo data.
+    if (!import.meta.env.DEV || !['localhost', '127.0.0.1'].includes(window.location.hostname) ||
+      (id && !id.startsWith('demo-'))) this.forcedScenario = '';
 
     const requestedLegacyTtl = Number(params.get('ttl'));
     if (Number.isFinite(requestedLegacyTtl) && requestedLegacyTtl > 0) {
@@ -759,45 +734,17 @@ class CheckoutStore {
       __INITIAL_TERMINAL__?: Terminal;
     };
     if (win.__INITIAL_TERMINAL__) this.terminal = win.__INITIAL_TERMINAL__;
-    let initialOrder: Order | null = initialOrderStatic || win.__INITIAL_ORDER__ || null;
+    const injectedOrder = win.__INITIAL_ORDER__;
+    let initialOrder: Order | null = injectedOrder?.id === id ? injectedOrder : null;
     if (initialOrder?._terminal) this.terminal = initialOrder._terminal;
 
     let checkoutLoadReason: string | null = null;
     if (!initialOrder && this.orderId && this.orderId !== 'demo-1' && !this.orderId.startsWith('demo-')) {
       const result = await fetchCheckoutOrder(this.orderId);
+      if (session !== this.session || this.orderId !== id) return;
       initialOrder = result.order;
       checkoutLoadReason = result.reason;
       if (initialOrder?._terminal) this.terminal = initialOrder._terminal;
-    }
-
-    // Offline cache fallback
-    if (!initialOrder && !this.forcedScenario && checkoutLoadReason === 'offline') {
-      if (this.terminal) {
-        const rawTableStored = localStorage.getItem('rahunok_term_' + this.terminal.code);
-        if (rawTableStored) {
-          try {
-            const parsed = JSON.parse(rawTableStored);
-            if (parsed && Number(parsed.total_amount) > 0 && isOrderFresh(parsed)) {
-              initialOrder = parsed;
-            }
-          } catch {
-            // ignore
-          }
-        }
-      }
-      if (!initialOrder) {
-        const rawStored =
-          localStorage.getItem('rahunok_order_' + this.orderId) ||
-          localStorage.getItem('rahunok_order_' + (this.orderId.slice ? this.orderId.slice(0, 6) : this.orderId)) ||
-          localStorage.getItem('rahunok_last_order');
-        if (rawStored) {
-          try {
-            initialOrder = JSON.parse(rawStored);
-          } catch {
-            // ignore
-          }
-        }
-      }
     }
 
     // Terminal in preparing state fallback
@@ -816,7 +763,7 @@ class CheckoutStore {
     }
 
     // Preset demos for dev/demo fixtures ONLY if no real order was found
-    if (!initialOrder) {
+    if (!initialOrder && this.forcedScenario) {
       if (this.forcedScenario === '1' || this.forcedScenario === 'fixed' || this.forcedScenario === 'order_classic') {
         initialOrder = {
           id: 'demo-sc1',
@@ -1389,31 +1336,6 @@ class CheckoutStore {
       return;
     }
 
-    if (initialOrder) {
-      if (!initialOrder.merchant) {
-        initialOrder.merchant = {
-          business_name: 'ФОП ДМИТРИШЕН',
-          display_name: 'BARCODE',
-          iban: 'UA12345678987654321345562',
-          tax_id: '11212121212',
-          bank_name: 'А-Банк'
-        };
-      } else {
-        if (!initialOrder.merchant.business_name) {
-          initialOrder.merchant.business_name = 'ФОП ДМИТРИШЕН';
-        }
-        if (!initialOrder.merchant.iban) {
-          initialOrder.merchant.iban = 'UA12345678987654321345562';
-        }
-        if (!initialOrder.merchant.tax_id) {
-          initialOrder.merchant.tax_id = '11212121212';
-        }
-        if (!initialOrder.merchant.bank_name) {
-          initialOrder.merchant.bank_name = 'А-Банк';
-        }
-      }
-    }
-
     this.order = initialOrder;
     if (this.order.status === 'paid') {
       this.statusState = 'success';
@@ -1425,87 +1347,128 @@ class CheckoutStore {
     }
   }
 
+  private isPayable(): boolean {
+    const order = this.order;
+    return Boolean(
+      this.isLoaded && order && order.id === this.orderId && this.orderId &&
+      !this.forcedScenario && !/^(demo-|term-|profile-)/i.test(this.orderId) &&
+      order.status === 'pending' && isOrderFresh(order) &&
+      Number.isFinite(order.total_amount) && order.total_amount > 0 &&
+      Number.isFinite(this.payTotalAmount) && this.payTotalAmount > 0
+    );
+  }
+
   async executePay(): Promise<void> {
     if (this.isProcessingPayment) return;
+    const session = this.session;
+    const attempt = ++this.paymentAttempt;
+    const order = this.order;
+    const orderId = this.orderId;
+    const amount = this.payTotalAmount;
+    const serverAmount = order?.total_amount;
+    const serverBaseAmount = order?.base_amount;
+    const location = window.location.href;
+    const bankCode = this.selectedBank?.code || 'UNJS';
+    const ownsAttempt = () => session === this.session && attempt === this.paymentAttempt;
+    const unchanged = () => ownsAttempt() && this.order === order && this.orderId === orderId &&
+      window.location.href === location && this.payTotalAmount === amount &&
+      order?.total_amount === serverAmount && order?.base_amount === serverBaseAmount &&
+      (this.selectedBank?.code || 'UNJS') === bankCode && this.isPayable();
     this.isProcessingPayment = true;
     vibrate(15);
 
-    const bank = this.selectedBank;
-    const bankCode = bank?.code || 'UNJS';
-    const isLvivDemo = bankCode === 'LVIV' || bank?.id === 'lviv';
-
-    if (isLvivDemo) {
-      setTimeout(() => {
-        this.isProcessingPayment = false;
-        this.closePaymentSheet();
-        this.statusState = 'pending';
-        this.isStatusScreenOpen = true;
-        setTimeout(() => {
-          this.statusState = 'success';
-          vibrate([30, 50, 30]);
-        }, 2000);
-      }, 1200);
-      return;
-    }
-
     try {
+      if (!this.isPayable()) {
+        throw new Error('Оплата тестового, завершеного або непідтвердженого рахунку заборонена');
+      }
+      this.stopPolling?.();
       const token = await executeTurnstile('pay');
+      if (!unchanged()) return;
       const clientOS = detectOS();
-      const result = await initiateBankPayment(this.orderId, bankCode, this.payTotalAmount, {
+      const result = await initiateBankPayment(orderId, bankCode, amount, {
         os: clientOS,
         turnstileToken: token,
-        recaptchaToken: token,
-        merchantName: this.order?.merchant?.business_name || this.merchantName || 'ФОП ДМИТРИШЕН',
-        merchantIban: this.order?.merchant?.iban || 'UA12345678987654321345562',
-        merchantTaxId: this.order?.merchant?.tax_id || '11212121212',
-        purpose: this.order?.description || this.order?.title || this.orderLabel || `Оплата замовлення ${this.order?.order_number || this.orderId}`,
-        orderNumber: this.order?.order_number || this.orderId
+        recaptchaToken: token
       });
 
-      if (result.redirect_url) {
-        launchDeepLink(result.redirect_url, result.fallback_url);
-      }
+      if (!unchanged()) return;
+      if (result.success !== true || !result.redirect_url) throw new Error(result.error || 'Ініціалізацію платежу відхилено');
+      launchDeepLink(result.redirect_url, result.fallback_url);
 
-      // Start polling for payment confirmation
+      // Pending is not success; only server confirmation may advance it.
+      this.closePaymentSheet();
+      this.statusState = 'pending';
+      this.isStatusScreenOpen = true;
       this.startStatusPolling();
-
-      setTimeout(() => {
-        this.isProcessingPayment = false;
-        this.closePaymentSheet();
-        this.statusState = 'pending';
-        this.isStatusScreenOpen = true;
-      }, 1200);
     } catch (err: unknown) {
-      this.isProcessingPayment = false;
+      if (!ownsAttempt() || this.order !== order || this.orderId !== orderId || window.location.href !== location) return;
       const msg = err instanceof Error ? err.message : 'Помилка ініціалізації платежу';
       alert(msg);
+    } finally {
+      if (ownsAttempt()) this.isProcessingPayment = false;
     }
   }
 
   startStatusPolling(): void {
-    if (this.statusPollingInterval) clearInterval(this.statusPollingInterval);
+    this.stopPolling?.();
+    if (!this.isPayable()) return;
+    const order = this.order!;
+    const orderId = this.orderId;
+    const session = this.session;
+    const attempt = this.paymentAttempt;
+    const location = window.location.href;
+    const controller = new AbortController();
+    let stopped = false;
+    let inFlight = false;
+    const current = () => !stopped && session === this.session && attempt === this.paymentAttempt &&
+      this.order === order && this.orderId === orderId && window.location.href === location;
     const apiBase = (window.location.hostname === 'localhost' && window.location.port !== '8787') ? 'http://localhost:8787' : '';
-
-    this.statusPollingInterval = setInterval(async () => {
+    const stop = () => {
+      stopped = true;
+      clearInterval(interval);
+      clearTimeout(timeout);
+      controller.abort();
+      if (this.statusPollingInterval === interval) this.statusPollingInterval = null;
+      if (this.stopPolling === stop) this.stopPolling = null;
+    };
+    const interval = setInterval(async () => {
+      if (!current()) { stop(); return; }
+      if (inFlight) return;
+      inFlight = true;
       try {
-        const res = await fetch(`${apiBase}/api/v1/checkout/${encodeURIComponent(this.orderId)}/status`);
-        if (res.ok) {
+        const res = await fetch(`${apiBase}/api/v1/checkout/${encodeURIComponent(orderId)}/status`, {
+          cache: 'no-store', redirect: 'error', signal: controller.signal,
+          headers: { Accept: 'application/json' }
+        });
+        if (current() && res.ok) {
           const data = await res.json();
+          if (!current()) return;
+          if ((data?.id != null && data.id !== orderId) ||
+            (data?.order_id != null && data.order_id !== orderId)) return;
           if (data && data.status === 'paid') {
-            if (this.statusPollingInterval) clearInterval(this.statusPollingInterval);
+            stop();
+            order.status = 'paid';
             this.statusState = 'success';
             vibrate([30, 50, 30]);
+          } else if (data?.status === 'cancelled' || data?.status === 'expired') {
+            stop();
+            order.status = data.status;
+            this.statusState = 'timeout';
           }
         }
       } catch {
-        // ignore
+        // A network failure is never evidence of payment.
+      } finally {
+        inFlight = false;
       }
     }, 2000);
-
-    // Stop after 8 minutes
-    setTimeout(() => {
-      if (this.statusPollingInterval) clearInterval(this.statusPollingInterval);
+    const timeout = setTimeout(() => {
+      const wasCurrent = current();
+      stop();
+      if (wasCurrent) this.statusState = 'timeout';
     }, 8 * 60 * 1000);
+    this.statusPollingInterval = interval;
+    this.stopPolling = stop;
   }
 }
 

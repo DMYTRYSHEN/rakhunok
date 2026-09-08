@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "checkout-authority-local-only",
+  "main": "src/checkout-backend/index.ts",
+  "compatibility_date": "2026-09-07",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [],
+  "dev": { "ip": "127.0.0.1", "port": 8791 },
+  "vars": { "CHECKOUT_MODE": "local" }
+  // Deliberately no production API service, KV IDs, routes, cron or DB defaults.
+}
