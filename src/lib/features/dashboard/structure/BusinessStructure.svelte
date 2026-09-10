@@ -328,7 +328,7 @@
 	>
 		<div>
 			<p class="text-xs font-bold tracking-[0.14em] text-blue-700 uppercase">Керування</p>
-			<h1 class="mt-2 text-2xl font-extrabold sm:text-3xl">Структура бізнесу</h1>
+			<h2 class="mt-2 text-2xl font-extrabold sm:text-3xl">Юридичні реквізити та робочі місця</h2>
 			<p class="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
 				Юридичні особи, банківські рахунки та точки, де ваша команда приймає оплату.
 			</p>
@@ -345,12 +345,12 @@
 			class="h-fit overflow-hidden rounded-lg border border-zinc-200 bg-white lg:sticky lg:top-24"
 		>
 			<div class="border-b border-zinc-200 p-4">
-				<p class="text-xs font-bold tracking-[0.12em] text-zinc-500 uppercase">Активний бізнес</p>
+				<p class="text-xs font-bold tracking-[0.12em] text-zinc-500 uppercase">Продавець для робочих місць</p>
 				<select
 					bind:value={selectedEntityId}
 					onchange={(e) => selectDefaultEntity((e.target as HTMLSelectElement).value)}
 					class="mt-3 h-11 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-600"
-					aria-label="Активний бізнес"
+					aria-label="Продавець для робочих місць"
 				>
 					{#each entities as entity (entity.id)}<option value={entity.id}>{entity.name}</option
 						>{/each}
@@ -363,7 +363,7 @@
 					class:bg-zinc-950={section === 'entities'}
 					class:text-white={section === 'entities'}
 					class="flex h-11 w-full items-center gap-3 rounded-md px-3 text-sm font-bold text-zinc-600"
-					><Building2 size={17} aria-hidden="true" /> Бізнеси
+					><Building2 size={17} aria-hidden="true" /> Юридичні продавці
 					<span class="ml-auto text-xs opacity-60">{entities.length}</span></button
 				>
 				<button
@@ -421,14 +421,14 @@
 				<section>
 					<div class="mb-4 flex items-center justify-between gap-4">
 						<div>
-							<h2 class="text-lg font-extrabold">Бізнеси</h2>
-							<p class="mt-1 text-xs text-zinc-500">Окремі юридичні особи або напрями роботи.</p>
+							<h2 class="text-lg font-extrabold">Юридичні продавці</h2>
+							<p class="mt-1 text-xs text-zinc-500">ТОВ, ФОП та інші юридичні продавці поточного бізнесу.</p>
 						</div>
 						<button
 							type="button"
 							onclick={() => openEditor('entity')}
 							class="inline-flex h-10 items-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-extrabold text-white"
-							><Plus size={16} aria-hidden="true" /> Додати</button
+							><Plus size={16} aria-hidden="true" /> Додати продавця</button
 						>
 					</div>
 					<div class="grid gap-3 sm:grid-cols-2">

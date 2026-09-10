@@ -9,6 +9,7 @@
 
   onMount(() => {
     checkout.init();
+    return () => checkout.disposeTerminal();
   });
 </script>
 

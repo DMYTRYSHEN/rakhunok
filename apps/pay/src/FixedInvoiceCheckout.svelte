@@ -9,7 +9,8 @@
   let sheet = $state<HTMLDialogElement>();
   const snapshot = $derived(view?.sync?.snapshot);
   const amount = $derived(snapshot?.order ? snapshot.order.amountMinor / 100 : null);
-  const canCreate = $derived(!!view && !view.busy && !view.attempt && snapshot?.state === 'payable' &&
+  const authoritative = $derived(snapshot?.source === 'authoritative' && !!view?.connected);
+  const canCreate = $derived(!!view && view.paymentActive && !view.busy && !view.attempt && snapshot?.state === 'payable' &&
     view.connected && (view.pending || !!view.sync?.canInitiate));
   const labels: Record<BusinessState, string> = {
     idle: 'Рахунок відсутній', preparing: 'Рахунок готується', payable: 'Очікує на оплату',
@@ -45,19 +46,21 @@
 <div class="local-banner">LOCAL SYNTHETIC · Без реальних грошей</div>
 <main class="clip-root" data-testid="fixed-invoice-checkout">
   <InvoiceFrame merchantName={view?.attempt?.quote.recipient.name ?? 'Фіксований рахунок'}
-    orderLabel="Рахунок до сплати" {amount} statusText={snapshot ? labels[snapshot.state] : 'Підключення до рахунку…'}
-    paid={snapshot?.state === 'paid'} preparing={snapshot?.state === 'preparing'}
-    canPay={canCreate} ctaText={view?.pending ? 'Повторити ту саму спробу' : 'Перейти до оплати'}
-    onpay={() => sheet?.showModal()}>
+    orderLabel="Рахунок до сплати" {amount} statusText={snapshot ? authoritative ? labels[snapshot.state] : 'Попередні дані · потрібна перевірка' : 'Підключення до рахунку…'}
+    paid={authoritative && snapshot?.state === 'paid'} preparing={snapshot?.state === 'preparing'}
+    canPay={!!view?.canOpen} ctaText={view?.pending ? 'Повторити ту саму спробу' : 'Перейти до оплати'}
+    onpay={() => { sheet?.showModal(); void controller?.beginPayment(); }}>
     {#snippet afterSummary()}
       <section class="authority" aria-live="polite">
         <p data-testid="authoritative-state">Стан: {snapshot?.state ?? '—'} · Ревізія: {snapshot?.revision ?? '—'}</p>
         <p data-testid="transport">З’єднання: {view?.sync?.transport ?? 'connecting'}</p>
+        <p data-testid="snapshot-source">Джерело: {snapshot?.source ?? '—'}</p>
+        {#if !view?.paymentActive}<p>Попередній показ. Polling вимкнено до «Перейти до оплати». Сума та статус потребують перевірки.</p>{/if}
         {#if snapshot?.order}<p class="identifier">ID рахунку: {snapshot.order.id}</p>{/if}
         {#if !view?.connected}<p>Оплата заблокована до свіжого підтвердження сервера.</p>{/if}
         {#if view?.error}<p role="alert">{view.error}</p>{/if}
-        {#if snapshot?.state === 'paid'}<p data-testid="paid-confirmation">Оплату підтверджено авторитетним станом рахунку.</p>{/if}
-        <button class="secondary" disabled={!controller || view?.busy} onclick={() => { void controller?.refresh(); }}>Оновити стан</button>
+        {#if authoritative && snapshot?.state === 'paid'}<p data-testid="paid-confirmation">Оплату підтверджено авторитетним станом рахунку.</p>{/if}
+        {#if view?.paymentActive}<button class="secondary" disabled={!controller || view?.busy} onclick={() => { void controller?.refresh(); }}>Оновити стан</button>{/if}
       </section>
       {#if view?.attempt}
         <section class="authority accepted" aria-live="polite">
@@ -80,18 +83,19 @@
           {#if view.receipt?.outcome === 'review'}<p role="alert">Потрібна перевірка платежу. Ця доставка не підтверджує оплату поточної версії рахунку.</p>{/if}
         </section>
       {/if}
-      <p class="scope-note">Локальна перевірка фіксованої суми. Без чайових, промокодів, розділення та реального переходу в банк. Статус оновлюється серверним polling.</p>
+      <p class="scope-note">Локальна перевірка фіксованої суми. Без чайових, промокодів, розділення та реального переходу в банк. Polling лише після переходу до оплати.</p>
     {/snippet}
   </InvoiceFrame>
 </main>
 
-<dialog bind:this={sheet} aria-labelledby="fixed-payment-title">
+<dialog bind:this={sheet} aria-labelledby="fixed-payment-title" onclose={() => controller?.closePayment()}>
   <div class="sheet-content">
     <button class="close" aria-label="Закрити оплату" onclick={() => sheet?.close()}>×</button>
     <span class="local-label">LOCAL SYNTHETIC</span>
     <h2 id="fixed-payment-title">Підтвердьте суму рахунку</h2>
     <p class="sheet-amount" data-testid="sheet-amount">{snapshot?.order ? money(snapshot.order.amountMinor) : '—'} ₴</p>
     <p>Локальний емулятор банку. Суму й отримувача визначає сервер; реальні кошти не списуються.</p>
+    <p>Після перевірки підтвердьте показану суму окремою дією. Вона може відрізнятися від попереднього показу.</p>
     {#if view?.error}<p role="alert">{view.error}</p>{/if}
     <button class="order-cta" data-testid="create-attempt" disabled={!canCreate}
       onclick={async () => { await controller?.create(); if (view?.attempt) sheet?.close(); }}>

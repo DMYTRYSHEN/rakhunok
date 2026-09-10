@@ -1,0 +1,25 @@
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "rakhunok-app",
+	"main": "../worker/src/app.ts",
+	"compatibility_date": "2026-08-28",
+	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": false,
+	"preview_urls": false,
+	"assets": {
+		"directory": "../apps/merchant-app/dist",
+		"binding": "ASSETS",
+		"run_worker_first": true,
+		"not_found_handling": "single-page-application"
+	},
+	"services": [
+		{ "binding": "API", "service": "rahunok" }
+	],
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
+	"routes": [
+		{ "pattern": "rakhunok.com/app*", "zone_name": "rakhunok.com" }
+	]
+}

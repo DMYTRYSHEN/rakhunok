@@ -14,10 +14,10 @@ export function getInvoiceShareLinks(invoice: InvoiceRecord): InvoiceShareLink[]
 		/^(table-|kasa-|bar-)/.test(invoice.reference);
 
 	if (isTerminalInvoice) {
-		if (invoice.lifecycleStatus === 'pending') {
+		if (invoice.terminalId && invoice.terminalCode) {
 			links.push({
 				label: 'Багаторазовий QR терміналу або столу',
-				path: `/tag/${invoice.reference}`
+				path: `/tag/${encodeURIComponent(invoice.terminalCode)}`
 			});
 		}
 		links.push({ label: 'Одноразовий чек для клієнта', path: `/pos/${shortReference}` });

@@ -4,6 +4,7 @@ import { createCheckoutSync, type SyncClock, type SyncView } from './checkout-sy
 import { checkoutHttpReader } from './checkout-http.ts';
 // @ts-ignore Node native TypeScript tests require explicit extensions.
 import { checkoutPost, createCheckoutAttempt, selectLocalInvoice, type AcceptedAttempt, type DeliveryReceipt } from './checkout-attempt.ts';
+import { decodeSnapshot, sameResource } from './checkout-contract.js';
 
 export type FixedCheckoutView = Readonly<{
   sync: SyncView | null;
@@ -13,6 +14,8 @@ export type FixedCheckoutView = Readonly<{
   pending: boolean;
   error: string | null;
   connected: boolean;
+  paymentActive: boolean;
+  canOpen: boolean;
 }>;
 
 export interface FixedCheckoutOptions {
@@ -50,13 +53,16 @@ export function createFixedCheckout(options: FixedCheckoutOptions) {
   let current: SyncView | null = null;
   let attempt: AcceptedAttempt | null = null;
   let receipt: DeliveryReceipt | null = null;
+  let paymentActive = false;
+  let generation = 0;
 
   const accessible = () => !disposed && !abort.signal.aborted;
   const connected = () => accessible() && online && visible && current?.transport === 'live';
   function emit() {
     options.onChange(Object.freeze({ sync: current, attempt, receipt, busy, error,
       pending: accessible() && !attempt && (controller?.hasPending() ?? false),
-      connected: connected() }));
+      connected: connected(), paymentActive,
+      canOpen: accessible() && online && visible && !!sync && !busy && !attempt }));
   }
   function observe(next: SyncView) {
     if (disposed) return;
@@ -67,6 +73,7 @@ export function createFixedCheckout(options: FixedCheckoutOptions) {
       attempt = null;
       receipt = null;
       busy = false;
+      paymentActive = false;
       error = revoked;
     } else if (next.transport === 'error') error = unavailable;
     else if (next.transport === 'live' && error === unavailable) error = null;
@@ -94,19 +101,25 @@ export function createFixedCheckout(options: FixedCheckoutOptions) {
       // Must precede selection AND sync construction: disposal can win after POST resolves.
       if (!accessible()) return;
       const { resource, token } = selectLocalInvoice(contexts);
+      const preview = decodeSnapshot(await checkoutPost('/__local/preview', {
+        'X-Local-Bootstrap': bootstrap, Authorization: `Bearer ${token}`
+      }, {}, abort.signal, options.fetcher));
+      if (!accessible()) return;
+      if (!sameResource(resource, preview.resource) || preview.source !== 'cache' || preview.canInitiate) throw new Error('Invalid preview');
       sync = createCheckoutSync({ resource, clock,
         reader: checkoutHttpReader(resource, token, options.fetcher), onChange: observe });
       controller = createCheckoutAttempt({ resource, token, bootstrap, signal: abort.signal,
         fetcher: options.fetcher,
         revalidateBeforePayment: async () => {
+          const phase = generation;
           const binding = await sync!.revalidateBeforePayment();
-          return accessible() && online && visible && sync?.view().canInitiate ? binding : null;
+          return phase === generation && accessible() && paymentActive && online && visible && sync?.view().canInitiate ? binding : null;
         }
       });
       sync.setOnline(online);
       sync.setVisible(visible);
       if (!accessible()) return;
-      await sync.start();
+      await sync.start(preview, false);
       if (!accessible()) return;
     } catch {
       if (accessible()) error = unavailable;
@@ -115,23 +128,48 @@ export function createFixedCheckout(options: FixedCheckoutOptions) {
     }
   }
 
+  async function beginPayment(): Promise<void> {
+    if (!accessible() || busy || !sync || attempt || !online || !visible) return;
+    const owner = ++generation;
+    paymentActive = true;
+    busy = true;
+    error = null;
+    emit();
+    try {
+      await sync.setActive(true);
+    } finally {
+      if (accessible() && owner === generation) { busy = false; emit(); }
+    }
+  }
+
+  function closePayment(): void {
+    // An uncertain POST must retain its immutable binding and recovery polling.
+    if (!accessible() || attempt || controller?.hasPending()) return;
+    generation++;
+    paymentActive = false;
+    busy = false;
+    void sync?.setActive(false);
+    emit();
+  }
+
   async function create(): Promise<void> {
     const view = latest();
-    if (!accessible() || busy || !controller || attempt || !online || !visible ||
+    if (!accessible() || !paymentActive || busy || !controller || attempt || !online || !visible ||
         view?.snapshot?.state !== 'payable' ||
         (!controller.hasPending() && (view.transport !== 'live' || !view.canInitiate))) return;
     const owner = controller;
+    const phase = generation;
     busy = true;
     error = null;
     emit();
     try {
       const accepted = await owner.create();
-      if (!accessible() || controller !== owner) return;
+      if (!accessible() || controller !== owner || phase !== generation) return;
       attempt = accepted;
     } catch {
-      if (accessible()) error = owner.hasPending() ? uncertain : 'Рахунок змінився або недоступний. Перевірте дані та повторіть спробу.';
+      if (accessible() && phase === generation) error = owner.hasPending() ? uncertain : 'Рахунок змінився або недоступний. Перевірте дані та повторіть спробу.';
     } finally {
-      if (accessible()) { busy = false; emit(); }
+      if (accessible() && phase === generation) { busy = false; emit(); }
     }
   }
 
@@ -156,9 +194,9 @@ export function createFixedCheckout(options: FixedCheckoutOptions) {
   }
 
   return {
-    start, create, deliver,
+    start, beginPayment, closePayment, create, deliver,
     async refresh(): Promise<void> {
-      if (!accessible()) return;
+      if (!accessible() || !paymentActive) return;
       await sync?.refresh();
     },
     setOnline(value: boolean): void {
@@ -174,6 +212,7 @@ export function createFixedCheckout(options: FixedCheckoutOptions) {
     dispose(): void {
       if (disposed) return;
       disposed = true;
+      paymentActive = false;
       abort.abort();
       sync?.dispose();
       sync = null;

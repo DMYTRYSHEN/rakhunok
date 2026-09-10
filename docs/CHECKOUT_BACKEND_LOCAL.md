@@ -195,6 +195,57 @@ The prior 21-test concurrency and 5-test real-PG webhook suites are historical
 evidence from the preceding phase, not newly rerun totals. This fixed slice adds
 visible-browser coverage but does not certify all ordinary Pay scenarios.
 
+### Cache-first fixed Pay activation (2026-09-08)
+
+Implemented only in the local synthetic fixed-invoice slice, not deployed Pay.
+Initial session bootstrap now requests POST /__local/preview. The Node server
+holds one immutable projection for a non-sliding 30-second TTL; this is not
+Cloudflare Cache API/KV. Every preview, including a hit, performs a current SQL
+capability/expiry/revocation/resource access check. A miss also reads authority.
+Thus cache reduces repeated projection reads, not all initial DB access. HTTP
+responses remain private/no-store; credentials and authorization decisions are
+not cached. No SQL migration was added.
+
+- Preview is source=cache, canInitiate=false, even when its state is paid. Neither
+  cache nor stale previously authoritative state displays current paid confirmation.
+- Before “Перейти до оплати”: no authoritative GET polling, including after
+  visibility/online changes or manual refresh calls. Preview itself is a one-off
+  authorized request, not a polling loop.
+- CTA opens confirmation and forces a fresh authoritative read. The user separately
+  confirms the displayed amount. Attempt creation performs another revision-bound
+  preflight and retains the atomic SQL revision/amount/status/recipient checks.
+- Closing before an attempt cancels polling and in-flight reads. Reopening forces
+  a new read. Generation fencing prevents an old cancelled preflight from sending
+  a POST in the reopened phase. An uncertain POST preserves its original binding
+  and recovery polling; it is not silently replaced or cancelled.
+- Polling runs during the activated payment session, pauses offline/hidden, and
+  stops on disposal/revocation. The local emulator retains polling after an accepted
+  attempt (including paid) until disposal so its explicit replay diagnostics remain
+  available; terminal-state automatic shutdown is not implemented in this slice.
+- Bounded JSON reading now releases its reader lock in finally on success/error,
+  retains the 65,536-byte limit and cancels oversized bodies only.
+
+Final verification: **207 Pay tests**, **31 selected backend/preview/HTTP tests**,
+zero failed/skipped. Svelte check **0 errors/0 warnings**, official autofixer no
+issues. Isolated production build **188 modules**, with no local lifecycle,
+preview route or emulator delivery endpoint in emitted JS; shared deploy assets
+were not overwritten.
+
+Final real Chromium E2E **1 passed**, on checkout_test_fixed_pay_cache_final_0908:
+6.5-second idle preview and closed-dialog windows each had no authority/attempt
+requests; reopening revalidated; one explicit attempt and webhook settled 123.45
+UAH at revision 2; replay preserved one ledger entry. A second context received
+cached paid but no paid confirmation or authority polling. Missing-bootstrap
+reload failed closed. No external/legacy/SSE/browser errors or body-capture
+failures occurred in this final run. No visibility overrides or synthetic clicks.
+
+Earlier runs in this phase failed CDP body collection despite app DOM already
+showing live authority and no observed AbortController call, visibility change,
+or navigation. Removing local request interception alone did not eliminate this.
+The final run passed after reader-lock cleanup, but a causal Chromium/GC diagnosis
+is not proven. Failures remain visible in test diagnostics; no mutation POST was
+retried to compensate for missing CDP data. Fresh/unused fixtures were used.
+
 ### Remaining external and rollout gates
 
 1. **Real provider integration:** immutable attempt-bound handoff, provider sandbox
@@ -235,5 +286,6 @@ visible-browser coverage but does not certify all ordinary Pay scenarios.
 - Do not run broad legacy Worker tests against shared services or treat normal
   Pay dev entry as a synthetic-data isolation boundary.
 
-No actual bank payment, remote SQL, production-data mutation, commit or deployment
-was performed by this remediation work.
+No actual bank payment, remote SQL, production-data mutation or deployment was
+performed by this remediation work. The preceding fixed-Pay slice was committed
+and pushed with user approval; this cache-first follow-up remains local/uncommitted.

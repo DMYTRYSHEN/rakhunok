@@ -296,13 +296,14 @@ function mapBusinessEntity(row: BusinessEntityRow): BusinessEntity {
 }
 
 function mapPosOrder(row: OrderRow): PosActiveOrder | null {
-	if (!row.terminal_id || (row.status !== 'pending' && row.status !== 'paid')) return null;
+	if (!row.terminal_id || !['pending', 'preparing', 'ready', 'paid'].includes(row.status)) return null;
 	return {
 		id: row.id,
 		terminalId: row.terminal_id,
 		title: row.title || row.order_number,
 		amount: Number(row.total_amount) || 0,
-		status: row.status,
+		// POS groups unpaid lifecycle stages together; the stored status remains unchanged.
+		status: row.status === 'paid' ? 'paid' : 'pending',
 		createdAt: row.created_at
 	};
 }
@@ -879,7 +880,19 @@ export function createDashboardGateway(
 				}
 				throw new Error('Не вдалося завантажити рахунок.');
 			}
-			return result.data ? mapInvoiceRecord(result.data) : null;
+			if (!result.data) return null;
+			const invoice = mapInvoiceRecord(result.data);
+			if (invoice.terminalId) {
+				// Resolve public code through the owned invoice's immutable terminal ID and RLS.
+				const terminalResult = await client
+					.from('terminals')
+					.select('code')
+					.eq('id', invoice.terminalId)
+					.maybeSingle<{ code: string }>();
+				if (terminalResult.error) throw new Error('Не вдалося завантажити посилання термінала.');
+				invoice.terminalCode = terminalResult.data?.code ?? null;
+			}
+			return invoice;
 		},
 
 		async listInvoiceEvents(invoiceId) {
@@ -917,7 +930,7 @@ export function createDashboardGateway(
 					.from('orders')
 					.select('id, order_number, title, total_amount, status, created_at, terminal_id')
 					.eq('merchant_id', merchantId)
-					.in('status', ['pending', 'paid'])
+					.in('status', ['pending', 'preparing', 'ready', 'paid'])
 					.order('created_at', { ascending: false })
 					.limit(50)
 			]);

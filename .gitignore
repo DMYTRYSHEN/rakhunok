@@ -6,10 +6,14 @@ node_modules
 .netlify
 .wrangler
 /worker/.wrangler-dist*
+/worker-rakhunok/.wrangler-dist*
 /.svelte-kit
+/.svelte-kit-dashboard
 /build
+/build-dashboard
 /apps/checkout/dist
 /apps/pay/dist
+/apps/pay/.*-dist
 /apps/conf/dist
 /supabase/.temp
 

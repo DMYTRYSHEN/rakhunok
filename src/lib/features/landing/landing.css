@@ -1,10 +1,8 @@
-@import 'tailwindcss';
-
 /* ==========================================================================
    RAHUNOK — ULTRA-PREMIUM APPLE INTELLIGENCE & JONY IVE DESIGN SYSTEM
    ========================================================================== */
 
-:root {
+.landing-vision {
 	/* Palette — Pearlescent Light (Ceramic Studio) */
 	--bg-canvas: #f8f9fa;
 	--bg-surface: rgba(255, 255, 255, 0.82);
@@ -56,7 +54,7 @@
 }
 
 /* Dark Mode — Cosmic Obsidian & Siri Fluid Aurora */
-[data-money-vision='apple-dark'] {
+.landing-vision[data-money-vision='apple-dark'] {
 	--bg-canvas: #060709;
 	--bg-surface: rgba(18, 20, 26, 0.75);
 	--bg-surface-elevated: rgba(24, 27, 36, 0.9);
@@ -80,13 +78,14 @@
 }
 
 /* Base resets & typography */
-*,
-*::before,
-*::after {
+.landing-vision,
+.landing-vision *,
+.landing-vision *::before,
+.landing-vision *::after {
 	box-sizing: border-box;
 }
 
-html {
+html:has(.landing-vision) {
 	scroll-behavior: smooth;
 	background-color: var(--bg-canvas);
 	color: var(--text-primary);
@@ -102,7 +101,7 @@ html {
 	-moz-osx-font-smoothing: grayscale;
 }
 
-body {
+body:has(.landing-vision) {
 	margin: 0;
 	padding: 0;
 	background: var(--bg-canvas);
@@ -114,23 +113,23 @@ body {
 		color 0.4s var(--ease-smooth);
 }
 
-body.modal-open {
+body.modal-open:has(.landing-vision) {
 	overflow: hidden;
 }
 
-a {
+:where(.landing-vision) a {
 	color: inherit;
 	text-decoration: none;
 }
 
-button,
-input,
-select,
-textarea {
+:where(.landing-vision) button,
+:where(.landing-vision) input,
+:where(.landing-vision) select,
+:where(.landing-vision) textarea {
 	font: inherit;
 }
 
-button {
+:where(.landing-vision) button {
 	cursor: pointer;
 	border: none;
 	background: none;
@@ -162,6 +161,7 @@ button {
 	position: relative;
 	min-height: 100vh;
 	background: var(--bg-canvas);
+	color: var(--text-primary);
 	isolation: isolate;
 }
 

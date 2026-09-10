@@ -1479,7 +1479,7 @@ body.light-mode .trust-card { background: rgba(48, 209, 88, 0.05); }
    ========================================================================== */
 .table-split-card {
     background: var(--card-bg);
-    border: 1px solid var(--card-border);
+    border: 0px solid var(--card-border);
     border-radius: 18px;
     padding: 12px 14px;
     margin-top: 12px;
@@ -1500,6 +1500,7 @@ body.light-mode .trust-card { background: rgba(48, 209, 88, 0.05); }
 .table-split-icon {
     font-size: 22px;
     flex-shrink: 0;
+    color: var(--order-text-dim);
 }
 
 .table-split-text {
@@ -1617,7 +1618,7 @@ body.light-mode .trust-card { background: rgba(48, 209, 88, 0.05); }
 
 .table-tips-card {
     background: var(--card-bg);
-    border: 1px solid var(--card-border);
+    border: 0px solid var(--card-border);
     border-radius: 18px;
     padding: 12px 14px;
     margin-top: 10px;
@@ -1843,7 +1844,7 @@ body.light-mode .trust-card { background: rgba(48, 209, 88, 0.05); }
 .nps-card {
     width: 100%;
     background: var(--card-bg);
-    border: 1px solid var(--card-border);
+
     border-radius: 18px;
     padding: 14px;
     margin-top: 14px;
@@ -1934,7 +1935,7 @@ body.light-mode .trust-card { background: rgba(48, 209, 88, 0.05); }
     justify-content: center;
     gap: 8px;
     background: rgba(255, 255, 255, 0.06);
-    border: 1px solid var(--card-border);
+    border: 0px solid var(--card-border);
     padding: 12px;
     border-radius: 14px;
     color: var(--order-text);
@@ -1942,6 +1943,7 @@ body.light-mode .trust-card { background: rgba(48, 209, 88, 0.05); }
     font-weight: 700;
     cursor: pointer;
     margin-top: 10px;
+     margin-bottom: 10px;
     transition: all 0.15s ease;
 }
 
@@ -2224,7 +2226,7 @@ body.light-mode .trust-card { background: rgba(48, 209, 88, 0.05); }
    ========================================================================== */
 .table-items-card {
     background: var(--card-bg);
-    border: 1px solid var(--card-border);
+    border: 0px solid var(--card-border);
     border-radius: 18px;
     padding: 12px 14px;
     margin-top: 10px;
@@ -2250,6 +2252,7 @@ body.light-mode .trust-card { background: rgba(48, 209, 88, 0.05); }
 
 .table-items-icon {
     font-size: 16px;
+    color: var(--order-text-dim);
 }
 
 .table-items-title {
@@ -2387,12 +2390,16 @@ body.light-mode .trust-card { background: rgba(48, 209, 88, 0.05); }
 .roundup-card,
 .loyalty-card {
     background: var(--card-bg);
-    border: 1px solid var(--card-border);
+    border: 0px solid var(--card-border);
     border-radius: 16px;
     margin-top: 10px;
+
     transition: border-color 0.2s, background 0.2s;
 }
-
+.loyalty-card {
+    border: 0px solid var(--card-border);
+        margin-bottom: 10px;
+}
 .roundup-card.active {
     border-color: rgba(56, 189, 248, 0.4);
     background: rgba(56, 189, 248, 0.05);
@@ -2536,7 +2543,7 @@ body.light-mode .trust-card { background: rgba(48, 209, 88, 0.05); }
    ========================================================================== */
 .live-tracker-card {
     background: var(--card-bg);
-    border: 1px solid var(--card-border);
+
     border-radius: 18px;
     padding: 14px;
     margin-top: 12px;
@@ -3154,7 +3161,7 @@ body.light-mode .trust-card { background: rgba(48, 209, 88, 0.05); }
     width: 100%;
     max-width: 360px;
     background: var(--order-surface);
-    border: 1px solid var(--card-border);
+    border: 0px solid var(--card-border);
     border-radius: 20px;
     padding: 16px;
     margin: 18px 0 14px;
@@ -3458,7 +3465,7 @@ body.light-mode .trust-card { background: rgba(48, 209, 88, 0.05); }
 .loyalty-trigger-btn {
     width: 100%;
     background: var(--card-bg);
-    border: 0.5px solid var(--card-border);
+    border: 0px solid var(--card-border);
     border-radius: 16px;
     padding: 12px 14px;
     display: flex;

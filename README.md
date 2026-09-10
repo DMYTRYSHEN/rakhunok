@@ -17,7 +17,16 @@ npm run dev
 
 The development server prints its local URL. Use `npm run build` to generate the static application in `build/` and `npm run preview` to inspect that build.
 
-For production, configure `PUBLIC_SUPABASE_URL` and `PUBLIC_SUPABASE_ANON_KEY` in the
+### Deployment scope and approval
+
+The authorized isolated Dashboard rollout is recorded in
+[docs/BUSINESS_SETTINGS_ROLLOUT_20260909.md](docs/BUSINESS_SETTINGS_ROLLOUT_20260909.md).
+Only `letsrealtalk-dashboard` was deployed; test landing is unchanged and shared API `rahunok`
+was not deployed. Production smoke is ongoing; real-JWT browser save is untested. No commit/push.
+Use [docs/DASHBOARD_ISOLATED_DEPLOYMENT.md](docs/DASHBOARD_ISOLATED_DEPLOYMENT.md) for that
+narrow scope. The combined command below is **not** the isolated rollout and requires separate approval.
+
+For a separately authorized combined production deployment, configure `PUBLIC_SUPABASE_URL` and `PUBLIC_SUPABASE_ANON_KEY` in the
 deployment environment or the ignored local `.env`, then run:
 
 ```powershell
@@ -97,7 +106,9 @@ Do not commit environment files or credentials. Local `.env*` files are ignored;
 
 ## Migration constraints
 
-The current production implementation remains in `../core` and is the behavioral reference. During migration:
+The legacy implementation in `../core` remains the behavioral reference. The constraints below
+remain the default; only the exact migration and isolated Dashboard deployment in the dated rollout
+record were separately authorized. They do not imply general rollout approval or full parity. During migration:
 
 - do not modify `../core/worker`;
 - do not modify `../core/db` or the production Supabase schema;

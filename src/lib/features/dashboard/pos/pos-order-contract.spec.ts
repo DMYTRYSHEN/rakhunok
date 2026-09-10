@@ -133,7 +133,10 @@ describe('legacy POS order contract', () => {
 				'merchant-1',
 				terminal,
 				draft,
-				[],
+				[{
+					id: 'previous-paid', terminalId: terminal.id, title: 'Оплачений рахунок',
+					amount: 250, status: 'paid', createdAt: '2026-08-26T09:00:00.000Z'
+				}],
 				new Date('2026-08-26T09:30:00.000Z'),
 				3_600
 			)

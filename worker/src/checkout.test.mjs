@@ -3,6 +3,30 @@ import test from 'node:test';
 
 import { routeCheckoutRequest } from './checkout.js';
 
+test('tag GET/HEAD bypass all alias KV/API injection and return no-store shell', async () => {
+	for (const method of ['GET', 'HEAD']) {
+		const { env, calls } = createEnv();
+		env.ORDERS_KV = {
+			get() { throw Error('terminal must not read alias KV'); },
+			put() { throw Error('terminal must not write alias KV'); }
+		};
+		const response = await routeCheckoutRequest(new Request('https://example.com/tag/table-30?id=wrong', { method }), env);
+		assert.equal(response.status, 200);
+		assert.equal(response.headers.get('Cache-Control'), 'no-store');
+		assert.equal(response.headers.get('X-Edge-Hydration'), null);
+		assert.doesNotMatch(await response.text(), /__INITIAL_ORDER__/);
+		assert.deepEqual(calls.api, []);
+	}
+});
+
+test('existing terminal API route is forwarded intact, never replaced', async () => {
+	const { env, calls } = createEnv(Response.json({ kind: 'idle' }));
+	const response = await routeCheckoutRequest(new Request('https://example.com/api/v1/checkout/terminal/table-30'), env);
+	assert.deepEqual(await response.json(), { kind: 'idle' });
+	assert.deepEqual(calls.api, ['/api/v1/checkout/terminal/table-30']);
+	assert.deepEqual(calls.assets, []);
+});
+
 function createEnv(orderResponse = new Response('', { status: 404 })) {
 	const calls = { api: [], assets: [] };
 	return {

@@ -7,6 +7,7 @@ import { handle } from './index.ts';
 import { retryTransaction } from './retry.ts';
 import { provision, localDatabaseUrl, fixture } from './local-fixture.mjs';
 import { createLocalBank, rawRequest } from './local-bank.mjs';
+import { createLocalPreview } from './local-preview.mjs';
 
 const connectionString = localDatabaseUrl(process.env.CHECKOUT_TEST_DATABASE_URL);
 const pool = new pg.Pool({ connectionString, max: 5, statement_timeout: 5000, lock_timeout: 2000 });
@@ -26,6 +27,7 @@ const db = {
 };
 const bank = createLocalBank({ pool, contexts, db, origin, key: randomBytes(32),
   enabled: process.env.CHECKOUT_LOCAL_BANK_SIMULATOR === '1' });
+const preview = createLocalPreview({ pool, db, contexts });
 const streams = new Map();
 const listener = new pg.Client({ connectionString });
 await listener.connect();
@@ -56,6 +58,13 @@ server.on('request', async (req,res)=>{
     res.setHeader('Referrer-Policy', 'no-referrer');
     if(req.headers.host!=='127.0.0.1:8792' || (req.headers.origin && req.headers.origin!==origin)) return reply(res,403,{error:'local_only'});
     const url=new URL(req.url,origin);
+    if(url.pathname==='/__local/preview') {
+      res.setHeader('Cache-Control','no-store, private, max-age=0');
+      res.setHeader('Vary','Authorization');
+      if(!bootstrapValid(req)) return reply(res,403,{error:'inaccessible'});
+      const result=await preview.handle(rawRequest(req,url));
+      res.writeHead(result.status,Object.fromEntries(result.headers));res.end(await result.text());return;
+    }
     if(url.pathname.startsWith('/__local/bank/')) {
       if(url.pathname==='/__local/bank/deliver' && !bootstrapValid(req)) return reply(res,403,{error:'inaccessible'});
       const result=await bank.handle(rawRequest(req,url));

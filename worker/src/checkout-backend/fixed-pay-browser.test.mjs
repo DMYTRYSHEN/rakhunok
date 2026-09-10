@@ -10,11 +10,12 @@ import { fixture, localDatabaseUrl } from './local-fixture.mjs';
 // provision/reset data here. Only real UI clicks may change financial state.
 const browserUrl = process.env.CHECKOUT_FIXED_BROWSER_URL;
 const origin = 'http://127.0.0.1:8792';
+const previewPath = '/__local/preview';
 const snapshotPath = `/api/checkout/v1/invoice/${fixture.order}/snapshot`;
 const attemptsPath = `/api/checkout/v1/invoice/${fixture.order}/attempts`;
 const deliveryPath = '/__local/bank/deliver';
 const responseBodies = new WeakMap();
-const collectedPaths = new Set([snapshotPath, attemptsPath, deliveryPath]);
+const collectedPaths = new Set([previewPath, snapshotPath, attemptsPath, deliveryPath]);
 
 async function jsonBody(response) {
   const captured = responseBodies.get(response);
@@ -55,9 +56,46 @@ async function launch(t) {
 
 async function guardedContext(browser, label, audit) {
   const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1280, height: 1000 } });
-  await context.route('**/*', async route => {
+  await context.addInitScript(() => {
+    // Observation only: never inspect abort reasons, request data or credentials.
+    const entries = [];
+    globalThis.__checkoutAbortAudit = entries;
+    const record = (type, stack) => {
+      try {
+        const entry = { type, timestamp: Date.now(), monotonic: performance.now(),
+          documentHidden: document.hidden, navigatorOnline: navigator.onLine };
+        if (stack) {
+          // Keep call sites, but strip URL queries/fragments/userinfo and tokens
+          // before storing anything in the page's diagnostic buffer.
+          entry.stack = String(stack)
+            .replace(/(?:https?|file|wss?):\/\/[^\s)]+/gi, value => {
+              try {
+                const url = new URL(value);
+                return `${url.protocol}//[host]${url.pathname}`;
+              } catch { return '[URL redacted]'; }
+            })
+            .replace(/postgres(?:ql)?:\/\/[^\s"'<>]+/gi, '[database URL redacted]')
+            .replace(/#local=[^\s"'<>]*/g, '#local=[redacted]')
+            .replace(/[A-Za-z0-9_-]{43,}/g, '[credential redacted]')
+            .slice(0, 4096);
+        }
+        entries.push(entry);
+        if (entries.length > 100) entries.splice(0, entries.length - 100);
+      } catch { /* Diagnostics must not affect application behavior. */ }
+    };
+    const abort = AbortController.prototype.abort;
+    AbortController.prototype.abort = function (...args) {
+      try { record('abort', new Error('AbortController.abort').stack); }
+      catch { /* Always forward even if observation fails. */ }
+      return Reflect.apply(abort, this, args);
+    };
+    document.addEventListener('visibilitychange', () => record('visibilitychange'));
+    globalThis.addEventListener('online', () => record('online'));
+    globalThis.addEventListener('offline', () => record('offline'));
+  });
+  // Leave same-origin requests unintercepted, including response body transport.
+  await context.route(/^(?!http:\/\/127\.0\.0\.1:8792\/|data:).*/, async route => {
     const url = new URL(route.request().url());
-    if (url.protocol === 'data:' || url.origin === origin) return route.continue();
     audit.external.push(`${label}: ${url.protocol}//[nonorigin]${safePath(url.href)}`);
     await route.abort('blockedbyclient');
   });
@@ -79,9 +117,9 @@ async function guardedContext(browser, label, audit) {
     page.on('request', request => {
       const url = new URL(request.url());
       const path = safePath(url.href);
-      audit.requests.push({ label, method: request.method(), path });
+      audit.requests.push({ label, method: request.method(), path, timestamp: Date.now() });
       if (request.isNavigationRequest() && request.frame() === page.mainFrame()) {
-        audit.navigations.push({ label, method: request.method(), path, phase: audit.phase });
+        audit.navigations.push({ label, method: request.method(), path, phase: audit.phase, timestamp: Date.now() });
       }
       if (/(?:^|\/)banks(?:\/|$)/i.test(url.pathname) ||
           (/(?:^|\/)checkout\/?$/i.test(url.pathname) && url.search) ||
@@ -96,6 +134,8 @@ async function guardedContext(browser, label, audit) {
       }
     });
     page.on('response', response => {
+      audit.responses.push({ label, method: response.request().method(), path: safePath(response.url()),
+        status: response.status(), phase: audit.phase, timestamp: Date.now() });
       // Start reading at the response event, before UI waits or subsequent polls.
       // Store settled outcomes so unused polling responses cannot reject unhandled.
       // Session responses contain credentials and must never be collected.
@@ -104,7 +144,7 @@ async function guardedContext(browser, label, audit) {
           value => ({ ok: true, value }),
           error => {
             const failure = { label, method: response.request().method(), path: safePath(response.url()),
-              status: response.status(), phase: audit.phase,
+              status: response.status(), phase: audit.phase, timestamp: Date.now(),
               error: redact(error instanceof Error ? error.message : error) };
             audit.bodyFailures.push(failure);
             return { ok: false, error: failure.error };
@@ -128,7 +168,7 @@ async function guardedContext(browser, label, audit) {
       // Navigation teardown can cancel an in-flight read without an application error.
       const failure = request.failure()?.errorText ?? 'unknown failure';
       audit.requestFailures.push({ label, method: request.method(), path: safePath(request.url()),
-        error: redact(failure), phase: audit.phase });
+        error: redact(failure), phase: audit.phase, timestamp: Date.now() });
       if (!failure.includes('ERR_ABORTED')) audit.errors.push(`${label}: ${safePath(request.url())}: ${redact(failure)}`);
     });
   });
@@ -194,11 +234,29 @@ function responseFor(page, path, method) {
     response.request().method() === method, { timeout: 15000 });
 }
 
+function paymentRequestCounts(audit) {
+  return {
+    snapshots: audit.requests.filter(request => request.path === snapshotPath && request.method === 'GET').length,
+    attempts: audit.requests.filter(request => request.path === attemptsPath && request.method === 'POST').length
+  };
+}
+
+async function expectPaymentIdle(audit, expected, message) {
+  const started = Date.now();
+  await expect.poll(() => {
+    // Callback assertions propagate; only the elapsed-time matcher is retried.
+    // Counts are cumulative, so an unexpected request cannot disappear later.
+    assert.deepEqual(paymentRequestCounts(audit), expected, message);
+    return Date.now() - started;
+  }, { timeout: 9000, intervals: [500], message }).toBeGreaterThanOrEqual(6500);
+  assert.deepEqual(paymentRequestCounts(audit), expected, message);
+}
+
 test('fixed invoice: real browser payment, polling authority, immutable replay and bootstrap reload', {
   skip: browserUrl === undefined ? 'Set CHECKOUT_FIXED_BROWSER_URL to opt in to the existing local fixture' : false,
-  timeout: 90000
+  timeout: 120000
 }, async t => {
-  const audit = { requests: [], external: [], forbidden: [], errors: [], navigations: [], hmr: [],
+  const audit = { requests: [], responses: [], external: [], forbidden: [], errors: [], navigations: [], hmr: [],
     requestFailures: [], bodyFailures: [], phase: 'validate existing fixture' };
   let browser;
   let pool;
@@ -219,21 +277,24 @@ test('fixed invoice: real browser payment, polling authority, immutable replay a
     const context = await guardedContext(browser, 'payment', audit);
     const page = await context.newPage();
     page.setDefaultTimeout(10000);
-    audit.phase = 'initial navigation and first snapshot response';
-    const firstRead = responseFor(page, snapshotPath, 'GET');
-    const [, firstResponse] = await Promise.all([page.goto(browserUrl, { waitUntil: 'domcontentloaded' }), firstRead]);
-    assert.equal(firstResponse.status(), 200);
-    audit.phase = 'first snapshot jsonBody(firstResponse)';
-    const fresh = await jsonBody(firstResponse);
-    audit.phase = 'initial authoritative snapshot and fixed frame assertions';
-    assert.equal(fresh.source, 'authoritative');
-    assert.equal(fresh.state, 'payable');
-    assert.equal(fresh.revision, 1);
-    assert.equal(fresh.order.id, fixture.order);
-    assert.equal(fresh.order.amountMinor, 12345);
+    audit.phase = 'initial navigation and cache preview response';
+    const previewRead = responseFor(page, previewPath, 'POST');
+    const [, previewResponse] = await Promise.all([page.goto(browserUrl, { waitUntil: 'domcontentloaded' }), previewRead]);
+    assert.equal(previewResponse.status(), 200);
+    audit.phase = 'initial preview jsonBody(previewResponse)';
+    const preview = await jsonBody(previewResponse);
+    const previewReceivedAt = Date.now();
+    assert.equal(preview.source, 'cache');
+    assert.equal(preview.canInitiate, false);
+    assert.equal(preview.state, 'payable');
+    assert.equal(preview.revision, 1);
+    assert.equal(preview.order.id, fixture.order);
+    assert.equal(preview.order.amountMinor, 12345);
     await visibleDocument(page);
     await fixedFrame(page);
-    await expect(page.getByTestId('authoritative-state')).toHaveText('Стан: payable · Ревізія: 1');
+    await expect(page.getByTestId('snapshot-source')).toHaveText('Джерело: cache');
+    await expect(page.getByTestId('paid-confirmation')).toHaveCount(0);
+    await expect(page.getByTestId('create-attempt')).toBeDisabled();
     await expect(page.getByTestId('invoice-pay')).toBeEnabled();
     assert.equal(new URL(page.url()).hash, '', 'bootstrap must be consumed without persistence');
     assert.equal(audit.navigations.filter(request => request.label === 'payment').length, 1,
@@ -241,15 +302,70 @@ test('fixed invoice: real browser payment, polling authority, immutable replay a
     assert.equal(audit.requests.filter(request => request.label === 'payment' &&
       request.path === '/__local/session' && request.method === 'POST').length, 1,
     'bootstrap must create exactly one session');
+    assert.equal(audit.requests.filter(request => request.path === previewPath && request.method === 'POST').length, 1);
+    audit.phase = 'preview remains idle beyond one polling interval';
+    await expectPaymentIdle(audit, { snapshots: 0, attempts: 0 }, 'preview must not read authority or create attempts');
+    await expect(page.getByTestId('paid-confirmation')).toHaveCount(0);
     assert.deepEqual(await stored(pool), initial, 'opening the invoice must not mutate the fixture');
 
     audit.phase = 'open confirmation dialog without mutation';
-    await page.getByTestId('invoice-pay').click();
     const dialog = page.getByRole('dialog', { name: 'Підтвердьте суму рахунку' });
+    // Observe the native click synchronously, before the real network response
+    // can validate the invoice. No response interception or artificial delay.
+    await page.getByTestId('invoice-pay').evaluate(element => {
+      element.addEventListener('click', () => {
+        element.dataset.createDisabledOnOpen = String(
+          document.querySelector('[data-testid="create-attempt"]')?.matches(':disabled') === true
+        );
+      }, { once: true });
+    });
+    const firstRead = responseFor(page, snapshotPath, 'GET');
+    const [, firstResponse] = await Promise.all([page.getByTestId('invoice-pay').click(), firstRead]);
+    await expect(page.getByTestId('invoice-pay')).toHaveAttribute('data-create-disabled-on-open', 'true');
+    assert.equal(firstResponse.status(), 200);
+    audit.phase = 'first snapshot jsonBody(firstResponse)';
+    const fresh = await jsonBody(firstResponse);
+    assert.equal(fresh.source, 'authoritative');
+    assert.equal(fresh.canInitiate, true);
+    assert.equal(fresh.state, 'payable');
+    assert.equal(fresh.revision, 1);
+    assert.equal(fresh.order.id, fixture.order);
+    assert.equal(fresh.order.amountMinor, 12345);
     await expect(dialog).toBeVisible();
     assert.equal(await dialog.evaluate(element => element instanceof HTMLDialogElement && element.matches(':modal')), true);
     await expect(dialog.getByTestId('sheet-amount')).toHaveText('123,45 ₴');
+    await expect(page.getByTestId('snapshot-source')).toHaveText('Джерело: authoritative');
+    await expect(page.getByTestId('authoritative-state')).toHaveText('Стан: payable · Ревізія: 1');
+    await expect(dialog.getByTestId('create-attempt')).toBeEnabled();
+    await expect(page.getByTestId('paid-confirmation')).toHaveCount(0);
     assert.deepEqual(await stored(pool), initial, 'opening the native dialog must not create an attempt');
+
+    audit.phase = 'native close stops polling beyond one interval';
+    const beforeClose = paymentRequestCounts(audit);
+    assert.equal(beforeClose.attempts, 0);
+    await dialog.getByRole('button', { name: 'Закрити оплату', exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect(page.getByTestId('invoice-pay')).toBeEnabled();
+    await expectPaymentIdle(audit, beforeClose, 'closing without an attempt must stop authority reads and initiation');
+    assert.deepEqual(await stored(pool), initial, 'closing the native dialog must not mutate the fixture');
+
+    audit.phase = 'reopen dialog and revalidate authority';
+    const reopenedRead = responseFor(page, snapshotPath, 'GET');
+    const [, reopenedResponse] = await Promise.all([page.getByTestId('invoice-pay').click(), reopenedRead]);
+    assert.equal(reopenedResponse.status(), 200);
+    const reopened = await jsonBody(reopenedResponse);
+    assert.equal(reopened.source, 'authoritative');
+    assert.equal(reopened.canInitiate, true);
+    assert.equal(reopened.state, 'payable');
+    assert.equal(reopened.revision, 1);
+    assert.equal(reopened.order.id, fixture.order);
+    assert.equal(reopened.order.amountMinor, 12345);
+    await expect(dialog).toBeVisible();
+    assert.equal(await dialog.evaluate(element => element instanceof HTMLDialogElement && element.matches(':modal')), true);
+    await expect(dialog.getByTestId('sheet-amount')).toHaveText('123,45 ₴');
+    await expect(dialog.getByTestId('create-attempt')).toBeEnabled();
+    assert.equal(paymentRequestCounts(audit).attempts, 0);
+    assert.deepEqual(await stored(pool), initial, 'reopening must only validate, never create an attempt');
 
     audit.phase = 'create attempt click and response';
     const [createdResponse] = await Promise.all([
@@ -344,6 +460,49 @@ test('fixed invoice: real browser payment, polling authority, immutable replay a
     audit.phase = 'close payment context';
     await context.close();
 
+    // Let the real 30-second local preview entry expire before a second UI
+    // startup. No cache writes, financial mutations, or mocked responses.
+    audit.phase = 'expire original payable preview for cached-paid startup';
+    const afterPayment = paymentRequestCounts(audit);
+    await expect.poll(() => {
+      assert.deepEqual(paymentRequestCounts(audit), afterPayment, 'closed payment context must remain idle');
+      return Date.now() - previewReceivedAt;
+    }, { timeout: 35000, intervals: [500] }).toBeGreaterThanOrEqual(31000);
+    assert.deepEqual(paymentRequestCounts(audit), afterPayment);
+
+    audit.phase = 'cached-paid preview in a second valid context';
+    const cachedContext = await guardedContext(browser, 'cached-paid', audit);
+    const cachedPage = await cachedContext.newPage();
+    const cachedRead = responseFor(cachedPage, previewPath, 'POST');
+    const [, cachedResponse] = await Promise.all([
+      cachedPage.goto(browserUrl, { waitUntil: 'domcontentloaded' }), cachedRead
+    ]);
+    assert.equal(cachedResponse.status(), 200);
+    const cachedPaid = await jsonBody(cachedResponse);
+    assert.equal(cachedPaid.source, 'cache');
+    assert.equal(cachedPaid.canInitiate, false);
+    assert.equal(cachedPaid.state, 'paid');
+    assert.equal(cachedPaid.revision, 2);
+    assert.equal(cachedPaid.order.id, fixture.order);
+    assert.equal(cachedPaid.order.amountMinor, 12345);
+    await visibleDocument(cachedPage);
+    await fixedFrame(cachedPage);
+    await expect(cachedPage.getByTestId('snapshot-source')).toHaveText('Джерело: cache');
+    await expect(cachedPage.getByTestId('paid-confirmation')).toHaveCount(0);
+    await expect(cachedPage.getByTestId('attempt-id')).toHaveCount(0);
+    await expect(cachedPage.getByTestId('create-attempt')).toBeDisabled();
+    await expectPaymentIdle(audit, afterPayment, 'cached paid preview must not read authority or initiate payment');
+    await expect(cachedPage.getByTestId('paid-confirmation')).toHaveCount(0);
+    assert.equal(new URL(cachedPage.url()).hash, '', 'second bootstrap must also be consumed');
+    assert.equal(audit.requests.filter(request => request.label === 'cached-paid' &&
+      request.path === '/__local/session' && request.method === 'POST').length, 1,
+    'cached-paid startup adds exactly one session request, not new persisted sessions');
+    assert.equal(audit.requests.filter(request => request.label === 'cached-paid' &&
+      request.path === previewPath && request.method === 'POST').length, 1);
+    assert.equal(audit.navigations.filter(request => request.label === 'cached-paid').length, 1);
+    assert.deepEqual(await stored(pool), paid, 'cached-paid startup must preserve the settled fixture');
+    await cachedContext.close();
+
     audit.phase = 'missing-bootstrap initial navigation';
     const isolated = await guardedContext(browser, 'missing-bootstrap', audit);
     const missing = await isolated.newPage();
@@ -373,17 +532,59 @@ test('fixed invoice: real browser payment, polling authority, immutable replay a
     assert.equal(audit.navigations.filter(request => request.label === 'payment').length, 1,
       'payment document must navigate exactly once; history.replaceState must not reload it');
     assert.equal(audit.requests.filter(request => request.path === '/__local/session' &&
-      request.method === 'POST').length, 1, 'exactly one session POST across both contexts');
+      request.method === 'POST').length, 2, 'one session POST per valid context; none for missing bootstrap');
+    assert.equal(audit.requests.filter(request => request.path === previewPath &&
+      request.method === 'POST').length, 2, 'one preview POST per valid context');
+    assert.deepEqual(paymentRequestCounts(audit), afterPayment, 'preview and missing bootstrap add no authority reads or attempts');
     assert.deepEqual(audit.bodyFailures, [], 'every collected response body must remain readable; body loss is not proof of reload');
     assert.deepEqual(audit.external, [], 'no nonorigin requests');
     assert.deepEqual(audit.forbidden, [], 'no legacy modules, legacy APIs or checkout push streams');
     assert.deepEqual(audit.errors, [], 'browser exceptions, console errors and HTTP failures');
-    t.diagnostic('123.45: payable revision 1 -> one attempt, no settlement -> polling paid revision 2 -> replay true, one ledger; missing-bootstrap reload fails closed.');
+    t.diagnostic('123.45: idle cache preview -> open/close/reopen authority revision 1 -> one attempt -> polling paid revision 2 -> replay true, one ledger; cached paid is not confirmation; missing-bootstrap reload fails closed.');
   } catch (error) {
+    const auditBrowser = [];
+    // Read existing pages only, before cleanup. No fetches, new pages or retries.
+    // A closed page/context must not replace the original test failure.
+    try {
+      for (const [contextIndex, context] of (browser?.contexts() ?? []).entries()) {
+        for (const [pageIndex, page] of context.pages().entries()) {
+          try {
+            const observation = await page.evaluate(() => {
+              const sanitize = value => String(value)
+                .replace(/(?:https?|file|wss?|postgres(?:ql)?):\/\/[^\s"'<>]+/gi, '[URL redacted]')
+                .replace(/#local=[^\s"'<>]*/g, '#local=[redacted]')
+                .replace(/[A-Za-z0-9_-]{43,}/g, '[credential redacted]');
+              const entries = globalThis.__checkoutAbortAudit;
+              return {
+                timestamp: Date.now(), monotonic: performance.now(),
+                documentHidden: document.hidden, navigatorOnline: navigator.onLine,
+                recentEntries: Array.isArray(entries) ? entries.slice(-30).map(entry => ({
+                  type: sanitize(entry.type), timestamp: entry.timestamp, monotonic: entry.monotonic,
+                  documentHidden: entry.documentHidden, navigatorOnline: entry.navigatorOnline,
+                  // Already sanitized at capture; preserve call-site paths here.
+                  stack: entry.stack == null ? undefined : String(entry.stack)
+                    .replace(/#local=[^\s"'<>]*/g, '#local=[redacted]')
+                    .replace(/[A-Za-z0-9_-]{43,}/g, '[credential redacted]').slice(0, 4096)
+                })) : [],
+                dom: Object.fromEntries(['transport', 'authoritative-state', 'snapshot-source'].map(id => [
+                  id, sanitize(document.querySelector(`[data-testid="${id}"]`)?.textContent ?? '').slice(0, 512)
+                ]))
+              };
+            });
+            auditBrowser.push({ contextIndex, pageIndex, ...observation });
+          } catch (observationError) {
+            auditBrowser.push({ contextIndex, pageIndex,
+              error: redact(observationError instanceof Error ? observationError.message : observationError) });
+          }
+        }
+      }
+    } catch (observationError) {
+      auditBrowser.push({ error: redact(observationError instanceof Error ? observationError.message : observationError) });
+    }
     t.diagnostic(redact(JSON.stringify({ phase: audit.phase, external: audit.external, forbidden: audit.forbidden,
       browserErrors: audit.errors, navigations: audit.navigations, hmr: audit.hmr,
       requestFailures: audit.requestFailures, bodyFailures: audit.bodyFailures,
-      recentRequests: audit.requests.slice(-20) })));
+      recentRequests: audit.requests.slice(-20), recentResponses: audit.responses.slice(-20), auditBrowser })));
     // Playwright call logs can contain the navigation fragment; never emit it.
     throw new Error(redact(`[${audit.phase}] ${error instanceof Error ? error.message : error}`));
   } finally {

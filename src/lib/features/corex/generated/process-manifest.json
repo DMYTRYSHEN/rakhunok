@@ -1165,6 +1165,20 @@
 				},
 				{
 					"method": "ANY",
+					"path": "/dashboard/_app",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/dashboard/_app/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "ANY",
 					"path": "/dashboard/",
 					"match": "prefix",
 					"status": "implemented",

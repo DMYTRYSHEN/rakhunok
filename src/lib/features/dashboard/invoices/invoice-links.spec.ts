@@ -20,17 +20,26 @@ describe('invoice share links', () => {
 		expect(getInvoiceShareLinks(invoice)[0].path).toBe(`/t/${invoice.shortId}`);
 	});
 
-	it('only exposes an active table tag for pending invoices', () => {
+	it.each(['pending', 'preparing', 'ready', 'paid', 'cancelled', 'expired'] as const)(
+		'exposes the linked terminal for a %s invoice without replacing the receipt', (lifecycleStatus) => {
 		const invoice = demoInvoices.find((item) => item.type === 'table');
 		if (!invoice) throw new Error('Expected a table demo invoice');
 
-		expect(getInvoiceShareLinks({ ...invoice, lifecycleStatus: 'pending' })[0].path).toBe(
-			`/tag/${invoice.reference}`
-		);
-		expect(
-			getInvoiceShareLinks({ ...invoice, lifecycleStatus: 'paid' }).some((link) =>
-				link.path.startsWith('/tag/')
-			)
-		).toBe(false);
+		const links = getInvoiceShareLinks({ ...invoice, reference: 'INV-30', terminalCode: 'table-30', lifecycleStatus });
+		expect(links).toEqual([
+			{ label: 'Багаторазовий QR терміналу або столу', path: '/tag/table-30' },
+			{ label: 'Одноразовий чек для клієнта', path: `/pos/${invoice.shortId}` },
+			{ label: 'Повне посилання', path: `/pay/${invoice.id}` }
+		]);
+	});
+
+	it('does not invent a terminal link from an invoice reference', () => {
+		const invoice = demoInvoices[1];
+		for (const terminalCode of [undefined, null, '']) {
+			expect(getInvoiceShareLinks({ ...invoice, reference: 'table-30', terminalCode })
+				.some((link) => link.path.startsWith('/tag/'))).toBe(false);
+		}
+		expect(getInvoiceShareLinks({ ...invoice, terminalId: null, terminalCode: 'table-30' })
+			.some((link) => link.path.startsWith('/tag/'))).toBe(false);
 	});
 });

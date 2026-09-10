@@ -1,0 +1,23 @@
+{
+	"name": "rakhunok-production-workers",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"wrangler": "node ../worker/node_modules/wrangler/bin/wrangler.js",
+		"check:web": "node ../worker/node_modules/wrangler/bin/wrangler.js deploy --dry-run --config wrangler.web.jsonc --outdir .wrangler-dist-web",
+		"check:dashboard": "node ../worker/node_modules/wrangler/bin/wrangler.js deploy --dry-run --config wrangler.dashboard.jsonc --outdir .wrangler-dist-dashboard",
+		"check:corex": "node ../worker/node_modules/wrangler/bin/wrangler.js deploy --dry-run --config wrangler.corex.jsonc --outdir .wrangler-dist-corex",
+		"check:app": "node ../worker/node_modules/wrangler/bin/wrangler.js deploy --dry-run --config wrangler.app.jsonc --outdir .wrangler-dist-app",
+		"check:checkout": "node ../worker/node_modules/wrangler/bin/wrangler.js deploy --dry-run --config wrangler.checkout.jsonc --outdir .wrangler-dist-checkout",
+		"check:conf": "node ../worker/node_modules/wrangler/bin/wrangler.js deploy --dry-run --config wrangler.conf.jsonc --outdir .wrangler-dist-conf",
+		"check:all": "npm run check:web && npm run check:dashboard && npm run check:corex && npm run check:app && npm run check:checkout && npm run check:conf",
+		"deploy:web": "node ../scripts/assert-shared-build.mjs && node ../worker/node_modules/wrangler/bin/wrangler.js deploy --config wrangler.web.jsonc",
+		"deploy:dashboard": "node ../scripts/assert-shared-build.mjs && node ../worker/node_modules/wrangler/bin/wrangler.js deploy --config wrangler.dashboard.jsonc",
+		"deploy:corex": "node ../scripts/assert-shared-build.mjs && node ../worker/node_modules/wrangler/bin/wrangler.js deploy --config wrangler.corex.jsonc",
+		"deploy:app": "node ../worker/node_modules/wrangler/bin/wrangler.js deploy --config wrangler.app.jsonc",
+		"deploy:checkout": "node ../worker/node_modules/wrangler/bin/wrangler.js deploy --config wrangler.checkout.jsonc",
+		"deploy:conf": "node ../worker/node_modules/wrangler/bin/wrangler.js deploy --config wrangler.conf.jsonc",
+		"deploy:all": "npm run deploy:web && npm run deploy:dashboard && npm run deploy:corex && npm run deploy:app && npm run deploy:checkout && npm run deploy:conf"
+	}
+}

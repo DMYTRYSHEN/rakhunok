@@ -1,5 +1,11 @@
 # Corex Worker rollout
 
+The authorized business-settings rollout recorded on 2026-09-09 deployed **only**
+`letsrealtalk-dashboard`, not either Corex Worker described here. Test landing is unchanged and
+shared API `rahunok` was not deployed. See the
+[dated rollout evidence](BUSINESS_SETTINGS_ROLLOUT_20260909.md); production smoke is ongoing,
+and authenticated real-JWT browser save is untested. This runbook grants no additional deployment approval.
+
 ## Scope
 
 - Source UI: `src/lib/features/corex`.

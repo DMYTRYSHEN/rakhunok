@@ -174,6 +174,38 @@ test('payment preflight does not rely on a previously started read', async () =>
   assert.equal(await binding, null); h.sync.dispose();
 });
 
+for (const held of ['existing poll', 'started preflight read']) test(`preflight awaiting ${held} returns null across immediate pause/resume, without borrowing fresh authority`, async t => {
+  const h = harness(); t.after(() => h.sync.dispose());
+  const start = h.sync.start(cached); await flush(); await h.respond(confirmed); await start;
+  if (held === 'existing poll') await h.advance(5000);
+  const binding = h.sync.revalidateBeforePayment(); await flush();
+  assert.equal(h.requests.length, 2);
+  assert.equal(h.sync.view().canInitiate, true);
+  let result = 'unsettled';
+  const settled = binding.then(value => { result = value; });
+
+  // Resume synchronously, before the cancelled flight's await continuation runs.
+  const pause = h.sync.setActive(false);
+  const resume = h.sync.setActive(true); await flush();
+  assert.equal(await pause, false);
+  assert.equal(h.requests[1].signal.aborted, true);
+  assert.equal(h.requests.length, 3);
+  assert.equal(result, null);
+  assert.equal(h.sync.view().canInitiate, false);
+
+  await h.respond(confirmed, 2); assert.equal(await resume, true); await settled;
+  assert.equal(await binding, null);
+  assert.equal(h.sync.view().canInitiate, true);
+  assert.equal(h.requests.length, 3, 'cancelled preflight must not queue a read behind resume');
+  const count = h.views.length; await h.respond(confirmed, 1);
+  assert.equal(h.views.length, count); assert.equal(h.requests.length, 3);
+
+  const explicit = h.sync.revalidateBeforePayment(); await flush();
+  assert.equal(h.requests.length, 4);
+  await h.respond(confirmed, 3);
+  assert.deepEqual(await explicit, { orderId: confirmed.order.id, orderRevision: confirmed.order.revision });
+});
+
 test('dispose cancels timers and outstanding reads without cross-page updates', async () => {
   const h = harness(); h.sync.start(cached); await flush(); h.sync.dispose();
   assert.equal(h.timers.size, 0);
@@ -224,4 +256,92 @@ test('clock regression cannot resurrect expired freshness', async () => {
   const h = harness(); h.sync.start(); await flush(); await h.respond(confirmed);
   h.jump(16000); assert.equal(h.sync.view().canInitiate, false);
   h.jump(-6000); assert.equal(h.sync.view().canInitiate, false); h.sync.dispose();
+});
+
+test('inactive start keeps cache non-authoritative for 60s; refresh, flags and preflight cannot activate', async t => {
+  const h = harness(); t.after(() => h.sync.dispose());
+  assert.equal(await h.sync.start(cached, false), false);
+  assert.equal(h.sync.view().transport, 'stale'); assert.equal(h.sync.view().canInitiate, false);
+  assert.equal(h.sync.view().snapshot.source, 'cache'); assert.equal(h.sync.view().snapshot.canInitiate, false);
+  assert.equal(h.sync.view().snapshot.order.amountMinor, 44400);
+  for (const value of [h.sync.view(), h.sync.view().snapshot, h.sync.view().snapshot.order]) assert.ok(Object.isFrozen(value));
+  assert.equal(await h.sync.refresh(), false); assert.equal(await h.sync.revalidateBeforePayment(), null);
+  h.sync.setOnline(false); h.sync.setVisible(false);
+  h.sync.setOnline(true); h.sync.setVisible(true);
+  await h.advance(60000);
+  assert.equal(h.requests.length, 0); assert.equal(h.timers.size, 0);
+  const activation = h.sync.setActive(true); await flush();
+  assert.equal(h.requests.length, 1); assert.equal(h.sync.view().canInitiate, false);
+  await h.respond(confirmed); assert.equal(await activation, true);
+  assert.equal(h.sync.view().transport, 'live'); assert.equal(h.sync.view().canInitiate, true);
+  await h.advance(5000); assert.equal(h.requests.length, 2);
+  await h.respond(confirmed);
+});
+
+test('inactive serialized paid authority is downgraded until an explicit authoritative read', async t => {
+  const h = harness(); t.after(() => h.sync.dispose());
+  await h.sync.start(paid, false);
+  assert.equal(h.sync.view().snapshot.state, 'paid'); assert.equal(h.sync.view().snapshot.source, 'cache');
+  assert.equal(h.sync.view().transport, 'stale'); assert.equal(h.sync.view().canInitiate, false);
+  await h.advance(60000); assert.equal(h.requests.length, 0);
+  const activation = h.sync.setActive(true); await flush();
+  assert.equal(h.sync.view().transport, 'stale');
+  await h.respond(paid); assert.equal(await activation, true);
+  assert.equal(h.sync.view().snapshot.source, 'authoritative'); assert.equal(h.sync.view().transport, 'live');
+  assert.equal(h.sync.view().canInitiate, false);
+});
+
+test('inactive notifications preserve watermark without reads; resume requests the latest revision', async t => {
+  const h = harness(); t.after(() => h.sync.dispose()); await h.sync.start(cached, false);
+  const change = { ...fixtures[1], revision: 9 };
+  h.sync.notify(change); h.sync.notify(change); h.sync.notify({ ...change, revision: 8 });
+  assert.equal(h.sync.view().watermark, 9);
+  await h.advance(60000); assert.equal(h.requests.length, 0); assert.equal(h.timers.size, 0);
+  const activation = h.sync.setActive(true); await flush();
+  assert.equal(h.requests.length, 1); assert.equal(h.requests[0].minimumRevision, 9);
+  await h.respond({ ...paid, revision: 9, order: { ...paid.order, revision: 9 } });
+  assert.equal(await activation, true); assert.equal(h.sync.view().transport, 'live');
+  assert.equal(h.sync.view().snapshot.revision, 9);
+});
+
+test('pausing live sync invalidates authority and cancels timers; resume revalidates before payment', async t => {
+  const h = harness(); t.after(() => h.sync.dispose());
+  const start = h.sync.start(); await flush(); await h.respond(confirmed); await start;
+  assert.equal(h.sync.view().canInitiate, true);
+  assert.equal(await h.sync.setActive(false), false);
+  assert.equal(h.sync.view().transport, 'stale'); assert.equal(h.sync.view().canInitiate, false);
+  assert.equal(h.timers.size, 0);
+  assert.equal(await h.sync.refresh(), false); assert.equal(await h.sync.revalidateBeforePayment(), null);
+  h.sync.setVisible(false); h.sync.setVisible(true); h.sync.setOnline(false); h.sync.setOnline(true);
+  await h.advance(60000); assert.equal(h.requests.length, 1);
+  const resume = h.sync.setActive(true); await flush();
+  assert.equal(h.requests.length, 2); assert.equal(h.sync.view().canInitiate, false);
+  await h.respond(confirmed); assert.equal(await resume, true); assert.equal(h.sync.view().canInitiate, true);
+  await h.advance(5000); assert.equal(h.requests.length, 3); await h.respond(confirmed);
+});
+
+test('pause during activation aborts flight, clears queued refresh and fences late response after resume', async t => {
+  const h = harness(); t.after(() => h.sync.dispose()); await h.sync.start(cached, false);
+  const activation = h.sync.setActive(true); await flush();
+  const queued = h.sync.refresh(); assert.equal(h.requests.length, 1);
+  await h.sync.setActive(false);
+  assert.equal(await activation, false); assert.equal(await queued, false);
+  assert.equal(h.requests[0].signal.aborted, true); assert.equal(h.timers.size, 0);
+  await h.advance(60000); assert.equal(h.requests.length, 1);
+  const resume = h.sync.setActive(true); await flush();
+  assert.equal(h.requests.length, 2);
+  const count = h.views.length; await h.respond(paid, 0);
+  assert.equal(h.views.length, count); assert.equal(h.sync.view().snapshot.state, 'payable');
+  assert.equal(h.sync.view().canInitiate, false);
+  await h.respond(confirmed, 1); assert.equal(await resume, true);
+  assert.equal(h.requests.length, 2); assert.equal(h.sync.view().canInitiate, true);
+});
+
+test('explicit resume still respects offline and hidden flags', async t => {
+  const h = harness(); t.after(() => h.sync.dispose());
+  h.sync.setOnline(false); h.sync.setVisible(false); await h.sync.start(cached, false);
+  assert.equal(await h.sync.setActive(true), false); assert.equal(h.requests.length, 0);
+  h.sync.setOnline(true); await flush(); assert.equal(h.requests.length, 0);
+  h.sync.setVisible(true); await flush(); assert.equal(h.requests.length, 1);
+  await h.respond(confirmed); assert.equal(h.sync.view().canInitiate, true);
 });

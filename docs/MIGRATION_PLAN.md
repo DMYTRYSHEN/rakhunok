@@ -6,7 +6,15 @@ The detailed dashboard behavior, UX, Tailwind, and acceptance specification is m
 
 Rebuild the working product from `D:\svetle\core` in `D:\svetle\corex` using the latest stable Svelte 5, SvelteKit, TypeScript, Vite, Tailwind CSS, Vitest, and Playwright versions available when scaffolding begins.
 
-The migration must reproduce current behavior before any redesign or backend change. The deployed Cloudflare Worker and Supabase database remain unchanged during this project. No Wrangler deployment is allowed until local parity is complete and separately approved.
+The migration must reproduce current behavior before any redesign or backend change. By default,
+deployed Workers and Supabase remain unchanged; remote changes require separate explicit approval.
+The exact later exception is the authorized DAC7 business-settings migration and isolated
+`letsrealtalk-dashboard` deployment recorded in the
+[2026-09-09 rollout evidence](BUSINESS_SETTINGS_ROLLOUT_20260909.md). Test landing is unchanged,
+shared API `rahunok` was not deployed, and no other rollout is authorized by that record.
+Production smoke is ongoing and authenticated real-JWT browser save remains untested; this is not
+a declaration of full migration parity. The original phase gates below remain the baseline for
+work outside that explicitly approved slice.
 
 ## Sources of Truth
 

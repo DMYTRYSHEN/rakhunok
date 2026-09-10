@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="90" height="85" viewBox="-42 -55 90 85">
+	<title>Курка, ліва доріжка; праворуч дзеркальна</title>
+	<g fill="#30372c" stroke="#30372c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+		<path stroke="none" d="M-19 0 C-31 -8 -30 -25 -34 -31 L-20 -24 L-23 -38 L-9 -26 C3 -28 11 -22 13 -16 L17 -31 C17 -39 28 -40 33 -33 L34 -23 L28 -14 C26 1 10 10 -6 8 Z"/>
+		<path stroke="none" d="M19 -38 Q16 -48 22 -46 Q27 -53 30 -43 Q38 -47 35 -36 M33 -30 L44 -25 L33 -23"/>
+		<path fill="none" stroke-width="2.5" d="M-6 8 L-7 15 L-15 15 M6 8 L7 15 L14 15"/>
+		<ellipse fill="#a5aa8d" stroke="none" cx="28" cy="-32" rx="1.8" ry="1.8"/>
+		<path fill="none" stroke="#a5aa8d" d="M-17 -14 Q-5 -23 9 -12 Q4 3 -13 -3 M-21 -19 L-13 -11"/>
+		<path fill="none" d="M-36 20 H40 M-33 23 H36 M-28 26 H31"/>
+	</g>
+</svg>

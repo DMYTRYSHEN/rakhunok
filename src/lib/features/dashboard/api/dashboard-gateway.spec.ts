@@ -1,6 +1,8 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { formatMoney } from '../utils/format';
+import { decideLegacyPosOrderCreation } from '../pos/pos-order-contract';
+import { createPosDraft } from '../pos/pos-drafts';
 import { createDashboardGateway } from './dashboard-gateway';
 
 const session = {
@@ -628,6 +630,21 @@ describe('dashboard gateway', () => {
 		expect(invoiceQuery.maybeSingle).toHaveBeenCalledOnce();
 	});
 
+	it('resolves a reusable code by terminal ID, not by the invoice number', async () => {
+		const invoiceQuery = query({ data: {
+			id: 'invoice-9', order_number: 'INV-30', title: 'Table order', type: 'table',
+			terminal_id: 'terminal-30', status: 'preparing', total_amount: 100,
+			created_at: '2026-09-07T20:00:00Z'
+		}, error: null });
+		const terminalQuery = query({ data: { code: 'table-30' }, error: null });
+		const client = { from: vi.fn((table: string) => table === 'orders' ? invoiceQuery : terminalQuery) } as unknown as SupabaseClient;
+		const invoice = await createDashboardGateway(client).getInvoice('merchant-7', 'invoice-9');
+		expect(invoice).toMatchObject({ reference: 'INV-30', terminalId: 'terminal-30', terminalCode: 'table-30' });
+		expect(invoiceQuery.filters).toEqual([['merchant_id', 'merchant-7'], ['id', 'invoice-9']]);
+		expect(terminalQuery.filters).toEqual([['id', 'terminal-30']]);
+		expect(terminalQuery.select).toHaveBeenCalledWith('code');
+	});
+
 	it('loads invoice events from the Worker without querying Supabase', async () => {
 		const fetcher = vi.fn(
 			async () =>
@@ -692,7 +709,7 @@ describe('dashboard gateway', () => {
 		expect(events[0]).toMatchObject({ type: 'payment_succeeded', bankCode: 'UNJS' });
 	});
 
-	it('loads the POS board within user and merchant ownership scopes', async () => {
+	it.each(['pending', 'preparing', 'ready'])('loads a new %s POS order instead of its previous paid receipt within ownership scopes', async (status) => {
 		const terminalQuery = query({
 			data: [
 				{
@@ -713,7 +730,7 @@ describe('dashboard gateway', () => {
 					order_number: 'table-1',
 					title: 'Вечеря',
 					total_amount: '840',
-					status: 'pending',
+					status,
 					created_at: '2026-08-25T20:00:00.000Z',
 					terminal_id: 'terminal-1',
 					type: 'table'
@@ -742,11 +759,20 @@ describe('dashboard gateway', () => {
 			['is_active', true]
 		]);
 		expect(orderQuery.filters).toContainEqual(['merchant_id', 'merchant-1']);
-		expect(orderQuery.in).toHaveBeenCalledWith('status', ['pending', 'paid']);
+		expect(orderQuery.in).toHaveBeenCalledWith('status', ['pending', 'preparing', 'ready', 'paid']);
 		expect(board.terminals).toHaveLength(1);
 		expect(board.activeOrders).toEqual([
-			expect.objectContaining({ id: 'new-order', terminalId: 'terminal-1', amount: 840 })
+			expect.objectContaining({
+				id: 'new-order', terminalId: 'terminal-1', amount: 840, status: 'pending'
+			})
 		]);
+		expect(
+			decideLegacyPosOrderCreation(
+				'merchant-1', board.terminals[0], createPosDraft(), board.activeOrders
+			)
+		).toMatchObject({ status: 'blocked', order: { id: 'new-order' } });
+		// A fresh read (including a reload) must keep the same terminal assignment.
+		expect(await createDashboardGateway(client).getPosBoard('user-1', 'merchant-1')).toEqual(board);
 	});
 
 	it('scopes POS realtime events and removes the channel during cleanup', () => {

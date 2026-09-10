@@ -27,6 +27,9 @@ const commonjs = ts.transpileModule(compiled.js.code, {
 const expiry = ts.transpileModule(readFileSync(new URL('../services/expiry.ts', import.meta.url), 'utf8'), {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
 }).outputText;
+const terminalAuthority = ts.transpileModule(readFileSync(new URL('../services/terminal-authority.ts', import.meta.url), 'utf8'), {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
+}).outputText;
 const deferred = () => {
   let resolve;
   const promise = new Promise(r => { resolve = r; });
@@ -64,6 +67,15 @@ function harness({ dev = false, url = 'https://checkout.invalid/pay/?id=order-a'
       if (name.endsWith('/banks.js')) return { DEFAULT_BANKS: [{ code: 'LVIV', feePct: 0 }] };
       if (name.endsWith('/profiles.js')) return { DEFAULT_PROFILES: {} };
       if (name.endsWith('/scenarios.js')) return { resolveScenario: () => ({ config: {} }) };
+      if (name.endsWith('/terminal-authority.js')) {
+        const exports = {};
+        vm.runInNewContext(terminalAuthority, {
+          exports, AbortController,
+          setTimeout: context.setTimeout, clearTimeout: context.clearTimeout,
+          fetch: context.fetch
+        });
+        return exports;
+      }
       if (name.endsWith('/expiry.js')) {
         const exports = {};
         vm.runInNewContext(expiry, { exports });
@@ -87,6 +99,178 @@ function harness({ dev = false, url = 'https://checkout.invalid/pay/?id=order-a'
   store.isLoaded = true;
   return { store, mocks, calls, intervals, timeouts, window };
 }
+
+const terminalA = '11111111-1111-4111-8111-111111111111';
+const terminalB = '22222222-2222-4222-8222-222222222222';
+const terminalOrder = (extra = {}) => invoice(terminalA, {
+  currency: 'UAH', type: 'table', expires_at: '2099-01-01T00:00:00Z',
+  items: [{ id: 'item', name: 'Original item', qty: 1, price: 100 }],
+  merchant: { display_name: 'Original merchant' }, ...extra
+});
+const selection = (order = terminalOrder()) => ({
+  kind: order ? 'active' : 'idle', terminal: { code: 'table-30', name: 'Table 30' }, order
+});
+function terminalHarness() {
+  const h = harness({ url: 'https://checkout.invalid/tag/table-30?id=wrong&demo=table' });
+  h.mocks.load = async id => ({ order: terminalOrder({ id }), reason: null });
+  h.mocks.fetch = async () => ({ ok: true, json: async () => selection() });
+  return h;
+}
+
+test('terminal ignores injection/query alias and hydrates original detail by UUID only', async () => {
+  const h = terminalHarness(); const ids = [];
+  h.window.__INITIAL_ORDER__ = invoice('wrong');
+  h.window.__INITIAL_TERMINAL__ = { code: 'wrong', name: 'wrong' };
+  h.mocks.load = async (id, options) => {
+    ids.push(id); assert.equal(options.apiBase, '');
+    return { order: terminalOrder(), reason: null };
+  };
+  await h.store.init();
+  assert.deepEqual(ids, [terminalA]);
+  assert.equal(h.store.orderId, terminalA);
+  assert.equal(h.store.orderItems[0].name, 'Original item');
+  assert.equal(h.store.merchantName, 'Original merchant');
+  assert.equal(h.store.forcedScenario, '');
+  assert.equal(h.store.terminal.code, 'table-30');
+  for (const [url, options] of h.calls.fetch) {
+    assert.equal(url, '/api/v1/checkout/terminal/table-30');
+    assert.equal(options.cache, 'no-store');
+    assert.equal(options.redirect, 'error');
+  }
+  h.store.startStatusPolling();
+  assert.equal(h.intervals.size, 1, 'only terminal authority timer');
+});
+
+test('terminal idle uses original table waiting without loading an alias invoice', async () => {
+  const h = terminalHarness(); let loads = 0;
+  h.mocks.fetch = async () => ({ ok: true, json: async () => selection(null) });
+  h.mocks.load = async () => { loads++; throw Error('must not load'); };
+  await h.store.init();
+  assert.equal(loads, 0); assert.equal(h.store.order, null);
+  assert.equal(h.store.stateScreenType, 'loading');
+  assert.equal(h.store.terminalMode, true);
+  await h.store.executePay(); assert.equal(h.calls.initiate.length, 0);
+});
+
+test('terminal rejects inactive, malformed, expired and mismatched authority/detail', async () => {
+  for (const extra of [
+    { id: 'alias' }, { status: 'paid' }, { status: 'cancelled' },
+    { total_amount: -1 }, { total_amount: '100' }, { expires_at: undefined },
+    { expires_at: '2000-01-01' }, { expires_at: 'invalid' }
+  ]) {
+    const h = terminalHarness();
+    h.mocks.fetch = async () => ({ ok: true, json: async () => selection(terminalOrder(extra)) });
+    await h.store.init(); assert.equal(h.store.order, null, JSON.stringify(extra));
+    assert.equal(h.store.stateScreenType, 'error');
+  }
+  for (const extra of [{ id: terminalB }, { status: 'preparing' }, { total_amount: 101 },
+    { expires_at: null }, { currency: 'USD' }]) {
+    const h = terminalHarness();
+    h.mocks.load = async () => ({ order: terminalOrder(extra), reason: null });
+    await h.store.init(); assert.equal(h.store.order, null, JSON.stringify(extra));
+    assert.equal(h.store.stateScreenType, 'error');
+  }
+});
+
+test('preparing positive and pending zero terminal invoices cannot pay', async () => {
+  for (const extra of [{ status: 'preparing' }, { total_amount: 0, base_amount: 0, items: [] }]) {
+    const h = terminalHarness(); const order = terminalOrder(extra);
+    h.mocks.fetch = async () => ({ ok: true, json: async () => selection(order) });
+    h.mocks.load = async () => ({ order, reason: null });
+    await h.store.init(); await h.store.executePay();
+    assert.equal(h.store.order.id, terminalA);
+    assert.equal(h.calls.initiate.length, 0);
+  }
+});
+
+test('terminal poll clears order/items/sheets on idle and errors, then recovers', async () => {
+  const h = terminalHarness(); await h.store.init();
+  for (const response of [
+    async () => ({ ok: true, json: async () => selection(null) }),
+    async () => ({ ok: false }), async () => { throw Error('offline'); }
+  ]) {
+    h.store.openPaymentSheet(); h.store.tipAmount = 10;
+    h.mocks.fetch = response; await h.store.refreshTerminal();
+    assert.equal(h.store.order, null); assert.equal(h.store.orderId, '');
+    assert.equal(h.store.orderItems.length, 0); assert.equal(h.store.isSheetOpen, false);
+    assert.equal(h.store.tipAmount, 0);
+    h.mocks.fetch = async () => ({ ok: true, json: async () => selection() });
+    await h.store.refreshTerminal(); assert.equal(h.store.orderId, terminalA);
+  }
+});
+
+test('terminal selection rollover during detail read is rejected', async () => {
+  const h = terminalHarness(); let reads = 0;
+  h.mocks.fetch = async () => ({ ok: true, json: async () => selection(terminalOrder({ id: ++reads === 1 ? terminalA : terminalB })) });
+  await h.store.init(); assert.equal(h.store.order, null);
+  assert.equal(h.store.stateScreenType, 'error');
+});
+
+test('terminal payment rechecks authority after captcha and never pays rollover B', async () => {
+  for (const next of [selection(terminalOrder({ id: terminalB })), selection(null), selection(terminalOrder({ total_amount: 101 }))]) {
+    const h = terminalHarness(); await h.store.init();
+    h.mocks.fetch = async () => ({ ok: true, json: async () => next });
+    await h.store.executePay();
+    assert.equal(h.calls.initiate.length, 0); assert.equal(h.calls.launch.length, 0);
+    assert.equal(h.store.order, null);
+  }
+  const h = terminalHarness(); await h.store.init(); await h.store.executePay();
+  assert.equal(h.calls.initiate.length, 1); assert.equal(h.calls.initiate[0][0], terminalA);
+  assert.equal(h.calls.launch.length, 1); assert.equal(h.intervals.size, 1);
+});
+
+test('terminal reads are single-flight and disposal/navigation fences pending detail', async () => {
+  const h = terminalHarness(); const pending = deferred();
+  h.mocks.load = () => pending.promise;
+  const first = h.store.init();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  await h.store.refreshTerminal(); assert.equal(h.calls.fetch.length, 1);
+  h.store.disposeTerminal();
+  pending.resolve({ order: terminalOrder(), reason: null }); await first;
+  assert.equal(h.store.order, null); assert.equal(h.intervals.size, 0);
+});
+
+test('terminal expiry tick revokes payment and clears data even during a stalled poll', async () => {
+  const h = terminalHarness(); await h.store.init();
+  h.store.order.expires_at = '2000-01-01';
+  const tick = [...h.intervals.values()][0]; tick();
+  assert.equal(h.store.order, null); assert.equal(h.store.stateScreenType, 'error');
+  await h.store.executePay(); assert.equal(h.calls.initiate.length, 0);
+});
+
+test('terminal poll rollover cancels pending bank response and keeps the replacement UUID', async () => {
+  const h = terminalHarness(); await h.store.init();
+  const pending = deferred(); const started = deferred();
+  h.mocks.initiate = () => { started.resolve(); return pending.promise; };
+  const payment = h.store.executePay(); await started.promise;
+  h.mocks.fetch = async () => ({ ok: true, json: async () => selection(terminalOrder({ id: terminalB })) });
+  await h.store.refreshTerminal();
+  pending.resolve({ success: true, redirect_url: 'https://bank.invalid/pay' });
+  await payment;
+  assert.equal(h.store.orderId, terminalB);
+  assert.equal(h.calls.initiate[0][0], terminalA);
+  assert.equal(h.calls.initiate.length, 1);
+  assert.equal(h.calls.launch.length, 0);
+  assert.equal(h.store.isStatusScreenOpen, false);
+});
+
+test('terminal preflight network error clears authority without payment', async () => {
+  const h = terminalHarness(); await h.store.init();
+  h.mocks.fetch = async () => { throw Error('offline'); };
+  await h.store.executePay();
+  assert.equal(h.store.order, null);
+  assert.equal(h.store.stateScreenType, 'error');
+  assert.equal(h.calls.initiate.length, 0);
+});
+
+test('malformed tag paths never fall back to query IDs or demo invoices', async () => {
+  const h = harness({ dev: true, url: 'http://localhost/tag/bad/path?id=order-a&demo=table' });
+  h.mocks.load = () => { throw Error('alias fallback forbidden'); };
+  await h.store.init();
+  assert.equal(h.store.order, null);
+  assert.equal(h.store.stateScreenType, 'error');
+  assert.equal(h.calls.fetch.length, 0);
+});
 
 test('offline cached orders and last order IDs are never consulted', async () => {
   for (const url of ['https://checkout.invalid/pay/?id=order-a', 'https://checkout.invalid/pay/']) {

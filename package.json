@@ -33,6 +33,10 @@
 		"test:conf": "npm --prefix apps/conf run test",
 		"generate:processes": "node --experimental-strip-types scripts/generate-process-manifest.ts",
 		"build": "npm run generate:processes && vite build && npm run build:docs",
+		"build:dashboard:isolated": "npm run generate:processes && vite build --mode dashboard-isolated && node scripts/assert-dashboard-isolated-build.mjs",
+		"check:dashboard:isolated": "npm --prefix worker run check:dashboard:isolated",
+		"deploy:dashboard:isolated": "npm run build:dashboard:isolated && npm run check:dashboard:isolated && npm --prefix worker run deploy:dashboard:isolated",
+		"test:dashboard:isolated": "node --experimental-strip-types --test scripts/assert-dashboard-isolated-build.test.mjs worker/src/dashboard.test.mjs",
 		"build:docs": "node scripts/copy-api-docs.mjs",
 		"preview": "vite preview",
 		"audit:openapi": "node --experimental-strip-types scripts/audit-openapi-coverage.ts",
@@ -55,7 +59,9 @@
 		"worker:deploy:dashboard:production": "npm --prefix worker run deploy:dashboard:production",
 		"worker:deploy:corex:production": "npm --prefix worker run deploy:corex:production",
 		"worker:deploy:conf:production": "npm --prefix worker run deploy:conf:production",
-		"deploy:production": "node scripts/deploy-production.mjs"
+		"deploy:production": "node scripts/deploy-production.mjs",
+		"rakhunok:check": "npm --prefix worker-rakhunok run check:all",
+		"rakhunok:deploy": "node scripts/deploy-rakhunok.mjs"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

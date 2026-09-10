@@ -27,6 +27,7 @@ export const demoInvoices: InvoiceRecord[] = Array.from({ length: 24 }, (_, inde
 		currency: 'UAH',
 		tableNumber: type === 'table' ? (index % 12) + 1 : null,
 		terminalId: type === 'table' ? `terminal-${(index % 4) + 1}` : null,
+		terminalCode: type === 'table' ? `table-${(index % 4) + 1}` : null,
 		paidAt: source.status === 'paid' ? createdAt : null,
 		paidBankCode: source.status === 'paid' ? 'UNJS' : null,
 		expiresAt: new Date(new Date(createdAt).getTime() + 7 * 86_400_000).toISOString()

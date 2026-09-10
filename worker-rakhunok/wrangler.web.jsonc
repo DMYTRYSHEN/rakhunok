@@ -1,0 +1,28 @@
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "rakhunok-web",
+	"main": "../worker/src/index.ts",
+	"compatibility_date": "2026-08-28",
+	"workers_dev": false,
+	"preview_urls": false,
+	"assets": {
+		"directory": "../build",
+		"binding": "ASSETS",
+		"run_worker_first": true,
+		"not_found_handling": "single-page-application"
+	},
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
+	"routes": [
+		{
+			"pattern": "rakhunok.com/*",
+			"zone_name": "rakhunok.com"
+		},
+		{
+			"pattern": "www.rakhunok.com/*",
+			"zone_name": "rakhunok.com"
+		}
+	]
+}

@@ -192,6 +192,17 @@
 								>
 							</div>
 						{/if}
+						{#if order.status === 'paid'}
+							<div class="mt-2">
+								<button
+									type="button"
+									onclick={() => openDraft(terminal.id)}
+									class="inline-flex min-h-9 items-center gap-2 rounded-md bg-zinc-900 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700"
+								>
+									<Banknote size={15} aria-hidden="true" /> Нове замовлення (чернетка)
+								</button>
+							</div>
+						{/if}
 					{:else}
 						<div class="mt-6">
 							<p class="text-sm font-bold text-emerald-700">Вільно</p>
@@ -202,7 +213,7 @@
 							onclick={() => openDraft(terminal.id)}
 							class="mt-5 inline-flex h-9 items-center gap-2 rounded-md bg-zinc-900 px-3 text-xs font-bold text-white hover:bg-blue-700"
 						>
-							<Banknote size={15} aria-hidden="true" /> Чернетка замовлення
+							<Banknote size={15} aria-hidden="true" /> Нове замовлення (чернетка)
 						</button>
 					{/if}
 				</article>

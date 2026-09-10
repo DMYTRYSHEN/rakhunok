@@ -73,6 +73,15 @@ async function fetchCheckoutShell(request, env, url) {
 			}
 		}
 	}
+	// A terminal alias is never an order-cache key or an injected invoice.
+	// The browser resolves its active selection through the separately owned API.
+	if (/^\/tag\//i.test(url.pathname)) {
+		const headers = new Headers(assetResponse.headers);
+		headers.set('Cache-Control', 'no-store');
+		headers.delete('ETag');
+		headers.delete('Last-Modified');
+		return new Response(assetResponse.body, { status: assetResponse.status, headers });
+	}
 	const orderId = resolveCheckoutId(url);
 
 	if (request.method !== 'GET' || !orderId || !assetResponse.ok) return assetResponse;

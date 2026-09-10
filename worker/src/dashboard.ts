@@ -14,7 +14,12 @@ function isDashboardApiPath(pathname: string): boolean {
 }
 
 function isDashboardAsset(pathname: string): boolean {
-	return pathname.startsWith('/_app/') || pathname === '/favicon.ico';
+	return (
+		pathname === '/dashboard/_app' ||
+		pathname.startsWith('/dashboard/_app/') ||
+		pathname.startsWith('/_app/') ||
+		pathname === '/favicon.ico'
+	);
 }
 
 function json(data: unknown, init: ResponseInit = {}): Response {
@@ -49,13 +54,13 @@ export async function routeDashboardRequest(request: Request, env: Env): Promise
 		return env.API.fetch(new Request(url, request));
 	}
 
+	if (isDashboardAsset(url.pathname)) {
+		return env.ASSETS.fetch(request);
+	}
+
 	if (isDashboardPath(url.pathname)) {
 		url.pathname = '/200';
 		return env.ASSETS.fetch(new Request(url, request));
-	}
-
-	if (isDashboardAsset(url.pathname)) {
-		return env.ASSETS.fetch(request);
 	}
 
 	return new Response('Not Found', {

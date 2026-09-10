@@ -1,0 +1,40 @@
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "rakhunok-corex",
+	"main": "../worker/src/corex.ts",
+	"compatibility_date": "2026-08-28",
+	"workers_dev": false,
+	"preview_urls": false,
+	"triggers": { "crons": ["* * * * *"] },
+	"workflows": [
+		{
+			"name": "rakhunok-corex-process",
+			"binding": "COREX_PROCESS_WORKFLOW",
+			"class_name": "CorexProcessWorkflow"
+		}
+	],
+	"vars": {
+		"SUPABASE_URL": "https://mwaeazabpvbxqfrceogr.supabase.co",
+		"SUPABASE_PUBLISHABLE_KEY": "sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk"
+	},
+	"assets": {
+		"directory": "../build",
+		"binding": "ASSETS",
+		"run_worker_first": true,
+		"not_found_handling": "single-page-application"
+	},
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
+	"routes": [
+		{
+			"pattern": "rakhunok.com/corex",
+			"zone_name": "rakhunok.com"
+		},
+		{
+			"pattern": "rakhunok.com/corex/*",
+			"zone_name": "rakhunok.com"
+		}
+	]
+}

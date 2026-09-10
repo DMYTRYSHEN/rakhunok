@@ -42,8 +42,8 @@
 	const loadInvoiceList = lazyModule(() => import('./invoices/InvoiceList.svelte'));
 	const loadInvoiceCreate = lazyModule(() => import('./invoices/InvoiceCreate.svelte'));
 	const loadDashboardSettings = lazyModule(() => import('./settings/DashboardSettings.svelte'));
-	const loadInvoiceRulesSettings = lazyModule(
-		() => import('./invoice-rules/InvoiceRulesSettings.svelte')
+	const loadBusinessSettingsWorkspace = lazyModule(
+		() => import('./business-settings/BusinessSettingsWorkspace.svelte')
 	);
 	const loadPaymentMethodsSettings = lazyModule(
 		() => import('./payment-methods/PaymentMethodsSettings.svelte')
@@ -84,7 +84,7 @@
 			invoices: loadInvoiceList,
 			invoice: loadInvoiceDetail,
 			'invoice-create': loadInvoiceCreate,
-			'invoice-rules': loadInvoiceRulesSettings,
+			'invoice-rules': loadBusinessSettingsWorkspace,
 			'payment-methods': loadPaymentMethodsSettings,
 			'public-page': loadPublicPageSettings,
 			pos: loadPosBoard,
@@ -138,6 +138,16 @@
 						taxId: '1234567890',
 						bankName: 'Demo Bank',
 						iban: 'UA123456789012345678901234567',
+						isActive: true
+					},
+					{
+						id: 'demo-entity-tov',
+						businessType: 'tov',
+						businessName: 'ТОВ «Демо магазин»',
+						displayName: 'ТОВ «Демо магазин»',
+						taxId: '12345678',
+						bankName: 'Demo Bank',
+						iban: '',
 						isActive: true
 					}
 				],
@@ -225,8 +235,6 @@
 		if (
 			view === 'overview' ||
 			view === 'settings' ||
-			view === 'invoice-rules' ||
-			view === 'payment-methods' ||
 			view === 'public-page' ||
 			view === 'team' ||
 			view === 'developer-api' ||
@@ -239,7 +247,7 @@
 		contentError = null;
 
 		try {
-			if (view === 'structure') {
+			if (view === 'structure' || view === 'invoice-rules' || view === 'payment-methods') {
 				await refreshStructure();
 			} else if (view === 'invoice-create') {
 				await Promise.all([refreshPosBoard(), refreshStructure()]);
@@ -651,6 +659,7 @@
 				<module.default
 					terminals={posBoard.terminals}
 					entities={structureData.entities}
+					businessContext={{ userId: sessionState.user.id, merchantId: sessionState.merchant.id, name: sessionState.merchant.displayName }}
 					onCreate={createInvoice}
 					demo={sessionState.user.id === 'demo-user'}
 				/>
@@ -660,9 +669,21 @@
 				<module.default {tableOrderTtlSeconds} onSave={saveTableOrderTtlSeconds} />
 			{/await}
 		{:else if view === 'invoice-rules'}
-			{#await loadInvoiceRulesSettings() then module}<module.default />{/await}
+			{#await loadBusinessSettingsWorkspace() then module}
+				{#key `${sessionState.user.id}:${sessionState.merchant.id}`}
+					<module.default merchant={sessionState.merchant} entities={structureData.entities} userId={sessionState.user.id} demo={sessionState.user.id === 'demo-user'} view="invoice-rules" />
+				{/key}
+			{/await}
 		{:else if view === 'payment-methods'}
-			{#await loadPaymentMethodsSettings() then module}<module.default />{/await}
+			{#await loadBusinessSettingsWorkspace() then module}
+				{#key `${sessionState.user.id}:${sessionState.merchant.id}`}
+					<module.default merchant={sessionState.merchant} entities={structureData.entities} userId={sessionState.user.id} demo={sessionState.user.id === 'demo-user'} view="payment-methods" />
+				{/key}
+			{/await}
+			<details class="mx-auto max-w-7xl rounded-xl border border-zinc-200 p-5">
+				<summary class="cursor-pointer font-bold">Картки та гаманці · інтеграції ще не активовані</summary>
+				<div class="mt-6">{#await loadPaymentMethodsSettings() then module}<module.default />{/await}</div>
+			</details>
 		{:else if view === 'public-page'}
 			{#await loadPublicPageSettings() then module}<module.default />{/await}
 		{:else if view === 'team'}
@@ -674,6 +695,14 @@
 		{:else if view === 'sandbox'}
 			{#await loadPaymentSandbox() then module}<module.default />{/await}
 		{:else if view === 'structure'}
+			{#await loadBusinessSettingsWorkspace() then module}
+				{#key `${sessionState.user.id}:${sessionState.merchant.id}`}
+					<module.default merchant={sessionState.merchant} entities={structureData.entities} userId={sessionState.user.id} demo={sessionState.user.id === 'demo-user'} view="structure" />
+				{/key}
+			{/await}
+			<details class="mx-auto max-w-7xl rounded-xl border border-zinc-200 p-5">
+				<summary class="cursor-pointer font-bold">Юридичні реквізити та робочі місця · керування записами</summary>
+				<div class="mt-6">
 			{#await loadBusinessStructure()}
 				<DashboardStateScreen loading />
 			{:then module}
@@ -690,6 +719,8 @@
 					onDeleteTerminal={deleteTerminal}
 				/>
 			{/await}
+				</div>
+			</details>
 		{:else if selectedInvoice}
 			{#await loadInvoiceDetail()}
 				<DashboardStateScreen loading />

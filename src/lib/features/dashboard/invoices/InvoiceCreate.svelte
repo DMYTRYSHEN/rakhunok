@@ -34,6 +34,8 @@
 	} from '../invoice-rules/invoice-rules';
 	import type { BusinessEntity, InvoiceCreateInput, InvoiceType, PosTerminal } from '../types';
 	import { formatMoney } from '../utils/format';
+	import InvoiceBusinessPreview from '../business-settings/InvoiceBusinessPreview.svelte';
+	import { settingsHref } from '../business-settings/business-settings';
 
 	type Scenario = {
 		id: InvoiceType;
@@ -45,11 +47,13 @@
 	let {
 		terminals: initialTerminals,
 		entities = [],
+		businessContext,
 		onCreate,
 		demo = false
 	}: {
 		terminals: PosTerminal[];
 		entities?: BusinessEntity[];
+		businessContext?: { userId: string; merchantId: string; name: string };
 		onCreate?: (input: InvoiceCreateInput) => Promise<{ id: string }>;
 		demo?: boolean;
 	} = $props();
@@ -360,7 +364,7 @@
 						<h2 class="mt-1 text-base font-extrabold">{selectedScenario.name}</h2>
 					</div>
 					<a
-						href={resolve(demo ? '/dashboard/invoice-rules?demo=1' : '/dashboard/invoice-rules')}
+						href={resolve(settingsHref('invoice-rules', selectedEntityId, demo) as '/')}
 						class="inline-flex items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-200"
 						><Settings2 size={14} aria-hidden="true" /> Правила</a
 					>
@@ -370,10 +374,10 @@
 					<div class="sm:col-span-2 space-y-2">
 						<div class="flex items-center justify-between">
 							<label for="entity-select" class="block text-xs font-bold text-zinc-600">
-								Отримувач коштів
+								Юридичний продавець · поточний отримувач
 							</label>
 							<a
-								href={resolve(demo ? '/dashboard/structure?demo=1' : '/dashboard/structure')}
+								href={resolve(settingsHref('structure', selectedEntityId, demo) as '/')}
 								class="text-xs font-medium text-blue-600 hover:text-blue-800"
 							>
 								Структура бізнесу →
@@ -427,6 +431,14 @@
 							</div>
 						{/if}
 					</div>
+
+					{#if selectedEntity && businessContext}
+						<div class="min-w-0 sm:col-span-2">
+							{#key `${businessContext.userId}:${businessContext.merchantId}`}
+								<InvoiceBusinessPreview entity={selectedEntity} context={businessContext} {demo} />
+							{/key}
+						</div>
+					{/if}
 
 					<label>
 						<span class="mb-2 block text-xs font-bold text-zinc-600">Номер рахунку</span>

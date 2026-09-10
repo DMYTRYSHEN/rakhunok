@@ -4,6 +4,8 @@ import { resolveScenario } from '../config/scenarios.js';
 import { fetchBanksCatalog, fetchCheckoutOrder, initiateBankPayment } from '../services/api.js';
 import { detectOS, launchDeepLink } from '../services/deeplink.js';
 import { isOrderFresh } from '../services/expiry.js';
+import { isTerminalPath, terminalCode, readTerminalSelection, matchesTerminalOrder } from '../services/terminal-authority.js';
+import type { TerminalSelection } from '../services/terminal-authority.js';
 import { executeTurnstile } from '../services/turnstile.js';
 import type { Bank } from '../types/bank.js';
 import type { DeliveryDetails, FiscalReceipt, LoyaltyCard, Order, OrderItem, PlatformSplit, Terminal, UpsellItem } from '../types/order.js';
@@ -29,6 +31,7 @@ export function round2(n: number): number {
 
 function getInitialOrderFromWindow(): Order | null {
   if (typeof window !== 'undefined') {
+    if (isTerminalPath(window.location.pathname)) return null;
     const win = window as unknown as { __INITIAL_ORDER__?: Order };
     if (win.__INITIAL_ORDER__ && typeof win.__INITIAL_ORDER__ === 'object' && win.__INITIAL_ORDER__.id) {
       return win.__INITIAL_ORDER__;
@@ -44,6 +47,11 @@ class CheckoutStore {
   orderId = $state<string>(initialOrderStatic?.id || 'demo-1');
   forcedScenario = $state<string>('');
   terminal = $state<Terminal | null>(initialOrderStatic?._terminal || null);
+  terminalMode = $state(typeof window !== 'undefined' && isTerminalPath(window.location.pathname));
+  private terminalSelection: TerminalSelection | null = null;
+  private terminalTimer: ReturnType<typeof setInterval> | null = null;
+  private terminalRead = 0;
+  private terminalBusy = false;
   legacyTtlMinutes = $state<number>(30);
 
   // Status
@@ -335,7 +343,7 @@ class CheckoutStore {
   resolvedScenario = $derived.by<ResolvedScenario>(() => {
     return resolveScenario(
       this.order,
-      this.terminal ? 'table' : this.forcedScenario,
+      this.terminalMode || this.terminal ? 'table' : this.forcedScenario,
       (typeof window !== 'undefined' &&
         (window as unknown as { __CHECKOUT_SCENARIOS__?: Record<string, Partial<ScenarioDefinition>> })
           .__CHECKOUT_SCENARIOS__) ||
@@ -668,8 +676,98 @@ class CheckoutStore {
   }
 
 
+  private clearTerminalOrder(error = false): void {
+    this.paymentAttempt++;
+    this.stopPolling?.();
+    this.isProcessingPayment = false;
+    this.terminalSelection = null;
+    this.order = null;
+    this.orderId = '';
+    this.orderItems = [];
+    this.upsellItems = [];
+    this.tipAmount = 0;
+    this.tipPercentage = null;
+    this.splitMode = 'none';
+    this.splitCustomAmount = 0;
+    this.keypadValue = '';
+    this.isRoundUpActive = false;
+    this.useBonuses = false;
+    this.loyaltyCard = null;
+    this.availableBonusPoints = 0;
+    this.promoApplied = false;
+    this.promoDiscount = 0;
+    this.delivery = { name: '', phone: '', method: 'branch', city: '', branch: '', price: 0 };
+    this.closePaymentSheet();
+    this.isActionSheetOpen = false;
+    this.isStatusScreenOpen = false;
+    this.isFiscalReceiptOpen = false;
+    this.isBnplSheetOpen = false;
+    this.isNpTrackingOpen = false;
+    this.isLoyaltyScannerOpen = false;
+    this.statusState = 'pending';
+    this.stateScreenType = error ? 'error' : 'loading';
+    this.errorTitle = 'Не вдалося перевірити рахунок';
+    this.errorMessage = 'Перевірте з’єднання. Актуальний рахунок з’явиться після повторної перевірки.';
+    this.isLoaded = true;
+  }
+
+  async refreshTerminal(): Promise<void> {
+    if (!this.terminalMode || this.terminalBusy) return;
+    const session = this.session;
+    const read = ++this.terminalRead;
+    const location = window.location.href;
+    const current = () => this.terminalMode && session === this.session &&
+      read === this.terminalRead && window.location.href === location;
+    this.terminalBusy = true;
+    try {
+      const selection = await readTerminalSelection(terminalCode(window.location.pathname));
+      if (!current()) return;
+      this.terminal = selection.terminal;
+      if (selection.kind === 'idle') {
+        this.clearTerminalOrder();
+        return;
+      }
+      if (this.terminalSelection && matchesTerminalOrder(selection, this.order)) {
+        this.terminalSelection = selection;
+        return;
+      }
+      // Revoke A before awaiting detail for B (also invalidates in-flight payment).
+      this.clearTerminalOrder();
+      const result = await fetchCheckoutOrder(selection.order!.id, { apiBase: '' });
+      if (!current()) return;
+      if (!matchesTerminalOrder(selection, result.order)) throw new Error('Terminal detail mismatch');
+      // Selection can roll over while the canonical detail request is in flight.
+      const confirmed = await readTerminalSelection(selection.terminal.code);
+      if (!current()) return;
+      if (!matchesTerminalOrder(confirmed, result.order)) throw new Error('Terminal selection changed');
+      this.terminalSelection = confirmed;
+      this.order = result.order;
+      this.orderId = result.order!.id;
+      this.orderItems = result.order!.items || [];
+      this.upsellItems = result.order!.upsells || [];
+      this.availableBonusPoints = result.order!.available_bonuses || 0;
+      this.loyaltyCard = result.order!.loyalty_card || null;
+      this.stateScreenType = 'loading';
+      this.isLoaded = true;
+    } catch {
+      if (current()) this.clearTerminalOrder(true);
+    } finally {
+      if (read === this.terminalRead) this.terminalBusy = false;
+    }
+  }
+
+  disposeTerminal(): void {
+    if (this.terminalTimer) clearInterval(this.terminalTimer);
+    this.terminalTimer = null;
+    this.terminalRead++;
+    this.terminalBusy = false;
+    if (this.terminalMode) this.clearTerminalOrder();
+  }
+
   async init(): Promise<void> {
     if (typeof window === 'undefined') return;
+    this.disposeTerminal();
+    this.terminalMode = isTerminalPath(window.location.pathname);
     const session = ++this.session;
     this.paymentAttempt++;
     this.stopPolling?.();
@@ -699,6 +797,23 @@ class CheckoutStore {
         this.banks = list;
       }
     }).catch(() => { /* Keep bundled catalog on failure. */ });
+
+    if (this.terminalMode) {
+      this.forcedScenario = '';
+      this.orderId = '';
+      this.stateScreenType = 'loading';
+      let ticks = 0;
+      this.terminalTimer = setInterval(() => {
+        if (this.order && this.terminalSelection && !matchesTerminalOrder(this.terminalSelection, this.order)) {
+          this.terminalRead++;
+          this.terminalBusy = false;
+          this.clearTerminalOrder(true);
+        }
+        if (++ticks % 2 === 0) void this.refreshTerminal();
+      }, 1000);
+      await this.refreshTerminal();
+      return;
+    }
 
     const params = new URLSearchParams(window.location.search);
     this.forcedScenario = (
@@ -1351,6 +1466,7 @@ class CheckoutStore {
     const order = this.order;
     return Boolean(
       this.isLoaded && order && order.id === this.orderId && this.orderId &&
+      (!this.terminalMode || (this.terminalSelection && matchesTerminalOrder(this.terminalSelection, order))) &&
       !this.forcedScenario && !/^(demo-|term-|profile-)/i.test(this.orderId) &&
       order.status === 'pending' && isOrderFresh(order) &&
       Number.isFinite(order.total_amount) && order.total_amount > 0 &&
@@ -1384,6 +1500,20 @@ class CheckoutStore {
       this.stopPolling?.();
       const token = await executeTurnstile('pay');
       if (!unchanged()) return;
+      if (this.terminalMode) {
+        try {
+          const selected = await readTerminalSelection(terminalCode(window.location.pathname));
+          if (!unchanged()) return;
+          if (!matchesTerminalOrder(selected, order)) throw new Error('Terminal selection changed');
+        } catch {
+          if (unchanged()) {
+            this.terminalRead++;
+            this.terminalBusy = false;
+            this.clearTerminalOrder(true);
+          }
+          return;
+        }
+      }
       const clientOS = detectOS();
       const result = await initiateBankPayment(orderId, bankCode, amount, {
         os: clientOS,
@@ -1399,7 +1529,7 @@ class CheckoutStore {
       this.closePaymentSheet();
       this.statusState = 'pending';
       this.isStatusScreenOpen = true;
-      this.startStatusPolling();
+      if (!this.terminalMode) this.startStatusPolling();
     } catch (err: unknown) {
       if (!ownsAttempt() || this.order !== order || this.orderId !== orderId || window.location.href !== location) return;
       const msg = err instanceof Error ? err.message : 'Помилка ініціалізації платежу';
@@ -1410,6 +1540,7 @@ class CheckoutStore {
   }
 
   startStatusPolling(): void {
+    if (this.terminalMode) return;
     this.stopPolling?.();
     if (!this.isPayable()) return;
     const order = this.order!;

@@ -1,0 +1,36 @@
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "rakhunok-checkout",
+	"main": "../worker/src/checkout.js",
+	"compatibility_date": "2026-08-28",
+	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": false,
+	"preview_urls": false,
+	"assets": {
+		"directory": "../apps/pay/dist",
+		"binding": "ASSETS",
+		"run_worker_first": true
+	},
+	"kv_namespaces": [
+		{ "binding": "ORDERS_KV", "id": "0c5bedeab0064a54882319a5f810306c" }
+	],
+	"services": [
+		{ "binding": "API", "service": "rahunok" }
+	],
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
+	"routes": [
+		{ "pattern": "rakhunok.com/checkout*", "zone_name": "rakhunok.com" },
+		{ "pattern": "rakhunok.com/o/*", "zone_name": "rakhunok.com" },
+		{ "pattern": "rakhunok.com/t/*", "zone_name": "rakhunok.com" },
+		{ "pattern": "rakhunok.com/tag/*", "zone_name": "rakhunok.com" },
+		{ "pattern": "rakhunok.com/pos/*", "zone_name": "rakhunok.com" },
+		{ "pattern": "rakhunok.com/pay", "zone_name": "rakhunok.com" },
+		{ "pattern": "rakhunok.com/pay/*", "zone_name": "rakhunok.com" },
+		{ "pattern": "rakhunok.com/api/v1/checkout*", "zone_name": "rakhunok.com" },
+		{ "pattern": "rakhunok.com/api/v1/banks*", "zone_name": "rakhunok.com" },
+		{ "pattern": "rakhunok.com/api/v1/logos*", "zone_name": "rakhunok.com" }
+	]
+}

@@ -40,6 +40,7 @@ export function createCheckoutSync(options: SyncOptions) {
   let disposed = false;
   let inaccessible = false;
   let started = false;
+  let active = true;
   let failed = false;
   let failures = 0;
   let pending = false;
@@ -80,7 +81,7 @@ export function createCheckoutSync(options: SyncOptions) {
   }
   function schedulePoll() {
     cancelPoll?.();
-    if (disposed || inaccessible || !online || !visible || !started) return;
+    if (disposed || inaccessible || !online || !visible || !started || !active) return;
     const base = Math.min(maxBackoffMs, pollMs * 2 ** Math.min(failures, 10));
     const sample = options.random?.() ?? 0.5;
     const jitter = Number.isFinite(sample) ? Math.max(0, Math.min(1, sample)) : 0.5;
@@ -105,7 +106,7 @@ export function createCheckoutSync(options: SyncOptions) {
     else schedulePoll();
   }
   function refresh(): Promise<boolean> {
-    if (!started || disposed || inaccessible || !online || !visible) return Promise.resolve(false);
+    if (!started || !active || disposed || inaccessible || !online || !visible) return Promise.resolve(false);
     if (flight) { pending = true; return flight.promise; }
     cancelPoll?.();
     const id = ++sequence;
@@ -158,9 +159,10 @@ export function createCheckoutSync(options: SyncOptions) {
 
   return {
     view,
-    start(bootstrap?: unknown) {
+    start(bootstrap?: unknown, activate = true) {
       if (started || disposed) throw new Error('Sync lifecycle already started or disposed');
       started = true;
+      active = activate;
       if (bootstrap !== undefined) {
         try {
           const initial = decodeSnapshot(bootstrap);
@@ -173,6 +175,17 @@ export function createCheckoutSync(options: SyncOptions) {
       emit(); return refresh();
     },
     refresh,
+    setActive(value: boolean): Promise<boolean> {
+      if (!started || disposed || inaccessible) return Promise.resolve(false);
+      if (active === value) return value ? refresh() : Promise.resolve(false);
+      active = value;
+      pending = false;
+      cancelPoll?.();
+      invalidate();
+      stopFlight();
+      emit();
+      return value ? refresh() : Promise.resolve(false);
+    },
     notify(value: unknown) {
       if (!started || disposed || inaccessible) return;
       let change;
@@ -195,7 +208,7 @@ export function createCheckoutSync(options: SyncOptions) {
       const expected = snapshot?.order;
       if (!expected || snapshot?.state !== 'payable') return null;
       // Never join a read started before this user's payment action.
-      if (flight) { await flight.promise; }
+      if (flight && !await flight.promise) return null;
       const ok = await refresh();
       if (!ok || !view().canInitiate || !snapshot?.order || snapshot.order.id !== expected.id || snapshot.order.revision !== expected.revision) return null;
       return Object.freeze({ orderId: snapshot.order.id, orderRevision: snapshot.order.revision });

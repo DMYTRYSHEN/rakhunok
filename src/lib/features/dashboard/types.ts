@@ -72,6 +72,7 @@ export type InvoiceRecord = InvoiceSummary & {
 	currency: string;
 	tableNumber: number | null;
 	terminalId: string | null;
+	terminalCode?: string | null;
 	paidAt: string | null;
 	paidBankCode: string | null;
 	expiresAt: string | null;

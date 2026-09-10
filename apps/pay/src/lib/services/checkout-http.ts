@@ -5,17 +5,21 @@ import type { CheckoutReader } from './checkout-sync';
 export async function boundedJson(response: Response): Promise<unknown> {
   const reader = response.body?.getReader();
   if (!reader) throw new Error('empty_response');
-  const chunks: Uint8Array[] = []; let length = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    length += value.length;
-    if (length > 65536) { await reader.cancel(); throw new Error('response_too_large'); }
-    chunks.push(value);
+  try {
+    const chunks: Uint8Array[] = []; let length = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.length;
+      if (length > 65536) { await reader.cancel(); throw new Error('response_too_large'); }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(length); let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  } finally {
+    reader.releaseLock();
   }
-  const bytes = new Uint8Array(length); let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
 }
 export function checkoutHttpReader(resource: Resource, token: string, fetcher = fetch): CheckoutReader {
   const scope = decodeResource(resource);

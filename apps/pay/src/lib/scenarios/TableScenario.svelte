@@ -88,7 +88,7 @@
   }
 
   $effect(() => {
-    if (checkout.terminal) {
+    if (checkout.terminal && !checkout.terminalMode) {
       const stopSync = startTableSync(
         checkout.terminal,
         checkout.legacyTtlMinutes,
@@ -122,6 +122,10 @@
   function handleManualRefresh(): void {
     vibrate(10);
     isRefreshing = true;
+    if (checkout.terminalMode) {
+      void checkout.refreshTerminal().finally(() => { isRefreshing = false; });
+      return;
+    }
     setTimeout(() => {
       isRefreshing = false;
       checkout.showToast('Статус столика синхронізовано з POS');

@@ -138,9 +138,9 @@
 		if (event.key !== 'Tab') return;
 		const focusable = Array.from(
 			container.querySelectorAll<HTMLElement>(
-				'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+				'a[href], summary, button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 			)
-		).filter((element) => !element.hidden);
+		).filter((element) => !element.hidden && element.getClientRects().length > 0);
 		const first = focusable[0];
 		const last = focusable.at(-1);
 		if (!first || !last) return;
@@ -358,36 +358,45 @@
 			<p class="mt-7 px-3 pb-2 text-[0.625rem] font-bold tracking-[0.14em] text-zinc-500 uppercase">
 				Керування
 			</p>
-			<a
-				href={resolve(demo ? '/dashboard/structure?demo=1' : '/dashboard/structure')}
-				onclick={() => (menuOpen = false)}
-				aria-current={activeSection === 'structure' ? 'page' : undefined}
-				class:nav-active={activeSection === 'structure'}
-				class="flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-semibold text-zinc-400 hover:text-white"
-			>
-				<HugeiconsIcon icon={Building03Icon} size={17} aria-hidden="true" />
-				Структура бізнесу
-			</a>
-			<a
-				href={resolve(demo ? '/dashboard/invoice-rules?demo=1' : '/dashboard/invoice-rules')}
-				onclick={() => (menuOpen = false)}
-				aria-current={activeSection === 'invoice-rules' ? 'page' : undefined}
-				class:nav-active={activeSection === 'invoice-rules'}
-				class="mt-1 flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-semibold text-zinc-400 hover:text-white"
-			>
-				<HugeiconsIcon icon={Scroll01Icon} size={17} aria-hidden="true" />
-				Правила рахунків
-			</a>
-			<a
-				href={resolve(demo ? '/dashboard/payment-methods?demo=1' : '/dashboard/payment-methods')}
-				onclick={() => (menuOpen = false)}
-				aria-current={activeSection === 'payment-methods' ? 'page' : undefined}
-				class:nav-active={activeSection === 'payment-methods'}
-				class="mt-1 flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-semibold text-zinc-400 hover:text-white"
-			>
-				<HugeiconsIcon icon={WalletCardsIcon} size={17} aria-hidden="true" />
-				Способи оплати
-			</a>
+			<details open class="group/business">
+				<summary class="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-md px-3 text-sm font-semibold text-zinc-300 hover:bg-white/7 hover:text-white [&::-webkit-details-marker]:hidden">
+					<HugeiconsIcon icon={Building03Icon} size={17} className="shrink-0" aria-hidden="true" />
+					<span class="min-w-0 flex-1">Налаштування бізнесу</span>
+					<HugeiconsIcon icon={ArrowDown01Icon} size={16} className="shrink-0 transition-transform group-open/business:rotate-180" aria-hidden="true" />
+				</summary>
+				<div class="mt-1 ml-5 space-y-0.5 border-l border-white/10 py-1 pl-2">
+					<a
+						href={resolve(demo ? '/dashboard/structure?demo=1' : '/dashboard/structure')}
+						onclick={() => (menuOpen = false)}
+						aria-current={activeSection === 'structure' ? 'page' : undefined}
+						class:nav-active={activeSection === 'structure'}
+						class="flex min-h-10 items-center gap-2 rounded-md px-2.5 text-xs font-semibold text-zinc-400 hover:bg-white/7 hover:text-white"
+					>
+						<HugeiconsIcon icon={Building03Icon} size={15} className="shrink-0" aria-hidden="true" />
+						Структура бізнесу
+					</a>
+					<a
+						href={resolve(demo ? '/dashboard/invoice-rules?demo=1' : '/dashboard/invoice-rules')}
+						onclick={() => (menuOpen = false)}
+						aria-current={activeSection === 'invoice-rules' ? 'page' : undefined}
+						class:nav-active={activeSection === 'invoice-rules'}
+						class="flex min-h-10 items-center gap-2 rounded-md px-2.5 text-xs font-semibold text-zinc-400 hover:bg-white/7 hover:text-white"
+					>
+						<HugeiconsIcon icon={Scroll01Icon} size={15} className="shrink-0" aria-hidden="true" />
+						Правила рахунків
+					</a>
+					<a
+						href={resolve(demo ? '/dashboard/payment-methods?demo=1' : '/dashboard/payment-methods')}
+						onclick={() => (menuOpen = false)}
+						aria-current={activeSection === 'payment-methods' ? 'page' : undefined}
+						class:nav-active={activeSection === 'payment-methods'}
+						class="flex min-h-10 items-center gap-2 rounded-md px-2.5 text-xs font-semibold text-zinc-400 hover:bg-white/7 hover:text-white"
+					>
+						<HugeiconsIcon icon={WalletCardsIcon} size={15} className="shrink-0" aria-hidden="true" />
+						Приймання платежів
+					</a>
+				</div>
+			</details>
 			<a
 				href={resolve(demo ? '/dashboard/public-page?demo=1' : '/dashboard/public-page')}
 				onclick={() => (menuOpen = false)}

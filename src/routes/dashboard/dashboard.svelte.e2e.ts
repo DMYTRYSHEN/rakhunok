@@ -270,28 +270,27 @@ test('renders invoice rows without horizontal scrolling on mobile', async ({ pag
 	await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll');
 });
 
-test('saves invoice rules and applies them without overwriting manual edits', async ({ page }) => {
+test('saves seller rules as drafts without applying them to invoice fields', async ({ page }) => {
 	await page.goto('/dashboard/invoice-rules?demo=1');
 
-	await page.getByRole('button', { name: /Самозайнята особа/ }).click();
-	await page.getByRole('textbox', { name: 'РНОКПП' }).fill('1234567890');
-	await page.getByRole('button', { name: 'Зберегти правила' }).click();
-	await expect(page.getByRole('button', { name: 'Правила збережено' })).toBeVisible();
+	await page.getByRole('combobox', { name: 'Продавець', exact: true }).selectOption('demo-entity');
+	await page.getByRole('textbox', { name: 'Префікс', exact: true }).fill('DRAFT');
+	await page.getByRole('button', { name: 'Зберегти всі чернетки' }).click();
+	await expect(page.getByRole('status')).toContainText('збережено лише в цьому браузері');
 
 	await page.goto('/dashboard/invoices/new?demo=1');
 	const reference = page.getByRole('textbox', { name: 'Номер рахунку' });
 	const purpose = page.getByRole('textbox', { name: 'Призначення платежу' });
-	await expect(reference).toHaveValue('RHK-2026-001049');
-	await expect(purpose).toHaveValue(/Оплата за товари\/послуги згідно рахунку RHK-2026-001049/);
-	await expect(page.getByText(/Автоматично за профілем: Самозайнята особа/)).toBeVisible();
+	await expect(reference).not.toHaveValue(/DRAFT/);
+	await expect(purpose).not.toHaveValue(/DRAFT/);
+	await expect(page.getByRole('complementary', { name: 'Чернетка налаштувань продавця' })).toContainText('DRAFT-000001');
 
 	await reference.fill('ВЛАСНИЙ-7');
 	await page.getByRole('button', { name: /Рахунок за столиком/ }).click();
 	await expect(reference).toHaveValue('ВЛАСНИЙ-7');
-	await expect(purpose).toHaveValue(/Оплата за послуги закладу/);
 
 	await page.getByRole('button', { name: 'Відновити за правилами' }).click();
-	await expect(reference).toHaveValue('RHK-2026-001049');
+	await expect(reference).not.toHaveValue(/DRAFT|ВЛАСНИЙ/);
 	await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll');
 });
 
@@ -309,7 +308,7 @@ test('opens the read-only POS board in demo mode', async ({ page }) => {
 	await expect(page.getByText('Очікує оплати')).toBeVisible();
 	await expect(page.getByText('Локальна демонстрація')).toBeVisible();
 
-	await page.getByRole('button', { name: 'Чернетка замовлення' }).first().click();
+	await page.getByRole('button', { name: 'Нове замовлення (чернетка)' }).first().click();
 	await expect(page.getByRole('region', { name: 'Чернетка замовлення' })).toBeVisible();
 	const servicePanel = page.getByRole('complementary', { name: 'Столи та обслуговування' });
 	await expect(servicePanel).toBeVisible();
@@ -336,9 +335,31 @@ test('keeps the POS route protected outside demo mode', async ({ page }) => {
 	await expect(page.getByRole('heading', { name: 'Робочі місця' })).not.toBeVisible();
 });
 
+test('starts a new draft below the receipt of a paid POS order', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/dashboard/pos?demo=1');
+	const paidCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Бар', exact: true }) });
+	const receipt = paidCard.getByRole('link', { name: 'Відкрити рахунок' });
+	const newDraft = paidCard.getByRole('button', { name: 'Нове замовлення (чернетка)', exact: true });
+	await expect(paidCard.getByText('Оплачено', { exact: true })).toBeVisible();
+	await expect(receipt).toBeVisible();
+	await expect(newDraft).toBeVisible();
+	const receiptBox = await receipt.boundingBox();
+	const draftBox = await newDraft.boundingBox();
+	expect(receiptBox).not.toBeNull();
+	expect(draftBox!.y).toBeGreaterThanOrEqual(receiptBox!.y + receiptBox!.height);
+	const pendingCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Стіл 2', exact: true }) });
+	await expect(pendingCard.getByRole('button', { name: 'Нове замовлення (чернетка)' })).toHaveCount(0);
+	await newDraft.click();
+	await expect(page.getByRole('region', { name: 'Чернетка замовлення' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Бар', exact: true })).toBeVisible();
+	await expect(page.getByTestId('pos-draft-total')).toHaveText(/0,00\s*(грн|₴)/);
+});
+
 test('previews the future Device Event Gateway for kasa workplaces', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/dashboard/structure?demo=1');
+	await page.getByText('Юридичні реквізити та робочі місця · керування записами', { exact: true }).click();
 	await page.getByRole('button', { name: /Робочі місця/ }).click();
 
 	const gateway = page.getByRole('region', { name: 'Device Event Gateway' });
@@ -363,7 +384,7 @@ test('previews the future Device Event Gateway for kasa workplaces', async ({ pa
 test('keeps the POS checkout usable on a phone', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/dashboard/pos?demo=1');
-	await page.getByRole('button', { name: 'Чернетка замовлення' }).first().click();
+	await page.getByRole('button', { name: 'Нове замовлення (чернетка)' }).first().click();
 
 	await expect(page.getByRole('region', { name: 'Чернетка замовлення' })).toBeVisible();
 	await expect(page.getByRole('complementary', { name: 'Столи та обслуговування' })).toBeHidden();
