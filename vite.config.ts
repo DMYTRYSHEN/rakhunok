@@ -74,6 +74,10 @@ export default defineConfig(({ mode }) => ({
 			allow: ['.']
 		},
 		proxy: {
+			'/conf': {
+				target: 'http://localhost:5176',
+				changeOrigin: true
+			},
 			'/dashboard/api': {
 				target: 'http://localhost:8787',
 				rewrite: (path) => path.slice('/dashboard'.length)

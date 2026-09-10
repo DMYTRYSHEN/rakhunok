@@ -1,6 +1,7 @@
 import { mockFlowEdges as deployEdges, mockFlowNodes as deployNodes } from './mock-flow';
 import { extendedFlowScenarios } from './extended-flow-scenarios';
 import { ksoSandboxScenario, ksoTargetScenario } from './kso-flow-scenarios';
+import { bankFlowScenarios } from './bank-flow-scenarios';
 import { generatedFlowScenarios } from './process-manifest';
 import type { FlowEdge, FlowNode, FlowNodeLayer, FlowScenario } from './types';
 
@@ -563,6 +564,7 @@ const deploy: FlowScenario = {
 export const rahunokFlowScenarios: FlowScenario[] = [
 	login,
 	...extendedFlowScenarios,
+	...bankFlowScenarios,
 	invoiceScenario('fixed'),
 	invoiceScenario('open_amount'),
 	tablePos,
