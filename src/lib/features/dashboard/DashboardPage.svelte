@@ -649,6 +649,15 @@
 				<module.default
 					{invoices}
 					onCancel={cancelInvoice}
+					onInvoicePaid={(invoiceId, bankCode) => {
+						const inv = invoices.find((i) => i.id === invoiceId);
+						if (inv) {
+							inv.status = 'paid';
+							inv.lifecycleStatus = 'paid';
+							inv.paidAt = new Date().toISOString();
+							inv.paidBankCode = bankCode;
+						}
+					}}
 					demo={sessionState.user.id === 'demo-user'}
 				/>
 			{/await}
@@ -682,7 +691,7 @@
 			{/await}
 			<details class="mx-auto max-w-7xl rounded-xl border border-zinc-200 p-5">
 				<summary class="cursor-pointer font-bold">Картки та гаманці · інтеграції ще не активовані</summary>
-				<div class="mt-6">{#await loadPaymentMethodsSettings() then module}<module.default />{/await}</div>
+				<div class="mt-6">{#await loadPaymentMethodsSettings() then module}<module.default entities={structureData.entities} />{/await}</div>
 			</details>
 		{:else if view === 'public-page'}
 			{#await loadPublicPageSettings() then module}<module.default />{/await}

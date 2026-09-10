@@ -29,6 +29,16 @@
 		type BankConnectionId,
 		type BankIntegrationConfig
 	} from './payment-methods';
+	import type { BusinessEntity } from '../types';
+
+	let { entities = [] }: { entities?: BusinessEntity[] } = $props();
+
+	// Official logos from /conf & Supabase banklink
+	const BANK_LOGOS: Record<BankConnectionId, string> = {
+		privatbank: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/31/94/f6/3194f6f5-1868-425b-ac5f-6bad596d5ad8/Placeholder.mill/200x200bb-75.webp',
+		'a-bank': 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/3a/76/1e/3a761e68-39dc-51ad-f189-e9d89227442c/Placeholder.mill/200x200bb-75.webp',
+		monobank: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/a7/06/5a/a7065ad9-93f8-5705-4b1a-81ade2916c05/Placeholder.mill/200x200bb-75.webp'
+	};
 
 	const statuses: { id: ProviderOnboardingStatus; label: string; detail: string }[] = [
 		{ id: 'not-started', label: 'Ще не починав', detail: 'Потрібна реєстрація у Tranzzo' },
@@ -57,6 +67,46 @@
 					? 3
 					: 2
 	);
+
+	/**
+	 * Pulls accounts from "Юридичні реквізити та робочі місця" with fallback to connection store
+	 */
+	function getAccountsForBank(bankId: BankConnectionId) {
+		if (entities && entities.length > 0) {
+			const matching = entities.filter((e) => {
+				const bankLower = (e.bankName || '').toLowerCase();
+				const ibanLower = (e.iban || '').toLowerCase();
+				if (bankId === 'privatbank') {
+					return bankLower.includes('приват') || bankLower.includes('pb') || ibanLower.includes('305299');
+				}
+				if (bankId === 'a-bank') {
+					return bankLower.includes('а-банк') || bankLower.includes('а банк') || bankLower.includes('a-bank') || ibanLower.includes('307770');
+				}
+				if (bankId === 'monobank') {
+					return bankLower.includes('моно') || bankLower.includes('mono') || bankLower.includes('універсал') || ibanLower.includes('322001');
+				}
+				return false;
+			});
+
+			if (matching.length > 0) {
+				return matching.map((e) => ({
+					iban: e.iban,
+					bankId,
+					currency: 'UAH',
+					name: `${e.businessName} (${e.displayName || e.taxId})`,
+					isActive: e.isActive ?? true,
+					source: 'structure' as const,
+					balanceFormatted: 'Синхронізується'
+				}));
+			}
+		}
+
+		// Fallback to bank-discovered accounts in storage
+		return (bankConnections[bankId]?.accounts || []).map((a) => ({
+			...a,
+			source: 'direct' as const
+		}));
+	}
 
 	function openBankConfig(bankId: BankConnectionId) {
 		activeModalBank = bankId;
@@ -205,7 +255,7 @@
 							</p>
 							<h2 class="mt-1 text-base font-extrabold">Банківські підключення</h2>
 							<p class="mt-1 text-sm leading-6 text-zinc-500">
-								Автоматична перевірка зарахувань за виписками без комісій карткового еквайрингу.
+								Автоматична перевірка зарахувань за виписками з офіційними логотипами та прив'язкою до реквізитів.
 							</p>
 						</div>
 						<div class="hidden sm:block">
@@ -222,9 +272,13 @@
 					<div class="p-5 sm:p-6">
 						<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 							<div class="flex items-start gap-4">
-								<span class="grid size-12 shrink-0 place-items-center rounded-lg bg-emerald-700 text-white font-black text-sm shadow-sm">
-									ПБ
-								</span>
+								<div class="relative size-12 shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-sm transition-transform hover:scale-105">
+									<img
+										src={BANK_LOGOS.privatbank}
+										alt="ПриватБанк"
+										class="size-full object-contain rounded-lg"
+									/>
+								</div>
 								<div>
 									<div class="flex items-center gap-2">
 										<h3 class="text-base font-bold text-zinc-900">ПриватБанк</h3>
@@ -274,11 +328,17 @@
 							</div>
 						</div>
 
-						<!-- Discovered accounts list -->
-						{#if bankConnections.privatbank.accounts.length > 0}
+						<!-- Discovered accounts list pulled from structure or direct -->
+						{@const pbAccounts = getAccountsForBank('privatbank')}
+						{#if pbAccounts.length > 0}
 							<div class="mt-4 space-y-2 rounded-md border border-zinc-100 bg-zinc-50/70 p-3">
-								<p class="text-[11px] font-bold tracking-wider text-zinc-400 uppercase">Активні рахунки для зарахування:</p>
-								{#each bankConnections.privatbank.accounts as acc (acc.iban)}
+								<div class="flex items-center justify-between text-[11px] font-bold tracking-wider text-zinc-500 uppercase">
+									<span>Активні рахунки для зарахування:</span>
+									<a href="/dashboard/structure" class="text-emerald-700 hover:underline">
+										Юридичні реквізити →
+									</a>
+								</div>
+								{#each pbAccounts as acc (acc.iban)}
 									<div class="flex items-center justify-between gap-3 text-xs">
 										<div class="flex items-center gap-2">
 											<input
@@ -290,6 +350,9 @@
 											<div>
 												<span class="font-mono font-bold text-zinc-800">{acc.iban}</span>
 												<span class="ml-2 text-zinc-500">({acc.name})</span>
+												{#if acc.source === 'structure'}
+													<span class="ml-1.5 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">З реквізитів</span>
+												{/if}
 											</div>
 										</div>
 										<span class="font-bold text-zinc-900">{acc.balanceFormatted || '—'}</span>
@@ -303,9 +366,13 @@
 					<div class="p-5 sm:p-6">
 						<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 							<div class="flex items-start gap-4">
-								<span class="grid size-12 shrink-0 place-items-center rounded-lg bg-emerald-500 text-zinc-950 font-black text-sm shadow-sm">
-									А24
-								</span>
+								<div class="relative size-12 shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-sm transition-transform hover:scale-105">
+									<img
+										src={BANK_LOGOS['a-bank']}
+										alt="А-Банк"
+										class="size-full object-contain rounded-lg"
+									/>
+								</div>
 								<div>
 									<div class="flex items-center gap-2">
 										<h3 class="text-base font-bold text-zinc-900">А-Банк</h3>
@@ -356,11 +423,17 @@
 							</div>
 						</div>
 
-						<!-- Discovered accounts list -->
-						{#if bankConnections['a-bank'].accounts.length > 0}
+						<!-- Discovered accounts list pulled from structure or direct -->
+						{@const abAccounts = getAccountsForBank('a-bank')}
+						{#if abAccounts.length > 0}
 							<div class="mt-4 space-y-2 rounded-md border border-zinc-100 bg-zinc-50/70 p-3">
-								<p class="text-[11px] font-bold tracking-wider text-zinc-400 uppercase">Активні рахунки для зарахування:</p>
-								{#each bankConnections['a-bank'].accounts as acc (acc.iban)}
+								<div class="flex items-center justify-between text-[11px] font-bold tracking-wider text-zinc-500 uppercase">
+									<span>Активні рахунки для зарахування:</span>
+									<a href="/dashboard/structure" class="text-emerald-700 hover:underline">
+										Юридичні реквізити →
+									</a>
+								</div>
+								{#each abAccounts as acc (acc.iban)}
 									<div class="flex items-center justify-between gap-3 text-xs">
 										<div class="flex items-center gap-2">
 											<input
@@ -372,6 +445,9 @@
 											<div>
 												<span class="font-mono font-bold text-zinc-800">{acc.iban}</span>
 												<span class="ml-2 text-zinc-500">({acc.name})</span>
+												{#if acc.source === 'structure'}
+													<span class="ml-1.5 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">З реквізитів</span>
+												{/if}
 											</div>
 										</div>
 										<span class="font-bold text-zinc-900">{acc.balanceFormatted || '—'}</span>
@@ -385,9 +461,13 @@
 					<div class="p-5 sm:p-6">
 						<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 							<div class="flex items-start gap-4">
-								<span class="grid size-12 shrink-0 place-items-center rounded-lg bg-zinc-950 text-white font-black text-sm shadow-sm">
-									mono
-								</span>
+								<div class="relative size-12 shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-sm transition-transform hover:scale-105">
+									<img
+										src={BANK_LOGOS.monobank}
+										alt="Monobank"
+										class="size-full object-contain rounded-lg"
+									/>
+								</div>
 								<div>
 									<div class="flex items-center gap-2">
 										<h3 class="text-base font-bold text-zinc-900">Monobank</h3>
@@ -437,11 +517,17 @@
 							</div>
 						</div>
 
-						<!-- Discovered accounts list -->
-						{#if bankConnections.monobank.accounts.length > 0}
+						<!-- Discovered accounts list pulled from structure or direct -->
+						{@const monoAccounts = getAccountsForBank('monobank')}
+						{#if monoAccounts.length > 0}
 							<div class="mt-4 space-y-2 rounded-md border border-zinc-100 bg-zinc-50/70 p-3">
-								<p class="text-[11px] font-bold tracking-wider text-zinc-400 uppercase">Активні рахунки для зарахування:</p>
-								{#each bankConnections.monobank.accounts as acc (acc.iban)}
+								<div class="flex items-center justify-between text-[11px] font-bold tracking-wider text-zinc-500 uppercase">
+									<span>Активні рахунки для зарахування:</span>
+									<a href="/dashboard/structure" class="text-emerald-700 hover:underline">
+										Юридичні реквізити →
+									</a>
+								</div>
+								{#each monoAccounts as acc (acc.iban)}
 									<div class="flex items-center justify-between gap-3 text-xs">
 										<div class="flex items-center gap-2">
 											<input
@@ -453,6 +539,9 @@
 											<div>
 												<span class="font-mono font-bold text-zinc-800">{acc.iban}</span>
 												<span class="ml-2 text-zinc-500">({acc.name})</span>
+												{#if acc.source === 'structure'}
+													<span class="ml-1.5 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">З реквізитів</span>
+												{/if}
 											</div>
 										</div>
 										<span class="font-bold text-zinc-900">{acc.balanceFormatted || '—'}</span>
@@ -589,11 +678,11 @@
 
 			<div class="border-t border-zinc-200 bg-zinc-50 p-5">
 				<a
-					href="/conf"
+					href="/dashboard/structure"
 					class="flex w-full items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-4 py-2.5 text-xs font-bold text-zinc-700 hover:bg-zinc-50 transition"
 				>
-					<span>Налаштування маршрутів у /conf</span>
-					<ExternalLink size={13} />
+					<Building2 size={14} />
+					<span>Юридичні реквізити та IBAN</span>
 				</a>
 			</div>
 		</aside>
@@ -606,7 +695,9 @@
 		<div class="w-full max-w-lg overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl">
 			<div class="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
 				<div class="flex items-center gap-2.5">
-					<Landmark size={20} class="text-emerald-600" />
+					<div class="size-8 overflow-hidden rounded-lg border border-zinc-200 bg-white p-0.5 shadow-sm">
+						<img src={BANK_LOGOS[activeModalBank]} alt="Логотип банку" class="size-full object-contain rounded" />
+					</div>
 					<h3 class="text-base font-bold text-zinc-900">
 						{#if activeModalBank === 'privatbank'}
 							Підключення ПриватБанк Автоклієнт 3.0
@@ -641,7 +732,7 @@
 						Для надання доступу до виписок компанії відскануйте QR-код у мобільному застосунку <strong>А24 для бізнесу</strong>:
 					</p>
 					<div class="flex flex-col items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 p-6">
-						<div class="grid size-40 place-items-center rounded-lg border-2 border-dashed border-emerald-500 bg-white p-2">
+						<div class="grid size-40 place-items-center rounded-lg border-2 border-dashed border-emerald-500 bg-white p-2 shadow-inner">
 							<QrCode size={120} class="text-zinc-900" />
 						</div>
 						<p class="mt-3 text-center text-[11px] font-semibold text-zinc-500">

@@ -6,16 +6,21 @@
 	import { formatInvoiceDate, formatMoney } from '../utils/format';
 	import { buildLegacyInvoiceCancellation } from './invoice-cancellation-contract';
 	import { filterInvoices } from './invoice-filters';
+	import DiscrepancyDispatcher from './DiscrepancyDispatcher.svelte';
+	import { demoDiscrepancies } from '../data/discrepancies';
 
 	let {
 		invoices,
 		onCancel,
+		onInvoicePaid,
 		demo = false
 	}: {
 		invoices: InvoiceRecord[];
 		onCancel?: (invoiceId: string) => Promise<void>;
+		onInvoicePaid?: (invoiceId: string, bankCode: string) => void;
 		demo?: boolean;
 	} = $props();
+	let activeTab = $state<'invoices' | 'discrepancies'>('invoices');
 	let cancellingId = $state<string | null>(null);
 	let actionError = $state<string | null>(null);
 	let search = $state('');
@@ -82,6 +87,34 @@
 		</div>
 	</header>
 
+	<!-- NAVIGATION TABS -->
+	<div class="flex items-center gap-2 border-b border-zinc-200">
+		<button
+			type="button"
+			onclick={() => (activeTab = 'invoices')}
+			class="border-b-2 px-4 py-3 text-sm font-bold transition {activeTab === 'invoices'
+				? 'border-blue-600 text-blue-600'
+				: 'border-transparent text-zinc-500 hover:text-zinc-800'}"
+		>
+			Усі рахунки ({invoices.length})
+		</button>
+		<button
+			type="button"
+			onclick={() => (activeTab = 'discrepancies')}
+			class="inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition {activeTab === 'discrepancies'
+				? 'border-blue-600 text-blue-600'
+				: 'border-transparent text-zinc-500 hover:text-zinc-800'}"
+		>
+			<span>Диспетчер розбіжностей</span>
+			<span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
+				{demoDiscrepancies.filter((d) => d.status === 'unresolved').length}
+			</span>
+		</button>
+	</div>
+
+	{#if activeTab === 'discrepancies'}
+		<DiscrepancyDispatcher {invoices} {onInvoicePaid} />
+	{:else}
 	<section class="rounded-lg border border-zinc-200 bg-white" aria-label="Реєстр рахунків">
 		{#if actionError}<p
 				class="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
@@ -269,4 +302,5 @@
 			</div>
 		</footer>
 	</section>
+	{/if}
 </div>
