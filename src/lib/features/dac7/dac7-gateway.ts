@@ -26,7 +26,7 @@ import {
 
 export function createDac7Gateway(client: SupabaseClient) {
 	return {
-		// 1. Role Permissions and Access Rights (????? ? 4903-IX)
+		// 1. Role Permissions and Access Rights (Закон № 4903-IX)
 		async getAssignedRole(userId: string): Promise<Dac7Role> {
 			const { data, error } = await client
 				.from('merchant_memberships')
@@ -59,7 +59,7 @@ export function createDac7Gateway(client: SupabaseClient) {
 					{
 						userId: 'demo-user',
 						email: 'owner@rahunok.app',
-						fullName: '????????? ????????? (???????)',
+						fullName: 'Олександр Дмитришен (Власник)',
 						role: 'admin',
 						assignedAt: new Date().toISOString(),
 						assignedBy: 'System',
@@ -68,28 +68,28 @@ export function createDac7Gateway(client: SupabaseClient) {
 					{
 						userId: 'user-platform-1',
 						email: 'cfo@boltfood.ua',
-						fullName: 'Bolt Food Ukraine (???????????)',
+						fullName: 'Bolt Food Ukraine (Фіндиректор)',
 						role: 'platform',
 						assignedAt: new Date().toISOString(),
-						assignedBy: '???????',
+						assignedBy: 'Власник',
 						isLiveAllowed: true
 					},
 					{
 						userId: 'user-seller-1',
 						email: 'oleksiy.tkachenko@gmail.com',
-						fullName: "??????? ???????? (???'??)",
+						fullName: "Олексій Ткаченко (Кур'єр)",
 						role: 'seller',
 						assignedAt: new Date().toISOString(),
-						assignedBy: '???.??????',
+						assignedBy: 'Дія.Підпис',
 						isLiveAllowed: true
 					},
 					{
 						userId: 'user-gov-1',
 						email: 'auditor@tax.gov.ua',
-						fullName: '??? ??????? (??????????? ?????? ????????)',
+						fullName: 'ДПС України (Департамент аудиту платформ)',
 						role: 'gov',
 						assignedAt: new Date().toISOString(),
-						assignedBy: '??????',
+						assignedBy: 'Мінфін',
 						isLiveAllowed: true
 					}
 				];
@@ -100,13 +100,13 @@ export function createDac7Gateway(client: SupabaseClient) {
 				email: `${row.role}@rahunok.app`,
 				fullName:
 					row.role === 'owner'
-						? '????????????? ?????????'
+						? 'Адміністратор платформи'
 						: row.role === 'manager'
-							? '???????????? ????????'
-							: "???'?? / ??????????",
+							? 'Платформений оператор'
+							: "Кур'єр / Виконавець",
 				role: row.role === 'owner' ? 'admin' : row.role === 'manager' ? 'platform' : 'seller',
 				assignedAt: row.created_at,
-				assignedBy: '???????',
+				assignedBy: 'Власник',
 				isLiveAllowed: row.status === 'active'
 			}));
 		},
@@ -133,7 +133,7 @@ export function createDac7Gateway(client: SupabaseClient) {
 			return data.map((row: any) => ({
 				id: row.id,
 				name: row.full_name,
-				role: row.seller_kind === 'INDIVIDUAL' ? "???'??" : '???????',
+				role: row.seller_kind === 'INDIVIDUAL' ? "Кур'єр" : 'Мерчант',
 				kyc:
 					row.status === 'blocked'
 						? 'blocked'
@@ -144,15 +144,15 @@ export function createDac7Gateway(client: SupabaseClient) {
 								: 'pending',
 				iban: true,
 				ibanFormatted: row.address?.iban || 'UA51 3220 0100 0002 6000 0001 2384',
-				bankName: row.address?.bank || '????????',
+				bankName: row.address?.bank || 'Монобанк',
 				score: row.status === 'blocked' ? 15 : 98,
 				earned: Number(row.earned || 0),
-				city: row.address?.city || '????',
+				city: row.address?.city || 'Київ',
 				since: new Date(row.created_at).toLocaleDateString('uk-UA', {
 					month: '2-digit',
 					year: 'numeric'
 				}),
-				last: '????????',
+				last: 'сьогодні',
 				mode: 'daily',
 				isFop: row.seller_kind === 'FOP',
 				address: row.address?.street ? `${row.address.street}, ${row.address.city || ''}` : undefined,
@@ -161,7 +161,7 @@ export function createDac7Gateway(client: SupabaseClient) {
 			}));
 		},
 
-		// 3. Payouts & Batches (With 10% PIT Law ? 4903-IX)
+		// 3. Payouts & Batches (With 10% PIT Law № 4903-IX)
 		async getPayouts(isDemo = false): Promise<Dac7Payout[]> {
 			if (isDemo) return demoPayouts;
 
@@ -182,7 +182,7 @@ export function createDac7Gateway(client: SupabaseClient) {
 				tax: Number(row.total_tax),
 				net: Number(row.total_net),
 				st: row.status,
-				rail: row.rail || '??? ? A2A',
+				rail: row.rail || 'СЕП · A2A',
 				date: new Date(row.created_at).toLocaleString('uk-UA', {
 					day: '2-digit',
 					month: '2-digit',
@@ -201,7 +201,7 @@ export function createDac7Gateway(client: SupabaseClient) {
 			isFop: boolean;
 			rail?: string;
 		}): Promise<Dac7Payout> {
-			// Tax Rule: FOP = 0% withholding (pays independently), Individual = 10% PIT (Law ? 4903-IX)
+			// Tax Rule: FOP = 0% withholding (pays independently), Individual = 10% PIT (Law № 4903-IX)
 			const taxRate = input.isFop ? 0 : 0.1;
 			const totalTax = Math.round(input.gross * taxRate * 100) / 100;
 			const totalNet = Math.round((input.gross - totalTax) * 100) / 100;
@@ -217,7 +217,7 @@ export function createDac7Gateway(client: SupabaseClient) {
 					total_net: totalNet,
 					mode: 'instant',
 					status: 'paid',
-					rail: input.rail || '??? ? A2A (Open Banking)'
+					rail: input.rail || 'СЕП · A2A (Open Banking)'
 				})
 				.select('*')
 				.single();
@@ -231,8 +231,8 @@ export function createDac7Gateway(client: SupabaseClient) {
 					tax: totalTax,
 					net: totalNet,
 					st: 'paid',
-					rail: input.rail || '??? ? A2A',
-					date: '?????',
+					rail: input.rail || 'СЕП · A2A',
+					date: 'щойно',
 					type: 'instant'
 				};
 			}
@@ -246,7 +246,7 @@ export function createDac7Gateway(client: SupabaseClient) {
 				net: Number(data.total_net),
 				st: data.status,
 				rail: data.rail,
-				date: '?????',
+				date: 'щойно',
 				type: data.mode
 			};
 		},
@@ -265,10 +265,10 @@ export function createDac7Gateway(client: SupabaseClient) {
 				platforms: [
 					{
 						id: 'live_1',
-						name: 'Live ????????? (Supabase)',
+						name: 'Live Платформа (Supabase)',
 						sellers: (payouts || []).length || 14200,
 						flow: totalGross || 184500000,
-						volume: `${(totalGross || 184500000).toLocaleString('uk-UA')} ?`,
+						volume: `${(totalGross || 184500000).toLocaleString('uk-UA')} ₴`,
 						dac7: '2026-09-30',
 						score: 99,
 						st: 'ok'
@@ -296,7 +296,7 @@ export function createDac7Gateway(client: SupabaseClient) {
 				id: row.id,
 				sessionId: row.session_id,
 				rnokpp: row.rnokpp_result || '3091248192',
-				name: row.user_full_name || '??????? ????????',
+				name: row.user_full_name || 'Олексій Ткаченко',
 				status: row.status,
 				p7sHash: 'sha256_live_signature_hash',
 				date: new Date(row.created_at).toLocaleString('uk-UA', {

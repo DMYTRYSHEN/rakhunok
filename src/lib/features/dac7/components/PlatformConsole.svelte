@@ -47,10 +47,10 @@
 	const totalNet = $derived(payouts.reduce((sum, p) => sum + p.net, 0));
 
 	async function runBatchPayout() {
-		batchStatus = '?????????? ?????????????? ????? ?????? ?? ????...';
+		batchStatus = 'Формування розрахункового батчу виплат за день...';
 		const targetSeller = sellers[0] || {
 			id: 'RHK-9E71AB3',
-			name: '??????? ????????',
+			name: 'Олексій Ткаченко',
 			isFop: false
 		};
 
@@ -63,7 +63,7 @@
 		});
 
 		payouts = [newPayout, ...payouts];
-		batchStatus = `???? ??????? ??????????! ?????????? 950 ?, ???????? 10% ???? (${newPayout.tax} ?), ???????????? ${newPayout.net} ?.`;
+		batchStatus = `Батч успішно сформовано! Нараховано 950 ₴, утримано 10% ПДФО (${newPayout.tax} ₴), перераховано ${newPayout.net} ₴.`;
 		setTimeout(() => (batchStatus = null), 6000);
 	}
 
@@ -78,7 +78,7 @@
   </DocSpec>
   <PlatformOperator>
     <Jurisdiction>UA</Jurisdiction>
-    <Name>Bolt Operations O? / ??? ????? ????????? ????????</Name>
+    <Name>Bolt Operations OÜ / ТОВ «Болт Оперейшнз Україна»</Name>
     <TIN jurisdiction="UA">43102914</TIN>
     <LawFramework>Law_4903_IX_Digital_Platforms</LawFramework>
   </PlatformOperator>
@@ -138,11 +138,11 @@ ${sellers
 						<Building2 size={14} />
 					</span>
 					<h2 class="text-base font-bold text-stone-900">
-						??????? ????????? ? Bolt Food (??????? CFO)
+						Консоль платформи • Bolt Food (Кабінет CFO)
 					</h2>
 				</div>
 				<p class="text-xs text-stone-500">
-					?????????? ?????: ???????????? ?????????? 10% ????, ?????? ??????? ?? ??????? ?? ??????????? ????????? DAC7
+					Податковий агент: автоматичний розрахунок 10% ПДФО, масові виплати за батчами та обов’язкова звітність DAC7
 				</p>
 			</div>
 
@@ -153,7 +153,7 @@ ${sellers
 					class="inline-flex items-center gap-1.5 rounded-xl bg-stone-900 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-stone-800 transition"
 				>
 					<Coins size={14} />
-					<span>?????????? ???? ??????</span>
+					<span>Сформувати батч виплат</span>
 				</button>
 
 				<button
@@ -162,7 +162,7 @@ ${sellers
 					class="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs font-bold text-stone-700 shadow-sm hover:bg-stone-50 transition"
 				>
 					<FileCode2 size={14} />
-					<span>???? DAC7 / DPI (XML)</span>
+					<span>Звіт DAC7 / DPI (XML)</span>
 				</button>
 			</div>
 		</div>
@@ -178,36 +178,36 @@ ${sellers
 	<!-- Stats Grid -->
 	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 		<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-1">
-			<span class="text-xs font-semibold text-stone-400">?????? ?????? (Gross)</span>
+			<span class="text-xs font-semibold text-stone-400">Оборот виплат (Gross)</span>
 			<div class="flex items-baseline justify-between">
-				<span class="text-xl font-black text-stone-900">{totalGross.toLocaleString('uk-UA')} ?</span>
+				<span class="text-xl font-black text-stone-900">{totalGross.toLocaleString('uk-UA')} ₴</span>
 				<span class="text-xs font-bold text-stone-400">100%</span>
 			</div>
 		</div>
 
 		<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-1">
-			<span class="text-xs font-semibold text-stone-400">???????? ???? 10% (???)</span>
+			<span class="text-xs font-semibold text-stone-400">Утримано ПДФО 10% (ДПС)</span>
 			<div class="flex items-baseline justify-between">
-				<span class="text-xl font-black text-rose-600">-{totalTax.toLocaleString('uk-UA')} ?</span>
+				<span class="text-xl font-black text-rose-600">-{totalTax.toLocaleString('uk-UA')} ₴</span>
 				<span class="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200">
-					????? ? 4903-IX
+					Закон № 4903-IX
 				</span>
 			</div>
 		</div>
 
 		<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-1">
-			<span class="text-xs font-semibold text-stone-400">????????? ???'???? (Net)</span>
+			<span class="text-xs font-semibold text-stone-400">Виплачено кур'єрам (Net)</span>
 			<div class="flex items-baseline justify-between">
-				<span class="text-xl font-black text-emerald-600">{totalNet.toLocaleString('uk-UA')} ?</span>
+				<span class="text-xl font-black text-emerald-600">{totalNet.toLocaleString('uk-UA')} ₴</span>
 				<span class="text-xs font-bold text-emerald-600">90%</span>
 			</div>
 		</div>
 
 		<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-1">
-			<span class="text-xs font-semibold text-stone-400">???????? ???'????</span>
+			<span class="text-xs font-semibold text-stone-400">Активних кур'єрів</span>
 			<div class="flex items-baseline justify-between">
 				<span class="text-xl font-black text-stone-900">{sellers.length}</span>
-				<span class="text-xs text-stone-400">????????????</span>
+				<span class="text-xs text-stone-400">Верифіковані</span>
 			</div>
 		</div>
 	</div>
@@ -216,43 +216,43 @@ ${sellers
 	<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
 		<div class="flex items-center justify-between">
 			<div>
-				<h3 class="text-sm font-bold text-stone-900">??????? ?????? ?? ????????? ???????</h3>
-				<p class="text-xs text-stone-500">???????????? ???????? 10% ??????? ????????? ?? ??????????? ??????</p>
+				<h3 class="text-sm font-bold text-stone-900">Історія виплат та утримання податку</h3>
+				<p class="text-xs text-stone-500">Автоматичний розподіл 10% податку платформи як податкового агента</p>
 			</div>
-			<span class="text-xs text-stone-400">?????? ??????: {payouts.length}</span>
+			<span class="text-xs text-stone-400">Всього виплат: {payouts.length}</span>
 		</div>
 
 		<div class="overflow-x-auto">
 			<table class="w-full text-left text-xs">
 				<thead class="border-b border-stone-200 bg-stone-50/70 text-stone-500">
 					<tr>
-						<th class="p-3 font-bold">????????? / ??????????</th>
-						<th class="p-3 font-bold">????? ???????</th>
-						<th class="p-3 font-bold">?????????? (Gross)</th>
-						<th class="p-3 font-bold">???? 10%</th>
-						<th class="p-3 font-bold">?? ??????? (Net)</th>
-						<th class="p-3 font-bold">??????</th>
-						<th class="p-3 font-bold text-right">???</th>
+						<th class="p-3 font-bold">Отримувач / Виконавець</th>
+						<th class="p-3 font-bold">Канал виплати</th>
+						<th class="p-3 font-bold">Нараховано (Gross)</th>
+						<th class="p-3 font-bold">ПДФО 10%</th>
+						<th class="p-3 font-bold">До виплати (Net)</th>
+						<th class="p-3 font-bold">Статус</th>
+						<th class="p-3 font-bold text-right">Час</th>
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-stone-100 text-stone-700">
 					{#if loading}
 						<tr>
-							<td colspan="7" class="p-4 text-center text-stone-400">???????????? ??????...</td>
+							<td colspan="7" class="p-4 text-center text-stone-400">Завантаження виплат...</td>
 						</tr>
 					{:else}
 						{#each payouts as p}
 							<tr class="hover:bg-stone-50/50">
 								<td class="p-3 font-medium text-stone-900">{p.seller}</td>
 								<td class="p-3 font-mono text-stone-500">{p.rail}</td>
-								<td class="p-3 font-semibold text-stone-900">{p.gross.toFixed(2)} ?</td>
+								<td class="p-3 font-semibold text-stone-900">{p.gross.toFixed(2)} ₴</td>
 								<td class="p-3 font-bold text-rose-600">
-									{p.tax > 0 ? `-${p.tax.toFixed(2)} ?` : '0.00 ? (???)'}
+									{p.tax > 0 ? `-${p.tax.toFixed(2)} ₴` : '0.00 ₴ (ФОП)'}
 								</td>
-								<td class="p-3 font-bold text-emerald-600">{p.net.toFixed(2)} ?</td>
+								<td class="p-3 font-bold text-emerald-600">{p.net.toFixed(2)} ₴</td>
 								<td class="p-3">
 									<span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700 border border-emerald-200">
-										<CheckCircle2 size={11} /> ??????????
+										<CheckCircle2 size={11} /> Зараховано
 									</span>
 								</td>
 								<td class="p-3 text-right text-stone-400">{p.date}</td>
@@ -272,13 +272,13 @@ ${sellers
 					<div class="flex items-center gap-2">
 						<FileCode2 size={18} class="text-stone-900" />
 						<h3 class="text-sm font-bold text-stone-900">
-							???????????? ???? DAC7 / DPI (OECD Schema v1.0)
+							Згенерований звіт DAC7 / DPI (OECD Schema v1.0)
 						</h3>
 					</div>
 					<div class="flex items-center gap-2">
 						{#if xmlValidated}
 							<span class="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-200">
-								????????? XSD ???????
+								Валідація XSD успішна
 							</span>
 						{/if}
 						<button
@@ -286,7 +286,7 @@ ${sellers
 							onclick={() => (xmlModalOpen = false)}
 							class="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
 						>
-							?
+							✕
 						</button>
 					</div>
 				</div>
@@ -297,7 +297,7 @@ ${sellers
 
 				<div class="flex items-center justify-between border-t border-stone-200 p-4 bg-stone-50">
 					<span class="text-xs text-stone-500">
-						???????? ?? ?????????????? ??? ??????? ?? ?????????? ???? ?? DAC7
+						Сумісний зі специфікаціями ДПС України та директивою Ради ЄС DAC7
 					</span>
 					<div class="flex items-center gap-2">
 						<button
@@ -305,14 +305,14 @@ ${sellers
 							onclick={downloadXml}
 							class="inline-flex items-center gap-1.5 rounded-xl bg-stone-900 px-4 py-2 text-xs font-bold text-white hover:bg-stone-800 transition"
 						>
-							<Download size={14} /> ??????????? .XML
+							<Download size={14} /> Завантажити .XML
 						</button>
 						<button
 							type="button"
 							onclick={() => (xmlModalOpen = false)}
 							class="rounded-xl border border-stone-200 bg-white px-4 py-2 text-xs font-bold text-stone-700 hover:bg-stone-100 transition"
 						>
-							???????
+							Закрити
 						</button>
 					</div>
 				</div>

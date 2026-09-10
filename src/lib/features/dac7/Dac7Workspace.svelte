@@ -21,11 +21,13 @@
 	let {
 		gateway,
 		demo = false,
-		initialRole = 'admin'
+		initialRole = 'admin',
+		onSignOut
 	}: {
 		gateway: Dac7Gateway;
 		demo?: boolean;
 		initialRole?: Dac7Role;
+		onSignOut?: () => void;
 	} = $props();
 
 	let currentRole = $state<Dac7Role>('admin');
@@ -40,12 +42,12 @@
 	});
 
 	const roleNav = [
-		{ id: 'admin' as Dac7Role, label: '????? ????', icon: UserCog },
-		{ id: 'platform' as Dac7Role, label: '????????? (CFO)', icon: Building2 },
-		{ id: 'seller' as Dac7Role, label: "???'?? (???????)", icon: UserCheck },
-		{ id: 'gov' as Dac7Role, label: '??????? (???)', icon: ShieldCheck },
-		{ id: 'dev' as Dac7Role, label: '?????????', icon: KeyRound },
-		{ id: 'sso' as Dac7Role, label: '???.?????? (SSO)', icon: Fingerprint },
+		{ id: 'admin' as Dac7Role, label: 'Адмін прав', icon: UserCog },
+		{ id: 'platform' as Dac7Role, label: 'Платформа (CFO)', icon: Building2 },
+		{ id: 'seller' as Dac7Role, label: "Кур'єр (Олексій)", icon: UserCheck },
+		{ id: 'gov' as Dac7Role, label: 'Держава (ДПС)', icon: ShieldCheck },
+		{ id: 'dev' as Dac7Role, label: 'Розробник', icon: KeyRound },
+		{ id: 'sso' as Dac7Role, label: 'Дія.Підпис (SSO)', icon: Fingerprint },
 		{ id: 'passport' as Dac7Role, label: 'Passkeys / pinPay', icon: Lock }
 	];
 </script>
@@ -60,7 +62,7 @@
 						R
 					</span>
 					<span class="font-extrabold text-stone-900 tracking-tight text-sm sm:text-base">
-						Rahunok Network ? DAC7 & ????? ? 4903-IX
+						Rahunok Network • DAC7 & Закон № 4903-IX
 					</span>
 				</a>
 			</div>
@@ -75,8 +77,18 @@
 						: 'border-blue-300 bg-blue-50 text-blue-800'}"
 				>
 					<span class="size-2 rounded-full {isDemoMode ? 'bg-emerald-500' : 'bg-blue-600 animate-pulse'}"></span>
-					<span>?????: {isDemoMode ? '???? (????????)' : 'Live (Supabase)'}</span>
+					<span>Режим: {isDemoMode ? 'Демо (Імітація)' : 'Live (Supabase)'}</span>
 				</button>
+
+				{#if onSignOut}
+					<button
+						type="button"
+						onclick={onSignOut}
+						class="rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-100 transition"
+					>
+						Вийти
+					</button>
+				{/if}
 			</div>
 		</div>
 

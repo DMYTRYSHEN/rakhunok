@@ -20,10 +20,10 @@
 					<span class="inline-flex size-6 items-center justify-center rounded-md bg-stone-900 text-white">
 						<Key size={14} />
 					</span>
-					<h2 class="text-base font-bold text-stone-900">??????? ?????????? ?????????</h2>
+					<h2 class="text-base font-bold text-stone-900">Кабінет розробника платформи</h2>
 				</div>
 				<p class="text-xs text-stone-500">
-					?????????? REST API ?? Webhook ??? ????????????? ?????? ???????????? ?????? ?? ??????? ? 4903-IX
+					Інтеграція REST API та Webhook для автоматизації виплат самозайнятим згідно із Законом № 4903-IX
 				</p>
 			</div>
 			<span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">
@@ -37,8 +37,8 @@
 	<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
 		<div class="flex items-center justify-between">
 			<div>
-				<h3 class="text-sm font-bold text-stone-900">????? ?????????? ????????? (Merchant API)</h3>
-				<p class="text-xs text-stone-500">??????????? ????????? ??????? ?????? ?? ??????????? Webhook</p>
+				<h3 class="text-sm font-bold text-stone-900">Ключі інтеграції платформи (Merchant API)</h3>
+				<p class="text-xs text-stone-500">Авторизація серверних запитів виплат та підключення Webhook</p>
 			</div>
 			<span class="rounded bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 border border-emerald-200">
 				Live Edge
@@ -57,9 +57,9 @@
 				class="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-stone-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-stone-800 transition"
 			>
 				{#if copied}
-					<Check size={14} /> ???????????
+					<Check size={14} /> Скопійовано
 				{:else}
-					<Copy size={14} /> ?????????
+					<Copy size={14} /> Копіювати
 				{/if}
 			</button>
 		</div>
@@ -68,19 +68,19 @@
 	<!-- Webhook Events Stream -->
 	<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
 		<div class="flex items-center justify-between">
-			<h3 class="text-sm font-bold text-stone-900">????? Webhook-????? ????????? ????? ????????</h3>
-			<span class="text-xs text-stone-400">??????: https://api.bolt.eu/webhooks/rahunok</span>
+			<h3 class="text-sm font-bold text-stone-900">Потік Webhook-подій життєвого циклу доставки</h3>
+			<span class="text-xs text-stone-400">Слухач: https://api.bolt.eu/webhooks/rahunok</span>
 		</div>
 
 		<div class="space-y-2 font-mono text-xs">
 			<div class="flex items-center justify-between p-3 rounded-xl bg-stone-50 border border-stone-100">
 				<span class="text-emerald-700 font-bold">courier.delivery.delivered</span>
-				<span class="text-stone-500">Order #884 ? 245 ? (???? 24.50 ?)</span>
+				<span class="text-stone-500">Order #884 · 245 ₴ (ПДФО 24.50 ₴)</span>
 				<span class="text-[10px] text-emerald-600 font-bold">200 OK</span>
 			</div>
 			<div class="flex items-center justify-between p-3 rounded-xl bg-stone-50 border border-stone-100">
 				<span class="text-blue-700 font-bold">payout.batch.settled</span>
-				<span class="text-stone-500">Batch #bt_02070_9E71 ? 630 ?</span>
+				<span class="text-stone-500">Batch #bt_02070_9E71 · 630 ₴</span>
 				<span class="text-[10px] text-emerald-600 font-bold">200 OK</span>
 			</div>
 			<div class="flex items-center justify-between p-3 rounded-xl bg-stone-50 border border-stone-100">
@@ -96,9 +96,9 @@
 		<div class="flex items-center justify-between text-stone-400">
 			<div class="flex items-center gap-2">
 				<Terminal size={14} />
-				<span>??????? ????????????? ??????? ????? cURL</span>
+				<span>Приклад ініціалізації виплати через cURL</span>
 			</div>
-			<span class="text-[11px] text-amber-400">10% ???? ??????????? ???????????</span>
+			<span class="text-[11px] text-amber-400">10% ПДФО утримується автоматично</span>
 		</div>
 		<pre class="overflow-x-auto text-emerald-400 bg-stone-900 p-4 rounded-xl leading-relaxed">
 curl -X POST https://api.rahunok.app/v1/dac7/payouts \

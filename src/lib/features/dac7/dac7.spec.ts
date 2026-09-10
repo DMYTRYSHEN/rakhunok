@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createDac7Gateway } from './dac7-gateway';
 import { demoSellers, demoPayouts, demoBatches } from './mockData';
 
-describe('DAC7 & Law ? 4903-IX Business Logic Tests', () => {
+describe('DAC7 & Law № 4903-IX Business Logic Tests', () => {
 	const mockClient: any = {
 		from: () => ({
 			select: () => ({
@@ -22,10 +22,10 @@ describe('DAC7 & Law ? 4903-IX Business Logic Tests', () => {
 
 	const gateway = createDac7Gateway(mockClient);
 
-	it('should calculate 10% PIT for individual self-employed under Law ? 4903-IX', async () => {
+	it('should calculate 10% PIT for individual self-employed under Law № 4903-IX', async () => {
 		const payout = await gateway.createPayout({
 			sellerId: 'RHK-9E71AB3',
-			sellerName: '??????? ????????',
+			sellerName: 'Олексій Ткаченко',
 			gross: 1000,
 			isFop: false,
 			rail: 'Monobank A2C'
@@ -39,7 +39,7 @@ describe('DAC7 & Law ? 4903-IX Business Logic Tests', () => {
 	it('should exempt FOP sellers from platform withholding (0% tax withheld)', async () => {
 		const payoutFop = await gateway.createPayout({
 			sellerId: 'RHK-4C20F91',
-			sellerName: '????? ?????? (???)',
+			sellerName: 'Марія Гнатюк (ФОП)',
 			gross: 2500,
 			isFop: true,
 			rail: 'PrivatBank IBAN'

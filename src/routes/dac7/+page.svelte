@@ -34,6 +34,16 @@
 		await checkAuth();
 	}
 
+	async function handleSignOut() {
+		if (client) {
+			await client.auth.signOut();
+		}
+		session = null;
+		if (typeof window !== 'undefined' && window.location.search.includes('demo=1')) {
+			window.location.href = '/dac7';
+		}
+	}
+
 	onMount(() => {
 		void checkAuth();
 	});
@@ -50,7 +60,11 @@
 	</div>
 {:else if session || isDemoFromQuery}
 	{#if gateway}
-		<Dac7Workspace {gateway} demo={isDemoFromQuery && !session} />
+		<Dac7Workspace
+			{gateway}
+			demo={isDemoFromQuery && !session}
+			onSignOut={handleSignOut}
+		/>
 	{/if}
 {:else}
 	<div class="min-h-screen bg-[#fafaf9] flex flex-col items-center justify-center p-4">

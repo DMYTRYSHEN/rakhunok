@@ -1,4 +1,4 @@
-﻿// Types for DAC7 / Digital Platforms Law № 4903-IX Ecosystem in corex
+// Types for DAC7 / Digital Platforms Law № 4903-IX Ecosystem in corex
 
 export type Dac7Role =
 	| 'admin'     // Admin Rights & Permission Hub (Керування ролями та доступами)
