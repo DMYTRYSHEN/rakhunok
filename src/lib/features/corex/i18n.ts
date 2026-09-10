@@ -137,7 +137,8 @@ const categoryUk: Record<FlowScenario['category'], string> = {
 	POS: 'POS',
 	Dashboard: 'Панель',
 	Delivery: 'Доставка',
-	Operations: 'Операції'
+	Operations: 'Операції',
+	Banking: 'Банкінг'
 };
 
 const scenarioUk: Record<string, { label: string; title: string; description: string }> = {

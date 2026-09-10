@@ -16,9 +16,15 @@
 		onConfirmMatch: (discrepancyId: string, invoiceId: string) => Promise<void> | void;
 	} = $props();
 
-	let selectedInvoiceId = $state<string>(discrepancy.suggestedInvoiceId || (pendingInvoices[0]?.id ?? ''));
+	let selectedInvoiceId = $state<string>('');
 	let isSubmitting = $state(false);
 	let manualNote = $state('');
+
+	$effect(() => {
+		if (!selectedInvoiceId) {
+			selectedInvoiceId = discrepancy.suggestedInvoiceId || (pendingInvoices[0]?.id ?? '');
+		}
+	});
 
 	const selectedInvoice = $derived(pendingInvoices.find((i) => i.id === selectedInvoiceId));
 

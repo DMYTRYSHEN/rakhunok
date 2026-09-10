@@ -129,7 +129,8 @@ export type FlowScenario = {
 		| 'POS'
 		| 'Dashboard'
 		| 'Delivery'
-		| 'Operations';
+		| 'Operations'
+		| 'Banking';
 	label: string;
 	title: string;
 	description: string;

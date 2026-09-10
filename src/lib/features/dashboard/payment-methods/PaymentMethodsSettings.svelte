@@ -57,6 +57,10 @@
 	let isSyncing = $state<Record<string, boolean>>({});
 	let notification = $state<{ type: 'success' | 'error'; message: string } | null>(null);
 
+	const pbAccounts = $derived(getAccountsForBank('privatbank'));
+	const abAccounts = $derived(getAccountsForBank('a-bank'));
+	const monoAccounts = $derived(getAccountsForBank('monobank'));
+
 	const issues = $derived(validatePaymentMethodsConfig(config));
 	const setupProgress = $derived(
 		config.onboardingStatus === 'not-started'
@@ -329,7 +333,6 @@
 						</div>
 
 						<!-- Discovered accounts list pulled from structure or direct -->
-						{@const pbAccounts = getAccountsForBank('privatbank')}
 						{#if pbAccounts.length > 0}
 							<div class="mt-4 space-y-2 rounded-md border border-zinc-100 bg-zinc-50/70 p-3">
 								<div class="flex items-center justify-between text-[11px] font-bold tracking-wider text-zinc-500 uppercase">
@@ -424,7 +427,6 @@
 						</div>
 
 						<!-- Discovered accounts list pulled from structure or direct -->
-						{@const abAccounts = getAccountsForBank('a-bank')}
 						{#if abAccounts.length > 0}
 							<div class="mt-4 space-y-2 rounded-md border border-zinc-100 bg-zinc-50/70 p-3">
 								<div class="flex items-center justify-between text-[11px] font-bold tracking-wider text-zinc-500 uppercase">
@@ -518,7 +520,6 @@
 						</div>
 
 						<!-- Discovered accounts list pulled from structure or direct -->
-						{@const monoAccounts = getAccountsForBank('monobank')}
 						{#if monoAccounts.length > 0}
 							<div class="mt-4 space-y-2 rounded-md border border-zinc-100 bg-zinc-50/70 p-3">
 								<div class="flex items-center justify-between text-[11px] font-bold tracking-wider text-zinc-500 uppercase">

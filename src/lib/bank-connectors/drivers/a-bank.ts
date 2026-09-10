@@ -334,10 +334,10 @@ export class ABankDriver implements BankConnectorDriver {
 					? params.rawBody
 					: new TextDecoder('utf-8').decode(params.rawBody);
 
-			const parsed = JSON.parse(bodyString) as RawABankPayment | { payment?: RawABankPayment };
-			const payment = 'payment' in parsed && parsed.payment ? parsed.payment : (parsed as RawABankPayment);
+			const parsed = JSON.parse(bodyString) as Record<string, unknown>;
+			const payment = (('payment' in parsed && parsed.payment ? parsed.payment : parsed) as unknown) as RawABankPayment;
 
-			if (!payment.id || !payment.credit_iban) {
+			if (!payment?.id || !payment?.credit_iban) {
 				return {
 					isValid: false,
 					reason: 'Невалідний payload вебхука А-Банку (відсутній id або credit_iban)'
