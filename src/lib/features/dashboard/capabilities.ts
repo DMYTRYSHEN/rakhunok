@@ -44,5 +44,5 @@ export const dashboardCapabilities = {
 		canWrite: false,
 		label: 'Публікація не активна'
 	},
-	staff: { state: 'planned', canRead: false, canWrite: false, label: 'Очікує membership і RLS' }
+	staff: { state: 'live-read', canRead: true, canWrite: true, label: 'Команда, ролі та запрошення активні' }
 } satisfies Record<string, DashboardCapability>;

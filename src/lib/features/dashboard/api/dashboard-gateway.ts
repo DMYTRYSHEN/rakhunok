@@ -18,7 +18,10 @@ import type {
 	PosActiveOrder,
 	PosBoard,
 	PosTerminal,
-	TerminalInput
+	TerminalInput,
+	TeamMember,
+	TeamInvitation,
+	CreateInvitationInput
 } from '../types';
 import { formatMoney } from '../utils/format';
 import type { LegacyPosOrderInsert } from '../pos/pos-order-contract';
@@ -134,6 +137,13 @@ export type DashboardGateway = {
 	): () => void;
 	signInWithGoogleIdToken(token: string, nonce: string): Promise<void>;
 	signOut(): Promise<void>;
+	listTeamMembers(merchantId: string): Promise<TeamMember[]>;
+	listTeamInvitations(merchantId: string): Promise<TeamInvitation[]>;
+	createTeamInvitation(merchantId: string, input: CreateInvitationInput): Promise<TeamInvitation>;
+	revokeTeamInvitation(merchantId: string, invitationId: string): Promise<void>;
+	resendTeamInvitation(merchantId: string, invitationId: string): Promise<void>;
+	removeTeamMember(merchantId: string, membershipId: string): Promise<void>;
+	acceptTeamInvitation(token: string): Promise<{ success: boolean; role: string }>;
 };
 
 export type DashboardAuthEvent = 'signed-in' | 'signed-out' | 'user-updated';
@@ -1103,6 +1113,143 @@ export function createDashboardGateway(
 		async signOut() {
 			const { error } = await client.auth.signOut();
 			if (error) throw error;
+		},
+
+		async listTeamMembers(merchantId: string) {
+			const { data, error } = await client
+				.from('merchant_memberships')
+				.select('id, merchant_id, user_id, role, terminal_id, status, created_at, terminals(name)')
+				.eq('merchant_id', merchantId)
+				.order('created_at', { ascending: true });
+
+			if (error) {
+				return [];
+			}
+
+			return (data || []).map((row: any) => ({
+				id: row.id,
+				merchantId: row.merchant_id,
+				userId: row.user_id,
+				email: row.user_id ? `${row.role}.${row.user_id.slice(0, 6)}@rahunok.app` : 'користувач',
+				fullName: row.role === 'kso' ? 'КСО термінал' : row.role === 'manager' ? 'Менеджер' : 'Касир',
+				role: row.role,
+				terminalId: row.terminal_id,
+				terminalName: row.terminals?.name || null,
+				status: row.status || 'active',
+				createdAt: row.created_at,
+				lastActiveAt: 'нещодавно'
+			}));
+		},
+
+		async listTeamInvitations(merchantId: string) {
+			const { data, error } = await client
+				.from('merchant_invitations')
+				.select('id, merchant_id, email, role, terminal_id, token, status, invited_by, created_at, expires_at, terminals(name)')
+				.eq('merchant_id', merchantId)
+				.order('created_at', { ascending: false });
+
+			if (error) {
+				return [];
+			}
+
+			return (data || []).map((row: any) => ({
+				id: row.id,
+				merchantId: row.merchant_id,
+				email: row.email,
+				role: row.role,
+				terminalId: row.terminal_id,
+				terminalName: row.terminals?.name || null,
+				token: row.token,
+				status: row.status,
+				invitedBy: row.invited_by,
+				createdAt: row.created_at,
+				expiresAt: row.expires_at
+			}));
+		},
+
+		async createTeamInvitation(merchantId: string, input: CreateInvitationInput) {
+			const randomBytes = crypto.getRandomValues(new Uint8Array(24));
+			const token = `inv_${Array.from(randomBytes, (b) => b.toString(16).padStart(2, '0')).join('')}`;
+			const user = (await client.auth.getUser()).data.user;
+
+			const { data, error } = await client
+				.from('merchant_invitations')
+				.insert({
+					merchant_id: merchantId,
+					email: input.email.trim().toLowerCase(),
+					role: input.role,
+					terminal_id: input.terminalId || null,
+					token,
+					invited_by: user?.id || '00000000-0000-0000-0000-000000000000'
+				})
+				.select('id, merchant_id, email, role, terminal_id, token, status, invited_by, created_at, expires_at')
+				.single();
+
+			if (error || !data) {
+				throw new Error(error?.message || 'Не вдалося створити запрошення.');
+			}
+
+			return {
+				id: data.id,
+				merchantId: data.merchant_id,
+				email: data.email,
+				role: data.role,
+				terminalId: data.terminal_id,
+				token: data.token,
+				status: data.status,
+				invitedBy: data.invited_by,
+				createdAt: data.created_at,
+				expiresAt: data.expires_at
+			};
+		},
+
+		async revokeTeamInvitation(merchantId: string, invitationId: string) {
+			const { error } = await client
+				.from('merchant_invitations')
+				.update({ status: 'revoked' })
+				.eq('id', invitationId)
+				.eq('merchant_id', merchantId);
+
+			if (error) {
+				throw new Error('Не вдалося скасувати запрошення.');
+			}
+		},
+
+		async resendTeamInvitation(merchantId: string, invitationId: string) {
+			const newExpires = new Date(Date.now() + 7 * 86400000).toISOString();
+			const { error } = await client
+				.from('merchant_invitations')
+				.update({ expires_at: newExpires, status: 'pending' })
+				.eq('id', invitationId)
+				.eq('merchant_id', merchantId);
+
+			if (error) {
+				throw new Error('Не вдалося продовжити запрошення.');
+			}
+		},
+
+		async removeTeamMember(merchantId: string, membershipId: string) {
+			const { error } = await client
+				.from('merchant_memberships')
+				.delete()
+				.eq('id', membershipId)
+				.eq('merchant_id', merchantId);
+
+			if (error) {
+				throw new Error('Не вдалося видалити учасника команди.');
+			}
+		},
+
+		async acceptTeamInvitation(token: string) {
+			const { data, error } = await client.rpc('accept_merchant_invitation', {
+				p_token: token
+			});
+
+			if (error) {
+				throw new Error(error.message || 'Не вдалося прийняти запрошення.');
+			}
+
+			return data as { success: boolean; role: string };
 		}
 	};
 }

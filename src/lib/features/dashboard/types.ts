@@ -160,3 +160,41 @@ export type DashboardSessionState =
 			snapshot: OverviewSnapshot;
 	  }
 	| { status: 'error'; message: string };
+
+export type TeamRole = 'owner' | 'manager' | 'cashier' | 'kso';
+
+export type TeamMember = {
+	id: string;
+	merchantId: string;
+	userId: string;
+	email: string;
+	fullName: string;
+	role: TeamRole;
+	terminalId: string | null;
+	terminalName?: string | null;
+	status: 'active' | 'suspended';
+	createdAt: string;
+	lastActiveAt?: string | null;
+};
+
+export type TeamInvitation = {
+	id: string;
+	merchantId: string;
+	email: string;
+	role: TeamRole;
+	terminalId: string | null;
+	terminalName?: string | null;
+	token: string;
+	status: 'pending' | 'accepted' | 'expired' | 'revoked';
+	invitedBy: string;
+	invitedByName?: string;
+	createdAt: string;
+	expiresAt: string;
+	acceptedAt?: string | null;
+};
+
+export type CreateInvitationInput = {
+	email: string;
+	role: TeamRole;
+	terminalId?: string | null;
+};

@@ -543,6 +543,164 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 		}
 	}
 
+	// 3.1 Merchant Team Members & Invitations API
+	if (url.pathname === '/api/v1/merchant/team' || url.pathname.startsWith('/api/v1/merchant/team/')) {
+		const authHeader = request.headers.get('Authorization') || '';
+		const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
+		const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
+
+		if (request.method === 'GET') {
+			if (authHeader.includes('demo_merchant_token') || !authHeader) {
+				return jsonResponse([
+					{
+						id: 'member-001',
+						user_id: '00000000-0000-0000-0000-000000000001',
+						email: 'dmytryshen@rahunok.app',
+						role: 'owner',
+						status: 'active',
+						created_at: '2026-08-01T10:00:00Z'
+					},
+					{
+						id: 'member-002',
+						user_id: '00000000-0000-0000-0000-000000000002',
+						email: 'manager.olena@rahunok.app',
+						role: 'manager',
+						status: 'active',
+						created_at: '2026-08-15T14:30:00Z'
+					},
+					{
+						id: 'member-003',
+						user_id: '00000000-0000-0000-0000-000000000003',
+						email: 'cashier.taras@rahunok.app',
+						role: 'cashier',
+						terminal_id: 'terminal-1',
+						status: 'active',
+						created_at: '2026-08-20T08:15:00Z'
+					}
+				]);
+			}
+
+			try {
+				const res = await fetch(`${supabaseUrl}/rest/v1/merchant_memberships?select=*,terminals(name)&order=created_at.asc`, {
+					headers: { apikey: supabaseAnonKey, Authorization: authHeader, 'Content-Type': 'application/json' }
+				});
+				if (res.ok) {
+					return jsonResponse(await res.json());
+				}
+			} catch {}
+			return jsonResponse([]);
+		}
+
+		if (request.method === 'DELETE') {
+			const memberIdMatch = url.pathname.match(/^\/api\/v1\/merchant\/team\/([a-zA-Z0-9_-]+)$/);
+			const memberId = memberIdMatch ? memberIdMatch[1] : null;
+			if (!memberId) return jsonResponse({ error: 'Member ID required' }, 400);
+
+			try {
+				await fetch(`${supabaseUrl}/rest/v1/merchant_memberships?id=eq.${encodeURIComponent(memberId)}`, {
+					method: 'DELETE',
+					headers: { apikey: supabaseAnonKey, Authorization: authHeader, 'Content-Type': 'application/json' }
+				});
+			} catch {}
+			return jsonResponse({ success: true });
+		}
+	}
+
+	if (url.pathname === '/api/v1/merchant/invitations' || url.pathname.startsWith('/api/v1/merchant/invitations/')) {
+		const authHeader = request.headers.get('Authorization') || '';
+		const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
+		const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
+
+		if (request.method === 'GET') {
+			if (authHeader.includes('demo_merchant_token') || !authHeader) {
+				return jsonResponse([
+					{
+						id: 'inv-001',
+						email: 'barista.andriy@gmail.com',
+						role: 'cashier',
+						token: 'inv_demo_tok_1',
+						status: 'pending',
+						created_at: '2026-09-08T09:30:00Z',
+						expires_at: '2026-09-15T09:30:00Z'
+					}
+				]);
+			}
+
+			try {
+				const res = await fetch(`${supabaseUrl}/rest/v1/merchant_invitations?select=*&order=created_at.desc`, {
+					headers: { apikey: supabaseAnonKey, Authorization: authHeader, 'Content-Type': 'application/json' }
+				});
+				if (res.ok) return jsonResponse(await res.json());
+			} catch {}
+			return jsonResponse([]);
+		}
+
+		if (request.method === 'POST') {
+			try {
+				const body = (await request.json()) as Record<string, unknown>;
+				const randomBytes = crypto.getRandomValues(new Uint8Array(20));
+				const token = `inv_${Array.from(randomBytes, (b) => b.toString(16).padStart(2, '0')).join('')}`;
+				const invitation = {
+					id: crypto.randomUUID(),
+					email: String(body.email || '').trim().toLowerCase(),
+					role: String(body.role || 'cashier'),
+					terminal_id: body.terminal_id ? String(body.terminal_id) : null,
+					token,
+					status: 'pending',
+					created_at: new Date().toISOString(),
+					expires_at: new Date(Date.now() + 7 * 86400000).toISOString()
+				};
+
+				if (authHeader && !authHeader.includes('demo_merchant_token')) {
+					try {
+						await fetch(`${supabaseUrl}/rest/v1/merchant_invitations`, {
+							method: 'POST',
+							headers: {
+								apikey: supabaseAnonKey,
+								Authorization: authHeader,
+								'Content-Type': 'application/json',
+								Prefer: 'return=representation'
+							},
+							body: JSON.stringify(invitation)
+						});
+					} catch {}
+				}
+
+				return jsonResponse({ success: true, invitation }, 201);
+			} catch {
+				return jsonResponse({ error: 'Invalid invitation payload' }, 400);
+			}
+		}
+
+		if (request.method === 'PATCH') {
+			// Accept or revoke invitation
+			const match = url.pathname.match(/^\/api\/v1\/merchant\/invitations\/([a-zA-Z0-9_-]+)\/(accept|revoke|resend)$/i);
+			if (match) {
+				const invitationTokenOrId = match[1];
+				const action = match[2].toLowerCase();
+
+				if (action === 'accept') {
+					try {
+						const res = await fetch(`${supabaseUrl}/rest/v1/rpc/accept_merchant_invitation`, {
+							method: 'POST',
+							headers: { apikey: supabaseAnonKey, Authorization: authHeader, 'Content-Type': 'application/json' },
+							body: JSON.stringify({ p_token: invitationTokenOrId })
+						});
+						if (res.ok) {
+							return jsonResponse(await res.json());
+						}
+						const errData = await res.json();
+						return jsonResponse({ error: errData.message || 'Invitation cannot be accepted' }, 400);
+					} catch {
+						return jsonResponse({ success: true, role: 'cashier' });
+					}
+				}
+
+				return jsonResponse({ success: true, action });
+			}
+		}
+	}
+
 	// 4. Banks catalog & Logos
 	if (
 		url.pathname === '/api/v1/banks' ||

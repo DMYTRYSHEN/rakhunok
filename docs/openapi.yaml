@@ -178,6 +178,132 @@ paths:
                 $ref: '#/components/schemas/Merchant'
 
   # =========================================================================
+  # 3.1. КОМАНДА, КАСИРИ ТА ЗАПРОШЕННЯ
+  # =========================================================================
+  /merchant/team:
+    get:
+      operationId: listTeamMembers
+      summary: Отримати список працівників бізнесу з ролями та призначеними касами
+      tags: [Team]
+      security:
+        - BearerAuth: []
+        - MerchantApiKey: []
+      responses:
+        '200':
+          description: Список активних співробітників
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TeamMember'
+
+  /merchant/team/{memberId}:
+    delete:
+      operationId: removeTeamMember
+      summary: Відкликати доступ та видалити співробітника з команди
+      tags: [Team]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Доступ успішно відкликано
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+        '403':
+          description: Тільки власник має право видаляти учасників команди
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /merchant/invitations:
+    get:
+      operationId: listInvitations
+      summary: Перелік активних та очікуючих запрошень у команду
+      tags: [Team]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Список запрошень
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TeamInvitation'
+    post:
+      operationId: createInvitation
+      summary: Створити запрошення для менеджера, касира або КСО
+      tags: [Team]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email, example: 'cashier@cafe.ua' }
+                role: { type: string, enum: [manager, cashier, kso], example: 'cashier' }
+                terminal_id: { type: string, format: uuid, nullable: true }
+      responses:
+        '201':
+          description: Запрошення створено та згенеровано унікальний токен (діє 7 днів)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  invitation:
+                    $ref: '#/components/schemas/TeamInvitation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /merchant/invitations/{token}/accept:
+    post:
+      operationId: acceptInvitation
+      summary: Прийняття запрошення користувачем та активація членства
+      tags: [Team]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema: { type: string, example: 'inv_98f4a1c02e5b7d91' }
+      responses:
+        '200':
+          description: Запрошення успішно прийнято, роль призначено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  role: { type: string, enum: [manager, cashier, kso] }
+                  merchant_id: { type: string, format: uuid }
+        '400':
+          description: Запрошення прострочене, скасоване або недійсне
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # =========================================================================
   # 4. КЕРУВАННЯ РАХУНКАМИ (ORDERS / INVOICES)
   # =========================================================================
   /orders:
@@ -1004,6 +1130,34 @@ components:
         alternative_url: { type: string, example: 'mono://bank.gov.ua/qr/{payload}' }
         encoding: { type: string, example: '1' }
         nbu_version: { type: string, example: '003' }
+
+    TeamMember:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        merchant_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        email: { type: string, format: email, example: 'cashier.taras@rahunok.app' }
+        fullName: { type: string, example: 'Тарас Шевчук' }
+        role: { type: string, enum: [owner, manager, cashier, kso], example: 'cashier' }
+        terminal_id: { type: string, format: uuid, nullable: true }
+        terminal_name: { type: string, nullable: true, example: 'Каса 1' }
+        status: { type: string, enum: [active, suspended], example: 'active' }
+        created_at: { type: string, format: date-time }
+
+    TeamInvitation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        merchant_id: { type: string, format: uuid }
+        email: { type: string, format: email, example: 'barista.andriy@gmail.com' }
+        role: { type: string, enum: [manager, cashier, kso], example: 'cashier' }
+        terminal_id: { type: string, format: uuid, nullable: true }
+        terminal_name: { type: string, nullable: true }
+        token: { type: string, example: 'inv_98f4a1c02e5b7d91' }
+        status: { type: string, enum: [pending, accepted, expired, revoked], example: 'pending' }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
 
     Error:
       type: object

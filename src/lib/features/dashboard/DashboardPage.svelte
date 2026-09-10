@@ -696,7 +696,14 @@
 		{:else if view === 'public-page'}
 			{#await loadPublicPageSettings() then module}<module.default />{/await}
 		{:else if view === 'team'}
-			{#await loadTeamSettings() then module}<module.default />{/await}
+			{#await loadTeamSettings() then module}
+				<module.default
+					gateway={gateway!}
+					merchantId={sessionState.merchant.id}
+					terminals={structureData.terminals}
+					demo={sessionState.user.id === 'demo-user'}
+				/>
+			{/await}
 		{:else if view === 'developer-api'}
 			{#await loadDeveloperApi() then module}
 				<module.default gateway={gateway!} merchantId={sessionState.merchant.id} />
