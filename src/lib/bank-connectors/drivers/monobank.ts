@@ -314,4 +314,109 @@ export class MonobankDriver implements BankConnectorDriver {
 			return { isValid: false, reason: `Помилка парсингу вебхука Monobank: ${message}` };
 		}
 	}
+
+	/**
+	 * Initiate Corporate Auth Request (https://api.monobank.ua/docs/corporate.html)
+	 */
+	async initiateCorporateAuth(params: {
+		keyId: string;
+		callbackUrl?: string;
+		baseUrl?: string;
+		fetcher?: typeof fetch;
+	}): Promise<{ tokenRequestId: string; acceptUrl: string; qrBase64?: string }> {
+		const fetcher = params.fetcher || fetch;
+		const baseUrl = (params.baseUrl || this.defaultBaseUrl).replace(/\/+$/, '');
+		const url = `${baseUrl}/api/corporate/auth/request`;
+
+		const res = await fetcher(url, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'X-Key-Id': params.keyId,
+				'X-Time': Math.floor(Date.now() / 1000).toString()
+			},
+			body: JSON.stringify({ callback: params.callbackUrl })
+		});
+
+		if (!res.ok) {
+			const err = await res.text().catch(() => '');
+			throw new Error(`Monobank Corporate помилка /auth/request (${res.status}): ${err}`);
+		}
+
+		const data = (await res.json()) as {
+			token_request_id: string;
+			accept_url: string;
+			qr?: string;
+		};
+
+		return {
+			tokenRequestId: data.token_request_id,
+			acceptUrl: data.accept_url,
+			qrBase64: data.qr
+		};
+	}
+
+	/**
+	 * Check Corporate Auth Request Status
+	 */
+	async checkCorporateAuthStatus(params: {
+		tokenRequestId: string;
+		keyId: string;
+		baseUrl?: string;
+		fetcher?: typeof fetch;
+	}): Promise<{ status: 'processing' | 'approved' | 'rejected'; token?: string }> {
+		const fetcher = params.fetcher || fetch;
+		const baseUrl = (params.baseUrl || this.defaultBaseUrl).replace(/\/+$/, '');
+		const url = `${baseUrl}/api/corporate/auth/request/${params.tokenRequestId}`;
+
+		const res = await fetcher(url, {
+			method: 'GET',
+			headers: {
+				'X-Key-Id': params.keyId,
+				'X-Time': Math.floor(Date.now() / 1000).toString()
+			}
+		});
+
+		if (!res.ok) {
+			const err = await res.text().catch(() => '');
+			throw new Error(`Monobank Corporate помилка перевірки статусу (${res.status}): ${err}`);
+		}
+
+		const data = (await res.json()) as {
+			status: 'processing' | 'approved' | 'rejected';
+			token?: string;
+		};
+
+		return data;
+	}
+
+	/**
+	 * Set Webhook URL for statement notifications
+	 */
+	async setWebhookUrl(params: {
+		token: string;
+		webhookUrl: string;
+		baseUrl?: string;
+		fetcher?: typeof fetch;
+	}): Promise<{ result: string }> {
+		const fetcher = params.fetcher || fetch;
+		const baseUrl = (params.baseUrl || this.defaultBaseUrl).replace(/\/+$/, '');
+		const url = `${baseUrl}/personal/webhook`;
+
+		const res = await fetcher(url, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'X-Token': params.token
+			},
+			body: JSON.stringify({ webHookUrl: params.webhookUrl })
+		});
+
+		if (!res.ok) {
+			const err = await res.text().catch(() => '');
+			throw new Error(`Monobank помилка встановлення webhook (${res.status}): ${err}`);
+		}
+
+		return { result: 'ok' };
+	}
 }

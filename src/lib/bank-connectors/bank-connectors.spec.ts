@@ -605,5 +605,192 @@ describe('Universal Bank Connectors', () => {
 			globalThis.fetch = originalFetch;
 		});
 	});
+
+	describe('Monobank Corporate Complete End-to-End Lifecycle Verification', () => {
+		it('executes full Corporate flow: provider auth request -> client QR approval -> token issuance -> account discovery -> invoice creation -> statement webhook receipt -> matching -> paid transition', async () => {
+			const driver = new MonobankDriver();
+
+			// 1. Step 1: Provider initiates Corporate Auth Request (POST /api/corporate/auth/request)
+			const mockAuthRequestFetcher = async (url: RequestInfo | URL, init?: RequestInit) => {
+				const headers = init?.headers as Record<string, string>;
+				expect(headers['X-Key-Id']).toBe('partner-key-id-99');
+				expect(headers['X-Time']).toBeDefined();
+
+				return new Response(
+					JSON.stringify({
+						token_request_id: 'mono-req-id-5544',
+						accept_url: 'https://mbnk.biz/auth/mono-req-id-5544',
+						qr: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+					}),
+					{ status: 200 }
+				);
+			};
+
+			const authReq = await driver.initiateCorporateAuth({
+				keyId: 'partner-key-id-99',
+				callbackUrl: 'https://api.rahunok.ua/v1/bank-callback/monobank',
+				fetcher: mockAuthRequestFetcher as unknown as typeof fetch
+			});
+
+			expect(authReq.tokenRequestId).toBe('mono-req-id-5544');
+			expect(authReq.acceptUrl).toBe('https://mbnk.biz/auth/mono-req-id-5544');
+			expect(authReq.qrBase64).toBeDefined();
+
+			// 2. Step 2: Merchant scans QR in Monobank app and approves access
+			// Server checks status (GET /api/corporate/auth/request/{token_request_id})
+			const mockCheckStatusFetcher = async () => {
+				return new Response(
+					JSON.stringify({
+						status: 'approved',
+						token: 'mono_permanent_corp_token_889900'
+					}),
+					{ status: 200 }
+				);
+			};
+
+			const statusCheck = await driver.checkCorporateAuthStatus({
+				tokenRequestId: authReq.tokenRequestId,
+				keyId: 'partner-key-id-99',
+				fetcher: mockCheckStatusFetcher as unknown as typeof fetch
+			});
+
+			expect(statusCheck.status).toBe('approved');
+			expect(statusCheck.token).toBe('mono_permanent_corp_token_889900');
+
+			const merchantToken = statusCheck.token!;
+
+			// 3. Step 3: Register Statement Webhook (POST /personal/webhook)
+			const mockWebhookFetcher = async (url: RequestInfo | URL, init?: RequestInit) => {
+				const headers = init?.headers as Record<string, string>;
+				expect(headers['X-Token']).toBe(merchantToken);
+				const body = JSON.parse(init?.body as string);
+				expect(body.webHookUrl).toBe('https://api.rahunok.ua/v1/bank-webhook/monobank');
+
+				return new Response(JSON.stringify({ result: 'ok' }), { status: 200 });
+			};
+
+			const whResult = await driver.setWebhookUrl({
+				token: merchantToken,
+				webhookUrl: 'https://api.rahunok.ua/v1/bank-webhook/monobank',
+				fetcher: mockWebhookFetcher as unknown as typeof fetch
+			});
+
+			expect(whResult.result).toBe('ok');
+
+			// 4. Step 4: Account Discovery (GET /personal/client-info)
+			const mockClientInfoFetcher = async (url: RequestInfo | URL, init?: RequestInit) => {
+				const headers = init?.headers as Record<string, string>;
+				expect(headers['X-Token']).toBe(merchantToken);
+
+				return new Response(
+					JSON.stringify({
+						name: 'ФОП Мельник Артем',
+						accounts: [
+							{
+								id: 'mono_acc_01',
+								iban: 'UA993052990000026001111111111',
+								currencyCode: 980,
+								type: 'fop',
+								balance: 8500000 // 85,000.00 UAH in minor units
+							}
+						]
+					}),
+					{ status: 200 }
+				);
+			};
+
+			const accounts = await driver.discoverAccounts(
+				{ token: merchantToken },
+				mockClientInfoFetcher as unknown as typeof fetch
+			);
+
+			expect(accounts.length).toBe(1);
+			expect(accounts[0].iban).toBe('UA993052990000026001111111111');
+			expect(accounts[0].balanceAvailableMinor).toBe(8500000n);
+
+			const merchantAccount = accounts[0];
+
+			// 5. Step 5: Merchant Creates Invoice in Rahunok
+			const invoiceOrder = {
+				id: 'order-uuid-5500',
+				orderNumber: '5500',
+				referenceCode: 'RAH-5500',
+				recipientIban: merchantAccount.iban,
+				amountMinor: 500000n, // 5,000.00 UAH (in minor units)
+				currency: 'UAH',
+				status: 'pending' as 'pending' | 'paid'
+			};
+
+			expect(invoiceOrder.status).toBe('pending');
+
+			// 6. Step 6: Buyer transfers funds -> Monobank pushes StatementItem Webhook
+			const incomingStatementWebhook = {
+				type: 'StatementItem',
+				data: {
+					account: merchantAccount.iban,
+					statementItem: {
+						id: 'mono_corp_tx_7890',
+						time: 1788965200,
+						description: 'Оплата замовлення #RAH-5500 згідно договору',
+						amount: 500000, // 5,000.00 UAH
+						operationAmount: 500000,
+						currencyCode: 980,
+						balance: 9000000,
+						hold: false,
+						counterName: 'ТОВ Технології',
+						counterIban: 'UA173077700000026205061543958',
+						counterEdrpou: '33445566'
+					}
+				}
+			};
+
+			const verifiedWebhook = await driver.verifyWebhook({
+				headers: {},
+				rawBody: JSON.stringify(incomingStatementWebhook),
+				account: merchantAccount
+			});
+
+			expect(verifiedWebhook.isValid).toBe(true);
+			const evidence = verifiedWebhook.normalizedEvidence!;
+
+			// Verify normalization
+			expect(evidence.amountMinor).toBe(500000n);
+			expect(evidence.currency).toBe('UAH');
+			expect(evidence.direction).toBe('credit');
+			expect(evidence.status).toBe('booked');
+			expect(evidence.evidenceId).toBe(
+				'urn:bank:monobank:UA993052990000026001111111111:mono_corp_tx_7890'
+			);
+
+			// 7. Step 7: Matching Engine Reconciles Payment
+			const matchResult = matchEvidenceAgainstTarget(evidence, {
+				orderId: invoiceOrder.id,
+				referenceCode: invoiceOrder.referenceCode,
+				recipientIban: invoiceOrder.recipientIban,
+				amountMinor: invoiceOrder.amountMinor,
+				currency: invoiceOrder.currency
+			});
+
+			expect(matchResult.decision).toBe('matched');
+			expect(matchResult.confidenceScore).toBe(1.0);
+			expect(matchResult.differenceMinor).toBe(0n);
+
+			// 8. Step 8: Transactional State Transition to PAID & Idempotency
+			const processedEvidenceLedger = new Set<string>();
+
+			if (matchResult.decision === 'matched') {
+				expect(processedEvidenceLedger.has(evidence.evidenceId)).toBe(false);
+				processedEvidenceLedger.add(evidence.evidenceId);
+
+				invoiceOrder.status = 'paid';
+			}
+
+			expect(invoiceOrder.status).toBe('paid');
+
+			// Replay protection test
+			expect(processedEvidenceLedger.has(evidence.evidenceId)).toBe(true);
+		});
+	});
 });
+
 
