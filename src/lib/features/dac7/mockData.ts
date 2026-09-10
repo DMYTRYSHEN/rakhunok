@@ -1,5 +1,6 @@
 import type {
 	Dac7Seller,
+	SellerCategory,
 	Dac7Payout,
 	Dac7Batch,
 	Dac7IncomeTransaction,
@@ -10,6 +11,89 @@ import type {
 } from './types';
 
 export const fmt = (n: number) => n.toLocaleString('uk-UA');
+
+export const CATEGORY_META: Record<
+	SellerCategory,
+	{
+		label: string;
+		shortLabel: string;
+		color: string;
+		taxDescription: string;
+		taxRateDisplay: string;
+		badgeClass: string;
+	}
+> = {
+	platform_gig: {
+		label: 'Платформний гіг-виконавець (ст. 178-1 ПКУ)',
+		shortLabel: 'Гіг (10% ПДФО)',
+		color: 'emerald',
+		taxDescription:
+			'10% ПДФО утримує платформа як податковий агент. Військовий збір 0.00 ₴. Ліміт 834 МЗП.',
+		taxRateDisplay: '10% ПДФО',
+		badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+	},
+	fop: {
+		label: 'Фізична особа – підприємець (ФОП)',
+		shortLabel: 'ФОП (0% агента)',
+		color: 'indigo',
+		taxDescription:
+			'Платформа не утримує податок (0%). ФОП сплачує ЄП самостійно. Звітність 4ДФ код 157.',
+		taxRateDisplay: '0% платформи',
+		badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200'
+	},
+	goods_casual: {
+		label: 'Продавець особистих/вживаних речей',
+		shortLabel: 'Товари (De Minimis)',
+		color: 'amber',
+		taxDescription:
+			'Звільнення до 30 операцій та 2000 € (DAC7 De Minimis). При перевищенні — Reportable.',
+		taxRateDisplay: 'De Minimis',
+		badgeClass: 'bg-amber-50 text-amber-700 border-amber-200'
+	},
+	property_rental: {
+		label: 'Орендодавець нерухомості',
+		shortLabel: 'Оренда житла',
+		color: 'violet',
+		taxDescription: 'Звітність DAC7 за обʼєктами з кадастровими номерами та кількістю діб оренди.',
+		taxRateDisplay: 'Кадастровий облік',
+		badgeClass: 'bg-violet-50 text-violet-700 border-violet-200'
+	},
+	transport_rental: {
+		label: 'Орендодавець транспорту / Каршеринг',
+		shortLabel: 'Оренда авто',
+		color: 'cyan',
+		taxDescription:
+			'Оренда рухомого майна. Звітність за VIN-кодами, держномерами та строками оренди.',
+		taxRateDisplay: 'Транспортний облік',
+		badgeClass: 'bg-cyan-50 text-cyan-700 border-cyan-200'
+	},
+	independent_pro: {
+		label: 'Незалежна професійна діяльність (ст. 178 ПКУ)',
+		shortLabel: 'Незалежний профі',
+		color: 'teal',
+		taxDescription: 'Репетитори, юристи, консультанти. Облік за довідкою форми 20-ОПП та РНОКПП.',
+		taxRateDisplay: 'Проф. діяльність',
+		badgeClass: 'bg-teal-50 text-teal-700 border-teal-200'
+	},
+	corporate_entity: {
+		label: 'Юридична особа / Корпоративний мерчант',
+		shortLabel: 'Юрособа (VARUS)',
+		color: 'blue',
+		taxDescription:
+			'ТОВ/ПрАТ. Розрахунки через комерційний рахунок. DAC7 Entity Reporting за ЄДРПОУ.',
+		taxRateDisplay: 'Юридична особа',
+		badgeClass: 'bg-blue-50 text-blue-700 border-blue-200'
+	},
+	excluded_seller: {
+		label: 'Виключений продавець (Excluded Seller)',
+		shortLabel: 'Виключений',
+		color: 'stone',
+		taxDescription:
+			'Держоргани, публічні лістингові компанії, готелі >2000 оренд/рік (звільнені від DAC7 DPI).',
+		taxRateDisplay: 'Звільнено від DPI',
+		badgeClass: 'bg-stone-100 text-stone-700 border-stone-200'
+	}
+};
 
 export const KYC_META: Record<string, { l: string; t: 'ok' | 'blue' | 'warn' | 'bad' }> = {
 	tier2: { l: 'Tier-2 · Дія', t: 'ok' },
@@ -113,7 +197,8 @@ export const demoSellers: Dac7Seller[] = [
 	{
 		id: 'RHK-9E71AB3',
 		name: 'Олексій Ткаченко',
-		role: "Кур'єр",
+		role: "Кур'єр (Спецрежим)",
+		category: 'platform_gig',
 		kyc: 'tier2',
 		iban: true,
 		ibanFormatted: 'UA51 3220 0100 0002 6000 0001 2384',
@@ -127,12 +212,21 @@ export const demoSellers: Dac7Seller[] = [
 		isFop: false,
 		address: 'вул. Січових Стрільців, 12, Дніпро, 49000',
 		dob: '15.04.1992',
-		rnokpp: '3091248192'
+		rnokpp: '3091248192',
+		thresholdDetails: {
+			annualLimitUah: 7211598,
+			currentEarnedUah: 136800,
+			isExceeded: false,
+			excessEarnedUah: 0,
+			baseTaxRate: 0.1,
+			excessTaxRate: 0.18
+		}
 	},
 	{
 		id: 'RHK-4C20F91',
 		name: 'Марія Гнатюк',
-		role: 'Водійка',
+		role: 'Водійка (ФОП 3 гр)',
+		category: 'fop',
 		kyc: 'tier2',
 		iban: true,
 		ibanFormatted: 'UA68 3052 9900 0002 6000 0004 8912',
@@ -144,6 +238,8 @@ export const demoSellers: Dac7Seller[] = [
 		last: 'сьогодні',
 		mode: 'daily',
 		isFop: true,
+		fopGroup: 3,
+		fopTaxRate: 5,
 		address: 'просп. Перемоги, 45, Київ, 01135',
 		dob: '08.11.1988',
 		rnokpp: '2847192041'
@@ -151,11 +247,14 @@ export const demoSellers: Dac7Seller[] = [
 	{
 		id: 'RHK-B33D002',
 		name: 'Ігор Савченко',
-		role: 'Продавець',
+		role: 'Продавець речей (Reportable)',
+		category: 'goods_casual',
 		kyc: 'tier2',
 		iban: true,
+		ibanFormatted: 'UA71 3052 9900 0002 6000 0009 3321',
+		bankName: 'ПриватБанк',
 		score: 99,
-		earned: 486200,
+		earned: 103500,
 		city: 'Львів',
 		since: '07.2024',
 		last: 'вчора',
@@ -164,27 +263,201 @@ export const demoSellers: Dac7Seller[] = [
 		isGoodsSeller: true,
 		goodsSalesYtd: 2300,
 		goodsSalesCount: 45,
+		deMinimis: {
+			salesCount: 45,
+			maxSalesThreshold: 30,
+			salesTotalEur: 2300,
+			maxEurThreshold: 2000,
+			isExempt: false
+		},
 		address: 'вул. Городоцька, 112, Львів, 79016',
-		dob: '23.07.1995'
+		dob: '23.07.1995',
+		rnokpp: '3482910482'
+	},
+	{
+		id: 'RHK-C182A94',
+		name: 'Олена Бойко',
+		role: 'Продавчиня речей (De Minimis Exempt)',
+		category: 'goods_casual',
+		kyc: 'tier2',
+		iban: true,
+		ibanFormatted: 'UA19 3223 1300 0002 6000 0019 4481',
+		bankName: 'Універсал Банк',
+		score: 96,
+		earned: 27900,
+		city: 'Полтава',
+		since: '04.2025',
+		last: '3 дні тому',
+		mode: 'daily',
+		isFop: false,
+		isGoodsSeller: true,
+		goodsSalesYtd: 620,
+		goodsSalesCount: 14,
+		deMinimis: {
+			salesCount: 14,
+			maxSalesThreshold: 30,
+			salesTotalEur: 620,
+			maxEurThreshold: 2000,
+			isExempt: true
+		},
+		address: 'вул. Соборності, 34, Полтава, 36000',
+		dob: '11.09.1997',
+		rnokpp: '3210948571'
+	},
+	{
+		id: 'RHK-P991K21',
+		name: 'Андрій Шевченко',
+		role: 'Орендодавець нерухомості',
+		category: 'property_rental',
+		kyc: 'tier2',
+		iban: true,
+		ibanFormatted: 'UA84 3007 1100 0002 6000 0005 5109',
+		bankName: 'Райффайзен Банк',
+		score: 99,
+		earned: 384000,
+		city: 'Київ',
+		since: '01.2024',
+		last: 'сьогодні',
+		mode: 'daily',
+		isFop: false,
+		address: 'вул. Хрещатик, 21, кв. 14, Київ, 01001',
+		dob: '29.09.1981',
+		rnokpp: '2718294018',
+		propertyDetails: {
+			address: 'вул. Хрещатик, 21, кв. 14, Київ, 01001',
+			cadastralNumber: '8000000000:72:001:0014',
+			rentalDays: 142,
+			propertyType: 'residential',
+			unitsCount: 2
+		}
+	},
+	{
+		id: 'RHK-T882M33',
+		name: 'Сергій Бондар',
+		role: 'Орендодавець авто / Каршеринг',
+		category: 'transport_rental',
+		kyc: 'tier2',
+		iban: true,
+		ibanFormatted: 'UA44 3226 6900 0002 6000 0033 1120',
+		bankName: 'Ощадбанк',
+		score: 94,
+		earned: 198000,
+		city: 'Одеса',
+		since: '06.2025',
+		last: 'вчора',
+		mode: 'daily',
+		isFop: false,
+		address: 'вул. Фонтанська дорога, 18, Одеса, 65016',
+		dob: '04.05.1989',
+		rnokpp: '2981029384',
+		transportDetails: {
+			vin: 'VF1234567890ABCDE',
+			plateNumber: 'KA 1234 CB',
+			model: 'Skoda Octavia 2.0 TDI',
+			rentalDays: 95,
+			vehicleType: 'car'
+		}
+	},
+	{
+		id: 'RHK-E551Q77',
+		name: 'Оксана Мельник',
+		role: 'Психологиня (ст. 178 ПКУ)',
+		category: 'independent_pro',
+		kyc: 'tier2',
+		iban: true,
+		ibanFormatted: 'UA77 3253 6500 0002 6000 0077 8899',
+		bankName: 'Кредобанк',
+		score: 98,
+		earned: 89000,
+		city: 'Львів',
+		since: '09.2024',
+		last: 'сьогодні',
+		mode: 'instant',
+		isFop: false,
+		address: 'вул. Личаківська, 55, Львів, 79010',
+		dob: '18.12.1986',
+		rnokpp: '3182940182',
+		professionalDetails: {
+			certNumber: '№ 4821-НП',
+			activityType: 'Психологічне консультування та психотерапія',
+			pkuArticle: '178',
+			registeredTaxOffice: 'ГУ ДПС у Львівській області'
+		}
+	},
+	{
+		id: 'RHK-CORP-VARUS',
+		name: 'ТОВ «ОМЕГА» (Мережа VARUS)',
+		role: 'Корпоративний партнер (Супермаркет)',
+		category: 'corporate_entity',
+		kyc: 'tier2',
+		iban: true,
+		ibanFormatted: 'UA82 3052 9900 0002 6000 0008 1900',
+		bankName: 'ПриватБанк Корп',
+		score: 100,
+		earned: 14850000,
+		city: 'Дніпро',
+		since: '01.2023',
+		last: 'сьогодні',
+		mode: 'daily',
+		isFop: false,
+		address: 'просп. Дмитра Яворницького, 105, Дніпро, 49000',
+		corporateDetails: {
+			edrpou: '32615482',
+			companyName: 'ТОВ "ОМЕГА" (Мережа VARUS)',
+			isVatPayer: true,
+			vatNumber: '326154804671'
+		}
+	},
+	{
+		id: 'RHK-EXCL-HOTEL',
+		name: 'ПрАТ «Готельний комплекс Дніпро»',
+		role: 'Великий готельний оператор',
+		category: 'excluded_seller',
+		kyc: 'tier2',
+		iban: true,
+		ibanFormatted: 'UA22 3003 3500 0002 6000 0012 3456',
+		bankName: 'Укрексімбанк',
+		score: 100,
+		earned: 29400000,
+		city: 'Київ',
+		since: '03.2022',
+		last: 'сьогодні',
+		mode: 'daily',
+		isFop: false,
+		address: 'вул. Хрещатик, 1/2, Київ, 01001',
+		corporateDetails: {
+			edrpou: '14352819',
+			companyName: 'ПрАТ "ГК Дніпро"',
+			isVatPayer: true
+		}
 	},
 	{
 		id: 'RHK-77A1E45',
 		name: 'Дмитро Коваль',
-		role: "Кур'єр",
+		role: "Кур'єр (Спецрежим)",
+		category: 'platform_gig',
 		kyc: 'tier1',
 		iban: true,
 		ibanFormatted: 'UA12 3077 7000 0002 6000 0009 1102',
 		bankName: 'А-Банк',
 		score: 84,
 		earned: 41200,
-		city: 'Одеса',
+		city: 'Харків',
 		since: '05.2026',
 		last: 'сьогодні',
 		mode: 'daily',
 		isFop: false,
-		address: 'вул. Дерибасівська, 1, Одеса, 65000',
+		address: 'просп. Науки, 14, Харків, 61000',
 		dob: '02.02.2001',
-		rnokpp: '3104928172'
+		rnokpp: '3104928172',
+		thresholdDetails: {
+			annualLimitUah: 7211598,
+			currentEarnedUah: 41200,
+			isExceeded: false,
+			excessEarnedUah: 0,
+			baseTaxRate: 0.1,
+			excessTaxRate: 0.18
+		}
 	}
 ];
 
@@ -278,9 +551,53 @@ export const demoPayouts: Dac7Payout[] = [
 	}
 ];
 
+export const demoPayments: import('./types').Dac7PaymentEvent[] = [
+	{
+		id: 'pay_9921',
+		orderId: 'ord_884',
+		customer: 'Іван',
+		amount: 550,
+		status: 'paid',
+		date: '02.07 12:35'
+	},
+	{
+		id: 'pay_9920',
+		orderId: 'ord_871',
+		customer: 'Анна',
+		amount: 350,
+		status: 'paid',
+		date: '02.07 10:00'
+	},
+	{
+		id: 'pay_9919',
+		orderId: 'ord_863',
+		customer: 'Олег',
+		amount: 420,
+		status: 'paid',
+		date: '01.07 20:25'
+	},
+	{
+		id: 'pay_9918',
+		orderId: 'ord_850',
+		customer: 'Марія',
+		amount: 1450,
+		status: 'paid',
+		date: '01.07 14:15'
+	},
+	{
+		id: 'pay_9917',
+		orderId: 'ord_842',
+		customer: 'Василь',
+		amount: 950,
+		status: 'paid',
+		date: '30.06 17:50'
+	}
+];
+
 export const demoIncome: Dac7IncomeTransaction[] = [
 	{
 		id: 'tx_884',
+		orderId: 'ord_884',
 		p: 'Bolt Food',
 		d: 'Доставка · замовлення №884',
 		gross: 245,
@@ -288,10 +605,12 @@ export const demoIncome: Dac7IncomeTransaction[] = [
 		net: 220.5,
 		date: '02.07',
 		time: '12:41',
-		batch: 'bt_02070_9E71'
+		batch: 'bt_02070_9E71',
+		deliveryStatus: 'DELIVERED'
 	},
 	{
 		id: 'tx_871',
+		orderId: 'ord_871',
 		p: 'Uklon',
 		d: 'Поїздка · Соборна → Перемога',
 		gross: 312,
@@ -299,10 +618,12 @@ export const demoIncome: Dac7IncomeTransaction[] = [
 		net: 280.8,
 		date: '02.07',
 		time: '10:05',
-		batch: 'bt_02070_9E71'
+		batch: 'bt_02070_9E71',
+		deliveryStatus: 'DELIVERED'
 	},
 	{
 		id: 'tx_863',
+		orderId: 'ord_863',
 		p: 'Bolt Food',
 		d: 'Доставка · замовлення №863',
 		gross: 198,
@@ -310,10 +631,25 @@ export const demoIncome: Dac7IncomeTransaction[] = [
 		net: 178.2,
 		date: '01.07',
 		time: '20:33',
-		batch: 'bt_01070_9E71'
+		batch: 'bt_01070_9E71',
+		deliveryStatus: 'DELIVERED'
+	},
+	{
+		id: 'tx_850_adj',
+		orderId: 'ord_850',
+		p: 'OLX',
+		d: 'Продаж · Коригування (повернення)',
+		gross: -100,
+		tax: -10,
+		net: -90,
+		date: '01.07',
+		time: '15:20',
+		batch: 'bt_01070_9E71',
+		deliveryStatus: 'ADJUSTED'
 	},
 	{
 		id: 'tx_850',
+		orderId: 'ord_850',
 		p: 'OLX',
 		d: 'Продаж · велотримач',
 		gross: 1450,
@@ -321,10 +657,12 @@ export const demoIncome: Dac7IncomeTransaction[] = [
 		net: 1305,
 		date: '01.07',
 		time: '14:19',
-		batch: 'bt_01070_9E71'
+		batch: 'bt_01070_9E71',
+		deliveryStatus: 'DELIVERED'
 	},
 	{
 		id: 'tx_842',
+		orderId: 'ord_842',
 		p: 'Kabanchik',
 		d: 'Послуга · збірка меблів',
 		gross: 950,
@@ -332,18 +670,20 @@ export const demoIncome: Dac7IncomeTransaction[] = [
 		net: 855,
 		date: '30.06',
 		time: '18:02',
-		batch: 'bt_30060_9E71'
+		batch: 'bt_30060_9E71',
+		deliveryStatus: 'DELIVERED'
 	},
 	{
-		id: 'tx_831',
-		p: 'Uklon',
-		d: 'Поїздка · вокзал → аеропорт',
-		gross: 486,
-		tax: 48.6,
-		net: 437.4,
-		date: '30.06',
-		time: '11:47',
-		batch: 'bt_30060_9E71'
+		id: 'tx_999',
+		orderId: 'ord_999',
+		p: 'Bolt Food',
+		d: 'Доставка · замовлення №999',
+		gross: 150,
+		tax: 15,
+		net: 135,
+		date: 'сьогодні',
+		time: 'в процесі',
+		deliveryStatus: 'IN_DELIVERY'
 	}
 ];
 
@@ -436,4 +776,89 @@ export const demoLoyaltyCards: Dac7LoyaltyCard[] = [
 		textColor: 'text-stone-900',
 		isLinked: true
 	}
+];
+
+export interface Dac7EscrowItem {
+	id: string;
+	seller: string;
+	buyer: string;
+	gross: number;
+	tax: number;
+	net: number;
+	status: 'held' | 'released' | 'refunded' | 'disputed';
+	date: string;
+	reason?: string;
+}
+
+export const demoEscrows: Dac7EscrowItem[] = [
+	{
+		id: 'esc_01J8ZK4A',
+		seller: 'Олексій Ткаченко',
+		buyer: 'Марія Коваленко',
+		gross: 1200,
+		tax: 120,
+		net: 1080,
+		status: 'held',
+		date: '2026-07-04'
+	},
+	{
+		id: 'esc_01J8ZK4B',
+		seller: 'Олексій Ткаченко',
+		buyer: 'Дмитро Шевченко',
+		gross: 3500,
+		tax: 350,
+		net: 3150,
+		status: 'disputed',
+		date: '2026-07-03'
+	},
+	{
+		id: 'esc_01J8ZK4C',
+		seller: 'Дмитро Кравченко',
+		buyer: 'Ірина Петренко',
+		gross: 2200,
+		tax: 220,
+		net: 1980,
+		status: 'released',
+		date: '2026-07-02'
+	},
+	{
+		id: 'esc_01J8ZK4D',
+		seller: 'Світлана Мороз',
+		buyer: 'Олег Козак',
+		gross: 800,
+		tax: 80,
+		net: 720,
+		status: 'refunded',
+		date: '2026-07-01',
+		reason: 'Замовлення скасовано клієнтом'
+	}
+];
+
+export const ESCROW_META: Record<
+	string,
+	{ l: string; t: 'ok' | 'blue' | 'warn' | 'bad' | 'neutral' }
+> = {
+	held: { l: 'В утриманні', t: 'warn' },
+	released: { l: 'Випущено', t: 'ok' },
+	refunded: { l: 'Повернено', t: 'neutral' },
+	disputed: { l: 'Диспут', t: 'bad' }
+};
+
+export const demoRegions = [
+	{ name: 'Київ та область', v: 92 },
+	{ name: 'Дніпропетровська', v: 71 },
+	{ name: 'Львівська', v: 64 },
+	{ name: 'Одеська', v: 58 },
+	{ name: 'Харківська', v: 46 },
+	{ name: 'Вінницька', v: 31 },
+	{ name: 'Полтавська', v: 27 },
+	{ name: 'Інші області', v: 55 }
+];
+
+export const demoIndustries = [
+	{ name: 'Доставка', v: 34, c: 'bg-emerald-500' },
+	{ name: 'Таксі', v: 27, c: 'bg-stone-900' },
+	{ name: 'Маркетплейси', v: 19, c: 'bg-stone-500' },
+	{ name: 'Фриланс', v: 12, c: 'bg-stone-400' },
+	{ name: 'Оренда', v: 8, c: 'bg-stone-300' }
 ];

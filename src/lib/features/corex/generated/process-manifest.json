@@ -1714,6 +1714,268 @@
 			"publicRoutes": ["letsrealtalk.com/corex", "letsrealtalk.com/corex/*"],
 			"bindings": [{ "name": "ASSETS", "type": "assets", "target": "../build" }],
 			"routes": []
+		},
+		{
+			"id": "rahunok-dac7",
+			"name": "rahunok-dac7",
+			"entrypoint": "worker/src/dac7-worker.ts",
+			"config": "worker/wrangler.dac7.jsonc",
+			"publicRoutes": ["api.rahunok.ua/v1/dac7*"],
+			"bindings": [],
+			"routes": [
+				{
+					"method": "GET",
+					"path": "/deliveries/incidents",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/deliveries/incidents",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/deliveries/incidents",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/events/batch",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/events/batch",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/events/batch",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/openapi.json",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/openapi.json",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/openapi.json",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/operators/register",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/operators/register",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/operators/register",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/orders/split",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/orders/split",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/orders/split",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/payouts/batch",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/payouts/batch",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/payouts/batch",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/performers/bank-account",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/performers/bank-account",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/performers/bank-account",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/performers/onboard",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/performers/onboard",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/performers/onboard",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/reports/form-4df",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/reports/form-4df",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/reports/form-4df",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/reports/oecd-dpi",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/reports/oecd-dpi",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/reports/oecd-dpi",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/swagger.json",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/swagger.json",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/swagger.json",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/treasury/payment-order",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/treasury/payment-order",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/treasury/payment-order",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dac7-worker.ts"
+				}
+			]
 		}
 	],
 	"contracts": [
@@ -2112,6 +2374,104 @@
 					"tags": ["Mobile payments"],
 					"status": "planned",
 					"source": "docs/kso-mobile-openapi.yaml"
+				}
+			]
+		},
+		{
+			"id": "dac7-platform-api",
+			"title": "Rahunok DAC7 Platform Engine API",
+			"version": "2.0.0",
+			"servers": ["https://api.rahunok.ua", "http://localhost:8787"],
+			"routes": [
+				{
+					"method": "POST",
+					"path": "/operators/register",
+					"operationId": "registerPlatformOperator",
+					"summary": "Реєстрація оператора цифрової платформи в Реєстрі ДПС",
+					"tags": ["Platform Onboarding"],
+					"status": "planned",
+					"source": "docs/dac7-openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/performers/onboard",
+					"operationId": "onboardPerformerDiia",
+					"summary": "Онбординг та верифікація виконавця / кур'єра через Дія.Підпис (KYC Tier-2)",
+					"tags": ["Performer KYC"],
+					"status": "planned",
+					"source": "docs/dac7-openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/performers/bank-account",
+					"operationId": "registerDedicatedIban",
+					"summary": "Реєстрація спеціального рахунку кур'єра (IBAN) з повідомленням ДПС",
+					"tags": ["Performer Banking"],
+					"status": "planned",
+					"source": "docs/dac7-openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/orders/split",
+					"operationId": "calculateOrderSplit",
+					"summary": "Розрахунок 4-way сплиту замовлення у Payment Ledger",
+					"tags": ["Order Split & Ledger"],
+					"status": "planned",
+					"source": "docs/dac7-openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/deliveries/incidents",
+					"operationId": "reportDeliveryIncident",
+					"summary": "Обробка інцидентів доставки (пошкодження товару, втрата, перепризначення, сторно)",
+					"tags": ["Logistics & Incidents"],
+					"status": "planned",
+					"source": "docs/dac7-openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/events/batch",
+					"operationId": "ingestDac7Batch",
+					"summary": "Пакетне завантаження подій платформи (Bulk Ingestion)",
+					"tags": ["DAC7 Ingestion"],
+					"status": "planned",
+					"source": "docs/dac7-openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/payouts/batch",
+					"operationId": "compileDac7PayoutBatch",
+					"summary": "Розрахунок батчу виплат на IBAN з утриманням 10% ПДФО (0% ВЗ)",
+					"tags": ["DAC7 Payouts"],
+					"status": "planned",
+					"source": "docs/dac7-openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/treasury/payment-order",
+					"operationId": "generateTreasuryPaymentOrder",
+					"summary": "Формування платіжної інструкції сплати ПДФО 10% до Казначейства",
+					"tags": ["Treasury Settlement"],
+					"status": "planned",
+					"source": "docs/dac7-openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/reports/form-4df",
+					"operationId": "generateForm4df",
+					"summary": "Генерація квартального податкового розрахунку Додаток 4ДФ",
+					"tags": ["State Tax Reporting"],
+					"status": "planned",
+					"source": "docs/dac7-openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/reports/oecd-dpi",
+					"operationId": "generateOecdDpiXml",
+					"summary": "Генерація податкового звіту OECD DPI XML (DAC7) для ДПС",
+					"tags": ["OECD DAC7 Compliance"],
+					"status": "planned",
+					"source": "docs/dac7-openapi.yaml"
 				}
 			]
 		}

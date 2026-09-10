@@ -1,0 +1,33 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "rahunok-dac7-preview",
+	"main": "src/dac7-worker.ts",
+	"compatibility_date": "2026-08-28",
+	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": true,
+	"preview_urls": true,
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
+	"vars": {
+		"ENVIRONMENT": "preview",
+		"PIT_TAX_RATE": "0.10",
+		"OECD_VERSION": "DPI_XML_Schema_v1.0"
+	},
+	"env": {
+		"production": {
+			"name": "rahunok-dac7",
+			"workers_dev": false,
+			"preview_urls": false,
+			"vars": {
+				"ENVIRONMENT": "production",
+				"PIT_TAX_RATE": "0.10",
+				"OECD_VERSION": "DPI_XML_Schema_v1.0"
+			},
+			"routes": [
+				{ "pattern": "api.rahunok.ua/v1/dac7*", "zone_name": "rahunok.ua" }
+			]
+		}
+	}
+}

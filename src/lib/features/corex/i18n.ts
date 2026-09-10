@@ -271,6 +271,12 @@ const scenarioUk: Record<string, { label: string; title: string; description: st
 		description:
 			'Запланований мережево-нейтральний процес від контексту покупця й loyalty quote до checkout та підтвердження вхідного платежу.'
 	},
+	'dac7-platform-varus': {
+		label: 'DAC7 та VARUS (3 Леджери)',
+		title: 'Повний цикл комплаєнсу DAC7, 3 Леджери та VARUS',
+		description:
+			'Наскрізний потік цифрової платформи доставки: клієнтський платіж, Дія.Підпис KYC, 3 леджери (Payment ≠ Courier Income ≠ Payout), утримання 10% ПДФО (0% ВЗ), СЕП-4 виплати, обробка інцидентів (пошкодження, втрата, перепризначення) та генерація звіту OECD DPI XML.'
+	},
 	deploy: {
 		label: 'Розгортання',
 		title: 'Build, review і захищене розгортання',

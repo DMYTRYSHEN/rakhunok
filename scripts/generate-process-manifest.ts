@@ -43,7 +43,8 @@ const workerConfigs = [
 	'wrangler.dashboard.jsonc',
 	'wrangler.app.jsonc',
 	'wrangler.checkout.jsonc',
-	'wrangler.corex.jsonc'
+	'wrangler.corex.jsonc',
+	'wrangler.dac7.jsonc'
 ];
 
 function workspacePath(file: string): string {
@@ -223,7 +224,8 @@ const manifest = {
 	workers: await Promise.all(workerConfigs.map(workerInventory)),
 	contracts: [
 		await openApiInventory('docs/openapi.yaml', 'rahunok-edge-api'),
-		await openApiInventory('docs/kso-mobile-openapi.yaml', 'kso-mobile-api')
+		await openApiInventory('docs/kso-mobile-openapi.yaml', 'kso-mobile-api'),
+		await openApiInventory('docs/dac7-openapi.yaml', 'dac7-platform-api')
 	]
 };
 

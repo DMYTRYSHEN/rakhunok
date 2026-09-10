@@ -2,6 +2,7 @@ import { mockFlowEdges as deployEdges, mockFlowNodes as deployNodes } from './mo
 import { extendedFlowScenarios } from './extended-flow-scenarios';
 import { ksoSandboxScenario, ksoTargetScenario } from './kso-flow-scenarios';
 import { bankFlowScenarios } from './bank-flow-scenarios';
+import { dac7PlatformFlowScenario } from './dac7-flow-scenario';
 import { generatedFlowScenarios } from './process-manifest';
 import type { FlowEdge, FlowNode, FlowNodeLayer, FlowScenario } from './types';
 
@@ -571,6 +572,7 @@ export const rahunokFlowScenarios: FlowScenario[] = [
 	payment,
 	ksoSandboxScenario,
 	ksoTargetScenario,
+	dac7PlatformFlowScenario,
 	deploy
 ];
 

@@ -134,6 +134,7 @@ export function createDac7Gateway(client: SupabaseClient) {
 				id: row.id,
 				name: row.full_name,
 				role: row.seller_kind === 'INDIVIDUAL' ? "Кур'єр" : 'Мерчант',
+				category: row.category || (row.seller_kind === 'FOP' ? 'fop' : 'platform_gig'),
 				kyc:
 					row.status === 'blocked'
 						? 'blocked'
@@ -155,7 +156,9 @@ export function createDac7Gateway(client: SupabaseClient) {
 				last: 'сьогодні',
 				mode: 'daily',
 				isFop: row.seller_kind === 'FOP',
-				address: row.address?.street ? `${row.address.street}, ${row.address.city || ''}` : undefined,
+				address: row.address?.street
+					? `${row.address.street}, ${row.address.city || ''}`
+					: undefined,
 				dob: row.dob ? new Date(row.dob).toLocaleDateString('uk-UA') : undefined,
 				rnokpp: row.rnokpp || '3091248192'
 			}));
@@ -257,14 +260,19 @@ export function createDac7Gateway(client: SupabaseClient) {
 		},
 
 		// 4. Gov & Tax Auditing
-		async getGovTelemetry(isDemo = false): Promise<{ platforms: Dac7GovPlatform[]; alerts: Dac7FraudAlert[] }> {
+		async getGovTelemetry(
+			isDemo = false
+		): Promise<{ platforms: Dac7GovPlatform[]; alerts: Dac7FraudAlert[] }> {
 			if (isDemo) {
 				return { platforms: demoGovPlatforms, alerts: demoFraudAlerts };
 			}
 
 			const { data: payouts } = await client.from('payouts').select('total_gross, total_tax');
 			const totalTax = (payouts || []).reduce((acc, p: any) => acc + Number(p.total_tax || 0), 0);
-			const totalGross = (payouts || []).reduce((acc, p: any) => acc + Number(p.total_gross || 0), 0);
+			const totalGross = (payouts || []).reduce(
+				(acc, p: any) => acc + Number(p.total_gross || 0),
+				0
+			);
 
 			return {
 				platforms: [

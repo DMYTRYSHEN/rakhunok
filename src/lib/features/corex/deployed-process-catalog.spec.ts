@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDeployedProcessCatalog } from './deployed-process-catalog';
+import { buildDeployedProcessCatalog, deployedProcessCatalog } from './deployed-process-catalog';
 import type { ProcessManifest } from './process-manifest';
 import type { FlowScenario } from './types';
 
@@ -118,5 +118,17 @@ describe('deployed process catalog', () => {
 				manifest({ deployed: false })
 			)
 		).toEqual([]);
+	});
+
+	it('includes dac7-platform-varus in deployedProcessCatalog', () => {
+		const item = deployedProcessCatalog.find((p) => p.id === 'dac7-platform-varus');
+		expect(item).toBeDefined();
+		expect(item).toMatchObject({
+			id: 'dac7-platform-varus',
+			workerId: 'rahunok-dac7',
+			workerName: 'rahunok-dac7',
+			contractStatus: 'matched',
+			contractOperationId: 'ingestDac7Batch'
+		});
 	});
 });

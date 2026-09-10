@@ -43,8 +43,14 @@
 		platform: {
 			title: 'Платформа (Bolt Food · CFO)',
 			desc: 'Податковий агент: утримання 10% ПДФО, батчі, виплати, DAC7 XML',
-			badgeClass: 'bg-blue-100 text-blue-800 border border-blue-200',
+			badgeClass: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
 			icon: Building2
+		},
+		business: {
+			title: 'БІЗНЕС (МЕРЧАНТ)',
+			desc: 'Партнер (напр. ресторан чи VARUS), що отримує платежі клієнтів',
+			icon: Building2,
+			badgeClass: 'bg-orange-50 text-orange-700 border border-orange-200'
 		},
 		seller: {
 			title: "Кур'єр (Олексій · Самозайнятий)",
@@ -109,7 +115,9 @@
 		<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 			<div class="space-y-1">
 				<div class="flex items-center gap-2">
-					<span class="inline-flex size-6 items-center justify-center rounded-md bg-stone-900 text-white">
+					<span
+						class="inline-flex size-6 items-center justify-center rounded-md bg-stone-900 text-white"
+					>
 						<Shield size={14} />
 					</span>
 					<h2 class="text-base font-bold text-stone-900">
@@ -117,12 +125,15 @@
 					</h2>
 				</div>
 				<p class="text-xs text-stone-500">
-					Конфігурація доступу та повноважень учасників екосистеми згідно з вимогами DAC7 та законодавства про цифрові платформи
+					Конфігурація доступу та повноважень учасників екосистеми згідно з вимогами DAC7 та
+					законодавства про цифрові платформи
 				</p>
 			</div>
 
 			<div class="flex items-center gap-2">
-				<span class="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-bold text-stone-700">
+				<span
+					class="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-bold text-stone-700"
+				>
 					<Users size={12} />
 					Користувачів з правами: {permissions.length}
 				</span>
@@ -130,7 +141,9 @@
 		</div>
 
 		{#if notification}
-			<div class="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">
+			<div
+				class="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800"
+			>
 				<CheckCircle2 size={16} />
 				<span>{notification}</span>
 			</div>
@@ -142,15 +155,23 @@
 		{#each Object.entries(roleConfig) as [key, roleInfo]}
 			{@const rKey = key as Dac7Role}
 			{@const isActiveView = currentRole === rKey}
-			<div class="flex flex-col justify-between rounded-2xl border bg-white p-5 shadow-sm transition hover:border-stone-400 {isActiveView ? 'border-stone-900 ring-2 ring-stone-900/10' : 'border-stone-200'}">
+			<div
+				class="flex flex-col justify-between rounded-2xl border bg-white p-5 shadow-sm transition hover:border-stone-400 {isActiveView
+					? 'border-stone-900 ring-2 ring-stone-900/10'
+					: 'border-stone-200'}"
+			>
 				<div class="space-y-3">
 					<div class="flex items-center justify-between">
-						<span class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold {roleInfo.badgeClass}">
+						<span
+							class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold {roleInfo.badgeClass}"
+						>
 							<roleInfo.icon size={13} />
 							<span>{roleInfo.title.split(' ')[0]}</span>
 						</span>
 						{#if isActiveView}
-							<span class="rounded-full bg-stone-900 px-2 py-0.5 text-[10px] font-extrabold text-white">
+							<span
+								class="rounded-full bg-stone-900 px-2 py-0.5 text-[10px] font-extrabold text-white"
+							>
 								Поточний екран
 							</span>
 						{/if}
@@ -177,12 +198,14 @@
 	</div>
 
 	<!-- Users and Access Assignments Table -->
-	<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
+	<div class="space-y-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
 		<div class="flex items-center justify-between">
 			<div>
 				<h3 class="text-sm font-bold text-stone-900">Призначення прав доступу користувачам</h3>
 				<p class="text-xs text-stone-500">
-					{demo ? 'Демонстраційний режим (імітація збереження)' : 'Синхронізація з Supabase merchant_memberships'}
+					{demo
+						? 'Демонстраційний режим (імітація збереження)'
+						: 'Синхронізація з Supabase merchant_memberships'}
 				</p>
 			</div>
 			<button
@@ -202,7 +225,7 @@
 						<th class="p-3 font-bold">Email</th>
 						<th class="p-3 font-bold">Призначена роль</th>
 						<th class="p-3 font-bold">Live Доступ</th>
-						<th class="p-3 font-bold text-right">Зміна ролі</th>
+						<th class="p-3 text-right font-bold">Зміна ролі</th>
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-stone-100 text-stone-700">
@@ -216,13 +239,17 @@
 								<td class="p-3 font-medium text-stone-900">{perm.fullName}</td>
 								<td class="p-3 font-mono text-stone-500">{perm.email}</td>
 								<td class="p-3">
-									<span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-bold {roleConfig[perm.role]?.badgeClass || 'bg-stone-100'}">
+									<span
+										class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-bold {roleConfig[
+											perm.role
+										]?.badgeClass || 'bg-stone-100'}"
+									>
 										{roleConfig[perm.role]?.title || perm.role}
 									</span>
 								</td>
 								<td class="p-3">
 									{#if perm.isLiveAllowed}
-										<span class="inline-flex items-center gap-1 text-emerald-700 font-semibold">
+										<span class="inline-flex items-center gap-1 font-semibold text-emerald-700">
 											<CheckCircle2 size={12} /> Активний
 										</span>
 									{:else}
@@ -249,20 +276,25 @@
 	</div>
 
 	<!-- Legal Framework Context -->
-	<div class="rounded-2xl border border-stone-200 bg-amber-50/40 p-5 text-xs text-amber-900 space-y-2">
+	<div
+		class="space-y-2 rounded-2xl border border-stone-200 bg-amber-50/40 p-5 text-xs text-amber-900"
+	>
 		<div class="flex items-center gap-2 font-bold text-amber-950">
 			<ShieldAlert size={14} />
 			<span>Юридичні обмеження згідно із Законом України № 4903-IX:</span>
 		</div>
-		<ul class="list-disc pl-5 space-y-1 text-stone-600">
+		<ul class="list-disc space-y-1 pl-5 text-stone-600">
 			<li>
-				<strong>Податковий агент:</strong> Цифрова платформа автоматично нараховує та утримує 10% ПДФО з виплат самозайнятим фізичним особам (військовий збір становить 0%).
+				<strong>Податковий агент:</strong> Цифрова платформа автоматично нараховує та утримує 10% ПДФО
+				з виплат самозайнятим фізичним особам (військовий збір становить 0%).
 			</li>
 			<li>
-				<strong>ФОП 1-3 груп:</strong> Якщо виконавець зареєстрований як ФОП, платформа виплачує 100% суми без утримання податку (0%), виконавець сплачує податки самостійно.
+				<strong>ФОП 1-3 груп:</strong> Якщо виконавець зареєстрований як ФОП, платформа виплачує 100%
+				суми без утримання податку (0%), виконавець сплачує податки самостійно.
 			</li>
 			<li>
-				<strong>Річний ліміт:</strong> Дохід фізичної особи без статусу ФОП обмежений 834 розмірами мінімальної заробітної плати на календарний рік.
+				<strong>Річний ліміт:</strong> Дохід фізичної особи без статусу ФОП обмежений 834 розмірами мінімальної
+				заробітної плати на календарний рік.
 			</li>
 		</ul>
 	</div>

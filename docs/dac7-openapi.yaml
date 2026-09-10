@@ -1,0 +1,446 @@
+openapi: 3.1.0
+info:
+  title: 'Rahunok DAC7 Platform Engine API'
+  version: '2.0.0'
+  description: |
+    # Rahunok DAC7 & Digital Platform Tax Engine
+    Повна OpenAPI 3.1 специфікація для цифрових платформ доставки та маркетплейсів (VARUS, Bolt Food, Glovo) згідно із Законом України № 4903-IX (імплементація Директиви ЄС DAC7 та ст. 178-1 ПКУ).
+
+    ### Ключові податкові норми:
+    - **ПДФО:** рівно 10% (утримується платформою як податковим агентом із доходів платформних самозайнятих).
+    - **Військовий збір:** НЕ діє (0.00 ₴).
+    - **Річний ліміт:** 834 розміри мінімальної заробітної плати (7 211 598 ₴ на 2026 рік). При перевищенні застосовується ставка 18%.
+    - **ФОП (ознака 157):** 0% податкового утримання платформою.
+    - **3-Леджерна архітектура:** Payment Ledger ≠ Courier Income Ledger ≠ Payout Ledger.
+
+servers:
+  - url: https://api.rahunok.ua
+    description: 'Production DAC7 Platform API'
+  - url: http://localhost:8787
+    description: 'Local Dev Server'
+
+paths:
+  /operators/register:
+    post:
+      operationId: registerPlatformOperator
+      summary: 'Реєстрація оператора цифрової платформи в Реєстрі ДПС'
+      description: 'Реєструє платформу як підзвітного оператора згідно зі ст. 178-1 ПКУ, видає статус податкового агента та генерує облікові ключі.'
+      tags: [Platform Onboarding]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [legalEntityName, edrpou, taxRegistrationNumber, contactEmail]
+              properties:
+                legalEntityName:
+                  type: string
+                  example: "ТОВ 'ОМЕГА' (VARUS Delivery)"
+                edrpou:
+                  type: string
+                  pattern: '^[0-9]{8}$'
+                  example: '32615482'
+                taxRegistrationNumber:
+                  type: string
+                  example: '326154804651'
+                contactEmail:
+                  type: string
+                  format: email
+                  example: 'tax.compliance@varus.ua'
+      responses:
+        '201':
+          description: 'Платформу успішно зареєстровано в ДПС та активовано'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  operatorId: { type: string, example: 'OP-VARUS-01' }
+                  status: { type: string, example: 'registered_active' }
+                  taxAgentStatus: { type: string, example: 'accredited' }
+                  webhookSecret: { type: string, example: 'whsec_9e1f8a4b2c7d' }
+                  registeredAt: { type: string, format: date-time }
+
+  /performers/onboard:
+    post:
+      operationId: onboardPerformerDiia
+      summary: "Онбординг та верифікація виконавця / кур'єра через Дія.Підпис (KYC Tier-2)"
+      description: 'Перевіряє кваліфікований електронний підпис (КЕП/P7S), валідує РНОКПП у ДПС та проводить AML/PEP скринінг.'
+      tags: [Performer KYC]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rnokpp, fullName, birthDate, category, diiaSignatureP7S]
+              properties:
+                rnokpp:
+                  type: string
+                  pattern: '^[0-9]{10}$'
+                  example: '3091248192'
+                fullName:
+                  type: string
+                  example: 'Олексій Володимирович Ткаченко'
+                birthDate:
+                  type: string
+                  format: date
+                  example: '1992-04-15'
+                category:
+                  type: string
+                  enum: [platform_gig, fop, goods_casual, property_rental]
+                  example: 'platform_gig'
+                diiaSignatureP7S:
+                  type: string
+                  description: 'Base64-encoded CMS/PKCS#7 signature container'
+      responses:
+        '200':
+          description: "Кур'єр успішно верифікований та акредитований"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  performerId: { type: string, example: 'PERF-3091248192' }
+                  rnokpp: { type: string, example: '3091248192' }
+                  kycTier: { type: string, example: 'tier2' }
+                  status: { type: string, example: 'verified_active' }
+                  pepSanctions: { type: string, example: 'clean' }
+
+  /performers/bank-account:
+    post:
+      operationId: registerDedicatedIban
+      summary: "Реєстрація спеціального рахунку кур'єра (IBAN) з повідомленням ДПС"
+      description: "Прив'язує спецрахунок IBAN для доходів від платформи. Ініціює передачу повідомлення до ДПС за ст. 178-1 ПКУ."
+      tags: [Performer Banking]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rnokpp, iban, bankCode, bankName]
+              properties:
+                rnokpp:
+                  type: string
+                  pattern: '^[0-9]{10}$'
+                  example: '3091248192'
+                iban:
+                  type: string
+                  pattern: '^UA[0-9]{27}$'
+                  example: 'UA513220010000026200000002384'
+                bankCode:
+                  type: string
+                  example: '322001'
+                bankName:
+                  type: string
+                  example: 'АТ УНІВЕРСАЛ БАНК (monobank)'
+      responses:
+        '200':
+          description: 'IBAN перевірено за алгоритмом Modulo 97 та зареєстровано в ДПС'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  iban: { type: string }
+                  status: { type: string, example: 'dedicated_platform_account_active' }
+                  stsNotification:
+                    type: object
+                    properties:
+                      status: { type: string, example: 'transmitted' }
+                      article: { type: string, example: '178-1 TCU' }
+
+  /orders/split:
+    post:
+      operationId: calculateOrderSplit
+      summary: 'Розрахунок 4-way сплиту замовлення у Payment Ledger'
+      description: "Розраховує миттєвий розподіл грошових потоків між еквайрингом (1.2%), мерчантом VARUS, кур'єрським пулом та платформою."
+      tags: [Order Split & Ledger]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, amountGrossMinor, merchantId, courierRnokpp, deliveryFeeMinor]
+              properties:
+                orderId:
+                  type: string
+                  example: 'ORD-VARUS-991'
+                amountGrossMinor:
+                  type: integer
+                  description: 'Сума у копійках (наприклад 93000 = 930.00 ₴)'
+                  example: 93000
+                merchantId:
+                  type: string
+                  example: 'MERCH-VARUS-DNIPRO-01'
+                courierRnokpp:
+                  type: string
+                  example: '3091248192'
+                deliveryFeeMinor:
+                  type: integer
+                  example: 8000
+      responses:
+        '200':
+          description: '4-way сплит зафіксовано в незмінному Payment Ledger'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId: { type: string }
+                  split:
+                    type: object
+                    properties:
+                      grossMinor: { type: integer, example: 93000 }
+                      acquiringFeeMinor: { type: integer, example: 1116 }
+                      merchantNetMinor: { type: integer, example: 85000 }
+                      courierPoolMinor: { type: integer, example: 8000 }
+                      platformMarginMinor: { type: integer, example: 0 }
+                  ledgerStatus: { type: string, example: 'captured' }
+
+  /deliveries/incidents:
+    post:
+      operationId: reportDeliveryIncident
+      summary: 'Обробка інцидентів доставки (пошкодження товару, втрата, перепризначення, сторно)'
+      description: "Проводить сторнування доходу кур'єра та 10% ПДФО або розподіл між декількома кур'єрами при аварії чи поломці."
+      tags: [Logistics & Incidents]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, incidentType, courierRnokpp]
+              properties:
+                orderId:
+                  type: string
+                  example: 'ORD-VARUS-991'
+                incidentType:
+                  type: string
+                  enum: [damaged_courier_fault, undelivered_loss, vehicle_breakdown]
+                  example: 'damaged_courier_fault'
+                courierRnokpp:
+                  type: string
+                  example: '3091248192'
+                refundAmountMinor:
+                  type: integer
+                  example: 93000
+                reassignedCourierRnokpp:
+                  type: string
+                  example: '2847192041'
+      responses:
+        '200':
+          description: 'Інцидент врегульовано, сторно або сплит проведено в бухгалтерському контурі'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId: { type: string }
+                  incidentType: { type: string }
+                  accountingAction: { type: string, example: 'STORNO_REVERSAL' }
+                  stornoPitTaxMinor: { type: integer, example: 1000 }
+                  refundStatus: { type: string, example: 'customer_refunded_full' }
+
+  /events/batch:
+    post:
+      operationId: ingestDac7Batch
+      summary: 'Пакетне завантаження подій платформи (Bulk Ingestion)'
+      description: 'Наскрізна пакетна обробка подій замовлень, платежів, підтверджень вручення (DELIVERED) та коригувань з ідемпотентністю.'
+      tags: [DAC7 Ingestion]
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 'Унікальний UUID запиту для захисту від дублювання'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [batchId, events]
+              properties:
+                batchId:
+                  type: string
+                  example: 'BATCH-INGEST-2026-09-11'
+                events:
+                  type: array
+                  items:
+                    type: object
+                    required: [type, orderId]
+                    properties:
+                      type:
+                        type: string
+                        enum:
+                          - payment.captured
+                          - payment.refund
+                          - delivery.completed
+                          - delivery.undelivered
+                          - delivery.damaged_courier_fault
+                          - delivery.reassigned
+                      orderId:
+                        type: string
+                      amountGrossMinor:
+                        type: integer
+                      courierRnokpp:
+                        type: string
+                      deliveryFeeMinor:
+                        type: integer
+      responses:
+        '200':
+          description: 'Батч успішно оброблено та зафіксовано в 3-х Леджерах'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: 'success' }
+                  processed: { type: integer, example: 10 }
+                  summary:
+                    type: object
+                    properties:
+                      paymentsProcessed: { type: integer }
+                      refundsProcessed: { type: integer }
+                      earningsAccrued: { type: integer }
+                      adjustmentsStorned: { type: integer }
+                      reassignmentsProcessed: { type: integer }
+                  erpAccountingDirectives:
+                    type: object
+                    properties:
+                      stornoPitWithholding: { type: string }
+                      doubleEntryLedgerSync: { type: string }
+
+  /payouts/batch:
+    post:
+      operationId: compileDac7PayoutBatch
+      summary: 'Розрахунок батчу виплат на IBAN з утриманням 10% ПДФО (0% ВЗ)'
+      description: "Агрегує нарахування кур'єрів за період, вираховує рівно 10% ПДФО (ВЗ 0.00 ₴) та формує реєстр СЕП-4."
+      tags: [DAC7 Payouts]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [rnokpp, gross]
+                    properties:
+                      rnokpp: { type: string }
+                      gross: { type: integer }
+                      category: { type: string }
+                      name: { type: string }
+      responses:
+        '200':
+          description: 'Батч сформовано та підготовлено до відправки у СЕП-4 НБУ'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  batchId: { type: string, example: 'BATCH-2026-09-11' }
+                  status: { type: string, example: 'ready_for_sep4' }
+                  currency: { type: string, example: 'UAH' }
+                  totals:
+                    type: object
+                    properties:
+                      gross: { type: integer }
+                      pitTaxWithheld: { type: integer }
+                      militaryTaxWithheld: { type: integer, example: 0 }
+                      netPayout: { type: integer }
+                      count: { type: integer }
+                  treasuryPaymentOrder:
+                    type: object
+                    properties:
+                      kbk: { type: string, example: '11010100' }
+                      amount: { type: integer }
+                      purpose: { type: string }
+
+  /treasury/payment-order:
+    post:
+      operationId: generateTreasuryPaymentOrder
+      summary: 'Формування платіжної інструкції сплати ПДФО 10% до Казначейства'
+      description: 'Створює платіжне доручення за стандартом НБУ № 101 на рахунок Державної казначейської служби України (КБК 11010100).'
+      tags: [Treasury Settlement]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [batchId, pitTaxAmountMinor]
+              properties:
+                batchId:
+                  type: string
+                  example: 'BATCH-2026-09-11'
+                pitTaxAmountMinor:
+                  type: integer
+                  example: 100000
+      responses:
+        '200':
+          description: 'Платіжну інструкцію сформовано для відправки через банківський шлюз'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  treasuryDocId: { type: string, example: 'TAX-DOC-20260911-01' }
+                  kbk: { type: string, example: '11010100' }
+                  amountMinor: { type: integer, example: 100000 }
+                  purpose:
+                    {
+                      type: string,
+                      example: "*;101;43829104;11010100;ПДФО 10% із доходів кур'єрів цифрової платформи за тиждень. Військовий збір 0.00 ₴;;;"
+                    }
+                  status: { type: string, example: 'transmitted' }
+
+  /reports/form-4df:
+    get:
+      operationId: generateForm4df
+      summary: 'Генерація квартального податкового розрахунку Додаток 4ДФ'
+      description: "Формує звіт за квартал з розбивкою за ознаками доходу 106 (платформні кур'єри 10% ПДФО), 157 (ФОП 0%), 102 (товари)."
+      tags: [State Tax Reporting]
+      parameters:
+        - in: query
+          name: quarter
+          required: false
+          schema: { type: string, example: 'Q3-2026' }
+      responses:
+        '200':
+          description: 'Квартальний звіт Додаток 4ДФ у форматі JSON/XML'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  formCode: { type: string, example: '4DF' }
+                  taxPeriod: { type: string, example: '2026-Q3' }
+                  taxAgentEdrpou: { type: string, example: '43829104' }
+                  totalIncomeMinor: { type: integer }
+                  totalPitWithheldMinor: { type: integer }
+                  totalMilitaryWithheldMinor: { type: integer, example: 0 }
+                  recordsCount: { type: integer }
+
+  /reports/oecd-dpi:
+    get:
+      operationId: generateOecdDpiXml
+      summary: 'Генерація податкового звіту OECD DPI XML (DAC7) для ДПС'
+      description: 'Генерує XML-файл міжнародного стандарту OECD DPI v1.0, що містить блоки PersonalServices, SaleOfGoods, ImmovableProperty, Entity.'
+      tags: [OECD DAC7 Compliance]
+      responses:
+        '200':
+          description: 'Валідований XML документ за стандартом OECD DPI v1.0'
+          content:
+            application/xml:
+              schema:
+                type: string
