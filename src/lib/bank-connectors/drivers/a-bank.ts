@@ -367,4 +367,140 @@ export class ABankDriver implements BankConnectorDriver {
 			};
 		}
 	}
+
+	/**
+	 * Register system in A-Bank (Chapter 6.1)
+	 * Note: Signature uses public_key from body, no x-system-id header.
+	 */
+	async registerSystem(params: {
+		publicKeyBase64: string;
+		privateKeyPem: string;
+		name: string;
+		description: string;
+		fio: string;
+		phone: string;
+		email: string;
+		logoBase64?: string;
+		baseUrl?: string;
+		fetcher?: typeof fetch;
+	}): Promise<{ systemId?: string; status: string; responseRef: string }> {
+		const fetcher = params.fetcher || fetch;
+		const timestamp = Date.now();
+		const requestRef = `reg-${Date.now()}`;
+		const bodyObj: Record<string, unknown> = {
+			public_key: params.publicKeyBase64,
+			name: params.name,
+			description: params.description,
+			fio: params.fio,
+			phone: params.phone,
+			email: params.email,
+			request_ref: requestRef
+		};
+		if (params.logoBase64) {
+			bodyObj.logo = params.logoBase64;
+		}
+		const bodyStr = JSON.stringify(bodyObj);
+		const signature = await signABankRequest(timestamp, bodyStr, params.privateKeyPem);
+
+		const baseUrl = (params.baseUrl || this.defaultBaseUrl).replace(/\/+$/, '');
+		const res = await fetcher(`${baseUrl}/registration`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'x-req-ts': timestamp.toString(),
+				'x-req-signature': signature
+			},
+			body: bodyStr
+		});
+
+		if (!res.ok) {
+			const err = await res.text().catch(() => '');
+			throw new Error(`А-Банк помилка /registration (${res.status}): ${err}`);
+		}
+
+		const data = (await res.json()) as {
+			result: string;
+			id?: string;
+			status: string;
+			response_ref: string;
+		};
+
+		return {
+			systemId: data.id,
+			status: data.status,
+			responseRef: data.response_ref
+		};
+	}
+
+	/**
+	 * Configure webhook URL in A-Bank (Chapter 6.3)
+	 */
+	async setWebhookUrl(params: {
+		credentials: ABankCredentials;
+		webhookUrl?: string;
+		fetcher?: typeof fetch;
+	}): Promise<{ result: string; webhookUrl?: string }> {
+		const fetcher = params.fetcher || fetch;
+		const timestamp = Date.now();
+		const requestRef = `wh-${Date.now()}`;
+		const bodyObj: Record<string, string> = {
+			request_ref: requestRef
+		};
+		if (params.webhookUrl) {
+			bodyObj.webhook_url = params.webhookUrl;
+		}
+		const bodyStr = JSON.stringify(bodyObj);
+		const signature = await signABankRequest(timestamp, bodyStr, params.credentials.privateKeyPem);
+
+		const url = `${this.getBaseUrl(params.credentials)}/registration/webhook-url`;
+		const res = await fetcher(url, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'x-system-id': params.credentials.systemId,
+				'x-req-ts': timestamp.toString(),
+				'x-req-signature': signature
+			},
+			body: bodyStr
+		});
+
+		if (!res.ok) {
+			const err = await res.text().catch(() => '');
+			throw new Error(`А-Банк помилка /registration/webhook-url (${res.status}): ${err}`);
+		}
+
+		const data = (await res.json()) as {
+			result: string;
+			webhook_url?: string;
+		};
+
+		return {
+			result: data.result,
+			webhookUrl: data.webhook_url
+		};
+	}
+
+	/**
+	 * Handle incoming authorization callback from A-Bank (Chapter 3.3)
+	 */
+	async handleAuthCallback(payload: unknown): Promise<{
+		token: string;
+		status: 'approved' | 'rejected' | 'pending';
+		metadata?: Record<string, unknown>;
+	}> {
+		const data = payload as { token?: string; status?: string };
+		if (!data?.token) {
+			throw new Error('Відсутній токен у callback відповіді А-Банку');
+		}
+
+		const statusStr = (data.status || '').toUpperCase();
+		const status: 'approved' | 'rejected' | 'pending' =
+			statusStr === 'APPROVED' ? 'approved' : statusStr === 'REJECTED' ? 'rejected' : 'pending';
+
+		return {
+			token: data.token,
+			status,
+			metadata: { raw: data }
+		};
+	}
 }

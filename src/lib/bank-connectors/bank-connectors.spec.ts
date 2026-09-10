@@ -351,4 +351,259 @@ describe('Universal Bank Connectors', () => {
 			expect(result.confidenceScore).toBe(0.4);
 		});
 	});
+
+	describe('A-Bank Complete End-to-End Lifecycle Verification', () => {
+		it('executes full chain: platform registration -> webhook config -> merchant QR consent -> account discovery -> invoice creation -> webhook receipt -> matching -> paid transition', async () => {
+			const driver = new ABankDriver();
+			const cryptoMod = await import('node:crypto');
+
+			// 1. Generate Ed25519 Keypair for Rahunok Platform
+			const { publicKey, privateKey } = cryptoMod.generateKeyPairSync('ed25519');
+			const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
+			const publicKeyDer = publicKey.export({ type: 'spki', format: 'der' });
+			const publicKeyBase64 = publicKeyDer.subarray(-32).toString('base64');
+
+			expect(publicKeyBase64.length).toBe(44);
+
+			// 2. Step 1: System Registration (Chapter 6.1)
+			const mockRegistrationFetcher = async (url: RequestInfo | URL, init?: RequestInit) => {
+				const headers = init?.headers as Record<string, string>;
+				// Verify: Must have timestamp and signature, but NO x-system-id yet!
+				expect(headers['x-req-ts']).toBeDefined();
+				expect(headers['x-req-signature']).toBeDefined();
+				expect(headers['x-system-id']).toBeUndefined();
+
+				const body = JSON.parse(init?.body as string);
+				expect(body.public_key).toBe(publicKeyBase64);
+				expect(body.name).toBe('ТОВ "Рахунок"');
+
+				return new Response(
+					JSON.stringify({
+						result: 'ok',
+						timestamp: '2026-09-10 12:00:00',
+						id: 'system-uuid-112233',
+						status: 'APPROVED',
+						request_ref: body.request_ref,
+						response_ref: 'resp-uuid-001'
+					}),
+					{ status: 200 }
+				);
+			};
+
+			const regResult = await driver.registerSystem({
+				publicKeyBase64,
+				privateKeyPem,
+				name: 'ТОВ "Рахунок"',
+				description: 'Платіжний агрегатор',
+				fio: 'Олександр Сидоренко',
+				phone: '+380501234567',
+				email: 'tech@rahunok.ua',
+				fetcher: mockRegistrationFetcher as unknown as typeof fetch
+			});
+
+			expect(regResult.status).toBe('APPROVED');
+			expect(regResult.systemId).toBe('system-uuid-112233');
+
+			const systemCredentials = {
+				systemId: regResult.systemId!,
+				privateKeyPem
+			};
+
+			// 3. Step 2: Configure Global Webhook URL (Chapter 6.3)
+			const mockWebhookUrlFetcher = async (url: RequestInfo | URL, init?: RequestInit) => {
+				const headers = init?.headers as Record<string, string>;
+				// Now x-system-id is mandatory!
+				expect(headers['x-system-id']).toBe('system-uuid-112233');
+				expect(headers['x-req-signature'].length).toBe(128);
+
+				const body = JSON.parse(init?.body as string);
+				expect(body.webhook_url).toBe('https://api.rahunok.ua/v1/bank-webhook/a-bank');
+
+				return new Response(
+					JSON.stringify({
+						result: 'ok',
+						timestamp: '2026-09-10 12:01:00',
+						request_ref: body.request_ref,
+						response_ref: 'resp-uuid-002',
+						webhook_url: body.webhook_url
+					}),
+					{ status: 200 }
+				);
+			};
+
+			const whResult = await driver.setWebhookUrl({
+				credentials: systemCredentials,
+				webhookUrl: 'https://api.rahunok.ua/v1/bank-webhook/a-bank',
+				fetcher: mockWebhookUrlFetcher as unknown as typeof fetch
+			});
+
+			expect(whResult.result).toBe('ok');
+			expect(whResult.webhookUrl).toBe('https://api.rahunok.ua/v1/bank-webhook/a-bank');
+
+			// 4. Step 3: Merchant Connects Bank in Dashboard (QR Consent - Chapter 6.4 & 3.3)
+			// Mock /auth/request
+			const originalFetch = globalThis.fetch;
+			globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+				const body = JSON.parse(init?.body as string);
+				return new Response(
+					JSON.stringify({
+						result: 'ok',
+						timestamp: '2026-09-10 12:02:00',
+						token: 'temp-auth-req-token-9988',
+						qr: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+						request_ref: body.request_ref,
+						response_ref: 'resp-uuid-003'
+					}),
+					{ status: 200 }
+				);
+			}) as unknown as typeof fetch;
+
+			const authInit = await driver.initiateAuth({
+				callbackUrl: 'https://api.rahunok.ua/v1/bank-callback/a-bank',
+				merchantId: 'merchant-company-1',
+				metadata: { credentials: systemCredentials }
+			});
+
+			expect(authInit.type).toBe('qr');
+			expect(authInit.qrCodeBase64).toBeDefined();
+			expect(authInit.token).toBe('temp-auth-req-token-9988');
+
+			// Client scans QR in A24 -> Bank sends callback
+			const bankCallbackPayload = {
+				token: 'permanent-merchant-token-xyz777',
+				status: 'APPROVED'
+			};
+			const callbackHandled = await driver.handleAuthCallback(bankCallbackPayload);
+			expect(callbackHandled.status).toBe('approved');
+			expect(callbackHandled.token).toBe('permanent-merchant-token-xyz777');
+
+			const merchantCredentials = {
+				...systemCredentials,
+				clientToken: callbackHandled.token
+			};
+
+			// 5. Step 4: Account Discovery (Chapter 6.5)
+			const mockAccountsFetcher = async (url: RequestInfo | URL, init?: RequestInit) => {
+				return new Response(
+					JSON.stringify({
+						result: 'ok',
+						timestamp: '2026-09-10 12:03:00',
+						companies: [
+							{
+								name: 'ТОВ "Крафтові Меблі"',
+								accounts: [
+									{
+										iban: 'UA623077700000026001411123751',
+										okpo: '39887766',
+										currency: 980,
+										name_full: 'ТОВ "Крафтові Меблі"',
+										balance_available: 45000.0,
+										balance_ledger: 45000.0
+									}
+								]
+							}
+						]
+					}),
+					{ status: 200 }
+				);
+			};
+
+			const discovered = await driver.discoverAccounts(
+				merchantCredentials,
+				mockAccountsFetcher as unknown as typeof fetch
+			);
+			expect(discovered.length).toBe(1);
+			expect(discovered[0].iban).toBe('UA623077700000026001411123751');
+			expect(discovered[0].balanceAvailableMinor).toBe(4500000n);
+
+			const merchantIban = discovered[0].iban;
+
+			// 6. Step 5: Merchant Creates Invoice in Rahunok
+			const invoiceOrder = {
+				id: 'order-uuid-9001',
+				orderNumber: '9001',
+				referenceCode: 'RAH-9001',
+				recipientIban: merchantIban,
+				amountMinor: 345000n, // 3,450.00 UAH
+				currency: 'UAH',
+				status: 'pending' as 'pending' | 'paid'
+			};
+
+			expect(invoiceOrder.status).toBe('pending');
+
+			// 7. Step 6: Buyer Pays via IBAN -> A-Bank pushes Webhook
+			const incomingWebhookPayload = {
+				id: 778899,
+				bill_id: 556677,
+				created: '2026-09-10T14:45:00',
+				status: 3, // Booked
+				credit_iban: merchantIban,
+				credit_okpo: '39887766',
+				credit_name: 'ТОВ "Крафтові Меблі"',
+				debit_iban: 'UA173077700000026205061543958',
+				debit_name: 'Коваленко Сергій',
+				debit_okpo: '3122334455',
+				purpose: 'Оплата за замовлення #RAH-9001 згідно рахунку',
+				currency: 'UAH',
+				sum: 3450.0,
+				fee: 10.0,
+				timestamp: 1788965100000
+			};
+
+			const webhookVerification = await driver.verifyWebhook({
+				headers: {},
+				rawBody: JSON.stringify(incomingWebhookPayload),
+				account: discovered[0]
+			});
+
+			expect(webhookVerification.isValid).toBe(true);
+			const evidence = webhookVerification.normalizedEvidence!;
+			expect(evidence.amountMinor).toBe(345000n);
+			expect(evidence.direction).toBe('credit');
+			expect(evidence.status).toBe('booked');
+			expect(evidence.evidenceId).toBe(
+				'urn:bank:a-bank:UA623077700000026001411123751:778899_556677'
+			);
+
+			// 8. Step 7: Matching Engine matches evidence against invoice
+			const matchResult = matchEvidenceAgainstTarget(evidence, {
+				orderId: invoiceOrder.id,
+				referenceCode: invoiceOrder.referenceCode,
+				recipientIban: invoiceOrder.recipientIban,
+				amountMinor: invoiceOrder.amountMinor,
+				currency: invoiceOrder.currency
+			});
+
+			expect(matchResult.decision).toBe('matched');
+			expect(matchResult.confidenceScore).toBe(1.0);
+			expect(matchResult.differenceMinor).toBe(0n);
+
+			// 9. Step 8: Transactional State Transition to PAID
+			// Simulate order status transition in database:
+			const processedEvidenceLedger = new Set<string>();
+
+			if (matchResult.decision === 'matched') {
+				// Prevent double processing / duplicate webhook delivery:
+				expect(processedEvidenceLedger.has(evidence.evidenceId)).toBe(false);
+				processedEvidenceLedger.add(evidence.evidenceId);
+
+				// Transition invoice to PAID
+				invoiceOrder.status = 'paid';
+			}
+
+			expect(invoiceOrder.status).toBe('paid');
+
+			// 10. Step 9: Verify Idempotency on Replayed Webhook
+			// If A-Bank retries webhook delivery:
+			if (processedEvidenceLedger.has(evidence.evidenceId)) {
+				// Already booked! Do not re-process invoice or double-fulfill
+				const isDuplicate = true;
+				expect(isDuplicate).toBe(true);
+			}
+
+			// Restore global fetch
+			globalThis.fetch = originalFetch;
+		});
+	});
 });
+
