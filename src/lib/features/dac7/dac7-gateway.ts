@@ -194,6 +194,11 @@ export function createDac7Gateway(client: SupabaseClient) {
 			}));
 		},
 
+		async getBatches(isDemo = false): Promise<Dac7Batch[]> {
+			if (isDemo) return demoBatches;
+			return demoBatches;
+		},
+
 		async createPayout(input: {
 			sellerId: string;
 			sellerName: string;

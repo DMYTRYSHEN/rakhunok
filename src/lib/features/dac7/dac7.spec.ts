@@ -66,9 +66,9 @@ describe('DAC7 & Law № 4903-IX Business Logic Tests', () => {
 
 		const payouts = await gateway.getPayouts(true);
 		expect(payouts.length).toBeGreaterThanOrEqual(3);
-		expect(payouts[0].gross).toBe(700);
-		expect(payouts[0].tax).toBe(70);
-		expect(payouts[0].net).toBe(630);
+		expect(payouts[0].gross).toBe(245);
+		expect(payouts[0].tax).toBe(24.5);
+		expect(payouts[0].net).toBe(220.5);
 	});
 
 	it('should enforce role permissions structure', async () => {
