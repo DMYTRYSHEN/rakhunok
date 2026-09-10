@@ -44,8 +44,8 @@
 		demo?: boolean;
 	} = $props();
 
-	let members = $state<TeamMember[]>([...demoTeamMembers]);
-	let invitations = $state<TeamInvitation[]>([...demoTeamInvitations]);
+	let members = $state<TeamMember[]>([]);
+	let invitations = $state<TeamInvitation[]>([]);
 	let isLoading = $state(false);
 	let isInviteModalOpen = $state(false);
 	let copiedToken = $state<string | null>(null);
@@ -102,7 +102,7 @@
 				gateway.listTeamMembers(merchantId),
 				gateway.listTeamInvitations(merchantId)
 			]);
-			if (loadedMembers.length > 0) members = loadedMembers;
+			members = loadedMembers;
 			invitations = loadedInvitations;
 		} catch (err) {
 			console.error('Failed to load team data:', err);
@@ -384,70 +384,91 @@
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-zinc-200">
-					{#each members as member (member.id)}
-						<tr class="hover:bg-zinc-50/70 transition">
-							<td class="px-6 py-4">
-								<div class="flex items-center gap-3">
-									<div class="grid size-8 shrink-0 place-items-center rounded-full bg-zinc-100 font-bold text-zinc-700 uppercase">
-										{member.fullName.charAt(0) || member.email.charAt(0)}
-									</div>
-									<div>
-										<p class="font-bold text-zinc-900">{member.fullName}</p>
-										<p class="text-zinc-500 text-[11px]">{member.email}</p>
-									</div>
+					{#if isLoading && members.length === 0}
+						<tr>
+							<td colspan="6" class="px-6 py-12 text-center text-zinc-500">
+								<div class="inline-flex items-center gap-2">
+									<RefreshCw size={16} class="animate-spin text-blue-600" />
+									<span>Завантаження команди...</span>
 								</div>
 							</td>
-							<td class="px-4 py-4">
-								<span
-									class="inline-flex rounded border px-2 py-0.5 text-[10px] font-bold uppercase {member.role ===
-									'owner'
-										? 'bg-purple-50 text-purple-800 border-purple-200'
-										: member.role === 'manager'
-											? 'bg-blue-50 text-blue-800 border-blue-200'
-											: member.role === 'kso'
-												? 'bg-amber-50 text-amber-800 border-amber-200'
-												: 'bg-emerald-50 text-emerald-800 border-emerald-200'}"
-								>
-									{member.role === 'owner'
-										? 'Власник'
-										: member.role === 'manager'
-											? 'Менеджер'
-											: member.role === 'kso'
-												? 'КСО'
-												: 'Касир'}
-								</span>
-							</td>
-							<td class="px-4 py-4">
-								{#if member.terminalName}
-									<span class="font-medium text-zinc-800">{member.terminalName}</span>
-								{:else if member.role === 'cashier' || member.role === 'kso'}
-									<span class="text-zinc-400">Усі каси</span>
-								{:else}
-									<span class="text-zinc-400">Весь бізнес</span>
-								{/if}
-							</td>
-							<td class="px-4 py-4 text-zinc-500">
-								{member.lastActiveAt || 'нещодавно'}
-							</td>
-							<td class="px-4 py-4">
-								<span class="inline-flex items-center gap-1 text-emerald-700 font-bold text-[11px]">
-									<span class="size-1.5 rounded-full bg-emerald-500"></span> Активний
-								</span>
-							</td>
-							<td class="px-6 py-4 text-right">
-								{#if member.role !== 'owner'}
-									<button
-										type="button"
-										onclick={() => handleRemoveMember(member.id)}
-										class="rounded-lg p-1.5 text-zinc-400 hover:bg-rose-50 hover:text-rose-600 transition"
-										title="Видалити доступ"
-									>
-										<Trash2 size={14} />
-									</button>
-								{/if}
+						</tr>
+					{:else if members.length === 0}
+						<tr>
+							<td colspan="6" class="px-6 py-12 text-center text-zinc-500">
+								<UsersRound size={32} class="mx-auto text-zinc-300 mb-2" />
+								<p class="font-bold text-sm text-zinc-800">Ще немає доданих співробітників</p>
+								<p class="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">
+									Створіть запрошення для касира, менеджера або налаштуйте автономну касу самообслуговування (КСО).
+								</p>
 							</td>
 						</tr>
-					{/each}
+					{:else}
+						{#each members as member (member.id)}
+							<tr class="hover:bg-zinc-50/70 transition">
+								<td class="px-6 py-4">
+									<div class="flex items-center gap-3">
+										<div class="grid size-8 shrink-0 place-items-center rounded-full bg-zinc-100 font-bold text-zinc-700 uppercase">
+											{member.fullName.charAt(0) || member.email.charAt(0)}
+										</div>
+										<div>
+											<p class="font-bold text-zinc-900">{member.fullName}</p>
+											<p class="text-zinc-500 text-[11px]">{member.email}</p>
+										</div>
+									</div>
+								</td>
+								<td class="px-4 py-4">
+									<span
+										class="inline-flex rounded border px-2 py-0.5 text-[10px] font-bold uppercase {member.role ===
+										'owner'
+											? 'bg-purple-50 text-purple-800 border-purple-200'
+											: member.role === 'manager'
+												? 'bg-blue-50 text-blue-800 border-blue-200'
+												: member.role === 'kso'
+													? 'bg-amber-50 text-amber-800 border-amber-200'
+													: 'bg-emerald-50 text-emerald-800 border-emerald-200'}"
+									>
+										{member.role === 'owner'
+											? 'Власник'
+											: member.role === 'manager'
+												? 'Менеджер'
+												: member.role === 'kso'
+													? 'КСО'
+													: 'Касир'}
+									</span>
+								</td>
+								<td class="px-4 py-4">
+									{#if member.terminalName}
+										<span class="font-medium text-zinc-800">{member.terminalName}</span>
+									{:else if member.role === 'cashier' || member.role === 'kso'}
+										<span class="text-zinc-400">Усі каси</span>
+									{:else}
+										<span class="text-zinc-400">Весь бізнес</span>
+									{/if}
+								</td>
+								<td class="px-4 py-4 text-zinc-500">
+									{member.lastActiveAt || 'нещодавно'}
+								</td>
+								<td class="px-4 py-4">
+									<span class="inline-flex items-center gap-1 text-emerald-700 font-bold text-[11px]">
+										<span class="size-1.5 rounded-full bg-emerald-500"></span> Активний
+									</span>
+								</td>
+								<td class="px-6 py-4 text-right">
+									{#if member.role !== 'owner'}
+										<button
+											type="button"
+											onclick={() => handleRemoveMember(member.id)}
+											class="rounded-lg p-1.5 text-zinc-400 hover:bg-rose-50 hover:text-rose-600 transition"
+											title="Видалити доступ"
+										>
+											<Trash2 size={14} />
+										</button>
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					{/if}
 				</tbody>
 			</table>
 		</div>

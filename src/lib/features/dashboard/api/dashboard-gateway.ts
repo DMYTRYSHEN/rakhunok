@@ -1116,17 +1116,21 @@ export function createDashboardGateway(
 		},
 
 		async listTeamMembers(merchantId: string) {
-			const { data, error } = await client
-				.from('merchant_memberships')
-				.select('id, merchant_id, user_id, role, terminal_id, status, created_at, terminals(name)')
-				.eq('merchant_id', merchantId)
-				.order('created_at', { ascending: true });
+			const [membershipsResult, merchantResult] = await Promise.all([
+				client
+					.from('merchant_memberships')
+					.select('id, merchant_id, user_id, role, terminal_id, status, created_at, terminals(name)')
+					.eq('merchant_id', merchantId)
+					.order('created_at', { ascending: true }),
+				client
+					.from('merchants')
+					.select('id, user_id, business_name, display_name, created_at')
+					.eq('id', merchantId)
+					.maybeSingle()
+			]);
 
-			if (error) {
-				return [];
-			}
-
-			return (data || []).map((row: any) => ({
+			const rows = membershipsResult.data || [];
+			const members = rows.map((row: any) => ({
 				id: row.id,
 				merchantId: row.merchant_id,
 				userId: row.user_id,
@@ -1139,6 +1143,28 @@ export function createDashboardGateway(
 				createdAt: row.created_at,
 				lastActiveAt: 'нещодавно'
 			}));
+
+			// If owner is not already in the memberships list, synthesize the owner entry
+			const ownerRow = merchantResult.data;
+			if (ownerRow && !members.some((m) => m.role === 'owner' || m.userId === ownerRow.user_id)) {
+				const user = (await client.auth.getUser()).data.user;
+				const ownerEmail = (user && user.id === ownerRow.user_id && user.email) ? user.email : 'owner@rahunok.app';
+				members.unshift({
+					id: `owner-${ownerRow.id}`,
+					merchantId: ownerRow.id,
+					userId: ownerRow.user_id,
+					email: ownerEmail,
+					fullName: ownerRow.display_name || ownerRow.business_name || 'Власник',
+					role: 'owner',
+					terminalId: null,
+					terminalName: null,
+					status: 'active',
+					createdAt: ownerRow.created_at || new Date().toISOString(),
+					lastActiveAt: 'зараз онлайн'
+				});
+			}
+
+			return members;
 		},
 
 		async listTeamInvitations(merchantId: string) {
