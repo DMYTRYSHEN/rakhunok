@@ -17,6 +17,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/",
 					"match": "exact",
@@ -47,6 +54,13 @@
 				{
 					"method": "PUT",
 					"path": "/",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/copilot",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
@@ -87,6 +101,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/api/sandbox/simulate",
 					"match": "exact",
@@ -117,6 +138,13 @@
 				{
 					"method": "PUT",
 					"path": "/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/auth/config",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
@@ -157,6 +185,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/api/v1/auth/demo-session",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/api/v1/auth/demo-session",
 					"match": "exact",
@@ -187,6 +222,13 @@
 				{
 					"method": "PUT",
 					"path": "/api/v1/auth/demo-session",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/banks",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
@@ -227,6 +269,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/api/v1/banks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/api/v1/banks/",
 					"match": "prefix",
@@ -262,6 +311,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/api/v1/copilot",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/api/v1/copilot",
 					"match": "exact",
@@ -292,6 +348,13 @@
 				{
 					"method": "PUT",
 					"path": "/api/v1/copilot",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/health",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
@@ -332,6 +395,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/api/v1/kso/checkout-requests",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/api/v1/kso/checkout-requests",
 					"match": "exact",
@@ -367,6 +437,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/api/v1/kso/checkout-requests/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/api/v1/kso/checkout-requests/",
 					"match": "prefix",
@@ -402,6 +479,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/api/v1/logos",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/api/v1/logos",
 					"match": "exact",
@@ -432,6 +516,97 @@
 				{
 					"method": "PUT",
 					"path": "/api/v1/logos",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/merchant/invitations",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/merchant/invitations",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/merchant/invitations",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/merchant/invitations",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/merchant/invitations",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/merchant/invitations",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/merchant/invitations/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/merchant/invitations/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/merchant/invitations/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/merchant/invitations/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/merchant/invitations/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/merchant/invitations/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/merchant/me",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
@@ -472,6 +647,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/api/v1/merchant/onboarding",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/api/v1/merchant/onboarding",
 					"match": "exact",
@@ -507,6 +689,104 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/api/v1/merchant/team",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/merchant/team",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/merchant/team",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/merchant/team",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/merchant/team",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/merchant/team",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/merchant/team/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/merchant/team/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/merchant/team/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/merchant/team/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/merchant/team/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/merchant/team/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/orders",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/orders",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/api/v1/orders",
 					"match": "exact",
@@ -573,6 +853,13 @@
 					"method": "PUT",
 					"path": "/api/v1/orders",
 					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/stats/summary",
+					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
 				},
@@ -612,6 +899,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/api/v1/webhooks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/api/v1/webhooks/",
 					"match": "prefix",
@@ -647,6 +941,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/api/v1/webhooks/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/api/v1/webhooks/simulate",
 					"match": "exact",
@@ -677,6 +978,13 @@
 				{
 					"method": "PUT",
 					"path": "/api/v1/webhooks/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/banks",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
@@ -717,6 +1025,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/banks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/banks/",
 					"match": "prefix",
@@ -747,6 +1062,13 @@
 				{
 					"method": "PUT",
 					"path": "/banks/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/checkout",
 					"match": "prefix",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
@@ -787,6 +1109,20 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/conf",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/conf",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/conf",
 					"match": "exact",
@@ -852,6 +1188,13 @@
 				{
 					"method": "PUT",
 					"path": "/conf",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/conf/",
 					"match": "prefix",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
@@ -892,6 +1235,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/dashboard/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/dashboard/api/sandbox/simulate",
 					"match": "exact",
@@ -922,6 +1272,13 @@
 				{
 					"method": "PUT",
 					"path": "/dashboard/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/docs",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
@@ -962,6 +1319,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/docs/",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/docs/",
 					"match": "exact",
@@ -997,6 +1361,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/health",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/health",
 					"match": "exact",
@@ -1032,6 +1403,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/logos",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/logos",
 					"match": "exact",
@@ -1067,6 +1445,13 @@
 					"source": "worker/src/index.ts"
 				},
 				{
+					"method": "DELETE",
+					"path": "/pay",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
 					"method": "GET",
 					"path": "/pay",
 					"match": "exact",
@@ -1098,6 +1483,13 @@
 					"method": "PUT",
 					"path": "/pay",
 					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/pay/",
+					"match": "prefix",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
 				},
@@ -1386,6 +1778,51 @@
 					"operationId": "completeMerchantOnboarding",
 					"summary": "Завершити 3-кроковий онбординг мерчанта",
 					"tags": ["Merchant"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/merchant/team",
+					"operationId": "listTeamMembers",
+					"summary": "Отримати список працівників бізнесу з ролями та призначеними касами",
+					"tags": ["Team"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/merchant/team/{memberId}",
+					"operationId": "removeTeamMember",
+					"summary": "Відкликати доступ та видалити співробітника з команди",
+					"tags": ["Team"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/merchant/invitations",
+					"operationId": "listInvitations",
+					"summary": "Перелік активних та очікуючих запрошень у команду",
+					"tags": ["Team"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/merchant/invitations",
+					"operationId": "createInvitation",
+					"summary": "Створити запрошення для менеджера, касира або КСО",
+					"tags": ["Team"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/merchant/invitations/{token}/accept",
+					"operationId": "acceptInvitation",
+					"summary": "Прийняття запрошення користувачем та активація членства",
+					"tags": ["Team"],
 					"status": "planned",
 					"source": "docs/openapi.yaml"
 				},
