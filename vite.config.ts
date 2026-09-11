@@ -103,6 +103,7 @@ export default defineConfig(({ mode }) => ({
 		})
 	],
 	server: {
+		host: true,
 		fs: {
 			allow: ['.']
 		},
