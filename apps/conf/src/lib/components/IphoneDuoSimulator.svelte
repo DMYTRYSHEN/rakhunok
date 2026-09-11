@@ -369,6 +369,19 @@
                                 </div>
 
                                 <div class="android-actions">
+                                    {#if urls.android_intent}
+                                        <a
+                                            href={urls.android_intent}
+                                            onclick={() => {
+                                                if (typeof window !== 'undefined' && urls.android_intent) {
+                                                    window.location.href = urls.android_intent;
+                                                }
+                                            }}
+                                            class="android-btn launch"
+                                        >
+                                            <Play size={14} /> Launch Intent
+                                        </a>
+                                    {/if}
                                     {#if bank.playstore_url}
                                         <a href={bank.playstore_url} target="_blank" rel="noreferrer" class="android-btn">
                                             <Play size={14} /> Google Play
@@ -1215,6 +1228,11 @@
     .android-btn.secondary {
         background: rgba(255, 255, 255, 0.08);
         color: #e2e8f0;
+    }
+
+    .android-btn.launch {
+        background: #f59e0b;
+        color: #fff;
     }
 
     /* Home indicator */
