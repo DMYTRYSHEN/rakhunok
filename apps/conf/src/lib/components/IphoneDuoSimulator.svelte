@@ -372,11 +372,6 @@
                                     {#if urls.android_intent}
                                         <a
                                             href={urls.android_intent}
-                                            onclick={() => {
-                                                if (typeof window !== 'undefined' && urls.android_intent) {
-                                                    window.location.href = urls.android_intent;
-                                                }
-                                            }}
                                             class="android-btn launch"
                                         >
                                             <Play size={14} /> Launch Intent

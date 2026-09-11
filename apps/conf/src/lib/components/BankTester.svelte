@@ -441,11 +441,6 @@
                                 <div class="flex items-center gap-2 pt-1">
                                     <a
                                         href={urls.android_intent}
-                                        onclick={() => {
-                                            if (typeof window !== 'undefined' && urls.android_intent) {
-                                                window.location.href = urls.android_intent;
-                                            }
-                                        }}
                                         class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer shadow-sm shadow-amber-600/20 active:scale-95"
                                     >
                                         <Play size={12} />
