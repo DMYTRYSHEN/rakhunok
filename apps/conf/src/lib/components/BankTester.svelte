@@ -10,6 +10,7 @@
     import { MOCK_SCENARIOS } from '../services/mock-scenarios';
     import { generateTestPayload, buildBankUrls } from '../services/payload-builder';
     import { BankLinkStore } from '../services/banklink-store';
+    import IphoneDuoSimulator from './IphoneDuoSimulator.svelte';
 
     interface Props {
         bank: BankEntry;
@@ -20,7 +21,7 @@
 
     let { bank, onClose, onTestRecorded, embedded = false }: Props = $props();
 
-    let activeTab = $state<'DEBUG' | 'PAYLOAD' | 'QR' | 'HISTORY'>('DEBUG');
+    let activeTab = $state<'IPHONE' | 'DEBUG' | 'PAYLOAD' | 'QR' | 'HISTORY'>('IPHONE');
     const defaultScenario = MOCK_SCENARIOS.find((scenario) => scenario.id === 'rozetka')!;
     let selectedScenarioId = $state<string>(defaultScenario.id);
 
@@ -228,39 +229,59 @@
         </div>
 
         <!-- Tabs Navigation -->
-        <div class={embedded ? 'px-2 border-b border-slate-200 grid grid-cols-4 bg-slate-50 text-xs font-medium' : 'px-6 border-b border-stone-800 flex items-center gap-2 bg-stone-900 text-xs font-medium'}>
+        <div class={embedded ? 'px-2 border-b border-slate-200 grid grid-cols-5 bg-slate-50 text-xs font-medium' : 'px-6 border-b border-stone-800 flex items-center gap-2 bg-stone-900 text-xs font-medium'}>
+            <button
+                onclick={() => activeTab = 'IPHONE'}
+                class="py-3 px-2 border-b-2 flex items-center justify-center gap-1.5 transition-all cursor-pointer {activeTab === 'IPHONE' ? 'border-blue-500 text-blue-400 font-bold' : 'border-transparent text-stone-400 hover:text-stone-200'}"
+            >
+                <Smartphone size={15} />
+                <span>{embedded ? 'DUO' : 'iPhone Duo'}</span>
+            </button>
             <button
                 onclick={() => activeTab = 'DEBUG'}
-                class="py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer {activeTab === 'DEBUG' ? 'border-blue-500 text-blue-400 font-bold' : 'border-transparent text-stone-400 hover:text-stone-200'}"
+                class="py-3 px-2 border-b-2 flex items-center justify-center gap-1.5 transition-all cursor-pointer {activeTab === 'DEBUG' ? 'border-blue-500 text-blue-400 font-bold' : 'border-transparent text-stone-400 hover:text-stone-200'}"
             >
                 <Terminal size={15} />
-                <span>{embedded ? 'DEBUG' : 'Deep Links & Симулятор'}</span>
+                <span>{embedded ? 'DEBUG' : 'Deep Links'}</span>
             </button>
             <button
                 onclick={() => activeTab = 'PAYLOAD'}
-                class="py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer {activeTab === 'PAYLOAD' ? 'border-blue-500 text-blue-400 font-bold' : 'border-transparent text-stone-400 hover:text-stone-200'}"
+                class="py-3 px-2 border-b-2 flex items-center justify-center gap-1.5 transition-all cursor-pointer {activeTab === 'PAYLOAD' ? 'border-blue-500 text-blue-400 font-bold' : 'border-transparent text-stone-400 hover:text-stone-200'}"
             >
                 <FileCode2 size={15} />
-                <span>{embedded ? 'PAYLOAD' : `NBU 003 Payload (${payload.fields.length} рядків)`}</span>
+                <span>{embedded ? 'PAYLOAD' : `Payload (${payload.fields.length})`}</span>
             </button>
             <button
                 onclick={() => activeTab = 'QR'}
-                class="py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer {activeTab === 'QR' ? 'border-blue-500 text-blue-400 font-bold' : 'border-transparent text-stone-400 hover:text-stone-200'}"
+                class="py-3 px-2 border-b-2 flex items-center justify-center gap-1.5 transition-all cursor-pointer {activeTab === 'QR' ? 'border-blue-500 text-blue-400 font-bold' : 'border-transparent text-stone-400 hover:text-stone-200'}"
             >
                 <QrCode size={15} />
-                <span>{embedded ? 'QR' : 'Живий QR-код для телефону'}</span>
+                <span>QR</span>
             </button>
             <button
                 onclick={() => activeTab = 'HISTORY'}
-                class="py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer {activeTab === 'HISTORY' ? 'border-blue-500 text-blue-400 font-bold' : 'border-transparent text-stone-400 hover:text-stone-200'}"
+                class="py-3 px-2 border-b-2 flex items-center justify-center gap-1.5 transition-all cursor-pointer {activeTab === 'HISTORY' ? 'border-blue-500 text-blue-400 font-bold' : 'border-transparent text-stone-400 hover:text-stone-200'}"
             >
                 <History size={15} />
-                <span>{embedded ? 'HISTORY' : 'Специфікація банку'}</span>
+                <span>{embedded ? 'INFO' : 'Специфікація'}</span>
             </button>
         </div>
 
         <!-- Body Tabs Content -->
         <div class={embedded ? 'p-4 overflow-y-auto space-y-5 flex-1 text-sm' : 'p-6 overflow-y-auto space-y-6 flex-1 text-sm'}>
+            <!-- TAB 0: IPHONE DUO SIMULATOR -->
+            {#if activeTab === 'IPHONE'}
+                <div class="space-y-4">
+                    <IphoneDuoSimulator
+                        bank={bank}
+                        formData={formData}
+                        urls={urls}
+                        encodedPayload={payload.encodedPayload}
+                        onTestSuccess={() => recordTestResult('success')}
+                    />
+                </div>
+            {/if}
+
             <!-- TAB 1: DEBUG / SIMULATOR -->
             {#if activeTab === 'DEBUG'}
                 <div class="space-y-6">

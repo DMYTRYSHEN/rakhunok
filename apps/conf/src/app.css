@@ -69,3 +69,49 @@ button { cursor: pointer; }
   .conf-workbench { grid-template-columns: 220px 560px 360px; overflow-x: auto; }
   .bank-sidebar { position: sticky; left: 0; height: 100vh; }
 }
+
+/* ─── iPhone Duo Hardware & Element Safeguards ─── */
+.iphone-duo-container, .iphone-duo-container * {
+  box-sizing: border-box;
+}
+
+.iphone-duo-container .faceid-button {
+  border-radius: 16px !important;
+  background: var(--bank-brand, #3b82f6) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
+}
+
+.iphone-duo-container .sheet-btn.open {
+  border-radius: 12px !important;
+  background: #0284c7 !important;
+  color: #fff !important;
+}
+
+.iphone-duo-container .sheet-btn.cancel {
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #94a3b8 !important;
+}
+
+.iphone-duo-container .appstore-get-btn {
+  border-radius: 17px !important;
+  background: #0284c7 !important;
+  color: #fff !important;
+}
+
+.iphone-duo-container .appstore-share-btn {
+  border-radius: 17px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.iphone-duo-container .android-btn {
+  border-radius: 12px !important;
+  color: #fff !important;
+}
+
+.iphone-duo-container .android-btn.secondary {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #e2e8f0 !important;
+}
+
