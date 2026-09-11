@@ -27,7 +27,13 @@
             if (!active) return;
             googleUser = data.session?.user ?? null;
             try {
-                passwordAuthenticated = !!googleUser && sessionStorage.getItem('banklink_auth') === googleUser.id;
+                const savedAuth = sessionStorage.getItem('banklink_auth');
+                if (savedAuth) {
+                    if (!googleUser) {
+                        googleUser = { id: savedAuth, email: 'local-admin@banklink.lan' } as User;
+                    }
+                    passwordAuthenticated = true;
+                }
             } catch {
                 passwordAuthenticated = false;
             }
@@ -37,7 +43,9 @@
 
         const { data } = supabase.auth.onAuthStateChange((_event, session) => {
             googleUser = session?.user ?? null;
-            if (!googleUser) passwordAuthenticated = false;
+            if (!googleUser && !sessionStorage.getItem('banklink_auth')) {
+                passwordAuthenticated = false;
+            }
         });
 
         return () => {
@@ -89,17 +97,10 @@
     <div class="min-h-screen bg-stone-950 flex items-center justify-center text-stone-500 text-xs font-mono">
         Ініціалізація BankLink...
     </div>
-{:else if !googleUser}
-    <AuthGate
-        step="google"
-        onGoogleLogin={handleGoogleLogin}
-        onPasswordAuthenticated={handlePasswordAuthenticated}
-        onGoogleLogout={handleLogout}
-    />
 {:else if !passwordAuthenticated}
     <AuthGate
-        step="password"
-        userEmail={googleUser.email}
+        step={googleUser ? 'password' : 'both'}
+        userEmail={googleUser?.email}
         onGoogleLogin={handleGoogleLogin}
         onPasswordAuthenticated={handlePasswordAuthenticated}
         onGoogleLogout={handleLogout}

@@ -4,14 +4,14 @@
     import { createGoogleNonce, loadGoogleIdentityServices } from './google-identity';
 
     interface Props {
-        step: 'google' | 'password';
+        step?: 'both' | 'google' | 'password';
         userEmail?: string;
         onGoogleLogin: (credential: string, nonce: string) => Promise<void>;
         onPasswordAuthenticated: () => void;
         onGoogleLogout: () => Promise<void>;
     }
 
-    let { step, userEmail = '', onGoogleLogin, onPasswordAuthenticated, onGoogleLogout }: Props = $props();
+    let { step = 'both', userEmail = '', onGoogleLogin, onPasswordAuthenticated, onGoogleLogout }: Props = $props();
 
     let passcode = $state('');
     let error = $state('');
@@ -26,23 +26,22 @@
         try {
             await onGoogleLogin(credential, nonce);
         } catch {
-            error = 'Не вдалося увійти через Google. Спробуйте ще раз.';
+            error = 'Не вдалося увійти через Google. Спробуйте ще раз або увійдіть за паролем.';
         } finally {
             isSubmitting = false;
         }
     }
 
     onMount(() => {
-        if (step !== 'google') return;
+        if (step === 'password') return;
         const clientId = import.meta.env.PUBLIC_GOOGLE_CLIENT_ID?.trim();
         if (!clientId) {
-            error = 'Сервіс входу через Google тимчасово недоступний.';
             return;
         }
 
         void Promise.all([loadGoogleIdentityServices(), createGoogleNonce()])
             .then(([google, nonce]) => {
-                if (!googleButton) throw new Error('Google sign-in button is unavailable.');
+                if (!googleButton) return;
                 google.accounts.id.initialize({
                     client_id: clientId,
                     nonce: nonce.hashed,
@@ -60,38 +59,20 @@
                 });
             })
             .catch((err) => {
-                console.warn('[AuthGate] Google Identity Services error:', err);
+                console.warn('[AuthGate] Google Identity Services notice:', err);
                 const isIp = typeof window !== 'undefined' && /^\d+\.\d+\.\d+\.\d+$/.test(window.location.hostname);
                 if (isIp) {
-                    error = 'Google OAuth не підтримує вхід через IP-адресу (10.10.10.x). Скористайтеся службовим кодом нижче.';
-                } else {
-                    error = 'Не вдалося завантажити вхід через Google. Скористайтеся службовим кодом нижче.';
+                    console.info('[AuthGate] Google OAuth disabled for raw IP origin. Direct password entry is available.');
                 }
             });
     });
-
-    function handleDirectPasscodeSubmit(e?: Event) {
-        if (e) e.preventDefault();
-        error = '';
-
-        if (!passcode.trim()) {
-            error = 'Введіть код доступу';
-            return;
-        }
-
-        if (passcode.trim() === '777' || passcode.trim() === 'admin777' || passcode.trim() === 'banklink') {
-            onPasswordAuthenticated();
-        } else {
-            error = 'Невірний пароль доступу. Використовуйте 777.';
-        }
-    }
 
     function handleSubmit(e?: Event) {
         if (e) e.preventDefault();
         error = '';
 
         if (!passcode.trim()) {
-            error = 'Введіть код доступу';
+            error = 'Введіть код доступу (777)';
             return;
         }
 
@@ -100,7 +81,7 @@
         if (passcode.trim() === '777' || passcode.trim() === 'admin777' || passcode.trim() === 'banklink') {
             onPasswordAuthenticated();
         } else {
-            error = 'Невірний пароль доступу. Спробуйте ще раз.';
+            error = 'Невірний пароль доступу. Використовуйте 777.';
             isSubmitting = false;
         }
     }
@@ -120,13 +101,50 @@
         <h1 class="text-2xl font-black tracking-tight text-white mb-2">
             BankLink Configurator
         </h1>
-        <p class="text-stone-400 text-sm mb-8">
-            {step === 'google'
-                ? 'Спочатку підтвердьте корпоративний Google-акаунт'
-                : 'Google підтверджено. Введіть службовий пароль доступу'}
+        <p class="text-stone-400 text-sm mb-6">
+            {step === 'password'
+                ? 'Google підтверджено. Введіть службовий пароль доступу'
+                : 'Вхід через Google або за службовим паролем'}
         </p>
 
-        {#if step === 'google'}
+        {#if step === 'password'}
+            <form onsubmit={handleSubmit} class="space-y-4">
+                <div class="rounded-xl border border-stone-800 bg-stone-950/50 px-3 py-2 text-left">
+                    <div class="text-[10px] font-semibold uppercase text-stone-500">Google account</div>
+                    <div class="mt-0.5 truncate text-sm text-stone-200">{userEmail}</div>
+                </div>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-500">
+                        <KeyRound size={18} />
+                    </div>
+                    <input
+                        type="password"
+                        bind:value={passcode}
+                        placeholder="Введіть код доступу (777)"
+                        autocomplete="current-password"
+                        class="w-full bg-stone-950/60 border border-stone-700/80 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-mono tracking-wider"
+                    />
+                </div>
+
+                <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.98] text-white font-semibold text-sm py-3.5 px-4 rounded-2xl transition-all shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                    <span>Увійти в панель</span>
+                    <ArrowRight size={16} />
+                </button>
+            </form>
+            <button
+                type="button"
+                onclick={() => void onGoogleLogout()}
+                class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 text-xs font-semibold text-stone-500 hover:text-stone-200"
+            >
+                <LogOut size={14} />
+                <span>Інший Google-акаунт</span>
+            </button>
+        {:else}
+            <!-- Google Sign-In Option -->
             <div class="relative flex min-h-11 w-full items-center justify-center overflow-hidden">
                 <div bind:this={googleButton} class:invisible={isSubmitting}></div>
                 {#if isSubmitting}
@@ -137,68 +155,40 @@
                 {/if}
             </div>
 
-            <div class="mt-6 pt-5 border-t border-stone-800/80 text-left">
-                <div class="text-[11px] uppercase tracking-wider text-stone-500 font-semibold mb-2.5 text-center">
-                    Вхід у локальній мережі (Wi-Fi / Dev)
+            <!-- Divider -->
+            <div class="relative my-6">
+                <div class="absolute inset-0 flex items-center">
+                    <div class="w-full border-t border-stone-800"></div>
                 </div>
-                <form onsubmit={handleDirectPasscodeSubmit} class="space-y-3">
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-500">
-                            <KeyRound size={16} />
-                        </div>
-                        <input
-                            type="password"
-                            bind:value={passcode}
-                            placeholder="Введіть код доступу (777)"
-                            autocomplete="current-password"
-                            class="w-full bg-stone-950/60 border border-stone-700/80 rounded-2xl pl-10 pr-4 py-3 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 font-mono tracking-wider"
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        class="w-full bg-stone-800 hover:bg-stone-700 active:scale-[0.98] text-stone-200 font-semibold text-xs py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer border border-stone-700/60"
-                    >
-                        <span>Увійти за службовим кодом (777)</span>
-                        <ArrowRight size={14} />
-                    </button>
-                </form>
-            </div>
-        {:else}
-        <form onsubmit={handleSubmit} class="space-y-4">
-            <div class="rounded-xl border border-stone-800 bg-stone-950/50 px-3 py-2 text-left">
-                <div class="text-[10px] font-semibold uppercase text-stone-500">Google account</div>
-                <div class="mt-0.5 truncate text-sm text-stone-200">{userEmail}</div>
-            </div>
-            <div class="relative">
-                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-500">
-                    <KeyRound size={18} />
+                <div class="relative flex justify-center text-xs uppercase">
+                    <span class="bg-stone-900 px-3 text-stone-500 font-mono tracking-widest text-[10px]">АБО ЗА ПАРОЛЕМ</span>
                 </div>
-                <input
-                    type="password"
-                    bind:value={passcode}
-                    placeholder="Введіть код доступу"
-                    autocomplete="current-password"
-                    class="w-full bg-stone-950/60 border border-stone-700/80 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-mono tracking-wider"
-                />
             </div>
 
-            <button
-                type="submit"
-                disabled={isSubmitting}
-                class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.98] text-white font-semibold text-sm py-3.5 px-4 rounded-2xl transition-all shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-                <span>Увійти в панель</span>
-                <ArrowRight size={16} />
-            </button>
-        </form>
-            <button
-                type="button"
-                onclick={() => void onGoogleLogout()}
-                class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 text-xs font-semibold text-stone-500 hover:text-stone-200"
-            >
-                <LogOut size={14} />
-                <span>Інший Google-акаунт</span>
-            </button>
+            <!-- Local Password Form -->
+            <form onsubmit={handleSubmit} class="space-y-3.5">
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-500">
+                        <KeyRound size={18} />
+                    </div>
+                    <input
+                        type="password"
+                        bind:value={passcode}
+                        placeholder="Введіть службовий пароль (777)"
+                        autocomplete="current-password"
+                        class="w-full bg-stone-950/60 border border-stone-700/80 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-mono tracking-wider"
+                    />
+                </div>
+
+                <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.98] text-white font-semibold text-sm py-3.5 px-4 rounded-2xl transition-all shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                    <span>Увійти за паролем</span>
+                    <ArrowRight size={16} />
+                </button>
+            </form>
         {/if}
 
         {#if error}
@@ -210,7 +200,7 @@
 
         <div class="mt-8 pt-6 border-t border-stone-800/80 flex items-center justify-center gap-2 text-xs text-stone-500">
             <CheckCircle2 size={13} class="text-emerald-500" />
-            <span>{step === 'google' ? 'Захищено Google та Supabase Auth' : 'Крок 2 з 2 · службова перевірка'}</span>
+            <span>Підтримується вхід через Google або код доступу</span>
         </div>
     </div>
 </div>
