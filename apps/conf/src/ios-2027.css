@@ -360,19 +360,78 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   padding: 16px 14px 13px;
   border-bottom: 1px solid var(--ios-line);
   background: var(--ios-panel);
+  transition: padding 0.2s ease;
+}
+
+.test-payload-toolbar.collapsed {
+  padding-bottom: 12px;
 }
 
 .test-toolbar-heading {
   display: flex;
   min-height: 31px;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
-.test-toolbar-heading > div { min-width: 0; }
+.test-toolbar-heading > div,
+.test-toolbar-heading-main { min-width: 0; }
+.test-toolbar-heading-main {
+  flex: 1;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
 .test-toolbar-heading span { display: block; color: var(--ios-ink); font-size: 12px; font-weight: 800; }
 .test-toolbar-heading small { display: block; overflow: hidden; margin-top: 2px; color: var(--ios-tertiary); font-size: 8px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .test-toolbar-heading b { padding: 3px 6px; border-radius: 5px; background: var(--ios-success-surface); color: var(--ios-success-text); font-size: 8px; }
+
+.test-toolbar-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.toolbar-toggle-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 50%;
+  background: var(--ios-surface);
+  border: 1px solid var(--ios-line-strong);
+  color: var(--ios-secondary);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.toolbar-toggle-circle:hover {
+  background: var(--ios-surface-high);
+  color: var(--ios-ink);
+  border-color: var(--ios-blue);
+}
+
+.toolbar-toggle-circle:active {
+  transform: scale(0.92);
+}
+
+.collapsed-summary {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--ios-surface);
+  border: 1px solid var(--ios-line);
+  color: var(--ios-blue);
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--ios-font-mono, monospace);
+}
 
 .test-toolbar-grid {
   display: grid;
@@ -643,6 +702,8 @@ body > #app > .min-h-screen > .relative > div:last-child { border-color: var(--i
   .embedded-editor > div > div:last-child button { min-height: 44px; padding-inline: 12px !important; }
 
   .test-payload-toolbar { padding: 12px; }
+  .test-payload-toolbar.collapsed { padding: 10px 12px; }
+  .toolbar-toggle-circle { width: 32px; height: 32px; min-width: 32px; min-height: 32px; }
   .test-toolbar-grid { grid-template-columns: minmax(0, 1fr) 92px; gap: 10px 8px; }
   .test-field input, .test-field select, .generate-button { height: 44px; min-height: 44px !important; }
   .test-field input, .test-field select { font-size: 16px !important; }

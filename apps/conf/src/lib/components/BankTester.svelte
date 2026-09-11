@@ -4,7 +4,7 @@
     import {
         X, Play, Copy, Check, QrCode, Terminal, FileCode2, History,
         Smartphone, Globe, ArrowUpRight, RotateCcw, ThumbsUp, ThumbsDown,
-        RefreshCw, Clock3
+        RefreshCw, Clock3, ChevronDown, ChevronUp
     } from '@lucide/svelte';
     import type { BankEntry, TestFormData, PayloadResult, BankUrls } from '../types';
     import { MOCK_SCENARIOS } from '../services/mock-scenarios';
@@ -22,6 +22,7 @@
     let { bank, onClose, onTestRecorded, embedded = false }: Props = $props();
 
     let activeTab = $state<'IPHONE' | 'DEBUG' | 'PAYLOAD' | 'QR' | 'HISTORY'>('IPHONE');
+    let isToolbarCollapsed = $state(false);
     const defaultScenario = MOCK_SCENARIOS.find((scenario) => scenario.id === 'rozetka')!;
     let selectedScenarioId = $state<string>(defaultScenario.id);
 
@@ -174,58 +175,84 @@
         </div>
 
         <!-- Test Payload Controls -->
-        <div class="test-payload-toolbar">
+        <div class="test-payload-toolbar" class:collapsed={isToolbarCollapsed}>
             <div class="test-toolbar-heading">
-                <div>
-                    <span>Test Payload</span>
+                <button
+                    type="button"
+                    class="test-toolbar-heading-main text-left cursor-pointer bg-transparent border-0 p-0"
+                    onclick={() => isToolbarCollapsed = !isToolbarCollapsed}
+                >
+                    <div class="flex items-center gap-2">
+                        <span>Test Payload</span>
+                        {#if isToolbarCollapsed}
+                            <span class="collapsed-summary">{formData.amount || 0} UAH · {selectedScenario?.badge || ''}</span>
+                        {/if}
+                    </div>
                     <small>{selectedScenario?.sublabel || 'Платіжні реквізити'}</small>
-                </div>
-                {#if testFeedback === 'Payload оновлено'}
-                    <b>Оновлено</b>
-                {/if}
-            </div>
-
-            <div class="test-toolbar-grid">
-                <label class="test-field test-field-preset">
-                    <span>Preset</span>
-                    <select value={selectedScenarioId} onchange={(event) => applyScenario(event.currentTarget.value)}>
-                        {#each MOCK_SCENARIOS as scenario (scenario.id)}
-                            <option value={scenario.id}>{scenario.badge} — {scenario.label}</option>
-                        {/each}
-                    </select>
-                </label>
-
-                <button type="button" class="generate-button" onclick={generatePayload}>
-                    <RefreshCw size={14} />
-                    <span>Generate</span>
                 </button>
-
-                <label class="test-field test-field-amount">
-                    <span>Amount</span>
-                    <input type="number" min="0" step="0.01" bind:value={formData.amount} />
-                </label>
-
-                <label class="test-field test-field-currency">
-                    <span>Currency</span>
-                    <select aria-label="Currency" disabled>
-                        <option>UAH</option>
-                    </select>
-                </label>
-
-                <label class="test-field test-field-reference">
-                    <span>Reference</span>
-                    <input type="text" bind:value={formData.reference} placeholder="Payment reference" />
-                </label>
+                <div class="test-toolbar-heading-actions">
+                    {#if testFeedback === 'Payload оновлено'}
+                        <b>Оновлено</b>
+                    {/if}
+                    <button
+                        type="button"
+                        onclick={() => isToolbarCollapsed = !isToolbarCollapsed}
+                        class="toolbar-toggle-circle"
+                        title={isToolbarCollapsed ? 'Розгорнути параметри тесту' : 'Згорнути параметри тесту'}
+                        aria-label={isToolbarCollapsed ? 'Розгорнути параметри тесту' : 'Згорнути параметри тесту'}
+                    >
+                        {#if isToolbarCollapsed}
+                            <ChevronDown size={15} />
+                        {:else}
+                            <ChevronUp size={15} />
+                        {/if}
+                    </button>
+                </div>
             </div>
 
-            <div class="protocol-badges" aria-label="Payload protocol summary">
-                <span>{bank.nbu_version}</span>
-                <span>{bank.encoding === '2' ? 'Windows-1251' : 'UTF-8'}</span>
-                <span>{formData.function || bank.nbu_function}</span>
-                <span>{formData.isoCategory}/{formData.isoPurpose}</span>
-                <span>{formData.lockFields || '—'}</span>
-                <span class="protocol-time"><Clock3 size={11} />{generatedAt.toLocaleTimeString('uk-UA')}</span>
-            </div>
+            {#if !isToolbarCollapsed}
+                <div class="test-toolbar-grid">
+                    <label class="test-field test-field-preset">
+                        <span>Preset</span>
+                        <select value={selectedScenarioId} onchange={(event) => applyScenario(event.currentTarget.value)}>
+                            {#each MOCK_SCENARIOS as scenario (scenario.id)}
+                                <option value={scenario.id}>{scenario.badge} — {scenario.label}</option>
+                            {/each}
+                        </select>
+                    </label>
+
+                    <button type="button" class="generate-button" onclick={generatePayload}>
+                        <RefreshCw size={14} />
+                        <span>Generate</span>
+                    </button>
+
+                    <label class="test-field test-field-amount">
+                        <span>Amount</span>
+                        <input type="number" min="0" step="0.01" bind:value={formData.amount} />
+                    </label>
+
+                    <label class="test-field test-field-currency">
+                        <span>Currency</span>
+                        <select aria-label="Currency" disabled>
+                            <option>UAH</option>
+                        </select>
+                    </label>
+
+                    <label class="test-field test-field-reference">
+                        <span>Reference</span>
+                        <input type="text" bind:value={formData.reference} placeholder="Payment reference" />
+                    </label>
+                </div>
+
+                <div class="protocol-badges" aria-label="Payload protocol summary">
+                    <span>{bank.nbu_version}</span>
+                    <span>{bank.encoding === '2' ? 'Windows-1251' : 'UTF-8'}</span>
+                    <span>{formData.function || bank.nbu_function}</span>
+                    <span>{formData.isoCategory}/{formData.isoPurpose}</span>
+                    <span>{formData.lockFields || '—'}</span>
+                    <span class="protocol-time"><Clock3 size={11} />{generatedAt.toLocaleTimeString('uk-UA')}</span>
+                </div>
+            {/if}
         </div>
 
         <!-- Tabs Navigation -->
