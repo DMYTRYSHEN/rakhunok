@@ -61,8 +61,12 @@ export const DEFAULT_BANKS: BankEntry[] = ([
     { id: 'pinb', code: 'PINB', name: 'PINBANK', nbu_version: '003', encoding: '1', nbu_function: 'ICT', domain_prefix: 'https://newbank.com/qr/', android_package: 'ua.com.cs.ifobs.mobile.pinp', ios_scheme: 'pinbank', universal_link: null, universal_link2: null, url_template: null, alternative_url: null, extra_links: null, routing_mode: 'redirect', logo: null, color: '#555555', active: true, checked: false, verified: true, mode: 'redirect', appstore_url: 'https://apps.apple.com/ua/app/pinbank-online/id1581853924', playstore_url: 'https://play.google.com/store/apps/details?id=ua.com.cs.ifobs.mobile.pinp' },
     { id: 'asvi', code: 'ASVI', name: 'amobank (ASVIO BANK)', nbu_version: '003', encoding: '1', nbu_function: 'ICT', domain_prefix: 'https://newbank.com/qr/', android_package: 'ua.bank.amo.app', ios_scheme: 'amobank', universal_link: null, universal_link2: null, url_template: null, alternative_url: null, extra_links: null, routing_mode: 'redirect', logo: null, color: '#555555', active: true, checked: false, verified: true, mode: 'redirect', appstore_url: 'https://apps.apple.com/ua/app/amobank-%D1%82%D0%B2%D1%96%D0%B9-%D0%BC%D0%BE%D0%B1%D1%96%D0%BB%D1%8C%D0%BD%D0%B8%D0%B9-%D0%B1%D0%B0%D0%BD%D0%BA/id6745878256', playstore_url: 'https://play.google.com/store/apps/details?id=ua.bank.amo.app' }
 ] satisfies BankEntry[]).map(withBankLogo);
-
-const LOCAL_STORAGE_KEY = 'banklink_local_cache';
+// Purge any legacy cache from localStorage to ensure 100% database source of truth
+if (typeof window !== 'undefined') {
+    try {
+        localStorage.removeItem('banklink_local_cache');
+    } catch {}
+}
 
 export const BankLinkStore = {
     getAll: async (): Promise<BankEntry[]> => {
@@ -73,22 +77,13 @@ export const BankLinkStore = {
                 .order('name');
 
             if (!error && data && data.length > 0) {
-                const list = (data as BankEntry[]).map(withBankLogo);
-                if (typeof window !== 'undefined') {
-                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
-                }
-                return list;
+                return (data as BankEntry[]).map(withBankLogo);
+            }
+            if (error) {
+                console.warn('[BankLinkStore] Supabase select error:', error.message);
             }
         } catch (e) {
-            console.warn('[BankLinkStore] fetch failed, using fallback:', e);
-        }
-
-        // Try local storage cache
-        if (typeof window !== 'undefined') {
-            try {
-                const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
-                if (cached) return (JSON.parse(cached) as BankEntry[]).map(withBankLogo);
-            } catch {}
+            console.warn('[BankLinkStore] fetch failed, using defaults fallback:', e);
         }
 
         return DEFAULT_BANKS;
