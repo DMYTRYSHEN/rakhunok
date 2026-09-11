@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { X, Save, Trash2, Copy, AlertCircle, Smartphone, Globe, Shield, ImagePlus, Upload } from '@lucide/svelte';
+    import { X, Save, Trash2, Copy, AlertCircle, Smartphone, Globe, Shield, ImagePlus, Upload, ExternalLink, Store } from '@lucide/svelte';
     import type { BankEntry } from '../types';
     import { BankLinkStore } from '../services/banklink-store';
 
@@ -288,6 +288,7 @@
                             <option value="scheme">App Scheme URL</option>
                             <option value="intent">Android Intent</option>
                             <option value="redirect">Web Redirect (НБУ шлюз)</option>
+                            <option value="store_links">Store Links (App Store / Google Play)</option>
                         </select>
                     </div>
                     <div>
@@ -339,7 +340,61 @@
                 </div>
             </div>
 
-            <!-- Section 4: Status Toggles -->
+            <!-- Section 4: Store Links -->
+            <div class="border-t border-stone-800/80 pt-5">
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-cyan-400 mb-3 flex items-center gap-1.5">
+                    <Store size={14} />
+                    <span>Store Links</span>
+                </h3>
+                <div class="grid grid-cols-1 gap-4">
+                    <div>
+                        <label class="block text-xs text-stone-400 mb-1">App Store (iOS)</label>
+                        <div class="flex gap-2">
+                            <input
+                                type="url"
+                                bind:value={localBank.appstore_url}
+                                placeholder="https://apps.apple.com/ua/app/..."
+                                class="flex-1 bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono focus:border-blue-500 focus:outline-none"
+                            />
+                            {#if localBank.appstore_url}
+                                <a
+                                    href={localBank.appstore_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    class="flex items-center justify-center w-9 h-9 bg-stone-800 hover:bg-stone-700 rounded-xl transition-colors shrink-0"
+                                    title="Відкрити в App Store"
+                                >
+                                    <ExternalLink size={15} class="text-stone-300" />
+                                </a>
+                            {/if}
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-stone-400 mb-1">Google Play (Android)</label>
+                        <div class="flex gap-2">
+                            <input
+                                type="url"
+                                bind:value={localBank.playstore_url}
+                                placeholder="https://play.google.com/store/apps/details?id=..."
+                                class="flex-1 bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono focus:border-blue-500 focus:outline-none"
+                            />
+                            {#if localBank.playstore_url}
+                                <a
+                                    href={localBank.playstore_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    class="flex items-center justify-center w-9 h-9 bg-stone-800 hover:bg-stone-700 rounded-xl transition-colors shrink-0"
+                                    title="Відкрити в Google Play"
+                                >
+                                    <ExternalLink size={15} class="text-stone-300" />
+                                </a>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 5: Status Toggles -->
             <div class="border-t border-stone-800/80 pt-5">
                 <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400 mb-3">
                     Статуси та доступність
