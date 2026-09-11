@@ -5,8 +5,41 @@ import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import net from 'node:net';
 
 const docsDirectory = resolve(import.meta.dirname, 'docs');
+
+let lastConfCheckTime = 0;
+let isConfServerAlive = false;
+const CONF_CHECK_TTL_MS = 1500;
+
+function isPortOpen(port: number, host = '127.0.0.1', timeout = 100): Promise<boolean> {
+	return new Promise((resolve) => {
+		const socket = new net.Socket();
+		let called = false;
+		const done = (open: boolean) => {
+			if (called) return;
+			called = true;
+			socket.destroy();
+			resolve(open);
+		};
+		socket.setTimeout(timeout);
+		socket.once('connect', () => done(true));
+		socket.once('timeout', () => done(false));
+		socket.once('error', () => done(false));
+		socket.connect(port, host);
+	});
+}
+
+async function isConfUp(): Promise<boolean> {
+	const now = Date.now();
+	if (now - lastConfCheckTime < CONF_CHECK_TTL_MS) {
+		return isConfServerAlive;
+	}
+	isConfServerAlive = await isPortOpen(5176, '127.0.0.1', 80);
+	lastConfCheckTime = now;
+	return isConfServerAlive;
+}
 
 function apiDocsDevServer(): Plugin {
 	return {
@@ -75,27 +108,61 @@ export default defineConfig(({ mode }) => ({
 		},
 		proxy: {
 			'/conf': {
-				target: 'http://localhost:5176',
-				changeOrigin: true
+				target: 'http://127.0.0.1:5176',
+				changeOrigin: true,
+				bypass: async (req) => {
+					// If the standalone conf dev server (apps/conf on port 5176) is not running,
+					// bypass the proxy so SvelteKit handles the request with src/routes/conf/+page.svelte
+					// and prevent AggregateError [ECONNREFUSED] proxy crashes.
+					const alive = await isConfUp();
+					if (!alive) {
+						return req.url;
+					}
+					return undefined;
+				},
+				configure: (proxy) => {
+					proxy.on('error', (_err, _req, res) => {
+						if ('writeHead' in res && !res.headersSent && !res.writableEnded) {
+							res.writeHead(302, { Location: '/conf' });
+							res.end();
+						}
+					});
+				}
 			},
 			'/dashboard/api': {
-				target: 'http://localhost:8787',
-				rewrite: (path) => path.slice('/dashboard'.length)
+				target: 'http://127.0.0.1:8787',
+				rewrite: (path) => path.slice('/dashboard'.length),
+				configure: (proxy) => {
+					proxy.on('error', (_err, _req, res) => {
+						if ('writeHead' in res && !res.headersSent && !res.writableEnded) {
+							res.writeHead(503, { 'Content-Type': 'application/json' });
+							res.end(JSON.stringify({ error: 'Worker dev server (port 8787) is not running' }));
+						}
+					});
+				}
 			},
 			'/pay': {
-				target: 'http://localhost:8787'
+				target: 'http://127.0.0.1:8787',
+				configure: (proxy) => {
+					proxy.on('error', (_err, _req, res) => {
+						if ('writeHead' in res && !res.headersSent && !res.writableEnded) {
+							res.writeHead(503, { 'Content-Type': 'text/plain' });
+							res.end('Worker dev server (port 8787) is not running');
+						}
+					});
+				}
 			},
 			'/o': {
-				target: 'http://localhost:8787'
+				target: 'http://127.0.0.1:8787'
 			},
 			'/t': {
-				target: 'http://localhost:8787'
+				target: 'http://127.0.0.1:8787'
 			},
 			'/pos': {
-				target: 'http://localhost:8787'
+				target: 'http://127.0.0.1:8787'
 			},
 			'/tag': {
-				target: 'http://localhost:8787'
+				target: 'http://127.0.0.1:8787'
 			}
 		}
 	},
