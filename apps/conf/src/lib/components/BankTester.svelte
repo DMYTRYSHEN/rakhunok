@@ -35,6 +35,24 @@
     let testFeedback = $state<string | null>(null);
     let generationKey = $state(0);
     let generatedAt = $state(new Date());
+    let redirectState = $state<'idle' | 'redirecting' | 'redirected'>('idle');
+    let showRedirectModal = $state(false);
+
+    function triggerDirectRedirect(url: string | null) {
+        if (!url || typeof window === 'undefined') return;
+        redirectState = 'redirecting';
+        try {
+            window.location.href = url;
+        } catch (err) {
+            console.error('Direct redirect error:', err);
+        }
+        setTimeout(() => {
+            redirectState = 'redirected';
+            setTimeout(() => {
+                redirectState = 'idle';
+            }, 3000);
+        }, 1200);
+    }
 
     // Derived payload & URLs
     let payload = $derived.by<PayloadResult>(() => {
@@ -438,15 +456,57 @@
                                 <div class="p-2.5 bg-stone-900 rounded-xl font-mono text-xs text-stone-300 break-all select-all">
                                     {urls.android_intent}
                                 </div>
-                                <div class="flex items-center gap-2 pt-1">
+                                <div class="flex flex-wrap items-center gap-2 pt-1">
+                                    <button
+                                        type="button"
+                                        onclick={() => triggerDirectRedirect(urls.android_intent)}
+                                        class="px-3.5 py-1.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm shadow-amber-600/25 active:scale-95 disabled:opacity-60"
+                                        disabled={redirectState === 'redirecting'}
+                                    >
+                                        {#if redirectState === 'redirecting'}
+                                            <RefreshCw size={12} class="animate-spin text-amber-100" />
+                                            <span>Редірект...</span>
+                                        {:else if redirectState === 'redirected'}
+                                            <Check size={12} class="text-emerald-300" />
+                                            <span>Редірект запущено!</span>
+                                        {:else}
+                                            <ArrowUpRight size={13} />
+                                            <span>Виконати редірект</span>
+                                        {/if}
+                                    </button>
+
                                     <a
                                         href={urls.android_intent}
-                                        class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer shadow-sm shadow-amber-600/20 active:scale-95"
+                                        class="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl text-xs font-medium flex items-center gap-1 transition-all cursor-pointer"
                                     >
                                         <Play size={12} />
-                                        <span>Відкрити (Launch)</span>
-                                        <ArrowUpRight size={12} />
+                                        <span>Прямий &lt;a href&gt;</span>
                                     </a>
+
+                                    <button
+                                        type="button"
+                                        onclick={() => {
+                                            showRedirectModal = true;
+                                            triggerDirectRedirect(urls.android_intent);
+                                        }}
+                                        class="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-amber-300 rounded-xl text-xs font-medium flex items-center gap-1 transition-all cursor-pointer"
+                                    >
+                                        <Globe size={12} />
+                                        <span>Шлюз-редірект</span>
+                                    </button>
+
+                                    {#if bank.playstore_url}
+                                        <a
+                                            href={bank.playstore_url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            class="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl text-xs font-medium flex items-center gap-1 transition-all cursor-pointer"
+                                        >
+                                            <Play size={12} />
+                                            <span>Google Play</span>
+                                        </a>
+                                    {/if}
+
                                     <button
                                         onclick={() => copyToClipboard(urls.android_intent!, 'intent')}
                                         class="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl text-xs flex items-center gap-1 transition-all cursor-pointer"
@@ -682,3 +742,70 @@
         </div>
     </div>
 </div>
+
+{#if showRedirectModal}
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-stone-900 border border-stone-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-5 text-center relative">
+            <button
+                onclick={() => { showRedirectModal = false; }}
+                class="absolute top-4 right-4 p-2 text-stone-400 hover:text-white rounded-full hover:bg-stone-800 transition-all cursor-pointer"
+                aria-label="Закрити"
+            >
+                <X size={16} />
+            </button>
+
+            <div class="flex flex-col items-center gap-3 pt-2">
+                <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-lg" style="background-color: {bank.color || '#3b82f6'}">
+                    {#if bank.logo}
+                        <img src={bank.logo} alt={bank.name} class="w-10 h-10 object-contain" />
+                    {:else}
+                        {bank.code.substring(0, 2)}
+                    {/if}
+                </div>
+                <div>
+                    <h4 class="text-base font-bold text-white">{bank.name}</h4>
+                    <p class="text-xs text-amber-400 flex items-center justify-center gap-1.5 mt-1 font-mono">
+                        <RefreshCw size={12} class="animate-spin" />
+                        Виконується редірект у додаток...
+                    </p>
+                </div>
+            </div>
+
+            <div class="p-3 bg-stone-950/80 rounded-2xl border border-stone-800 text-xs text-stone-300 text-left space-y-1.5 font-mono">
+                <div class="text-[10px] text-stone-500 uppercase tracking-wider">Android Intent Target</div>
+                <div class="text-[11px] text-amber-300/90 break-all select-all">{urls.android_intent}</div>
+            </div>
+
+            <div class="space-y-2 pt-2">
+                <button
+                    type="button"
+                    onclick={() => triggerDirectRedirect(urls.android_intent)}
+                    class="w-full py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-amber-600/30 active:scale-98 transition-all cursor-pointer"
+                >
+                    <ArrowUpRight size={16} />
+                    <span>Відкрити додаток банку</span>
+                </button>
+
+                {#if bank.playstore_url}
+                    <a
+                        href={bank.playstore_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        class="w-full py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                        <Play size={14} />
+                        <span>Відкрити в Google Play</span>
+                    </a>
+                {/if}
+
+                <button
+                    type="button"
+                    onclick={() => { showRedirectModal = false; }}
+                    class="w-full py-2 text-stone-400 hover:text-stone-200 text-xs transition-colors cursor-pointer"
+                >
+                    Скасувати / Назад
+                </button>
+            </div>
+        </div>
+    </div>
+{/if}

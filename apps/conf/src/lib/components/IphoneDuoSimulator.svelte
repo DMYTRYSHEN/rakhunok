@@ -370,11 +370,22 @@
 
                                 <div class="android-actions">
                                     {#if urls.android_intent}
+                                        <button
+                                            type="button"
+                                            class="android-btn launch"
+                                            onclick={() => {
+                                                if (typeof window !== 'undefined' && urls.android_intent) {
+                                                    window.location.href = urls.android_intent;
+                                                }
+                                            }}
+                                        >
+                                            <ExternalLink size={14} /> Редірект
+                                        </button>
                                         <a
                                             href={urls.android_intent}
-                                            class="android-btn launch"
+                                            class="android-btn"
                                         >
-                                            <Play size={14} /> Launch Intent
+                                            <Play size={14} /> Прямий &lt;a&gt;
                                         </a>
                                     {/if}
                                     {#if bank.playstore_url}
