@@ -182,9 +182,11 @@ export function buildBankUrls(bank: Partial<BankEntry>, encodedPayload: string):
     } else if (bank.universal_link2) {
         android_intent = `${bank.universal_link2}${encodedPayload}`;
     } else if (bank.android_package) {
-        const prefix = bank.domain_prefix || 'https://bank.gov.ua/qr/';
-        const hostAndPath = prefix.replace(/^https?:\/\//, '');
-        const cleanHostPath = hostAndPath.endsWith('/') ? hostAndPath : `${hostAndPath}/`;
+        let cleanHostPath = 'bank.gov.ua/qr/';
+        if (bank.domain_prefix && !bank.domain_prefix.includes('bank.gov.ua')) {
+            const hostAndPath = bank.domain_prefix.replace(/^https?:\/\//, '');
+            cleanHostPath = hostAndPath.endsWith('/') ? hostAndPath : `${hostAndPath}/`;
+        }
         const fallback = bank.playstore_url ? `;S.browser_fallback_url=${encodeURIComponent(bank.playstore_url)}` : '';
         android_intent = `intent://${cleanHostPath}${encodedPayload}#Intent;scheme=https;package=${bank.android_package}${fallback};end;`;
     }
