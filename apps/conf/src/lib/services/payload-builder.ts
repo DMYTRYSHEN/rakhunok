@@ -176,19 +176,28 @@ export function buildBankUrls(bank: Partial<BankEntry>, encodedPayload: string):
         web_https = `${bank.universal_link}${encodedPayload}`;
     }
 
-    let android_intent: string | null = null;
+    // Android custom scheme URL (same scheme as iOS — most banks register the same scheme on both platforms)
+    let android_scheme: string | null = null;
+    if (bank.ios_scheme) {
+        android_scheme = `${bank.ios_scheme}://bank.gov.ua/qr/${encodedPayload}`;
+    }
+
+    // Standard Android App Link (android-app://...)
+    let android_app_link: string | null = null;
     if (bank.universal_link2 && bank.universal_link2.includes('{payload}')) {
-        android_intent = bank.universal_link2.replace('{payload}', encodedPayload);
+        android_app_link = bank.universal_link2.replace('{payload}', encodedPayload);
     } else if (bank.universal_link2) {
-        android_intent = `${bank.universal_link2}${encodedPayload}`;
+        android_app_link = `${bank.universal_link2}${encodedPayload}`;
     } else if (bank.android_package) {
-        let cleanHostPath = 'bank.gov.ua/qr/';
-        if (bank.domain_prefix && !bank.domain_prefix.includes('bank.gov.ua')) {
-            const hostAndPath = bank.domain_prefix.replace(/^https?:\/\//, '');
-            cleanHostPath = hostAndPath.endsWith('/') ? hostAndPath : `${hostAndPath}/`;
-        }
+        // Fallback generator for android-app:// format if not explicitly set
+        android_app_link = `android-app://${bank.android_package}/https/bank.gov.ua/qr/${encodedPayload}`;
+    }
+
+    // Standard Intent URI with scheme=https
+    let android_intent: string | null = null;
+    if (bank.android_package) {
         const fallback = bank.playstore_url ? `;S.browser_fallback_url=${encodeURIComponent(bank.playstore_url)}` : '';
-        android_intent = `intent://${cleanHostPath}${encodedPayload}#Intent;scheme=https;package=${bank.android_package}${fallback};end;`;
+        android_intent = `intent://bank.gov.ua/qr/${encodedPayload}#Intent;scheme=https;package=${bank.android_package}${fallback};end;`;
     }
 
     let ios_universal: string | null = null;
@@ -209,6 +218,8 @@ export function buildBankUrls(bank: Partial<BankEntry>, encodedPayload: string):
         ios_universal,
         ios_scheme,
         android_intent,
+        android_scheme,
+        android_app_link,
         web_https: web_https || null
     };
 }

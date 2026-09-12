@@ -28,6 +28,7 @@
     async function loadBanks() {
         isLoading = true;
         try {
+            await BankLinkStore.syncMissingAndroidLinks();
             bankList = await BankLinkStore.getAll();
         } catch (error) {
             console.error('Failed to load banks:', error);

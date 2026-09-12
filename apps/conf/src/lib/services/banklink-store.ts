@@ -133,6 +133,21 @@ export const BankLinkStore = {
         if (error) throw error;
     },
 
+    syncMissingAndroidLinks: async () => {
+        const banks = await BankLinkStore.getAll();
+        for (const b of banks) {
+            if (!b.universal_link2 && b.android_package) {
+                b.universal_link2 = `android-app://${b.android_package}/https/bank.gov.ua/qr/`;
+                try {
+                    await BankLinkStore.save(b, b.id);
+                    console.log(`[BankLinkStore] Auto-migrated universal_link2 for ${b.name}`);
+                } catch (e) {
+                    console.warn(`[BankLinkStore] Failed to auto-migrate ${b.name}:`, e);
+                }
+            }
+        }
+    },
+
     toggleActive: async (id: string, currentActive: boolean): Promise<boolean> => {
         const newActive = !currentActive;
         const { error } = await supabase

@@ -37,6 +37,7 @@
     let generatedAt = $state(new Date());
     let redirectState = $state<'idle' | 'redirecting' | 'redirected'>('idle');
     let showRedirectModal = $state(false);
+    let launchLog = $state<string[]>([]);
 
     function triggerDirectRedirect(url: string | null) {
         if (!url || typeof window === 'undefined') return;
@@ -54,10 +55,79 @@
         }, 1200);
     }
 
+    /**
+     * Cascading Android app launch strategy:
+     * 1. Custom URL scheme (alliancebank://bank.gov.ua/qr/...) — most apps register this
+     * 2. intent:// with custom scheme — explicit package + scheme fallback
+     * 3. intent:// with https scheme — for banks with verified domain links
+     * 4. Play Store — if nothing else works
+     */
+    function launchAndroidApp() {
+        if (typeof window === 'undefined') return;
+        redirectState = 'redirecting';
+        launchLog = [];
+
+        const strategies: { label: string; url: string }[] = [];
+
+        // Strategy 1: Direct custom scheme URL (highest success rate)
+        if (urls.android_scheme) {
+            strategies.push({ label: `Кастомна схема: ${bank.ios_scheme}://`, url: urls.android_scheme });
+        }
+
+        // Strategy 2: intent:// with custom scheme (has S.browser_fallback_url)
+        if (urls.android_intent && bank.ios_scheme && urls.android_intent.includes(`scheme=${bank.ios_scheme}`)) {
+            strategies.push({ label: `Intent (scheme=${bank.ios_scheme})`, url: urls.android_intent });
+        }
+
+        // Strategy 3: intent:// with https scheme
+        if (bank.android_package) {
+            const fallback = bank.playstore_url ? `;S.browser_fallback_url=${encodeURIComponent(bank.playstore_url)}` : '';
+            const httpsIntent = `intent://bank.gov.ua/qr/${payload.encodedPayload}#Intent;scheme=https;package=${bank.android_package}${fallback};end;`;
+            if (httpsIntent !== urls.android_intent) {
+                strategies.push({ label: 'Intent (scheme=https)', url: httpsIntent });
+            }
+        }
+
+        // Strategy 4: Web HTTPS URL (universal link that may trigger app association)
+        if (urls.web_https) {
+            strategies.push({ label: 'Web HTTPS URL', url: urls.web_https });
+        }
+
+        if (strategies.length === 0) {
+            launchLog = ['❌ Немає жодної стратегії для запуску'];
+            redirectState = 'redirected';
+            return;
+        }
+
+        // Execute first strategy immediately
+        const first = strategies[0];
+        launchLog = [`▶ Спроба: ${first.label}`];
+
+        try {
+            window.location.href = first.url;
+        } catch (err) {
+            launchLog = [...launchLog, `❌ Помилка: ${err}`];
+        }
+
+        // After a delay, show all strategies for manual retry
+        setTimeout(() => {
+            launchLog = [
+                ...launchLog,
+                `✅ Редірект відправлено`,
+                `---`,
+                `Якщо додаток не відкрився, спробуйте інші стратегії нижче:`
+            ];
+            redirectState = 'redirected';
+            setTimeout(() => {
+                redirectState = 'idle';
+            }, 5000);
+        }, 1500);
+    }
+
     function generateHtmlButtonSnippet(intentUrl: string | null, bankName: string, color: string | null): string {
         if (!intentUrl) return '';
-        const btnColor = color || '#1A73E8';
-        return `<a href="${intentUrl}"\n   style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px; background-color: ${btnColor}; color: #ffffff; text-decoration: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 600; border-radius: 12px; box-shadow: 0 4px 12px ${btnColor}40;">\n  <span>💳 Оплатити через ${bankName}</span>\n</a>`;
+        const btnColor = color || '#007bff';
+        return `<a href="${intentUrl}" style="display: inline-block; padding: 10px 20px; background-color: ${btnColor}; color: white; text-decoration: none; border-radius: 5px;">💳 intent ${bankName}</a>`;
     }
 
     // Derived payload & URLs
@@ -459,66 +529,24 @@
                             </div>
 
                             {#if urls.android_intent}
-                                <div class="p-2.5 bg-stone-900 rounded-xl font-mono text-xs text-stone-300 break-all select-all">
-                                    {urls.android_intent}
+                                <div class="p-2.5 bg-stone-900 rounded-xl font-mono text-xs text-stone-300 break-all select-all mb-2">
+                                    {urls.android_app_link || urls.android_intent}
                                 </div>
+
                                 <div class="flex flex-wrap items-center gap-2 pt-1">
-                                    <!-- Головна кнопка: Відкрити (Launch) нативний <a> лінк -->
+                                    <!-- Головна кнопка: Відкрити (Launch) нативний <a> лінк, що працює як Web Button -->
                                     <a
-                                        href={urls.android_intent}
+                                        href={urls.android_app_link || urls.android_intent}
                                         class="px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-amber-600/30 active:scale-95"
                                     >
                                         <Play size={13} fill="currentColor" />
-                                        <span>Відкрити (Launch)</span>
+                                        <span>Відкрити в Android додатку</span>
                                         <ArrowUpRight size={13} />
                                     </a>
 
-                                    <!-- Кнопка: Редірект через JS -->
+                                    <!-- Кнопка копіювання -->
                                     <button
-                                        type="button"
-                                        onclick={() => triggerDirectRedirect(urls.android_intent)}
-                                        class="px-3.5 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-60"
-                                        disabled={redirectState === 'redirecting'}
-                                    >
-                                        {#if redirectState === 'redirecting'}
-                                            <RefreshCw size={12} class="animate-spin text-amber-400" />
-                                            <span>Редірект...</span>
-                                        {:else if redirectState === 'redirected'}
-                                            <Check size={12} class="text-emerald-300" />
-                                            <span>Редірект запущено!</span>
-                                        {:else}
-                                            <ArrowUpRight size={12} />
-                                            <span>JS Редірект</span>
-                                        {/if}
-                                    </button>
-
-                                    <!-- Шлюз-редірект (модалка) -->
-                                    <button
-                                        type="button"
-                                        onclick={() => {
-                                            showRedirectModal = true;
-                                            triggerDirectRedirect(urls.android_intent);
-                                        }}
-                                        class="px-3.5 py-2 bg-stone-800 hover:bg-stone-700 text-amber-300 rounded-xl text-xs font-medium flex items-center gap-1 transition-all cursor-pointer"
-                                    >
-                                        <Globe size={12} />
-                                        <span>Шлюз-редірект</span>
-                                    </button>
-
-                                    {#if bank.playstore_url}
-                                        <a
-                                            href={bank.playstore_url}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            class="px-3 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl text-xs font-medium flex items-center gap-1 transition-all cursor-pointer"
-                                        >
-                                            <Play size={12} />
-                                            <span>Google Play</span>
-                                        </a>
-                                    {/if}
-
-                                    <button
-                                        onclick={() => copyToClipboard(urls.android_intent!, 'intent')}
+                                        onclick={() => copyToClipboard((urls.android_app_link || urls.android_intent)!, 'intent')}
                                         class="px-3 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl text-xs flex items-center gap-1 transition-all cursor-pointer"
                                     >
                                         {#if copiedKey === 'intent'}
@@ -531,35 +559,27 @@
                                     </button>
                                 </div>
 
-                                <!-- Прев'ю нативної кнопки оплати для мобільного сайту (Web Button) -->
-                                <div class="mt-2.5 p-3.5 bg-stone-900/80 rounded-2xl border border-stone-800/80 flex flex-col gap-2.5">
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-[11px] text-stone-400 font-semibold uppercase tracking-wider">
-                                            Прев'ю живої кнопки сайту (Web Button):
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onclick={() => copyToClipboard(generateHtmlButtonSnippet(urls.android_intent, bank.name, bank.color), 'html-button')}
-                                            class="text-[11px] text-amber-400 hover:text-amber-300 font-medium flex items-center gap-1 cursor-pointer transition-colors"
-                                        >
-                                            {#if copiedKey === 'html-button'}
-                                                <Check size={12} class="text-emerald-400" />
-                                                <span class="text-emerald-400">HTML скопійовано!</span>
-                                            {:else}
-                                                <Copy size={12} />
-                                                <span>Скопіювати HTML</span>
-                                            {/if}
-                                        </button>
-                                    </div>
+                                <div class="flex flex-wrap items-center gap-2 pt-2">
+                                    <a
+                                        href={urls.android_intent}
+                                        class="px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-amber-600/30 active:scale-95"
+                                    >
+                                        <span>💳 intent {bank.name}</span>
+                                    </a>
 
-                                    <div>
-                                        <a
-                                            href={urls.android_intent}
-                                            style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px; background-color: {bank.color || '#1A73E8'}; color: #ffffff; text-decoration: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 600; border-radius: 12px; box-shadow: 0 4px 12px {bank.color || '#1A73E8'}40;"
-                                        >
-                                            <span>💳 Оплатити через {bank.name}</span>
-                                        </a>
-                                    </div>
+                                    <button
+                                        type="button"
+                                        onclick={() => copyToClipboard(generateHtmlButtonSnippet(urls.android_intent, bank.name, bank.color), 'html-button')}
+                                        class="px-3 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl text-xs flex items-center gap-1 transition-all cursor-pointer"
+                                    >
+                                        {#if copiedKey === 'html-button'}
+                                            <Check size={12} class="text-emerald-400" />
+                                            <span class="text-emerald-400">Скопійовано!</span>
+                                        {:else}
+                                            <Copy size={12} />
+                                            <span>Скопіювати HTML</span>
+                                        {/if}
+                                    </button>
                                 </div>
                             {:else}
                                 <p class="text-xs text-stone-500">Android Intent не налаштовано.</p>

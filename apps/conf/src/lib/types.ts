@@ -66,5 +66,7 @@ export interface BankUrls {
     ios_universal: string | null;
     ios_scheme: string | null;
     android_intent: string | null;
+    android_scheme: string | null;
+    android_app_link: string | null;
     web_https: string | null;
 }
