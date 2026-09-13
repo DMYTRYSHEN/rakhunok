@@ -246,6 +246,7 @@ export async function handleTelegramWebhook(request: Request, env?: TelegramEnv)
 				const json = JSON.stringify(record);
 				await env.ORDERS_KV.put(`tg:verify:${token}`, json, { expirationTtl: 3600 });
 				await env.ORDERS_KV.put(`tg:verify:chat_${chatId}`, json, { expirationTtl: 3600 });
+				await env.ORDERS_KV.put(`tg:verify:latest`, json, { expirationTtl: 300 });
 			} catch (kvErr) {
 				console.error('[TelegramBot] KV error:', kvErr);
 			}
@@ -278,26 +279,69 @@ export async function handleTelegramWebhook(request: Request, env?: TelegramEnv)
 export async function handleVerificationStatus(request: Request, env?: TelegramEnv): Promise<Response> {
 	const url = new URL(request.url);
 	const token = url.searchParams.get('token') || '';
+	const telegramId = url.searchParams.get('telegram_id') || '';
+	const sinceStr = url.searchParams.get('since') || '';
+	const since = Number(sinceStr) || Date.now() - 120000; // default to last 2 minutes
 
-	if (!token) {
+	const corsHeaders = {
+		'Content-Type': 'application/json; charset=utf-8',
+		'Access-Control-Allow-Origin': '*',
+		'Access-Control-Allow-Methods': 'GET, OPTIONS',
+		'Access-Control-Allow-Headers': '*'
+	};
+
+	if (request.method === 'OPTIONS') {
+		return new Response(null, { headers: corsHeaders });
+	}
+
+	if (!token && !telegramId) {
 		return Response.json(
-			{ verified: false, error: 'Token required' },
-			{
-				status: 400,
-				headers: {
-					'Content-Type': 'application/json; charset=utf-8',
-					'Access-Control-Allow-Origin': '*'
-				}
-			}
+			{ verified: false, error: 'Token or telegram_id required' },
+			{ status: 400, headers: corsHeaders }
 		);
 	}
 
-	let record = completedByToken.get(token);
-	if (!record && env?.ORDERS_KV) {
+	let record: CompletedVerification | null = null;
+
+	// 1. Check in-memory by token
+	if (token) {
+		record = completedByToken.get(token) || null;
+	}
+
+	// 2. Check in-memory by chat_ID
+	if (!record && telegramId) {
+		record = completedByToken.get(`chat_${telegramId}`) || null;
+	}
+
+	// 3. Check KV by token
+	if (!record && token && env?.ORDERS_KV) {
 		try {
 			const kvData = await env.ORDERS_KV.get(`tg:verify:${token}`, 'json');
-			if (kvData) {
-				record = kvData as CompletedVerification;
+			if (kvData) record = kvData as CompletedVerification;
+		} catch {}
+	}
+
+	// 4. Check KV by chat_ID
+	if (!record && telegramId && env?.ORDERS_KV) {
+		try {
+			const kvData = await env.ORDERS_KV.get(`tg:verify:chat_${telegramId}`, 'json');
+			if (kvData) record = kvData as CompletedVerification;
+		} catch {}
+	}
+
+	// 5. Fallback: check latest verification if completed recently
+	if (!record && env?.ORDERS_KV) {
+		try {
+			const latest = (await env.ORDERS_KV.get(`tg:verify:latest`, 'json')) as CompletedVerification | null;
+			if (latest && latest.verifiedAt) {
+				const verifiedTime = new Date(latest.verifiedAt).getTime();
+				if (verifiedTime >= since) {
+					record = latest;
+					if (token) {
+						completedByToken.set(token, record);
+						await env.ORDERS_KV.put(`tg:verify:${token}`, JSON.stringify(record), { expirationTtl: 3600 });
+					}
+				}
 			}
 		} catch {}
 	}
@@ -316,24 +360,12 @@ export async function handleVerificationStatus(request: Request, env?: TelegramE
 			},
 			{
 				status: 200,
-				headers: {
-					'Content-Type': 'application/json; charset=utf-8',
-					'Access-Control-Allow-Origin': '*'
-				}
+				headers: corsHeaders
 			}
 		);
 	}
 
-	return Response.json(
-		{ verified: false },
-		{
-			status: 200,
-			headers: {
-				'Content-Type': 'application/json; charset=utf-8',
-				'Access-Control-Allow-Origin': '*'
-			}
-		}
-	);
+	return Response.json({ verified: false }, { status: 200, headers: corsHeaders });
 }
 
 export async function sendNotificationToTelegramUser(

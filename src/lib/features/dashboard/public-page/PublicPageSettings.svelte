@@ -107,23 +107,28 @@
 		saved = true;
 	}
 
+	let tokenCreatedAt = $state(0);
+
 	function startTelegramVerification() {
 		verifyToken = Math.random().toString(36).substring(2, 12);
+		tokenCreatedAt = Date.now() - 10000; // 10 seconds leeway
 		verificationSuccessMessage = null;
 		showVerifyModal = true;
 		startPolling();
 	}
 
 	async function pollOnce() {
-		if (!verifyToken) return;
+		if (!verifyToken && !config.telegramId) return;
 		try {
 			const apiHost =
 				typeof window !== 'undefined' &&
 				(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
 					? 'https://letsrealtalk.com'
 					: '';
+			const tgIdParam = config.telegramId ? `&telegram_id=${config.telegramId}` : '';
+			const sinceParam = tokenCreatedAt ? `&since=${tokenCreatedAt}` : '';
 			const res = await fetch(
-				`${apiHost}/api/v1/verification/status?token=${encodeURIComponent(verifyToken)}`
+				`${apiHost}/api/v1/verification/status?token=${encodeURIComponent(verifyToken)}${tgIdParam}${sinceParam}`
 			);
 			if (res.ok) {
 				const data = await res.json();
@@ -143,7 +148,7 @@
 					stopPolling();
 					setTimeout(() => {
 						showVerifyModal = false;
-					}, 1600);
+					}, 1200);
 				}
 			}
 		} catch {}
@@ -595,14 +600,14 @@
 							class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[11px] font-bold text-zinc-700"
 							>2</span
 						>
-						<span>У чаті з ботом натисніть кнопку <strong>Розпочати (Start)</strong>.</span>
+						<span>У чаті з ботом натисніть <strong>Розпочати (Start)</strong> або надішліть <strong>/start</strong>.</span>
 					</div>
 					<div class="flex items-start gap-2.5">
 						<span
 							class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[11px] font-bold text-zinc-700"
 							>3</span
 						>
-						<span>Натисніть нативну кнопку <strong>📱 Поділитися номером</strong>.</span>
+						<span>Натисніть кнопку в чаті <strong>📱 Підтвердити мій номер телефону</strong>.</span>
 					</div>
 				</div>
 
@@ -615,6 +620,17 @@
 			{/if}
 
 			<div class="mt-5 flex flex-col gap-2">
+				{#if isPolling && !verificationSuccessMessage}
+					<button
+						type="button"
+						onclick={pollOnce}
+						class="flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#229ED9]/40 bg-[#229ED9]/10 text-xs font-bold text-[#229ED9] transition-colors hover:bg-[#229ED9]/20 active:scale-[0.99]"
+					>
+						<Check size={14} />
+						Я вже надіслав номер — Перевірити зараз
+					</button>
+				{/if}
+
 				<a
 					href="https://t.me/{telegramBotUsername}?start=verify_{verifyToken}"
 					target="_blank"
