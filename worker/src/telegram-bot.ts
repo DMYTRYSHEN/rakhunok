@@ -73,46 +73,36 @@ export async function handleTelegramWebhook(request: Request, env?: TelegramEnv)
 	const username = message.from?.username;
 	const text = (message.text || '').trim();
 
-	// 1. Handle /start command with verification token
+	// 1. Handle /start command (with or without token)
 	if (text.startsWith('/start')) {
 		const parts = text.split(/\s+/);
 		const param = parts[1] || '';
+		const token = param.startsWith('verify_')
+			? param.replace('verify_', '').trim()
+			: `chat_${chatId}`;
 
-		if (param.startsWith('verify_')) {
-			const token = param.replace('verify_', '').trim();
-			pendingByChat.set(chatId, {
-				token,
-				expires: Date.now() + 15 * 60 * 1000 // 15 minutes
-			});
+		pendingByChat.set(chatId, {
+			token,
+			expires: Date.now() + 15 * 60 * 1000 // 15 minutes
+		});
 
-			await sendTelegramMessage(
-				botToken,
-				chatId,
-				`👋 <b>Вітаємо в офіційному боті сервісу Rahunok!</b>\n\n` +
-					`Для підтвердження вашого профілю продавця та захисту персональної платіжної адреси на <b>rahunok.com</b>, будь ласка, натисніть кнопку нижче:`,
-				{
-					keyboard: [
-						[
-							{
-								text: '📱 Підтвердити мій номер телефону',
-								request_contact: true
-							}
-						]
-					],
-					resize_keyboard: true,
-					one_time_keyboard: true
-				}
-			);
-			return new Response('OK', { status: 200 });
-		}
-
-		// Plain /start without token
 		await sendTelegramMessage(
 			botToken,
 			chatId,
-			`👋 <b>Вітаємо!</b> Це офіційний бот <b>Rahunok</b> (@RhnkBot).\n\n` +
-				`Він призначений для швидкої, безпечної та безкоштовної верифікації номерів телефонів мерчантів і клієнтів у сервісі Rahunok.\n\n` +
-				`Щоб пройти верифікацію, розпочніть процес у своєму кабінеті або під час оплати.`
+			`👋 <b>Вітаємо в офіційному боті сервісу Rahunok!</b>\n\n` +
+				`Для підтвердження вашого профілю продавця та захисту персональної платіжної адреси на <b>rahunok.com</b>, будь ласка, натисніть кнопку нижче:`,
+			{
+				keyboard: [
+					[
+						{
+							text: '📱 Підтвердити мій номер телефону',
+							request_contact: true
+						}
+					]
+				],
+				resize_keyboard: true,
+				one_time_keyboard: true
+			}
 		);
 		return new Response('OK', { status: 200 });
 	}
