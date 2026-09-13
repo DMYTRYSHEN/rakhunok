@@ -114,46 +114,56 @@
 		startPolling();
 	}
 
+	async function pollOnce() {
+		if (!verifyToken) return;
+		try {
+			const apiHost =
+				typeof window !== 'undefined' &&
+				(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+					? 'https://letsrealtalk.com'
+					: '';
+			const res = await fetch(
+				`${apiHost}/api/v1/verification/status?token=${encodeURIComponent(verifyToken)}`
+			);
+			if (res.ok) {
+				const data = await res.json();
+				if (data.verified && data.phone) {
+					config.phone = data.phone;
+					config.phoneVerified = true;
+					config.telegramId = data.telegramId;
+					config.telegramUsername = data.telegramUsername;
+					if (data.avatarUrl) {
+						config.avatarUrl = data.avatarUrl;
+					} else if (data.telegramUsername) {
+						config.avatarUrl = `https://t.me/i/userpic/320/${data.telegramUsername}.jpg`;
+					}
+					saved = false;
+					savePublicPageConfig(config);
+					verificationSuccessMessage = `Номер ${data.phone} успішно підтверджено!`;
+					stopPolling();
+					setTimeout(() => {
+						showVerifyModal = false;
+					}, 1600);
+				}
+			}
+		} catch {}
+	}
+
+	function handleVisibilityChange() {
+		if (document.visibilityState === 'visible' && isPolling) {
+			// Immediately check when user returns to the tab (e.g. from Telegram)
+			pollOnce();
+		}
+	}
+
 	function startPolling() {
 		stopPolling();
 		isPolling = true;
-		pollInterval = setInterval(async () => {
-			if (!verifyToken || !showVerifyModal) {
-				stopPolling();
-				return;
-			}
-			try {
-				const apiHost =
-					typeof window !== 'undefined' &&
-					(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-						? 'https://letsrealtalk.com'
-						: '';
-				const res = await fetch(
-					`${apiHost}/api/v1/verification/status?token=${encodeURIComponent(verifyToken)}`
-				);
-				if (res.ok) {
-					const data = await res.json();
-					if (data.verified && data.phone) {
-						config.phone = data.phone;
-						config.phoneVerified = true;
-						config.telegramId = data.telegramId;
-						config.telegramUsername = data.telegramUsername;
-						if (data.avatarUrl) {
-							config.avatarUrl = data.avatarUrl;
-						} else if (data.telegramUsername) {
-							config.avatarUrl = `https://t.me/i/userpic/320/${data.telegramUsername}.jpg`;
-						}
-						saved = false;
-						savePublicPageConfig(config);
-						verificationSuccessMessage = `Номер ${data.phone} успішно підтверджено!`;
-						stopPolling();
-						setTimeout(() => {
-							showVerifyModal = false;
-						}, 1600);
-					}
-				}
-			} catch {}
-		}, 2000);
+		// Immediate first check
+		pollOnce();
+		// Then poll every 1.5s
+		pollInterval = setInterval(pollOnce, 1500);
+		document.addEventListener('visibilitychange', handleVisibilityChange);
 	}
 
 	function stopPolling() {
@@ -162,6 +172,7 @@
 			pollInterval = null;
 		}
 		isPolling = false;
+		document.removeEventListener('visibilitychange', handleVisibilityChange);
 	}
 
 	function closeVerifyModal() {
