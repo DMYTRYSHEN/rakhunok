@@ -1,8 +1,8 @@
 {
   "contract": "docs/openapi.yaml",
-  "generatedAt": "2026-09-10T08:28:57.202Z",
+  "generatedAt": "2026-09-13T01:24:54.245Z",
   "summary": {
-    "openApiOperations": 24,
+    "openApiOperations": 29,
     "implementedOperations": 24,
     "developmentOnlyOperations": 1,
     "consumedOperations": 8,
@@ -10,7 +10,7 @@
     "missingConsumedOperations": 0,
     "consumedButNotImplemented": 0,
     "implementedButUndocumented": 0,
-    "documentedButNotImplemented": 0,
+    "documentedButNotImplemented": 5,
     "operationsWithoutOperationId": 0,
     "directSupabaseDependencies": 6
   },
@@ -248,7 +248,38 @@
     }
   ],
   "implementedButUndocumented": [],
-  "documentedButNotImplemented": [],
+  "documentedButNotImplemented": [
+    {
+      "method": "GET",
+      "path": "/api/v1/merchant/team",
+      "operationId": "listTeamMembers",
+      "summary": "Отримати список працівників бізнесу з ролями та призначеними касами"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/merchant/team/{memberId}",
+      "operationId": "removeTeamMember",
+      "summary": "Відкликати доступ та видалити співробітника з команди"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/merchant/invitations",
+      "operationId": "listInvitations",
+      "summary": "Перелік активних та очікуючих запрошень у команду"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/merchant/invitations",
+      "operationId": "createInvitation",
+      "summary": "Створити запрошення для менеджера, касира або КСО"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/merchant/invitations/{token}/accept",
+      "operationId": "acceptInvitation",
+      "summary": "Прийняття запрошення користувачем та активація членства"
+    }
+  ],
   "implementationAliases": [
     {
       "method": "POST",
@@ -287,6 +318,36 @@
       "path": "/api/v1/merchant/me",
       "operationId": "updateMerchant",
       "summary": "Оновити реквізити або назву бренду"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/merchant/team",
+      "operationId": "listTeamMembers",
+      "summary": "Отримати список працівників бізнесу з ролями та призначеними касами"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/merchant/team/{memberId}",
+      "operationId": "removeTeamMember",
+      "summary": "Відкликати доступ та видалити співробітника з команди"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/merchant/invitations",
+      "operationId": "listInvitations",
+      "summary": "Перелік активних та очікуючих запрошень у команду"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/merchant/invitations",
+      "operationId": "createInvitation",
+      "summary": "Створити запрошення для менеджера, касира або КСО"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/merchant/invitations/{token}/accept",
+      "operationId": "acceptInvitation",
+      "summary": "Прийняття запрошення користувачем та активація членства"
     },
     {
       "method": "GET",

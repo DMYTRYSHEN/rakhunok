@@ -50,6 +50,15 @@
 
 	onMount(() => {
 		config = loadPublicPageConfig();
+		if (config.telegramId && !config.avatarUrl) {
+			const apiHost =
+				typeof window !== 'undefined' &&
+				(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+					? 'https://letsrealtalk.com'
+					: '';
+			config.avatarUrl = `${apiHost}/api/v1/telegram/avatar?user_id=${config.telegramId}`;
+			savePublicPageConfig(config);
+		}
 	});
 
 	onDestroy(() => {
@@ -98,6 +107,9 @@
 						config.phoneVerified = true;
 						config.telegramId = data.telegramId;
 						config.telegramUsername = data.telegramUsername;
+						if (data.avatarUrl) {
+							config.avatarUrl = (apiHost ? apiHost : '') + data.avatarUrl;
+						}
 						saved = false;
 						savePublicPageConfig(config);
 						verificationSuccessMessage = `Номер ${data.phone} успішно підтверджено!`;
@@ -130,6 +142,7 @@
 		config.phoneVerified = false;
 		config.telegramId = undefined;
 		config.telegramUsername = undefined;
+		config.avatarUrl = undefined;
 		saved = false;
 		savePublicPageConfig(config);
 	}
@@ -139,6 +152,8 @@
 		config.phoneVerified = true;
 		config.telegramId = 777123456;
 		config.telegramUsername = 'demo_user';
+		config.avatarUrl =
+			'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80';
 		saved = false;
 		savePublicPageConfig(config);
 		verificationSuccessMessage = 'Номер успішно верифіковано в демо-режимі!';
@@ -271,9 +286,17 @@
 									{#if config.phoneVerified && config.phone}
 										Підтверджений номер: <strong class="font-mono text-zinc-800">{config.phone}</strong>
 										{#if config.telegramId}
-											<span class="ml-2 inline-flex items-center gap-1 rounded bg-[#229ED9]/10 px-2 py-0.5 text-[11px] font-semibold text-[#229ED9]">
-												<Send size={11} />
-												{#if config.telegramUsername}@{config.telegramUsername}{:else}ID: {config.telegramId}{/if}
+											<span class="ml-2 inline-flex items-center gap-1.5 rounded-full bg-[#229ED9]/10 py-0.5 pr-2 pl-1 text-[11px] font-semibold text-[#229ED9]">
+												{#if config.avatarUrl}
+													<img
+														src={config.avatarUrl}
+														alt=""
+														class="size-4 rounded-full object-cover"
+													/>
+												{:else}
+													<Send size={11} class="ml-1" />
+												{/if}
+												<span>{#if config.telegramUsername}@{config.telegramUsername}{:else}ID: {config.telegramId}{/if}</span>
 											</span>
 										{/if}
 									{:else}
@@ -426,9 +449,13 @@
 				class="min-h-80 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.18),transparent_42%)] p-6 text-center"
 			>
 				<div
-					class="mx-auto grid size-16 place-items-center rounded-lg bg-[#c9ff4a] text-xl font-black text-zinc-950"
+					class="mx-auto grid size-16 place-items-center rounded-lg bg-[#c9ff4a] text-xl font-black text-zinc-950 overflow-hidden shadow-inner"
 				>
-					{initials || 'R'}
+					{#if config.avatarUrl}
+						<img src={config.avatarUrl} alt={previewName} class="size-full object-cover" />
+					{:else}
+						{initials || 'R'}
+					{/if}
 				</div>
 				<h2 class="mt-5 text-xl font-extrabold">{previewName}</h2>
 				{#if config.phoneVerified && config.phone}

@@ -900,6 +900,216 @@
 				},
 				{
 					"method": "DELETE",
+					"path": "/api/v1/telegram/avatar",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/telegram/avatar",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/telegram/avatar",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/telegram/avatar",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/telegram/avatar",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/telegram/avatar",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/telegram/notify",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/telegram/notify",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/telegram/notify",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/telegram/notify",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/telegram/notify",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/telegram/notify",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/telegram/setup-webhook",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/telegram/setup-webhook",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/telegram/setup-webhook",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/telegram/setup-webhook",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/telegram/setup-webhook",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/telegram/setup-webhook",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/telegram/webhook",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/telegram/webhook",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/telegram/webhook",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/telegram/webhook",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/telegram/webhook",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/telegram/webhook",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/verification/status",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/verification/status",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/verification/status",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/verification/status",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/verification/status",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/verification/status",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
 					"path": "/api/v1/webhooks/",
 					"match": "prefix",
 					"status": "implemented",

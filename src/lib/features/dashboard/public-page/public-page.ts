@@ -6,6 +6,7 @@ export type PublicPageConfig = {
 	phoneVerified?: boolean;
 	telegramId?: number;
 	telegramUsername?: string;
+	avatarUrl?: string;
 };
 
 export const PUBLIC_PAGE_STORAGE_KEY = 'rahunok.public-page.v1';
@@ -32,7 +33,8 @@ export const defaultPublicPageConfig: PublicPageConfig = {
 	phone: '',
 	phoneVerified: false,
 	telegramId: undefined,
-	telegramUsername: undefined
+	telegramUsername: undefined,
+	avatarUrl: undefined
 };
 
 export function normalizePublicSlug(value: string) {
@@ -75,7 +77,8 @@ export function loadPublicPageConfig(): PublicPageConfig {
 			phone: typeof stored.phone === 'string' ? stored.phone : '',
 			phoneVerified: Boolean(stored.phoneVerified),
 			telegramId: typeof stored.telegramId === 'number' ? stored.telegramId : undefined,
-			telegramUsername: typeof stored.telegramUsername === 'string' ? stored.telegramUsername : undefined
+			telegramUsername: typeof stored.telegramUsername === 'string' ? stored.telegramUsername : undefined,
+			avatarUrl: typeof stored.avatarUrl === 'string' ? stored.avatarUrl : undefined
 		};
 	} catch {
 		return { ...defaultPublicPageConfig };

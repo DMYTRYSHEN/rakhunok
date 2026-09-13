@@ -361,6 +361,7 @@ test('routeWebRequest handles telegram webhook and phone verification flow', asy
 	assert.equal(verifiedData.phone, '+380981234567');
 	assert.equal(verifiedData.telegramId, 777123);
 	assert.equal(verifiedData.telegramUsername, 'test_tg_user');
+	assert.equal(verifiedData.avatarUrl, '/api/v1/telegram/avatar?user_id=777123');
 
 	// 5. Test telegram notify endpoint
 	const notifyRes = await routeWebRequest(
@@ -372,4 +373,11 @@ test('routeWebRequest handles telegram webhook and phone verification flow', asy
 		dummyEnv
 	);
 	assert.equal(notifyRes.status, 200);
+
+	// 6. Test telegram avatar endpoint
+	const noUserAvatarRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/telegram/avatar'),
+		dummyEnv
+	);
+	assert.equal(noUserAvatarRes.status, 400);
 });
