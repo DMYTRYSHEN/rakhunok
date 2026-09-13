@@ -361,4 +361,15 @@ test('routeWebRequest handles telegram webhook and phone verification flow', asy
 	assert.equal(verifiedData.phone, '+380981234567');
 	assert.equal(verifiedData.telegramId, 777123);
 	assert.equal(verifiedData.telegramUsername, 'test_tg_user');
+
+	// 5. Test telegram notify endpoint
+	const notifyRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/telegram/notify', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ telegram_id: 777123, text: 'Hello from Rahunok!' })
+		}),
+		dummyEnv
+	);
+	assert.equal(notifyRes.status, 200);
 });

@@ -3,7 +3,8 @@ import { handleAiWorkerRequest } from './ai-worker-core.ts';
 import {
 	handleTelegramWebhook,
 	handleVerificationStatus,
-	registerTelegramWebhook
+	registerTelegramWebhook,
+	sendNotificationToTelegramUser
 } from './telegram-bot.ts';
 
 interface Env {
@@ -826,6 +827,24 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 
 	if (url.pathname === '/api/v1/verification/status') {
 		return handleVerificationStatus(request, env);
+	}
+
+	if (url.pathname === '/api/v1/telegram/notify') {
+		if (request.method !== 'POST') {
+			return new Response('Method Not Allowed', { status: 405 });
+		}
+		try {
+			const body = (await request.json()) as { telegram_id?: number; text?: string };
+			const telegramId = Number(body.telegram_id);
+			const text = String(body.text || '').trim();
+			if (!telegramId || !text) {
+				return jsonResponse({ error: 'telegram_id and text required' }, 400);
+			}
+			const success = await sendNotificationToTelegramUser(telegramId, text, env);
+			return jsonResponse({ success });
+		} catch {
+			return jsonResponse({ error: 'Invalid JSON payload' }, 400);
+		}
 	}
 
 	if (url.pathname === '/api/v1/telegram/setup-webhook') {

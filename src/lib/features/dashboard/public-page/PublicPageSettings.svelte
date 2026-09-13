@@ -147,6 +147,51 @@
 			showVerifyModal = false;
 		}, 1200);
 	}
+
+	let showSendMessageModal = $state(false);
+	let notificationText = $state('');
+	let isSendingNotification = $state(false);
+	let notificationStatus = $state<{ success?: boolean; error?: string } | null>(null);
+
+	async function sendTelegramNotification() {
+		if (!config.telegramId || !notificationText.trim()) return;
+		isSendingNotification = true;
+		notificationStatus = null;
+		try {
+			const apiHost =
+				typeof window !== 'undefined' &&
+				(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+					? 'https://letsrealtalk.com'
+					: '';
+			const res = await fetch(`${apiHost}/api/v1/telegram/notify`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					telegram_id: config.telegramId,
+					text: notificationText.trim()
+				})
+			});
+			if (res.ok) {
+				const data = await res.json();
+				if (data.success) {
+					notificationStatus = { success: true };
+					notificationText = '';
+					setTimeout(() => {
+						showSendMessageModal = false;
+						notificationStatus = null;
+					}, 1500);
+				} else {
+					notificationStatus = { error: 'Не вдалося доставити повідомлення ботом' };
+				}
+			} else {
+				notificationStatus = { error: 'Помилка сервера' };
+			}
+		} catch (err: any) {
+			notificationStatus = { error: err?.message || 'Помилка мережі' };
+		} finally {
+			isSendingNotification = false;
+		}
+	}
 </script>
 
 <div class="mx-auto max-w-7xl">
@@ -245,6 +290,20 @@
 										<ShieldCheck size={13} />
 										Верифіковано
 									</span>
+									{#if config.telegramId}
+										<button
+											type="button"
+											onclick={() => {
+												showSendMessageModal = true;
+												notificationText = '';
+												notificationStatus = null;
+											}}
+											class="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#229ED9]/40 bg-[#229ED9]/10 px-2.5 py-1 text-xs font-bold text-[#229ED9] transition-colors hover:bg-[#229ED9]/20"
+										>
+											<Send size={12} />
+											Написати
+										</button>
+									{/if}
 									<button
 										type="button"
 										onclick={resetVerification}
@@ -493,6 +552,98 @@
 				>
 					<Check size={14} class="text-emerald-600" />
 					Імітувати успіх (Тестовий режим)
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+{#if showSendMessageModal}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+		<div class="relative w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-2xl">
+			<button
+				type="button"
+				onclick={() => (showSendMessageModal = false)}
+				class="absolute right-4 top-4 cursor-pointer text-zinc-400 hover:text-zinc-600"
+				aria-label="Закрити"
+			>
+				<X size={18} />
+			</button>
+
+			<div class="flex items-center gap-3">
+				<div class="grid size-11 place-items-center rounded-xl bg-[#229ED9]/10 text-[#229ED9]">
+					<Send size={22} />
+				</div>
+				<div>
+					<h3 class="text-base font-extrabold text-zinc-900">Надіслати в Telegram</h3>
+					<p class="text-xs text-zinc-500">
+						Отримувач: <strong class="text-zinc-800">{#if config.telegramUsername}@{config.telegramUsername}{:else}ID: {config.telegramId}{/if}</strong>
+					</p>
+				</div>
+			</div>
+
+			<div class="mt-4">
+				<label for="telegram-notification-text" class="mb-1.5 block text-xs font-bold text-zinc-700">
+					Текст повідомлення
+				</label>
+				<textarea
+					id="telegram-notification-text"
+					bind:value={notificationText}
+					rows="3"
+					placeholder="Введіть текст для відправки через бота @RhnkBot..."
+					class="w-full rounded-md border border-zinc-200 p-3 text-sm leading-5 outline-none focus:border-[#229ED9]"
+				></textarea>
+
+				<div class="mt-2 flex flex-wrap gap-1.5">
+					<button
+						type="button"
+						onclick={() => (notificationText = '🎉 Вітаємо! Ваш профіль та номер телефону успішно верифіковано на Rahunok.')}
+						class="cursor-pointer rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] text-zinc-600 hover:bg-zinc-100"
+					>
+						+ Шаблон вітання
+					</button>
+					<button
+						type="button"
+						onclick={() => (notificationText = '🔔 Тестове сповіщення з вашого кабінету Rahunok: зв’язок із ботом налаштовано успішно!')}
+						class="cursor-pointer rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] text-zinc-600 hover:bg-zinc-100"
+					>
+						+ Тест зв\'язку
+					</button>
+				</div>
+			</div>
+
+			{#if notificationStatus?.success}
+				<div class="mt-3 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-2.5 text-xs font-bold text-emerald-800">
+					<Check size={16} class="text-emerald-600" />
+					Повідомлення успішно доставлено в Telegram!
+				</div>
+			{:else if notificationStatus?.error}
+				<div class="mt-3 rounded-md border border-red-200 bg-red-50 p-2.5 text-xs font-semibold text-red-700">
+					{notificationStatus.error}
+				</div>
+			{/if}
+
+			<div class="mt-5 flex gap-2">
+				<button
+					type="button"
+					onclick={() => (showSendMessageModal = false)}
+					class="flex-1 cursor-pointer rounded-lg border border-zinc-200 bg-white py-2.5 text-xs font-bold text-zinc-700 hover:bg-zinc-50"
+				>
+					Скасувати
+				</button>
+				<button
+					type="button"
+					disabled={!notificationText.trim() || isSendingNotification}
+					onclick={sendTelegramNotification}
+					class="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#229ED9] py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#1E88E5] disabled:bg-zinc-300"
+				>
+					{#if isSendingNotification}
+						<Loader2 size={14} class="animate-spin" />
+						Відправка...
+					{:else}
+						<Send size={14} />
+						Надіслати
+					{/if}
 				</button>
 			</div>
 		</div>
