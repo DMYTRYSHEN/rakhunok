@@ -282,6 +282,7 @@ export async function handleVerificationStatus(request: Request, env?: TelegramE
 	const telegramId = url.searchParams.get('telegram_id') || '';
 	const sinceStr = url.searchParams.get('since') || '';
 	const since = Number(sinceStr) || Date.now() - 120000; // default to last 2 minutes
+	const waitSec = Math.min(Math.max(Number(url.searchParams.get('wait') || 0), 0), 10);
 
 	const corsHeaders = {
 		'Content-Type': 'application/json; charset=utf-8',
@@ -301,49 +302,65 @@ export async function handleVerificationStatus(request: Request, env?: TelegramE
 		);
 	}
 
-	let record: CompletedVerification | null = null;
+	async function lookupRecord(): Promise<CompletedVerification | null> {
+		let rec: CompletedVerification | null = null;
 
-	// 1. Check in-memory by token
-	if (token) {
-		record = completedByToken.get(token) || null;
-	}
+		// 1. Check in-memory by token
+		if (token) {
+			rec = completedByToken.get(token) || null;
+		}
 
-	// 2. Check in-memory by chat_ID
-	if (!record && telegramId) {
-		record = completedByToken.get(`chat_${telegramId}`) || null;
-	}
+		// 2. Check in-memory by chat_ID
+		if (!rec && telegramId) {
+			rec = completedByToken.get(`chat_${telegramId}`) || null;
+		}
 
-	// 3. Check KV by token
-	if (!record && token && env?.ORDERS_KV) {
-		try {
-			const kvData = await env.ORDERS_KV.get(`tg:verify:${token}`, 'json');
-			if (kvData) record = kvData as CompletedVerification;
-		} catch {}
-	}
+		// 3. Check KV by token
+		if (!rec && token && env?.ORDERS_KV) {
+			try {
+				const kvData = await env.ORDERS_KV.get(`tg:verify:${token}`, 'json');
+				if (kvData) rec = kvData as CompletedVerification;
+			} catch {}
+		}
 
-	// 4. Check KV by chat_ID
-	if (!record && telegramId && env?.ORDERS_KV) {
-		try {
-			const kvData = await env.ORDERS_KV.get(`tg:verify:chat_${telegramId}`, 'json');
-			if (kvData) record = kvData as CompletedVerification;
-		} catch {}
-	}
+		// 4. Check KV by chat_ID
+		if (!rec && telegramId && env?.ORDERS_KV) {
+			try {
+				const kvData = await env.ORDERS_KV.get(`tg:verify:chat_${telegramId}`, 'json');
+				if (kvData) rec = kvData as CompletedVerification;
+			} catch {}
+		}
 
-	// 5. Fallback: check latest verification if completed recently
-	if (!record && env?.ORDERS_KV) {
-		try {
-			const latest = (await env.ORDERS_KV.get(`tg:verify:latest`, 'json')) as CompletedVerification | null;
-			if (latest && latest.verifiedAt) {
-				const verifiedTime = new Date(latest.verifiedAt).getTime();
-				if (verifiedTime >= since) {
-					record = latest;
-					if (token) {
-						completedByToken.set(token, record);
-						await env.ORDERS_KV.put(`tg:verify:${token}`, JSON.stringify(record), { expirationTtl: 3600 });
+		// 5. Fallback: check latest verification if completed recently
+		if (!rec && env?.ORDERS_KV) {
+			try {
+				const latest = (await env.ORDERS_KV.get(`tg:verify:latest`, 'json')) as CompletedVerification | null;
+				if (latest && latest.verifiedAt) {
+					const verifiedTime = new Date(latest.verifiedAt).getTime();
+					if (verifiedTime >= since) {
+						rec = latest;
+						if (token) {
+							completedByToken.set(token, rec);
+							await env.ORDERS_KV.put(`tg:verify:${token}`, JSON.stringify(rec), { expirationTtl: 3600 });
+						}
 					}
 				}
-			}
-		} catch {}
+			} catch {}
+		}
+		return rec;
+	}
+
+	let record = await lookupRecord();
+
+	// If not found yet and client requested waiting (long polling), poll rapidly for up to waitSec
+	if (!record && waitSec > 0) {
+		const startTime = Date.now();
+		const maxTime = waitSec * 1000;
+		while (Date.now() - startTime < maxTime) {
+			await new Promise((resolve) => setTimeout(resolve, 250));
+			record = await lookupRecord();
+			if (record) break;
+		}
 	}
 
 	if (record) {

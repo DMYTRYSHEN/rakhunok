@@ -107,7 +107,9 @@
 		saved = true;
 	}
 
+	let toastMessage = $state<string | null>(null);
 	let tokenCreatedAt = $state(0);
+	let activePollingAbortController: AbortController | null = null;
 
 	function startTelegramVerification() {
 		verifyToken = Math.random().toString(36).substring(2, 12);
@@ -117,8 +119,8 @@
 		startPolling();
 	}
 
-	async function pollOnce() {
-		if (!verifyToken && !config.telegramId) return;
+	async function pollOnce(wait = 0): Promise<boolean> {
+		if (!verifyToken && !config.telegramId) return false;
 		try {
 			const apiHost =
 				typeof window !== 'undefined' &&
@@ -127,8 +129,12 @@
 					: '';
 			const tgIdParam = config.telegramId ? `&telegram_id=${config.telegramId}` : '';
 			const sinceParam = tokenCreatedAt ? `&since=${tokenCreatedAt}` : '';
+			const waitParam = wait > 0 ? `&wait=${wait}` : '';
+
+			activePollingAbortController = new AbortController();
 			const res = await fetch(
-				`${apiHost}/api/v1/verification/status?token=${encodeURIComponent(verifyToken)}${tgIdParam}${sinceParam}`
+				`${apiHost}/api/v1/verification/status?token=${encodeURIComponent(verifyToken)}${tgIdParam}${sinceParam}${waitParam}`,
+				{ signal: activePollingAbortController.signal }
 			);
 			if (res.ok) {
 				const data = await res.json();
@@ -144,39 +150,51 @@
 					}
 					saved = false;
 					savePublicPageConfig(config);
-					verificationSuccessMessage = `Номер ${data.phone} успішно підтверджено!`;
 					stopPolling();
+					// Close popup automatically and instantly!
+					showVerifyModal = false;
+					toastMessage = `Номер ${data.phone} успішно підтверджено!`;
 					setTimeout(() => {
-						showVerifyModal = false;
-					}, 1200);
+						toastMessage = null;
+					}, 4000);
+					return true;
 				}
 			}
-		} catch {}
+		} catch (err: any) {
+			if (err?.name === 'AbortError') return false;
+		} finally {
+			activePollingAbortController = null;
+		}
+		return false;
 	}
 
 	function handleVisibilityChange() {
-		if (document.visibilityState === 'visible' && isPolling) {
-			// Immediately check when user returns to the tab (e.g. from Telegram)
-			pollOnce();
+		if (document.visibilityState === 'visible' && isPolling && showVerifyModal) {
+			// Tab focused/visible: immediate non-waiting poll
+			pollOnce(0);
 		}
 	}
 
-	function startPolling() {
+	async function startPolling() {
 		stopPolling();
 		isPolling = true;
-		// Immediate first check
-		pollOnce();
-		// Then poll every 1.5s
-		pollInterval = setInterval(pollOnce, 1500);
 		document.addEventListener('visibilitychange', handleVisibilityChange);
+
+		// Fast continuous long-poll loop while modal is open
+		while (isPolling && showVerifyModal) {
+			const verified = await pollOnce(4); // Server waits up to 4s, responds in <300ms once verified!
+			if (verified) break;
+			// Brief delay before next long-poll
+			await new Promise((r) => setTimeout(r, 150));
+		}
 	}
 
 	function stopPolling() {
-		if (pollInterval) {
-			clearInterval(pollInterval);
-			pollInterval = null;
-		}
 		isPolling = false;
+		if (activePollingAbortController) {
+			activePollingAbortController.abort();
+			activePollingAbortController = null;
+		}
 		document.removeEventListener('visibilitychange', handleVisibilityChange);
 	}
 
@@ -205,11 +223,12 @@
 			'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80';
 		saved = false;
 		savePublicPageConfig(config);
-		verificationSuccessMessage = 'Номер успішно верифіковано в демо-режимі!';
 		stopPolling();
+		showVerifyModal = false;
+		toastMessage = 'Номер успішно верифіковано в демо-режимі!';
 		setTimeout(() => {
-			showVerifyModal = false;
-		}, 1200);
+			toastMessage = null;
+		}, 4000);
 	}
 
 	let showSendMessageModal = $state(false);
@@ -258,7 +277,18 @@
 	}
 </script>
 
-<div class="mx-auto max-w-7xl">
+<div class="mx-auto max-w-7xl relative">
+	{#if toastMessage}
+		<div
+			class="fixed right-6 top-6 z-50 flex items-center gap-3 rounded-xl border border-emerald-300 bg-white px-4 py-3.5 text-xs font-bold text-emerald-900 shadow-2xl transition-all"
+		>
+			<div class="grid size-7 place-items-center rounded-full bg-emerald-100 text-emerald-700">
+				<Check size={16} />
+			</div>
+			<span>{toastMessage}</span>
+		</div>
+	{/if}
+
 	<header class="mb-7 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
 		<div>
 			<p class="text-xs font-bold tracking-[0.14em] text-cyan-700 uppercase">
@@ -620,17 +650,6 @@
 			{/if}
 
 			<div class="mt-5 flex flex-col gap-2">
-				{#if isPolling && !verificationSuccessMessage}
-					<button
-						type="button"
-						onclick={pollOnce}
-						class="flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#229ED9]/40 bg-[#229ED9]/10 text-xs font-bold text-[#229ED9] transition-colors hover:bg-[#229ED9]/20 active:scale-[0.99]"
-					>
-						<Check size={14} />
-						Я вже надіслав номер — Перевірити зараз
-					</button>
-				{/if}
-
 				<a
 					href="https://t.me/{telegramBotUsername}?start=verify_{verifyToken}"
 					target="_blank"
