@@ -108,19 +108,16 @@
 	}
 
 	let toastMessage = $state<string | null>(null);
-	let tokenCreatedAt = $state(0);
-	let activePollingAbortController: AbortController | null = null;
 
 	function startTelegramVerification() {
 		verifyToken = Math.random().toString(36).substring(2, 12);
-		tokenCreatedAt = Date.now() - 10000; // 10 seconds leeway
 		verificationSuccessMessage = null;
 		showVerifyModal = true;
 		startPolling();
 	}
 
-	async function pollOnce(wait = 0): Promise<boolean> {
-		if (!verifyToken && !config.telegramId) return false;
+	async function pollOnce() {
+		if (!verifyToken && !config.telegramId) return;
 		try {
 			const apiHost =
 				typeof window !== 'undefined' &&
@@ -128,13 +125,8 @@
 					? 'https://letsrealtalk.com'
 					: '';
 			const tgIdParam = config.telegramId ? `&telegram_id=${config.telegramId}` : '';
-			const sinceParam = tokenCreatedAt ? `&since=${tokenCreatedAt}` : '';
-			const waitParam = wait > 0 ? `&wait=${wait}` : '';
-
-			activePollingAbortController = new AbortController();
 			const res = await fetch(
-				`${apiHost}/api/v1/verification/status?token=${encodeURIComponent(verifyToken)}${tgIdParam}${sinceParam}${waitParam}`,
-				{ signal: activePollingAbortController.signal }
+				`${apiHost}/api/v1/verification/status?token=${encodeURIComponent(verifyToken)}${tgIdParam}`
 			);
 			if (res.ok) {
 				const data = await res.json();
@@ -157,44 +149,31 @@
 					setTimeout(() => {
 						toastMessage = null;
 					}, 4000);
-					return true;
 				}
 			}
-		} catch (err: any) {
-			if (err?.name === 'AbortError') return false;
-		} finally {
-			activePollingAbortController = null;
-		}
-		return false;
+		} catch {}
 	}
 
 	function handleVisibilityChange() {
 		if (document.visibilityState === 'visible' && isPolling && showVerifyModal) {
-			// Tab focused/visible: immediate non-waiting poll
-			pollOnce(0);
+			pollOnce();
 		}
 	}
 
-	async function startPolling() {
+	function startPolling() {
 		stopPolling();
 		isPolling = true;
+		pollOnce();
+		pollInterval = setInterval(pollOnce, 800);
 		document.addEventListener('visibilitychange', handleVisibilityChange);
-
-		// Fast continuous long-poll loop while modal is open
-		while (isPolling && showVerifyModal) {
-			const verified = await pollOnce(4); // Server waits up to 4s, responds in <300ms once verified!
-			if (verified) break;
-			// Brief delay before next long-poll
-			await new Promise((r) => setTimeout(r, 150));
-		}
 	}
 
 	function stopPolling() {
-		isPolling = false;
-		if (activePollingAbortController) {
-			activePollingAbortController.abort();
-			activePollingAbortController = null;
+		if (pollInterval) {
+			clearInterval(pollInterval);
+			pollInterval = null;
 		}
+		isPolling = false;
 		document.removeEventListener('visibilitychange', handleVisibilityChange);
 	}
 
