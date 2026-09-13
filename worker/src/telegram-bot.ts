@@ -1,7 +1,8 @@
-export interface TelegramEnv {
+﻿export interface TelegramEnv {
 	TELEGRAM_BOT_TOKEN?: string;
 	SUPABASE_URL?: string;
 	SUPABASE_ANON_KEY?: string;
+	ORDERS_KV?: KVNamespace;
 }
 
 // In-memory verification storage across worker isolate lifecycle
@@ -86,6 +87,12 @@ export async function handleTelegramWebhook(request: Request, env?: TelegramEnv)
 			expires: Date.now() + 15 * 60 * 1000 // 15 minutes
 		});
 
+		if (env?.ORDERS_KV) {
+			try {
+				await env.ORDERS_KV.put(`tg:pending:${chatId}`, token, { expirationTtl: 1800 });
+			} catch {}
+		}
+
 		await sendTelegramMessage(
 			botToken,
 			chatId,
@@ -136,38 +143,47 @@ export async function handleTelegramWebhook(request: Request, env?: TelegramEnv)
 		let rawPhone = (contact.phone_number || '').trim();
 		const normalizedPhone = rawPhone.startsWith('+') ? rawPhone : `+${rawPhone}`;
 
-		const pending = pendingByChat.get(chatId);
-		if (pending && pending.expires > Date.now()) {
-			completedByToken.set(pending.token, {
-				phone: normalizedPhone,
-				telegramId: fromId || chatId,
-				telegramUsername: username,
-				verifiedAt: new Date().toISOString(),
-				expires: Date.now() + 60 * 60 * 1000 // 1 hour retention
-			});
-			pendingByChat.delete(chatId);
-
-			await sendTelegramMessage(
-				botToken,
-				chatId,
-				`✅ <b>Чудово! Ваш номер телефону успішно підтверджено:</b>\n` +
-					`<code>${normalizedPhone}</code>\n\n` +
-					`Тепер ви можете повернутися на сторінку налаштувань у браузері — статус оновиться автоматично.`,
-				{
-					remove_keyboard: true
-				}
-			);
-		} else {
-			// Contact shared without an active pending token or session expired
-			await sendTelegramMessage(
-				botToken,
-				chatId,
-				`✅ Номер <code>${normalizedPhone}</code> отримано. Якщо ви проходите верифікацію на сайті, будь ласка, відкрийте посилання з кабінету знову.`,
-				{
-					remove_keyboard: true
-				}
-			);
+		let token = pendingByChat.get(chatId)?.token;
+		if (!token && env?.ORDERS_KV) {
+			try {
+				token = (await env.ORDERS_KV.get(`tg:pending:${chatId}`)) || undefined;
+			} catch {}
 		}
+		if (!token) {
+			token = `chat_${chatId}`;
+		}
+
+		const record = {
+			phone: normalizedPhone,
+			telegramId: fromId || chatId,
+			telegramUsername: username,
+			verifiedAt: new Date().toISOString(),
+			expires: Date.now() + 60 * 60 * 1000 // 1 hour retention
+		};
+
+		completedByToken.set(token, record);
+		completedByToken.set(`chat_${chatId}`, record);
+
+		if (env?.ORDERS_KV) {
+			try {
+				const json = JSON.stringify(record);
+				await env.ORDERS_KV.put(`tg:verify:${token}`, json, { expirationTtl: 3600 });
+				await env.ORDERS_KV.put(`tg:verify:chat_${chatId}`, json, { expirationTtl: 3600 });
+			} catch (kvErr) {
+				console.error('[TelegramBot] KV error:', kvErr);
+			}
+		}
+
+		await sendTelegramMessage(
+			botToken,
+			chatId,
+			`✅ <b>Чудово! Ваш номер телефону успішно підтверджено:</b>\n` +
+				`<code>${normalizedPhone}</code>\n\n` +
+				`Тепер ви можете повернутися на сторінку налаштувань у браузері — статус оновиться автоматично.`,
+			{
+				remove_keyboard: true
+			}
+		);
 
 		return new Response('OK', { status: 200 });
 	}
@@ -182,7 +198,7 @@ export async function handleTelegramWebhook(request: Request, env?: TelegramEnv)
 	return new Response('OK', { status: 200 });
 }
 
-export function handleVerificationStatus(request: Request): Response {
+export async function handleVerificationStatus(request: Request, env?: TelegramEnv): Promise<Response> {
 	const url = new URL(request.url);
 	const token = url.searchParams.get('token') || '';
 
@@ -199,8 +215,17 @@ export function handleVerificationStatus(request: Request): Response {
 		);
 	}
 
-	const record = completedByToken.get(token);
-	if (record && record.expires > Date.now()) {
+	let record = completedByToken.get(token);
+	if (!record && env?.ORDERS_KV) {
+		try {
+			const kvData = await env.ORDERS_KV.get(`tg:verify:${token}`, 'json');
+			if (kvData) {
+				record = kvData as CompletedVerification;
+			}
+		} catch {}
+	}
+
+	if (record) {
 		return Response.json(
 			{
 				verified: true,

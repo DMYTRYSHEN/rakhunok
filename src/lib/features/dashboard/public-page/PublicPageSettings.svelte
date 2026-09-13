@@ -83,7 +83,14 @@
 				return;
 			}
 			try {
-				const res = await fetch(`/api/v1/verification/status?token=${encodeURIComponent(verifyToken)}`);
+				const apiHost =
+					typeof window !== 'undefined' &&
+					(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+						? 'https://letsrealtalk.com'
+						: '';
+				const res = await fetch(
+					`${apiHost}/api/v1/verification/status?token=${encodeURIComponent(verifyToken)}`
+				);
 				if (res.ok) {
 					const data = await res.json();
 					if (data.verified && data.phone) {

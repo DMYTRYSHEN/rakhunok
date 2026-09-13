@@ -9,6 +9,7 @@ import {
 interface Env {
 	ASSETS: Fetcher;
 	BANKS_KV?: KVNamespace;
+	ORDERS_KV?: KVNamespace;
 	PUBLIC_DOMAIN?: string;
 	SUPABASE_URL?: string;
 	SUPABASE_ANON_KEY?: string;
@@ -824,7 +825,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 	}
 
 	if (url.pathname === '/api/v1/verification/status') {
-		return handleVerificationStatus(request);
+		return handleVerificationStatus(request, env);
 	}
 
 	if (url.pathname === '/api/v1/telegram/setup-webhook') {
