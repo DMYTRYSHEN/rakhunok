@@ -295,3 +295,70 @@ test('routeWebRequest handles PATCH /api/v1/orders/:id and promo/delivery/callba
 	assert.equal(promoData.success, true);
 	assert.equal(promoData.discount_amount, 10);
 });
+
+test('routeWebRequest handles telegram webhook and phone verification flow', async () => {
+	const dummyEnv = { ASSETS: { fetch: async () => new Response('mock') } };
+
+	// 1. Initial status check (should be false)
+	const initialStatusRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/verification/status?token=test_token_456'),
+		dummyEnv
+	);
+	assert.equal(initialStatusRes.status, 200);
+	const initialData = await initialStatusRes.json();
+	assert.equal(initialData.verified, false);
+
+	// 2. Telegram /start with verify token
+	const startWebhookRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/telegram/webhook', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				update_id: 1001,
+				message: {
+					message_id: 1,
+					chat: { id: 777123, type: 'private' },
+					from: { id: 777123, is_bot: false, first_name: 'TestUser' },
+					text: '/start verify_test_token_456'
+				}
+			})
+		}),
+		dummyEnv
+	);
+	assert.equal(startWebhookRes.status, 200);
+
+	// 3. Telegram user shares contact
+	const contactWebhookRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/telegram/webhook', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				update_id: 1002,
+				message: {
+					message_id: 2,
+					chat: { id: 777123, type: 'private' },
+					from: { id: 777123, is_bot: false, first_name: 'TestUser', username: 'test_tg_user' },
+					contact: {
+						phone_number: '380981234567',
+						first_name: 'TestUser',
+						user_id: 777123
+					}
+				}
+			})
+		}),
+		dummyEnv
+	);
+	assert.equal(contactWebhookRes.status, 200);
+
+	// 4. Status check again (should be verified now)
+	const verifiedStatusRes = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/verification/status?token=test_token_456'),
+		dummyEnv
+	);
+	assert.equal(verifiedStatusRes.status, 200);
+	const verifiedData = await verifiedStatusRes.json();
+	assert.equal(verifiedData.verified, true);
+	assert.equal(verifiedData.phone, '+380981234567');
+	assert.equal(verifiedData.telegramId, 777123);
+	assert.equal(verifiedData.telegramUsername, 'test_tg_user');
+});

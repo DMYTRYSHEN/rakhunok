@@ -1,6 +1,19 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { Check, ExternalLink, Globe2, Link2, Save, ShieldAlert, UserRound } from '@lucide/svelte';
+	import { onDestroy, onMount } from 'svelte';
+	import {
+		Check,
+		ExternalLink,
+		Globe2,
+		Link2,
+		Loader2,
+		Save,
+		ShieldAlert,
+		ShieldCheck,
+		Smartphone,
+		Send,
+		UserRound,
+		X
+	} from '@lucide/svelte';
 	import {
 		defaultPublicPageConfig,
 		loadPublicPageConfig,
@@ -12,6 +25,13 @@
 
 	let config = $state<PublicPageConfig>({ ...defaultPublicPageConfig });
 	let saved = $state(false);
+	let showVerifyModal = $state(false);
+	let telegramBotUsername = $state('RhnkBot');
+	let verifyToken = $state('');
+	let isPolling = $state(false);
+	let verificationSuccessMessage = $state<string | null>(null);
+	let pollInterval: ReturnType<typeof setInterval> | null = null;
+
 	const slugIssue = $derived(validatePublicSlug(config.slug));
 	const previewName = $derived(config.displayName.trim() || 'Назва бізнесу');
 	const previewDescription = $derived(
@@ -32,6 +52,10 @@
 		config = loadPublicPageConfig();
 	});
 
+	onDestroy(() => {
+		stopPolling();
+	});
+
 	function updateSlug(event: Event) {
 		config.slug = normalizePublicSlug((event.currentTarget as HTMLInputElement).value);
 		saved = false;
@@ -41,6 +65,80 @@
 		if (slugIssue) return;
 		savePublicPageConfig(config);
 		saved = true;
+	}
+
+	function startTelegramVerification() {
+		verifyToken = Math.random().toString(36).substring(2, 12);
+		verificationSuccessMessage = null;
+		showVerifyModal = true;
+		startPolling();
+	}
+
+	function startPolling() {
+		stopPolling();
+		isPolling = true;
+		pollInterval = setInterval(async () => {
+			if (!verifyToken || !showVerifyModal) {
+				stopPolling();
+				return;
+			}
+			try {
+				const res = await fetch(`/api/v1/verification/status?token=${encodeURIComponent(verifyToken)}`);
+				if (res.ok) {
+					const data = await res.json();
+					if (data.verified && data.phone) {
+						config.phone = data.phone;
+						config.phoneVerified = true;
+						config.telegramId = data.telegramId;
+						config.telegramUsername = data.telegramUsername;
+						saved = false;
+						savePublicPageConfig(config);
+						verificationSuccessMessage = `Номер ${data.phone} успішно підтверджено!`;
+						stopPolling();
+						setTimeout(() => {
+							showVerifyModal = false;
+						}, 1600);
+					}
+				}
+			} catch {}
+		}, 2000);
+	}
+
+	function stopPolling() {
+		if (pollInterval) {
+			clearInterval(pollInterval);
+			pollInterval = null;
+		}
+		isPolling = false;
+	}
+
+	function closeVerifyModal() {
+		stopPolling();
+		showVerifyModal = false;
+	}
+
+	function resetVerification() {
+		stopPolling();
+		config.phone = '';
+		config.phoneVerified = false;
+		config.telegramId = undefined;
+		config.telegramUsername = undefined;
+		saved = false;
+		savePublicPageConfig(config);
+	}
+
+	function simulateSuccess() {
+		config.phone = '+380 (98) 765-43-21';
+		config.phoneVerified = true;
+		config.telegramId = 777123456;
+		config.telegramUsername = 'demo_user';
+		saved = false;
+		savePublicPageConfig(config);
+		verificationSuccessMessage = 'Номер успішно верифіковано в демо-режимі!';
+		stopPolling();
+		setTimeout(() => {
+			showVerifyModal = false;
+		}, 1200);
 	}
 </script>
 
@@ -109,6 +207,57 @@
 					<p class="mt-2 text-xs leading-5 {slugIssue ? 'text-red-700' : 'text-zinc-500'}">
 						{slugIssue ?? 'Латинські літери, цифри та дефіси. Від 3 до 40 символів.'}
 					</p>
+
+					<div class="mt-5 border-t border-zinc-100 pt-5">
+						<div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+							<div>
+								<div class="flex items-center gap-1.5">
+									<Smartphone size={15} class="text-zinc-500" />
+									<span class="text-xs font-bold text-zinc-700">Верифікація номера телефону</span>
+								</div>
+								<p class="mt-1 text-xs text-zinc-500">
+									{#if config.phoneVerified && config.phone}
+										Підтверджений номер: <strong class="font-mono text-zinc-800">{config.phone}</strong>
+										{#if config.telegramId}
+											<span class="ml-2 inline-flex items-center gap-1 rounded bg-[#229ED9]/10 px-2 py-0.5 text-[11px] font-semibold text-[#229ED9]">
+												<Send size={11} />
+												{#if config.telegramUsername}@{config.telegramUsername}{:else}ID: {config.telegramId}{/if}
+											</span>
+										{/if}
+									{:else}
+										Підтвердіть номер для закріплення вашої адреси rahunok.com/@{config.slug || 'ваша-адреса'} та отримання сповіщень.
+									{/if}
+								</p>
+							</div>
+
+							{#if config.phoneVerified && config.phone}
+								<div class="flex items-center gap-2">
+									<span
+										class="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700"
+									>
+										<ShieldCheck size={13} />
+										Верифіковано
+									</span>
+									<button
+										type="button"
+										onclick={resetVerification}
+										class="cursor-pointer text-xs text-zinc-400 underline hover:text-zinc-600"
+									>
+										Змінити
+									</button>
+								</div>
+							{:else}
+								<button
+									type="button"
+									onclick={startTelegramVerification}
+									class="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-[#229ED9] px-3.5 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-[#1E88E5] active:scale-95"
+								>
+									<Send size={13} />
+									Верифікувати номер телефону
+								</button>
+							{/if}
+						</div>
+					</div>
 				</div>
 			</section>
 
@@ -216,6 +365,14 @@
 					{initials || 'R'}
 				</div>
 				<h2 class="mt-5 text-xl font-extrabold">{previewName}</h2>
+				{#if config.phoneVerified && config.phone}
+					<div
+						class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-0.5 text-xs font-semibold text-emerald-400"
+					>
+						<ShieldCheck size={13} />
+						<span>{config.phone}</span>
+					</div>
+				{/if}
 				<p class="mx-auto mt-2 max-w-64 text-sm leading-6 text-zinc-400">{previewDescription}</p>
 				<div class="mt-7 grid gap-2">
 					<div
@@ -249,3 +406,88 @@
 		</aside>
 	</div>
 </div>
+
+{#if showVerifyModal}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+		<div class="relative w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-2xl">
+			<button
+				type="button"
+				onclick={closeVerifyModal}
+				class="absolute right-4 top-4 cursor-pointer text-zinc-400 hover:text-zinc-600"
+				aria-label="Закрити"
+			>
+				<X size={18} />
+			</button>
+
+			<div class="flex items-center gap-3">
+				<div class="grid size-11 place-items-center rounded-xl bg-[#229ED9]/10 text-[#229ED9]">
+					<Send size={22} />
+				</div>
+				<div>
+					<h3 class="text-base font-extrabold text-zinc-900">Підтвердження через Telegram</h3>
+					<p class="text-xs text-zinc-500">Швидка верифікація номера телефону</p>
+				</div>
+			</div>
+
+			{#if verificationSuccessMessage}
+				<div class="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-xs font-bold text-emerald-800">
+					<Check size={18} class="shrink-0 text-emerald-600" />
+					<span>{verificationSuccessMessage}</span>
+				</div>
+			{:else}
+				<div class="mt-4 space-y-2.5 rounded-lg border border-zinc-100 bg-zinc-50 p-4 text-xs text-zinc-600">
+					<div class="flex items-start gap-2.5">
+						<span
+							class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[11px] font-bold text-zinc-700"
+							>1</span
+						>
+						<span>Натисніть кнопку <strong>Відкрити бота</strong> нижче.</span>
+					</div>
+					<div class="flex items-start gap-2.5">
+						<span
+							class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[11px] font-bold text-zinc-700"
+							>2</span
+						>
+						<span>У чаті з ботом натисніть кнопку <strong>Розпочати (Start)</strong>.</span>
+					</div>
+					<div class="flex items-start gap-2.5">
+						<span
+							class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[11px] font-bold text-zinc-700"
+							>3</span
+						>
+						<span>Натисніть нативну кнопку <strong>📱 Поділитися номером</strong>.</span>
+					</div>
+				</div>
+
+				{#if isPolling}
+					<div class="mt-3 flex items-center justify-center gap-2 py-1 text-xs text-zinc-500">
+						<Loader2 size={14} class="animate-spin text-[#229ED9]" />
+						<span>Очікуємо на підтвердження контакту від бота...</span>
+					</div>
+				{/if}
+			{/if}
+
+			<div class="mt-5 flex flex-col gap-2">
+				<a
+					href="https://t.me/{telegramBotUsername}?start=verify_{verifyToken}"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#229ED9] text-xs font-bold text-white shadow-xs transition-all hover:bg-[#1E88E5]"
+				>
+					<Send size={15} />
+					Відкрити @{telegramBotUsername}
+					<ExternalLink size={13} />
+				</a>
+
+				<button
+					type="button"
+					onclick={simulateSuccess}
+					class="flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50"
+				>
+					<Check size={14} class="text-emerald-600" />
+					Імітувати успіх (Тестовий режим)
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}

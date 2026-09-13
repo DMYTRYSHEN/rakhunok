@@ -1,5 +1,10 @@
 import { simulateSandboxPayment } from './sandbox.ts';
 import { handleAiWorkerRequest } from './ai-worker-core.ts';
+import {
+	handleTelegramWebhook,
+	handleVerificationStatus,
+	registerTelegramWebhook
+} from './telegram-bot.ts';
 
 interface Env {
 	ASSETS: Fetcher;
@@ -11,6 +16,7 @@ interface Env {
 	AZURE_BEARER_TOKEN?: string;
 	AZURE_HOST?: string;
 	MODEL_NAME?: string;
+	TELEGRAM_BOT_TOKEN?: string;
 }
 
 const PUBLIC_FILES = new Set(['/favicon.ico', '/robots.txt']);
@@ -810,6 +816,22 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 	// 8. AI Copilot endpoint
 	if (url.pathname === '/api/v1/copilot' || url.pathname === '/api/copilot') {
 		return handleAiWorkerRequest(request, env as any);
+	}
+
+	// 9. Telegram Bot Webhook & Phone Verification
+	if (url.pathname === '/api/v1/telegram/webhook') {
+		return handleTelegramWebhook(request, env);
+	}
+
+	if (url.pathname === '/api/v1/verification/status') {
+		return handleVerificationStatus(request);
+	}
+
+	if (url.pathname === '/api/v1/telegram/setup-webhook') {
+		const publicDomain = env.PUBLIC_DOMAIN || 'https://letsrealtalk.com';
+		const webhookUrl = `${publicDomain}/api/v1/telegram/webhook`;
+		const result = await registerTelegramWebhook(webhookUrl, env);
+		return jsonResponse(result);
 	}
 
 	const CHECKOUT_API_REGEX =
