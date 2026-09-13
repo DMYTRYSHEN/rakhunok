@@ -130,6 +130,11 @@ export default defineConfig(({ mode }) => ({
 					});
 				}
 			},
+			'/api': {
+				target: 'https://letsrealtalk.com',
+				changeOrigin: true,
+				secure: true
+			},
 			'/dashboard/api': {
 				target: 'http://127.0.0.1:8787',
 				rewrite: (path) => path.slice('/dashboard'.length),

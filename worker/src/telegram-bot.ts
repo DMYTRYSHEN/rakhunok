@@ -31,59 +31,75 @@ export async function handleTelegramAvatarProxy(request: Request, env?: Telegram
 	const url = new URL(request.url);
 	const userIdStr = url.searchParams.get('user_id');
 	const userId = Number(userIdStr);
-	if (!userId) {
-		return new Response('User ID required', { status: 400 });
+	const username = (url.searchParams.get('username') || '').replace(/^@/, '').trim();
+
+	const corsHeaders = {
+		'Access-Control-Allow-Origin': '*',
+		'Access-Control-Allow-Methods': 'GET, OPTIONS',
+		'Access-Control-Allow-Headers': '*'
+	};
+
+	if (request.method === 'OPTIONS') {
+		return new Response(null, { headers: corsHeaders });
+	}
+
+	if (!userId && !username) {
+		return new Response('User ID or username required', { status: 400, headers: corsHeaders });
 	}
 
 	const botToken = getBotToken(env);
-	if (!botToken) {
-		return new Response('Bot token not configured', { status: 500 });
+
+	// 1. If we have userId and botToken, try official getUserProfilePhotos
+	if (userId && botToken) {
+		try {
+			const photosRes = await fetch(
+				`https://api.telegram.org/bot${botToken}/getUserProfilePhotos?user_id=${userId}&limit=1`
+			);
+			if (photosRes.ok) {
+				const photosData = (await photosRes.json()) as any;
+				const photos = photosData?.result?.photos;
+				if (photos && photos.length > 0 && photos[0]?.length > 0) {
+					const photoVariants = photos[0];
+					const selectedPhoto = photoVariants[photoVariants.length - 1]; // Highest available resolution
+					const fileId = selectedPhoto.file_id;
+
+					const fileRes = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`);
+					if (fileRes.ok) {
+						const fileData = (await fileRes.json()) as any;
+						const filePath = fileData?.result?.file_path;
+						if (filePath) {
+							const imgRes = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`);
+							if (imgRes.ok) {
+								const headers = new Headers(corsHeaders);
+								headers.set('Content-Type', imgRes.headers.get('content-type') || 'image/jpeg');
+								headers.set('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+								return new Response(imgRes.body, { status: 200, headers });
+							}
+						}
+					}
+				}
+			}
+		} catch (err) {
+			console.error('[handleTelegramAvatarProxy] getUserProfilePhotos error:', err);
+		}
 	}
 
-	try {
-		const photosRes = await fetch(
-			`https://api.telegram.org/bot${botToken}/getUserProfilePhotos?user_id=${userId}&limit=1`
-		);
-		if (!photosRes.ok) {
-			return new Response('Failed to fetch profile photos', { status: 502 });
+	// 2. Fallback: If username is provided, fetch public avatar from Telegram CDN
+	if (username) {
+		try {
+			const publicAvatarRes = await fetch(`https://t.me/i/userpic/320/${username}.jpg`);
+			if (publicAvatarRes.ok) {
+				const headers = new Headers(corsHeaders);
+				headers.set('Content-Type', publicAvatarRes.headers.get('content-type') || 'image/jpeg');
+				headers.set('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+				return new Response(publicAvatarRes.body, { status: 200, headers });
+			}
+		} catch (err) {
+			console.error('[handleTelegramAvatarProxy] publicAvatar error:', err);
 		}
-		const photosData = (await photosRes.json()) as any;
-		const photos = photosData?.result?.photos;
-		if (!photos || !photos.length || !photos[0]?.length) {
-			return new Response('No avatar found', { status: 404 });
-		}
-
-		const photoVariants = photos[0];
-		const selectedPhoto = photoVariants[Math.min(1, photoVariants.length - 1)];
-		const fileId = selectedPhoto.file_id;
-
-		const fileRes = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`);
-		if (!fileRes.ok) {
-			return new Response('Failed to get file info', { status: 502 });
-		}
-		const fileData = (await fileRes.json()) as any;
-		const filePath = fileData?.result?.file_path;
-		if (!filePath) {
-			return new Response('File path not found', { status: 404 });
-		}
-
-		const imgRes = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`);
-		if (!imgRes.ok) {
-			return new Response('Failed to download avatar', { status: 502 });
-		}
-
-		const headers = new Headers();
-		headers.set('Content-Type', imgRes.headers.get('content-type') || 'image/jpeg');
-		headers.set('Cache-Control', 'public, max-age=86400, s-maxage=86400');
-		headers.set('Access-Control-Allow-Origin', '*');
-
-		return new Response(imgRes.body, {
-			status: 200,
-			headers
-		});
-	} catch (err: any) {
-		return new Response(err?.message || 'Server error', { status: 500 });
 	}
+
+	return new Response('Avatar not found', { status: 404, headers: corsHeaders });
 }
 
 export async function sendTelegramMessage(
@@ -217,7 +233,7 @@ export async function handleTelegramWebhook(request: Request, env?: TelegramEnv)
 			phone: normalizedPhone,
 			telegramId: fromId || chatId,
 			telegramUsername: username,
-			avatarUrl: `/api/v1/telegram/avatar?user_id=${fromId || chatId}`,
+			avatarUrl: `/api/v1/telegram/avatar?user_id=${fromId || chatId}${username ? `&username=${username}` : ''}`,
 			verifiedAt: new Date().toISOString(),
 			expires: Date.now() + 60 * 60 * 1000 // 1 hour retention
 		};
@@ -293,7 +309,9 @@ export async function handleVerificationStatus(request: Request, env?: TelegramE
 				phone: record.phone,
 				telegramId: record.telegramId,
 				telegramUsername: record.telegramUsername,
-				avatarUrl: record.avatarUrl || `/api/v1/telegram/avatar?user_id=${record.telegramId}`,
+				avatarUrl:
+					record.avatarUrl ||
+					`/api/v1/telegram/avatar?user_id=${record.telegramId}${record.telegramUsername ? `&username=${record.telegramUsername}` : ''}`,
 				verifiedAt: record.verifiedAt
 			},
 			{

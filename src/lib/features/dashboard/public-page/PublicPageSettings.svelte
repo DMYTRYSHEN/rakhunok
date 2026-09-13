@@ -48,16 +48,47 @@
 			.toUpperCase()
 	);
 
+	let avatarLoadFailed = $state(false);
+
+	const resolvedAvatarUrl = $derived.by(() => {
+		if (avatarLoadFailed) return null;
+
+		let url = config.avatarUrl;
+		if (!url && config.telegramUsername) {
+			return `https://t.me/i/userpic/320/${config.telegramUsername}.jpg`;
+		}
+		if (!url && config.telegramId) {
+			url = `/api/v1/telegram/avatar?user_id=${config.telegramId}${config.telegramUsername ? `&username=${config.telegramUsername}` : ''}`;
+		}
+		if (!url) return null;
+
+		if (url.startsWith('http://') || url.startsWith('https://')) {
+			return url;
+		}
+
+		const apiHost =
+			typeof window !== 'undefined' &&
+			(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+				? 'https://letsrealtalk.com'
+				: '';
+		return `${apiHost}${url}`;
+	});
+
+	$effect(() => {
+		const _ = `${config.avatarUrl}_${config.telegramUsername}_${config.telegramId}`;
+		avatarLoadFailed = false;
+	});
+
 	onMount(() => {
 		config = loadPublicPageConfig();
-		if (config.telegramId && !config.avatarUrl) {
-			const apiHost =
-				typeof window !== 'undefined' &&
-				(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-					? 'https://letsrealtalk.com'
-					: '';
-			config.avatarUrl = `${apiHost}/api/v1/telegram/avatar?user_id=${config.telegramId}`;
-			savePublicPageConfig(config);
+		if (!config.avatarUrl) {
+			if (config.telegramUsername) {
+				config.avatarUrl = `https://t.me/i/userpic/320/${config.telegramUsername}.jpg`;
+				savePublicPageConfig(config);
+			} else if (config.telegramId) {
+				config.avatarUrl = `/api/v1/telegram/avatar?user_id=${config.telegramId}`;
+				savePublicPageConfig(config);
+			}
 		}
 	});
 
@@ -108,7 +139,9 @@
 						config.telegramId = data.telegramId;
 						config.telegramUsername = data.telegramUsername;
 						if (data.avatarUrl) {
-							config.avatarUrl = (apiHost ? apiHost : '') + data.avatarUrl;
+							config.avatarUrl = data.avatarUrl;
+						} else if (data.telegramUsername) {
+							config.avatarUrl = `https://t.me/i/userpic/320/${data.telegramUsername}.jpg`;
 						}
 						saved = false;
 						savePublicPageConfig(config);
@@ -287,11 +320,14 @@
 										Підтверджений номер: <strong class="font-mono text-zinc-800">{config.phone}</strong>
 										{#if config.telegramId}
 											<span class="ml-2 inline-flex items-center gap-1.5 rounded-full bg-[#229ED9]/10 py-0.5 pr-2 pl-1 text-[11px] font-semibold text-[#229ED9]">
-												{#if config.avatarUrl}
+												{#if resolvedAvatarUrl}
 													<img
-														src={config.avatarUrl}
+														src={resolvedAvatarUrl}
 														alt=""
 														class="size-4 rounded-full object-cover"
+														onerror={() => {
+															avatarLoadFailed = true;
+														}}
 													/>
 												{:else}
 													<Send size={11} class="ml-1" />
@@ -451,8 +487,15 @@
 				<div
 					class="mx-auto grid size-16 place-items-center rounded-lg bg-[#c9ff4a] text-xl font-black text-zinc-950 overflow-hidden shadow-inner"
 				>
-					{#if config.avatarUrl}
-						<img src={config.avatarUrl} alt={previewName} class="size-full object-cover" />
+					{#if resolvedAvatarUrl}
+						<img
+							src={resolvedAvatarUrl}
+							alt={previewName}
+							class="size-full object-cover"
+							onerror={() => {
+								avatarLoadFailed = true;
+							}}
+						/>
 					{:else}
 						{initials || 'R'}
 					{/if}
