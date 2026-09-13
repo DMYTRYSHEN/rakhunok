@@ -11,6 +11,7 @@
 		ShieldCheck,
 		Smartphone,
 		Send,
+		Trash2,
 		UserRound,
 		X
 	} from '@lucide/svelte';
@@ -182,8 +183,9 @@
 		showVerifyModal = false;
 	}
 
-	function resetVerification() {
+	async function resetVerification() {
 		stopPolling();
+		const prevTelegramId = config.telegramId;
 		config.phone = '';
 		config.phoneVerified = false;
 		config.telegramId = undefined;
@@ -191,6 +193,21 @@
 		config.avatarUrl = undefined;
 		saved = false;
 		savePublicPageConfig(config);
+
+		toastMessage = 'Верифікацію тимчасово видалено';
+		setTimeout(() => {
+			toastMessage = null;
+		}, 3500);
+
+		try {
+			const apiHost =
+				typeof window !== 'undefined' &&
+				(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+					? 'https://letsrealtalk.com'
+					: '';
+			const tgParam = prevTelegramId ? `?telegram_id=${prevTelegramId}` : '';
+			await fetch(`${apiHost}/api/v1/verification/reset${tgParam}`, { method: 'POST' });
+		} catch {}
 	}
 
 	function simulateSuccess() {
@@ -367,7 +384,7 @@
 							</div>
 
 							{#if config.phoneVerified && config.phone}
-								<div class="flex items-center gap-2">
+								<div class="flex flex-wrap items-center gap-2">
 									<span
 										class="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700"
 									>
@@ -391,9 +408,11 @@
 									<button
 										type="button"
 										onclick={resetVerification}
-										class="cursor-pointer text-xs text-zinc-400 underline hover:text-zinc-600"
+										class="inline-flex cursor-pointer items-center gap-1 rounded-md border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 active:scale-95"
+										title="Тимчасово видалити верифікацію для повторного тестування або оновлення"
 									>
-										Змінити
+										<Trash2 size={12} />
+										Тимчасово видалити верифікацію
 									</button>
 								</div>
 							{:else}

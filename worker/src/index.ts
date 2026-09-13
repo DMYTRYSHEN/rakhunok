@@ -3,6 +3,7 @@ import { handleAiWorkerRequest } from './ai-worker-core.ts';
 import {
 	handleTelegramWebhook,
 	handleVerificationStatus,
+	handleVerificationReset,
 	handleTelegramAvatarProxy,
 	registerTelegramWebhook,
 	sendNotificationToTelegramUser
@@ -828,6 +829,10 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 
 	if (url.pathname === '/api/v1/verification/status') {
 		return handleVerificationStatus(request, env);
+	}
+
+	if (url.pathname === '/api/v1/verification/reset') {
+		return handleVerificationReset(request, env);
 	}
 
 	if (url.pathname === '/api/v1/telegram/avatar') {

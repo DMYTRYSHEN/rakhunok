@@ -366,6 +366,36 @@ export async function handleVerificationStatus(request: Request, env?: TelegramE
 	return Response.json({ verified: false }, { status: 200, headers: corsHeaders });
 }
 
+export async function handleVerificationReset(request: Request, env?: TelegramEnv): Promise<Response> {
+	const url = new URL(request.url);
+	const telegramId = url.searchParams.get('telegram_id') || '';
+
+	completedByToken.clear();
+
+	if (env?.ORDERS_KV) {
+		try {
+			await env.ORDERS_KV.delete('tg:verify:latest');
+			if (telegramId) {
+				await env.ORDERS_KV.delete(`tg:verify:chat_${telegramId}`);
+				await env.ORDERS_KV.delete(`tg:pending:${telegramId}`);
+			}
+		} catch {}
+	}
+
+	return Response.json(
+		{ ok: true, reset: true },
+		{
+			status: 200,
+			headers: {
+				'Content-Type': 'application/json; charset=utf-8',
+				'Access-Control-Allow-Origin': '*',
+				'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+				'Access-Control-Allow-Headers': '*'
+			}
+		}
+	);
+}
+
 export async function sendNotificationToTelegramUser(
 	chatId: number,
 	text: string,
