@@ -1,5 +1,6 @@
 import { simulateSandboxPayment } from './sandbox.ts';
 import { handleAiWorkerRequest } from './ai-worker-core.ts';
+import { handleTelegramInvoice, handleTelegramInvoicePreview, type TelegramInvoiceEnv } from './telegram-invoice.ts';
 import {
 	handleTelegramWebhook,
 	handleVerificationStatus,
@@ -9,7 +10,7 @@ import {
 	sendNotificationToTelegramUser
 } from './telegram-bot.ts';
 
-interface Env {
+interface Env extends TelegramInvoiceEnv {
 	ASSETS: Fetcher;
 	BANKS_KV?: KVNamespace;
 	ORDERS_KV?: KVNamespace;
@@ -823,6 +824,13 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 	}
 
 	// 9. Telegram Bot Webhook & Phone Verification
+	if (url.pathname === '/api/v1/telegram/invoices/preview') {
+		return handleTelegramInvoicePreview(request, env);
+	}
+	if (url.pathname === '/api/v1/telegram/invoices/send') {
+		return handleTelegramInvoice(request, env);
+	}
+
 	if (url.pathname === '/api/v1/telegram/webhook') {
 		return handleTelegramWebhook(request, env);
 	}

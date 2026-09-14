@@ -9,6 +9,16 @@ import net from 'node:net';
 
 const docsDirectory = resolve(import.meta.dirname, 'docs');
 
+export function isConnectionRefused(error: unknown): boolean {
+	if (!error || typeof error !== 'object') return false;
+	// Check every attempted address, not just an AggregateError's top-level code.
+	if ('errors' in error) {
+		return Array.isArray(error.errors) && error.errors.length > 0 &&
+			error.errors.every(isConnectionRefused);
+	}
+	return 'code' in error && error.code === 'ECONNREFUSED';
+}
+
 let lastConfCheckTime = 0;
 let isConfServerAlive = false;
 const CONF_CHECK_TTL_MS = 1500;
@@ -139,10 +149,16 @@ export default defineConfig(({ mode }) => ({
 				target: 'http://127.0.0.1:8787',
 				rewrite: (path) => path.slice('/dashboard'.length),
 				configure: (proxy) => {
-					proxy.on('error', (_err, _req, res) => {
+					proxy.on('error', (error, _req, res) => {
 						if ('writeHead' in res && !res.headersSent && !res.writableEnded) {
-							res.writeHead(503, { 'Content-Type': 'application/json' });
-							res.end(JSON.stringify({ error: 'Worker dev server (port 8787) is not running' }));
+							res.writeHead(503, {
+								'Content-Type': 'application/json',
+								'Cache-Control': 'no-store'
+							});
+							res.end(JSON.stringify({
+								ok: false,
+								error: isConnectionRefused(error) ? 'local_api_unavailable' : 'delivery_unknown'
+							}));
 						}
 					});
 				}

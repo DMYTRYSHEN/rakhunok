@@ -463,6 +463,54 @@
 		return gateway.createInvoice(input);
 	}
 
+	async function loadTelegramInvoices() {
+		if (!gateway || sessionState.status !== 'ready' || sessionState.user.id === 'demo-user') {
+			throw new Error('Увійдіть до кабінету для завантаження рахунків.');
+		}
+		const scope = sessionState;
+		const rows = await gateway.listInvoices(scope.merchant.id);
+		if (destroyed || sessionState !== scope) throw new Error('Сесію змінено. Відкрийте форму повторно.');
+		return rows;
+	}
+
+	async function previewTelegramInvoiceCard(orderId: string) {
+		const scope = sessionState;
+		const activeGateway = gateway;
+		const { previewTelegramInvoice, TelegramInvoicePreviewError } = await import('./public-page/telegram-invoice-client');
+		if (destroyed || sessionState !== scope || gateway !== activeGateway || !activeGateway || scope.status !== 'ready' || scope.user.id === 'demo-user') {
+			throw new TelegramInvoicePreviewError('unauthorized');
+		}
+		let accessToken: string;
+		try {
+			({ accessToken } = await activeGateway.getDeveloperSession());
+		} catch {
+			throw new TelegramInvoicePreviewError('unauthorized');
+		}
+		if (destroyed || sessionState !== scope || gateway !== activeGateway) throw new TelegramInvoicePreviewError('unauthorized');
+		const card = await previewTelegramInvoice({ fetcher: fetch, accessToken, orderId });
+		if (destroyed || sessionState !== scope || gateway !== activeGateway) throw new TelegramInvoicePreviewError('unauthorized');
+		return card;
+	}
+
+	async function sendTelegramInvoiceCard(orderId: string) {
+		const scope = sessionState;
+		const activeGateway = gateway;
+		const { sendTelegramInvoice, TelegramInvoiceError } = await import('./public-page/telegram-invoice-client');
+		if (destroyed || sessionState !== scope || gateway !== activeGateway || !activeGateway || scope.status !== 'ready' || scope.user.id === 'demo-user') {
+			throw new TelegramInvoiceError('Увійдіть до кабінету для надсилання рахунку.');
+		}
+		let accessToken: string;
+		try {
+			({ accessToken } = await activeGateway.getDeveloperSession());
+		} catch {
+			throw new TelegramInvoiceError('Не вдалося підтвердити сесію. Нічого не надіслано.');
+		}
+		if (destroyed || sessionState !== scope || gateway !== activeGateway) {
+			throw new TelegramInvoiceError('Сесію змінено. Нічого не надіслано.');
+		}
+		await sendTelegramInvoice({ fetcher: fetch, accessToken, orderId });
+	}
+
 	async function cancelInvoice(invoiceId: string) {
 		if (!gateway) throw new Error('Dashboard API недоступний.');
 		await gateway.cancelInvoice(invoiceId);
@@ -694,7 +742,16 @@
 				<div class="mt-6">{#await loadPaymentMethodsSettings() then module}<module.default entities={structureData.entities} />{/await}</div>
 			</details>
 		{:else if view === 'public-page'}
-			{#await loadPublicPageSettings() then module}<module.default />{/await}
+			{#await loadPublicPageSettings() then module}
+				{#key `${sessionState.user.id}:${sessionState.merchant.id}`}
+					<module.default
+						demo={sessionState.user.id === 'demo-user'}
+						onLoadInvoices={loadTelegramInvoices}
+						onPreviewInvoice={previewTelegramInvoiceCard}
+						onSendInvoice={sendTelegramInvoiceCard}
+					/>
+				{/key}
+			{/await}
 		{:else if view === 'team'}
 			{#await loadTeamSettings() then module}
 				<module.default

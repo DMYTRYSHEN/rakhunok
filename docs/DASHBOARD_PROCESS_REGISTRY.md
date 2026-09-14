@@ -27,6 +27,44 @@ changes do not bypass these rules.
 
 ## Analysis Order
 
+### DASH-TELEGRAM-INVOICE-001 — local self-test delivery (2026-09-13)
+
+- **Status:** `ANALYZING` — local implementation tested; remote activation not approved/performed.
+- User approved adding an invoice action beside Telegram message templates and sending to self
+  while testing; buyer delivery remains separate future scope.
+- Isolated existing-invoice selection, PNG/caption delivery, operator-configured single user/chat,
+  verified bearer and canonical owner checks. No invoice creation/payment mutation added.
+- Existing SDK token getter/read gateway reused; locked Auth, POS, checkout and classic invoice
+  creation invariants unchanged. Per-account component key isolates in-memory delivery state.
+- Demo stays local. Legacy non-demo notification/verification contracts remain separate.
+- 356 backend tests, 103 client/gateway tests; Svelte zero errors/warnings; full-page desktop/mobile
+  demo and synthetic retry/reopen checks passed without live sends. No authenticated live smoke.
+- Limitations and operator activation: [Telegram self-test](TELEGRAM_INVOICE_SELF_TEST.md).
+- Redesign validation: 438 Worker and 217 focused frontend tests passed; full/half-size QR
+  decoding verified. Canonical read-only authenticated local preview returned 200. Branded
+  card includes legal recipient, number, dates and verified short URL; 72-hour display cap
+  does not mutate invoice expiry. Approved local launcher active; no redesign send/deployment.
+- User-approved local proxy remediation: only definite `ECONNREFUSED` (all aggregate causes)
+  reports `local_api_unavailable`; other transport failures remain uncertain. Exact legacy 503
+  compatibility only; duplicate warning hidden without weakening retry confirmation or safety gates.
+- Remediation evidence: 101 client/proxy + 31 gateway tests, 1 synthetic Chromium regression,
+  scoped ESLint clean, Svelte check 0 errors/0 warnings and official Svelte MCP clean.
+  Local GET confirmed 503 structured response with `Cache-Control: no-store`; no live sends.
+- Final local verification (2026-09-14): full `TelegramInvoiceComposer.svelte`,
+  `PublicPageSettings.svelte`, and `DashboardPage.svelte` submitted to official Svelte 5 MCP
+  autofixer; no issues. Dashboard's five pre-existing invoice-effect suggestions remain
+  intentionally unchanged. Full Dashboard rerun after the Telegram-only correction: no issues.
+- Corrected Telegram preview/send scope capture before lazy import; session/gateway changes or
+  teardown during import/token acquisition now fail before dispatch. Stale previews are rejected;
+  already-dispatched send outcomes remain recordable. Shared locked auth lifecycle was not changed.
+- Evidence: 217 focused client/proxy/scope/gateway tests (including 14 request-race regressions),
+  scoped ESLint clean, direct Svelte check 0 errors/0 warnings, one synthetic Chromium regression
+  with API/external requests blocked. Browser fixture now supplies the required canonical preview.
+  Reviewed exact-cent/date/label/allowlisted-URL decoder and composer generation fencing; no
+  additional actionable client decoder issue found. No live sends or deployment in this review.
+- Status remains `ANALYZING`: known shared auth subscription initialization issue remains outside
+  this scope; these local checks do not certify authenticated account-switching or live delivery.
+
 ### DASH-BUSINESS-DRAFTS-002 — authorized isolated rollout (updated 2026-09-09)
 
 - **Status:** `ANALYZING` — authorized migration and isolated Dashboard deployment completed;

@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
+	import type { InvoiceRecord } from '../types';
+	import type { TelegramInvoiceCard } from './telegram-invoice-client';
+	import TelegramInvoiceComposer from './TelegramInvoiceComposer.svelte';
 	import {
 		Check,
 		ExternalLink,
@@ -24,6 +27,18 @@
 		type PublicPageConfig
 	} from './public-page';
 
+	let { demo = false, onLoadInvoices, onPreviewInvoice, onSendInvoice }: {
+		demo?: boolean;
+		onLoadInvoices?: () => Promise<InvoiceRecord[]>;
+		onPreviewInvoice?: (id: string) => Promise<TelegramInvoiceCard>;
+		onSendInvoice?: (id: string) => Promise<void>;
+	} = $props();
+	let showInvoiceComposer = $state(false);
+	// DashboardPage keys this instance by user + merchant. Modal/composer teardown must
+	// not forget delivery outcomes; navigation, refresh or an account change does.
+	// UI-only memory, deliberately separate from the persisted public-page config.
+	let sentInvoiceIds = $state<string[]>([]);
+	let uncertainInvoiceIds = $state<string[]>([]);
 	let config = $state<PublicPageConfig>({ ...defaultPublicPageConfig });
 	let saved = $state(false);
 	let showVerifyModal = $state(false);
@@ -49,10 +64,11 @@
 			.toUpperCase()
 	);
 
-	let avatarLoadFailed = $state(false);
+	let failedAvatarSource = $state<string | null>(null);
+	const avatarSource = $derived(`${config.avatarUrl}_${config.telegramUsername}_${config.telegramId}`);
 
 	const resolvedAvatarUrl = $derived.by(() => {
-		if (avatarLoadFailed) return null;
+		if (demo || failedAvatarSource === avatarSource) return null;
 
 		let url = config.avatarUrl;
 		if (!url && config.telegramUsername) {
@@ -75,12 +91,8 @@
 		return `${apiHost}${url}`;
 	});
 
-	$effect(() => {
-		const _ = `${config.avatarUrl}_${config.telegramUsername}_${config.telegramId}`;
-		avatarLoadFailed = false;
-	});
-
 	onMount(() => {
+		if (demo) return;
 		config = loadPublicPageConfig();
 		if (!config.avatarUrl) {
 			if (config.telegramUsername) {
@@ -104,7 +116,7 @@
 
 	function persist() {
 		if (slugIssue) return;
-		savePublicPageConfig(config);
+		if (!demo) savePublicPageConfig(config);
 		saved = true;
 	}
 
@@ -118,6 +130,7 @@
 	}
 
 	async function pollOnce() {
+		if (demo) return;
 		if (!verifyToken && !config.telegramId) return;
 		try {
 			const apiHost =
@@ -152,7 +165,7 @@
 					}, 4000);
 				}
 			}
-		} catch {}
+		} catch { /* Preserve legacy best-effort verification polling. */ }
 	}
 
 	function handleVisibilityChange() {
@@ -163,6 +176,7 @@
 
 	function startPolling() {
 		stopPolling();
+		if (demo) return;
 		isPolling = true;
 		pollOnce();
 		pollInterval = setInterval(pollOnce, 800);
@@ -175,7 +189,7 @@
 			pollInterval = null;
 		}
 		isPolling = false;
-		document.removeEventListener('visibilitychange', handleVisibilityChange);
+		if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', handleVisibilityChange);
 	}
 
 	function closeVerifyModal() {
@@ -192,6 +206,10 @@
 		config.telegramUsername = undefined;
 		config.avatarUrl = undefined;
 		saved = false;
+		if (demo) {
+			toastMessage = 'Демо: верифікацію скинуто лише локально, без запиту до сервера.';
+			return;
+		}
 		savePublicPageConfig(config);
 
 		toastMessage = 'Верифікацію тимчасово видалено';
@@ -207,10 +225,22 @@
 					: '';
 			const tgParam = prevTelegramId ? `?telegram_id=${prevTelegramId}` : '';
 			await fetch(`${apiHost}/api/v1/verification/reset${tgParam}`, { method: 'POST' });
-		} catch {}
+		} catch { /* Preserve legacy best-effort verification reset. */ }
 	}
 
 	function simulateSuccess() {
+		if (demo) {
+			config.phone = '+380 (98) 765-43-21';
+			config.phoneVerified = true;
+			config.telegramId = 777123456;
+			config.telegramUsername = 'demo_user';
+			config.avatarUrl = undefined;
+			saved = false;
+			stopPolling();
+			showVerifyModal = false;
+			toastMessage = 'Демо: верифікацію імітовано локально. Дані не збережено, Telegram не викликався.';
+			return;
+		}
 		config.phone = '+380 (98) 765-43-21';
 		config.phoneVerified = true;
 		config.telegramId = 777123456;
@@ -234,6 +264,11 @@
 
 	async function sendTelegramNotification() {
 		if (!config.telegramId || !notificationText.trim()) return;
+		if (demo) {
+			notificationStatus = { success: true };
+			notificationText = '';
+			return;
+		}
 		isSendingNotification = true;
 		notificationStatus = null;
 		try {
@@ -265,8 +300,8 @@
 			} else {
 				notificationStatus = { error: 'Помилка сервера' };
 			}
-		} catch (err: any) {
-			notificationStatus = { error: err?.message || 'Помилка мережі' };
+		} catch (err) {
+			notificationStatus = { error: err instanceof Error ? err.message : 'Помилка мережі' };
 		} finally {
 			isSendingNotification = false;
 		}
@@ -368,7 +403,7 @@
 														alt=""
 														class="size-4 rounded-full object-cover"
 														onerror={() => {
-															avatarLoadFailed = true;
+															failedAvatarSource = avatarSource;
 														}}
 													/>
 												{:else}
@@ -537,7 +572,7 @@
 							alt={previewName}
 							class="size-full object-cover"
 							onerror={() => {
-								avatarLoadFailed = true;
+								failedAvatarSource = avatarSource;
 							}}
 						/>
 					{:else}
@@ -648,6 +683,9 @@
 			{/if}
 
 			<div class="mt-5 flex flex-col gap-2">
+				{#if demo}
+					<p class="text-xs text-amber-800">Демо: підтвердження лише локальне, без відкриття Telegram і без збереження.</p>
+				{:else}
 				<a
 					href="https://t.me/{telegramBotUsername}?start=verify_{verifyToken}"
 					target="_blank"
@@ -658,6 +696,7 @@
 					Відкрити @{telegramBotUsername}
 					<ExternalLink size={13} />
 				</a>
+				{/if}
 
 				<button
 					type="button"
@@ -674,7 +713,10 @@
 
 {#if showSendMessageModal}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-		<div class="relative w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-2xl">
+		<dialog open aria-label={showInvoiceComposer ? 'Рахунок у Telegram — self-test' : 'Надіслати в Telegram'} class="relative m-auto max-h-[90dvh] w-full overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-2xl {showInvoiceComposer ? 'max-w-lg p-0' : 'max-w-md p-6'}">
+			{#if showInvoiceComposer}
+				<TelegramInvoiceComposer {demo} {onLoadInvoices} {onPreviewInvoice} {onSendInvoice} bind:sentIds={sentInvoiceIds} bind:uncertainIds={uncertainInvoiceIds} onClose={() => (showInvoiceComposer = false)} />
+			{:else}
 			<button
 				type="button"
 				onclick={() => (showSendMessageModal = false)}
@@ -723,13 +765,19 @@
 					>
 						+ Тест зв\'язку
 					</button>
+					<button
+						type="button"
+						disabled={isSendingNotification}
+						onclick={() => (showInvoiceComposer = true)}
+						class="cursor-pointer rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+					>+ Виставити рахунок</button>
 				</div>
 			</div>
 
 			{#if notificationStatus?.success}
 				<div class="mt-3 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-2.5 text-xs font-bold text-emerald-800">
 					<Check size={16} class="text-emerald-600" />
-					Повідомлення успішно доставлено в Telegram!
+					{demo ? 'Демо: повідомлення імітовано локально. Нічого не надіслано.' : 'Повідомлення успішно доставлено в Telegram!'}
 				</div>
 			{:else if notificationStatus?.error}
 				<div class="mt-3 rounded-md border border-red-200 bg-red-50 p-2.5 text-xs font-semibold text-red-700">
@@ -760,6 +808,7 @@
 					{/if}
 				</button>
 			</div>
-		</div>
+			{/if}
+		</dialog>
 	</div>
 {/if}
