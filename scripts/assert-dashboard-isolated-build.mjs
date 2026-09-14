@@ -22,7 +22,10 @@ export function assertDashboardConfig(config) {
 	assert.deepEqual(config.routes, [
 		{ pattern: 'letsrealtalk.com/dashboard*', zone_name: 'letsrealtalk.com' }
 	]);
-	assert.deepEqual(config.services, [{ binding: 'API', service: 'rahunok' }]);
+	assert.deepEqual(config.services, [
+		{ binding: 'API', service: 'rahunok' },
+		{ binding: 'TELEGRAM', service: 'letsrealtalk-telegram' }
+	]);
 	assert.deepEqual(config.assets, {
 		directory: '../build-dashboard',
 		binding: 'ASSETS',

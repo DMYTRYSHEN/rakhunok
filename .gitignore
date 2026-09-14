@@ -9,12 +9,16 @@ node_modules
 /worker-rakhunok/.wrangler-dist*
 /.svelte-kit
 /.svelte-kit-dashboard
+/.svelte-kit-corex
 /build
 /build-dashboard
+/build-corex
 /apps/checkout/dist
 /apps/pay/dist
 /apps/pay/.*-dist
 /apps/conf/dist
+/apps/merchant-app/dist
+/apps/merchant-app/.*-dist
 /supabase/.temp
 
 # OS

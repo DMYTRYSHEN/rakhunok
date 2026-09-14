@@ -60,6 +60,8 @@ test('accepts only the explicit test-domain dashboard deployment contract', () =
 		{ routes: [{ pattern: 'rakhunok.com/dashboard*', zone_name: 'rakhunok.com' }] },
 		{ routes: [...config.routes, { pattern: 'letsrealtalk.com/*' }] },
 		{ services: [{ binding: 'API', service: 'other' }] },
+		{ services: [{ binding: 'API', service: 'rahunok' }] },
+		{ services: [{ binding: 'API', service: 'rahunok' }, { binding: 'TELEGRAM', service: 'rahunok' }] },
 		{ assets: { ...config.assets, directory: '../build' } },
 		{ assets: { ...config.assets, not_found_handling: 'single-page-application' } },
 		{ assets: { ...config.assets, run_worker_first: false } },

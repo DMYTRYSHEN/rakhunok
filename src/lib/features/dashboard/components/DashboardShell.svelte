@@ -447,7 +447,7 @@
 			>
 				<HugeiconsIcon icon={Scroll01Icon} size={17} aria-hidden="true" />
 				<span>DAC7 & Платформи</span>
-				<span class="ml-auto rounded bg-emerald-950/80 px-1.5 py-0.5 text-[0.5625rem] font-bold text-emerald-400 border border-emerald-500/30">№ 4903-IX</span>
+				<span class="ml-auto rounded bg-emerald-950/80 px-1.5 py-0.5 text-[0.5625rem] font-bold text-emerald-400 border border-emerald-500/30">Н</span>
 			</a>
 			<a
 				href={resolve(demo ? '/dashboard/settings?demo=1' : '/dashboard/settings')}

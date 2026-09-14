@@ -1,0 +1,24 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "letsrealtalk-telegram",
+	"main": "src/telegram.ts",
+	"compatibility_date": "2026-09-14",
+	"workers_dev": false,
+	"preview_urls": false,
+	"routes": [],
+	"secrets": {
+		"required": [
+			"SUPABASE_URL", "SUPABASE_ANON_KEY", "TELEGRAM_BOT_TOKEN",
+			"TELEGRAM_INVOICE_TEST_USER_ID", "TELEGRAM_INVOICE_TEST_CHAT_ID"
+		]
+	},
+	"vars": {
+		"TELEGRAM_INVOICE_SELF_TEST_ENABLED": "true",
+		"TELEGRAM_INVOICE_PUBLIC_ORIGIN": "https://letsrealtalk.com"
+	},
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1,
+		"traces": { "enabled": true }
+	}
+}

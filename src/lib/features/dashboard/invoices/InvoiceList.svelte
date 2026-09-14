@@ -238,9 +238,9 @@
 							<td class="px-5 py-4">
 								<a href={resolve(detailHref(invoice.id))} class="block">
 									<span class="block text-sm font-bold group-hover:text-blue-700"
-										>{invoice.title}</span
+										>{invoice.reference}</span
 									>
-									<span class="mt-1 block text-xs text-zinc-500">{invoice.reference}</span>
+									<span class="mt-1 block text-xs text-zinc-500">{invoice.title}</span>
 								</a>
 							</td>
 							<td class="px-4 py-4 text-xs font-semibold text-zinc-600">{invoice.type}</td>

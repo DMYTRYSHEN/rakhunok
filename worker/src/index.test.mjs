@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { beforeEach, afterEach } from 'node:test';
 
 import { routeWebRequest } from './index.ts';
+
+// These routing/QR fixtures must never contact the real database.
+let originalFetch;
+beforeEach(() => {
+	originalFetch = globalThis.fetch;
+	globalThis.fetch = async () => Response.json([]);
+});
+afterEach(() => {
+	globalThis.fetch = originalFetch;
+});
 
 function createEnv() {
 	const requests = [];
@@ -232,10 +242,9 @@ test('routeWebRequest handles auth and merchant onboarding', async () => {
 		}),
 		{ ASSETS: { fetch: async () => new Response('mock') } }
 	);
-	assert.equal(onboardRes.status, 200);
+	assert.equal(onboardRes.status, 401);
 	const onboard = await onboardRes.json();
-	assert.equal(onboard.success, true);
-	assert.equal(onboard.merchant.business_name, 'ФОП Тест');
+	assert.deepEqual(onboard, { error: 'Unauthorized' });
 });
 
 test('routeWebRequest handles sandbox simulation', async () => {
@@ -262,10 +271,9 @@ test('routeWebRequest handles PATCH /api/v1/orders/:id and promo/delivery/callba
 		}),
 		{ ASSETS: { fetch: async () => new Response('mock') } }
 	);
-	assert.equal(patchRes.status, 200);
+	assert.equal(patchRes.status, 401);
 	const patchData = await patchRes.json();
-	assert.equal(patchData.success, true);
-	assert.equal(patchData.order.status, 'cancelled');
+	assert.deepEqual(patchData, { error: 'Unauthorized' });
 
 	// 2. Callback
 	const callbackRes = await routeWebRequest(

@@ -942,6 +942,90 @@
 				},
 				{
 					"method": "DELETE",
+					"path": "/api/v1/telegram/invoices/preview",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/telegram/invoices/preview",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/telegram/invoices/preview",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/telegram/invoices/preview",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/telegram/invoices/preview",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/telegram/invoices/preview",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/telegram/invoices/send",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/telegram/invoices/send",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/telegram/invoices/send",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/telegram/invoices/send",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/telegram/invoices/send",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/telegram/invoices/send",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
 					"path": "/api/v1/telegram/notify",
 					"match": "exact",
 					"status": "implemented",
@@ -1062,6 +1146,48 @@
 				{
 					"method": "PUT",
 					"path": "/api/v1/telegram/webhook",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/verification/reset",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/verification/reset",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/verification/reset",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/verification/reset",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/verification/reset",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/verification/reset",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
@@ -1923,7 +2049,22 @@
 			"config": "worker/wrangler.corex.jsonc",
 			"publicRoutes": ["letsrealtalk.com/corex", "letsrealtalk.com/corex/*"],
 			"bindings": [{ "name": "ASSETS", "type": "assets", "target": "../build" }],
-			"routes": []
+			"routes": [
+				{
+					"method": "ANY",
+					"path": "/corex/_app",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/corex.ts"
+				},
+				{
+					"method": "ANY",
+					"path": "/corex/_app/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/corex.ts"
+				}
+			]
 		},
 		{
 			"id": "rahunok-dac7",

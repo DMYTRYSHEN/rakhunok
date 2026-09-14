@@ -12,18 +12,18 @@
 
 ## 2. Перевірена основа репозиторію
 
-| Наявне | Використання / обмеження |
-| --- | --- |
-| [BankManager](../apps/conf/src/lib/components/BankManager.svelte), [BankConfiguratorModal](../apps/conf/src/lib/components/BankConfiguratorModal.svelte) | Основа вибору банку та налаштування deeplink/NBU; не керування банківськими credentials |
-| [BankLinkStore](../apps/conf/src/lib/services/banklink-store.ts) | Прямий browser CRUD каталогу, fallback до кешу/defaults; немає потрібного release/CAS lifecycle |
-| [BankTester](../apps/conf/src/lib/components/BankTester.svelte) | Генерація payload і ручна оцінка; не доказ оплати. Тестер отримує selectedBank, тоді як редактор має localBank: спочатку забезпечити тестування саме відкритої чернетки |
-| [ProcessDiagram](../src/lib/features/corex/ProcessDiagram.svelte) | Початкове повторне використання діаграми та run overlay; спільний presentation layer без Dashboard singleton-залежностей |
-| [ProcessDefinition](../src/lib/features/corex/process-definition.ts), [ProcessFlowDefinition](../src/lib/features/corex/process-flow-definition.ts) | Виконуваний процес і міжсистемна бізнес-схема — різні моделі |
-| [ReleaseFlowCanvas](../src/lib/features/corex/ReleaseFlowCanvas.svelte) | Єдиний редактор; зараз залежить від Dashboard wiring, тому вбудовування потребує виділення спільного ядра |
-| [Corex gateway](../src/lib/features/corex/corex-process-gateway.ts), [control plane](../worker/src/corex-control-plane.ts) | Чернетки з конфліктами ревізій, immutable версії, publish/start та run history; використати, але додати банківський scope/RBAC |
-| [Process manifest generator](../scripts/generate-process-manifest.ts), [catalog](../src/lib/features/corex/deployed-process-catalog.ts) | Статична евристична інвентаризація, не live Cloudflare inventory; неповне покриття Conf/production/bindings |
-| [Conf Worker](../worker/src/conf.ts) | Поточний `/conf/api/*` forward у API, не готовий proxy Corex або захищений bank control plane |
-| [Checkout authority](../supabase/migrations/20260907222910_checkout_authority.sql), [settlement ledger](../supabase/migrations/20260908020000_checkout_settlement_ledger.sql) | Локальна основа незмінних спроб і атомарності, не готовий production bank adapter |
+| Наявне                                                                                                                                                                        | Використання / обмеження                                                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [BankManager](../apps/conf/src/lib/components/BankManager.svelte), [BankConfiguratorModal](../apps/conf/src/lib/components/BankConfiguratorModal.svelte)                      | Основа вибору банку та налаштування deeplink/NBU; не керування банківськими credentials                                                                                 |
+| [BankLinkStore](../apps/conf/src/lib/services/banklink-store.ts)                                                                                                              | Прямий browser CRUD каталогу, fallback до кешу/defaults; немає потрібного release/CAS lifecycle                                                                         |
+| [BankTester](../apps/conf/src/lib/components/BankTester.svelte)                                                                                                               | Генерація payload і ручна оцінка; не доказ оплати. Тестер отримує selectedBank, тоді як редактор має localBank: спочатку забезпечити тестування саме відкритої чернетки |
+| [ProcessDiagram](../src/lib/features/corex/ProcessDiagram.svelte)                                                                                                             | Початкове повторне використання діаграми та run overlay; спільний presentation layer без Dashboard singleton-залежностей                                                |
+| [ProcessDefinition](../src/lib/features/corex/process-definition.ts), [ProcessFlowDefinition](../src/lib/features/corex/process-flow-definition.ts)                           | Виконуваний процес і міжсистемна бізнес-схема — різні моделі                                                                                                            |
+| [ReleaseFlowCanvas](../src/lib/features/corex/ReleaseFlowCanvas.svelte)                                                                                                       | Єдиний редактор; зараз залежить від Dashboard wiring, тому вбудовування потребує виділення спільного ядра                                                               |
+| [Corex gateway](../src/lib/features/corex/corex-process-gateway.ts), [control plane](../worker/src/corex-control-plane.ts)                                                    | Чернетки з конфліктами ревізій, immutable версії, publish/start та run history; використати, але додати банківський scope/RBAC                                          |
+| [Process manifest generator](../scripts/generate-process-manifest.ts), [catalog](../src/lib/features/corex/deployed-process-catalog.ts)                                       | Статична евристична інвентаризація, не live Cloudflare inventory; неповне покриття Conf/production/bindings                                                             |
+| [Conf Worker](../worker/src/conf.ts)                                                                                                                                          | Поточний `/conf/api/*` forward у API, не готовий proxy Corex або захищений bank control plane                                                                           |
+| [Checkout authority](../supabase/migrations/20260907222910_checkout_authority.sql), [settlement ledger](../supabase/migrations/20260908020000_checkout_settlement_ledger.sql) | Локальна основа незмінних спроб і атомарності, не готовий production bank adapter                                                                                       |
 
 Фактичні remote deployments, RLS і зовнішній `rahunok` у межах цього планування не перевірялися. Старі mock-only описи Corex не замінюють перевірку поточного коду, а наявний код не доводить його розгортання.
 
@@ -55,16 +55,16 @@
 
 ### Процеси для кожного банку
 
-| Процес | Призначення |
-| --- | --- |
-| Підключення платформи | Реєстрація/погодження Rahunok, якщо API цього потребує; для інших конекторів `not_required` |
-| Підключення клієнта | Token або QR consent, підтвердження доступу, відмова/відкликання |
-| Виявлення рахунків | Отримання рахунків, звірка власника, явний вибір доступних для Rahunok |
-| Приймання повідомлень | Auth callback і transaction webhook як різні контракти; для polling-only не вигадувати webhook |
-| Синхронізація виписки | Account-level polling, paging, overlapping windows, rate limiting і checkpoint |
-| Зіставлення та підтвердження | Спільний захищений subprocess, показаний у кожному банку, але не скопійований |
-| Відновлення й контроль доступу | Пропущені події, backfill, revoked credentials, сторно, manual review |
-| Доставка мерчанту | Спільний процес outbox → підписане повідомлення → retry/DLQ, видимий із банківського flow; не повторює підтвердження оплати |
+| Процес                         | Призначення                                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Підключення платформи          | Реєстрація/погодження Rahunok, якщо API цього потребує; для інших конекторів `not_required`                                 |
+| Підключення клієнта            | Token або QR consent, підтвердження доступу, відмова/відкликання                                                            |
+| Виявлення рахунків             | Отримання рахунків, звірка власника, явний вибір доступних для Rahunok                                                      |
+| Приймання повідомлень          | Auth callback і transaction webhook як різні контракти; для polling-only не вигадувати webhook                              |
+| Синхронізація виписки          | Account-level polling, paging, overlapping windows, rate limiting і checkpoint                                              |
+| Зіставлення та підтвердження   | Спільний захищений subprocess, показаний у кожному банку, але не скопійований                                               |
+| Відновлення й контроль доступу | Пропущені події, backfill, revoked credentials, сторно, manual review                                                       |
+| Доставка мерчанту              | Спільний процес outbox → підписане повідомлення → retry/DLQ, видимий із банківського flow; не повторює підтвердження оплати |
 
 Приклад міжсистемної схеми; це план, не поточна deployed topology:
 
@@ -109,22 +109,22 @@ flowchart LR
 
 Це логічні сутності, не готова SQL-міграція:
 
-| Сутність | Scope / ключова роль |
-| --- | --- |
-| Bank | Глобальна публічна банківська ідентичність, без credentials |
-| ConnectorDefinition | Банк + API-продукт, capabilities, owner/account eligibility, підтримувані operation IDs |
-| PlatformRegistration | Connector + environment, bank approval/system ID, захищене посилання на platform key |
-| MerchantConnection | Tenant + business entity + connector + environment, consent/token state і credential reference |
-| RecipientAccount | Банк-підтверджена ідентичність рахунку і власника, явний дозвіл використання |
-| ContractVersion | Джерело/дата/hash документа, схеми, статуси, endpoint definitions, невирішені питання |
-| BankFlowBinding | Посилання на business-flow/process/version та технічні resources, не копія графа |
-| IntegrationRelease | Незмінний узгоджений комплект config + contract + adapter artifact + process versions + test evidence |
-| Activation | Активний release на environment/контрольовану групу підключень, actor, revision, час |
-| DeploymentObservation | Реальні спостереження Worker/version/routes/bindings із provenance і freshness |
-| Evidence / SyncCheckpoint | Ідентичність банківської операції, історія змін, прогрес синхронізації; приватні серверні дані |
-| MerchantWebhookEndpoint | Tenant + environment, перевірений HTTPS URL, підписки, account/entity scope, secret reference, revision і lifecycle |
-| MerchantEvent / Outbox | Незмінна версійована подія, зв'язок із підтвердженням та замовленням, tenant/environment; створюється атомарно з фінансовим рішенням |
-| WebhookDelivery / DeliveryAttempt | Окрема доставка на endpoint, стабільний event ID, версія призначення, спроби, наступний retry, результат, lease/fencing |
+| Сутність                          | Scope / ключова роль                                                                                                                 |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Bank                              | Глобальна публічна банківська ідентичність, без credentials                                                                          |
+| ConnectorDefinition               | Банк + API-продукт, capabilities, owner/account eligibility, підтримувані operation IDs                                              |
+| PlatformRegistration              | Connector + environment, bank approval/system ID, захищене посилання на platform key                                                 |
+| MerchantConnection                | Tenant + business entity + connector + environment, consent/token state і credential reference                                       |
+| RecipientAccount                  | Банк-підтверджена ідентичність рахунку і власника, явний дозвіл використання                                                         |
+| ContractVersion                   | Джерело/дата/hash документа, схеми, статуси, endpoint definitions, невирішені питання                                                |
+| BankFlowBinding                   | Посилання на business-flow/process/version та технічні resources, не копія графа                                                     |
+| IntegrationRelease                | Незмінний узгоджений комплект config + contract + adapter artifact + process versions + test evidence                                |
+| Activation                        | Активний release на environment/контрольовану групу підключень, actor, revision, час                                                 |
+| DeploymentObservation             | Реальні спостереження Worker/version/routes/bindings із provenance і freshness                                                       |
+| Evidence / SyncCheckpoint         | Ідентичність банківської операції, історія змін, прогрес синхронізації; приватні серверні дані                                       |
+| MerchantWebhookEndpoint           | Tenant + environment, перевірений HTTPS URL, підписки, account/entity scope, secret reference, revision і lifecycle                  |
+| MerchantEvent / Outbox            | Незмінна версійована подія, зв'язок із підтвердженням та замовленням, tenant/environment; створюється атомарно з фінансовим рішенням |
+| WebhookDelivery / DeliveryAttempt | Окрема доставка на endpoint, стабільний event ID, версія призначення, спроби, наступний retry, результат, lease/fencing              |
 
 Тип власника `individual / sole_proprietor / legal_entity` — характеристика бізнес-сутності та eligibility, не обов'язково окремий адаптер. Один API для ФОП і ТОВ — один adapter; інший personal API того самого банку — інший connector.
 
@@ -132,12 +132,12 @@ Credentials ротуються незалежно від бізнес-версі
 
 ## 6. Межі швидких змін
 
-| Зміна | Дозволений шлях |
-| --- | --- |
-| Інтервал polling, timeout/retry у межах capability, схвалений template, layout | Versioned config, validation/tests, review, activation |
-| Зміна поля опису або структури response | Declarative typed mapping лише в обмеженій схемі, fixtures і review; невідомі поля/структури fail closed |
-| Новий host, auth/signature, одиниці суми, трактування фінансового статусу, transaction identity, payment authority | Перевірений код/контракт адаптера, security review, tests, окремий deploy |
-| Worker/binding/route або webhook registration | Окремий infrastructure/bank change plan, permissions, dry-run де доступний, explicit approval |
+| Зміна                                                                                                              | Дозволений шлях                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Інтервал polling, timeout/retry у межах capability, схвалений template, layout                                     | Versioned config, validation/tests, review, activation                                                   |
+| Зміна поля опису або структури response                                                                            | Declarative typed mapping лише в обмеженій схемі, fixtures і review; невідомі поля/структури fail closed |
+| Новий host, auth/signature, одиниці суми, трактування фінансового статусу, transaction identity, payment authority | Перевірений код/контракт адаптера, security review, tests, окремий deploy                                |
+| Worker/binding/route або webhook registration                                                                      | Окремий infrastructure/bank change plan, permissions, dry-run де доступний, explicit approval            |
 
 Не дозволяти довільний JavaScript, довільний authenticated fetch, вибір довільного секрету, редирект credentials на новий host або правило «будь-який status → paid» у графі. Загальний Corex HTTP action не замінює bank adapter. Egress allowlist, redirect handling і перевірка призначення credentials виконуються сервером.
 
@@ -198,15 +198,15 @@ Credentials ротуються незалежно від бізнес-версі
 
 ## 9. Етапи реалізації та критерії приймання
 
-| Етап | Результат | Критерій готовності |
-| --- | --- | --- |
-| P0. Контракти та межі | Узгоджені сутності, RBAC, environment isolation, bank capability matrix, unresolved bank questions | Відомо, які поля можна конфігурувати, що є доказом і хто має право активувати |
-| P1. Read-only Bank Flow | У Conf параметри й посилання; у Corex bank/process/resource associations, diagram та inspector | Для кожного пілотного банку видно шлях даних, Workers/endpoints та provenance; відкриття сторінки не виконує mutation/bank calls |
-| P2. Версійні налаштування | Draft/CAS, shared draft tester, diff, immutable releases, audit, explicit activation | Тестер перевіряє саме draft; stale save відхилений; rollback перевірений; browser не має секретів чи широких прав |
-| P3. Типізовані bank operations | Server adapter contract, protected credential resolution, compiler/runtime integration, account scheduler/inbox | Локальні fixture/negative/concurrency tests; generic HTTP не може отримати bank secret; без remote rollout |
-| P4. Перший банк end-to-end | Приват за наявності доступу; Dashboard onboarding, підтвердження та merchant delivery за розділами 12–15 | Санкціонований test/preprod шлях Dashboard → доказ → paid → доставка касі; дублікат не видає товар повторно, недоступність каси не відкочує paid |
-| P5. Керовані оновлення | Contract diff, impact analysis, shadow, controlled activation, rollback, run/trace overlay | Зміна банку відтворена у тесті; видно зачеплені ресурси; активні спроби не переприв'язані; observation/drift правдиві |
-| P6. Другий адаптер | А-Банк/mono за готовністю, той самий контракт подій мерчанту, процеси лише в Corex | Новий банк доданий без дублювання confirmation/delivery engine; ізоляція й release suite проходять повторно |
+| Етап                           | Результат                                                                                                       | Критерій готовності                                                                                                                                                                        |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P0. Контракти та межі          | Узгоджені сутності, RBAC, environment isolation, bank capability matrix, unresolved bank questions              | Відомо, які поля можна конфігурувати, що є доказом і хто має право активувати                                                                                                              |
+| P1. Read-only Bank Flow        | У Conf параметри й посилання; у Corex bank/process/resource associations, diagram та inspector                  | Для кожного пілотного банку видно шлях даних, Workers/endpoints та provenance; відкриття сторінки не виконує mutation/bank calls                                                           |
+| P2. Версійні налаштування      | Draft/CAS, shared draft tester, diff, immutable releases, audit, explicit activation                            | Тестер перевіряє саме draft; stale save відхилений; rollback перевірений; browser не має секретів чи широких прав                                                                          |
+| P3. Типізовані bank operations | Server adapter contract, protected credential resolution, compiler/runtime integration, account scheduler/inbox | Локальні fixture/negative/concurrency tests; generic HTTP не може отримати bank secret; без remote rollout                                                                                 |
+| P4. Перший банк end-to-end     | Приват за наявності доступу; Dashboard onboarding, підтвердження та merchant delivery за розділами 12–16        | Санкціонований test/preprod шлях Dashboard → доказ → paid → доставка касі; API не повертає успіх без durable commit; дублікат не видає товар повторно, недоступність каси не відкочує paid |
+| P5. Керовані оновлення         | Contract diff, impact analysis, shadow, controlled activation, rollback, run/trace overlay                      | Зміна банку відтворена у тесті; видно зачеплені ресурси; активні спроби не переприв'язані; observation/drift правдиві                                                                      |
+| P6. Другий адаптер             | А-Банк/mono за готовністю, той самий контракт подій мерчанту, процеси лише в Corex                              | Новий банк доданий без дублювання confirmation/delivery engine; ізоляція й release suite проходять повторно                                                                                |
 
 P1 не залежить від реальних credentials і дає перший видимий результат. P2–P4 не обходять P0 security gate. Не оцінювати строки банківського погодження як гарантований engineering термін.
 
@@ -280,16 +280,16 @@ Timeline: спроба створена → банк повідомив/випи
 
 ### 13.2. Мінімальний envelope v1
 
-| Поле | Призначення |
-| --- | --- |
-| `id`, `type`, `schema_version` | Стабільний event ID, тип події, версія схеми |
-| `created_at`, `environment` | Час створення події та явне test/live середовище |
-| `merchant_id`, `business_entity_id` | Авторизований власник; не довіряти цим полям без перевірки підпису й локального scope |
-| `data.invoice_id`, `data.payment_attempt_id`, `data.confirmation_id` | Стабільний зв'язок із рахунком, спробою та доказом рішення |
-| `data.merchant_reference` | Зовнішнє замовлення/сесія каси, зафіксовані сервером під час створення рахунку |
-| `data.amount_minor`, `data.currency`, `data.status` | Точна сума у мінімальних одиницях, валюта, підтверджений стан |
-| `data.confirmed_at`, `data.confirmation_source` | Час рішення, bank/manual походження, якщо ручний режим дозволений окремою політикою |
-| `data.resource_version` | Монотонна версія платіжного ресурсу для виявлення застарілих подій |
+| Поле                                                                 | Призначення                                                                           |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `id`, `type`, `schema_version`                                       | Стабільний event ID, тип події, версія схеми                                          |
+| `created_at`, `environment`                                          | Час створення події та явне test/live середовище                                      |
+| `merchant_id`, `business_entity_id`                                  | Авторизований власник; не довіряти цим полям без перевірки підпису й локального scope |
+| `data.invoice_id`, `data.payment_attempt_id`, `data.confirmation_id` | Стабільний зв'язок із рахунком, спробою та доказом рішення                            |
+| `data.merchant_reference`                                            | Зовнішнє замовлення/сесія каси, зафіксовані сервером під час створення рахунку        |
+| `data.amount_minor`, `data.currency`, `data.status`                  | Точна сума у мінімальних одиницях, валюта, підтверджений стан                         |
+| `data.confirmed_at`, `data.confirmation_source`                      | Час рішення, bank/manual походження, якщо ручний режим дозволений окремою політикою   |
+| `data.resource_version`                                              | Монотонна версія платіжного ресурсу для виявлення застарілих подій                    |
 
 Назви є пропозицією контракту; перед реалізацією узгодити `invoice_id` з фактичною моделлю order/checkout, не створювати дубль фінансового ресурсу. Повні реквізити платника не включати за замовчуванням. Банківський reference не підміняє `merchant_reference`.
 
@@ -331,22 +331,109 @@ HTTP-запит мерчанту не виконувати всередині ф
 
 Ці кроки деталізують P0–P6, а не замінюють їх security/deployment gates.
 
-| Крок | Інтерфейс / backend результат | Gate |
-| --- | --- | --- |
-| 1. Узгодити контракт | Межі Conf/Corex/Dashboard, payment event v1, зовнішній reference каси, roles, retention, error states | Визначені власник рахунку, джерело paid, правила fulfillment та підпис webhook |
-| 2. Локальний UX | Conf з параметрами/посиланнями; Corex карта; Dashboard майстри й подвійний статус рахунку на явно synthetic даних | Немає секретів, банківських викликів і прихованих mutations |
-| 3. Захищене підключення | Consent/token backend, tenant-scoped account binding, credential storage/rotation, read-only adapter | Ownership/RBAC/revocation та test/live isolation пройдені; schema migrations окремо погоджені |
-| 4. Локальна фінансова вертикаль | Evidence → matching → confirmation/event/outbox; status API | Crash/concurrency/deduplication tests, жодного paid за неперевіреним callback |
-| 5. Локальна доставка | Endpoint settings, signer, retries, журнал, replay, mock каса з durable inbox | Підпис, SSRF, дублікат, downtime, replay/rotation тести; товар не видається за `webhook.test` |
-| 6. Санкціонований bank shadow | Один мерчант/рахунок; порівняння доказів з очікуваннями, без автоматичного paid та live fulfillment | Задокументовані статуси, latency, призначення, completeness; немає зайвого подвоєння запитів |
-| 7. Контрольований live пілот | Окреме погодження deployment і активації; один мерчант, рахунок, endpoint; санкціонована мала реальна оплата | Dashboard/Pay paid та каса отримує правильну подію; повтор не виконує дію вдруге; відключена каса не блокує paid |
-| 8. Розширення | Спостереження, поступове додавання рахунків/банків, документація мерчанта й приклади перевірки підпису | Пройдені операційні критерії, відомі обмеження та готовий rollback/runbook |
+| Крок                            | Інтерфейс / backend результат                                                                                     | Gate                                                                                                             |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 1. Узгодити контракт            | Межі Conf/Corex/Dashboard, payment event v1, зовнішній reference каси, roles, retention, error states             | Визначені власник рахунку, джерело paid, правила fulfillment та підпис webhook                                   |
+| 2. Локальний UX                 | Conf з параметрами/посиланнями; Corex карта; Dashboard майстри й подвійний статус рахунку на явно synthetic даних | Немає секретів, банківських викликів і прихованих mutations                                                      |
+| 3. Захищене підключення         | Consent/token backend, tenant-scoped account binding, credential storage/rotation, read-only adapter              | Ownership/RBAC/revocation та test/live isolation пройдені; schema migrations окремо погоджені                    |
+| 4. Локальна фінансова вертикаль | Evidence → matching → confirmation/event/outbox; status API                                                       | Crash/concurrency/deduplication tests, жодного paid за неперевіреним callback                                    |
+| 5. Локальна доставка            | Endpoint settings, signer, retries, журнал, replay, mock каса з durable inbox                                     | Підпис, SSRF, дублікат, downtime, replay/rotation тести; товар не видається за `webhook.test`                    |
+| 6. Санкціонований bank shadow   | Один мерчант/рахунок; порівняння доказів з очікуваннями, без автоматичного paid та live fulfillment               | Задокументовані статуси, latency, призначення, completeness; немає зайвого подвоєння запитів                     |
+| 7. Контрольований live пілот    | Окреме погодження deployment і активації; один мерчант, рахунок, endpoint; санкціонована мала реальна оплата      | Dashboard/Pay paid та каса отримує правильну подію; повтор не виконує дію вдруге; відключена каса не блокує paid |
+| 8. Розширення                   | Спостереження, поступове додавання рахунків/банків, документація мерчанта й приклади перевірки підпису            | Пройдені операційні критерії, відомі обмеження та готовий rollback/runbook                                       |
 
 Якщо банк не має підтвердженого sandbox, local simulator не називати sandbox банку; реальний read-only shadow і будь-який платіж потребують явного дозволу. Розділити перемикачі `ingestion`, `automatic_confirmation`, `merchant_delivery`: зупинка доставки не зупиняє підтвердження; зупинка автоматичного підтвердження зберігає докази для review. За відкликання consent припиняється доступ до банку незалежно від перемикачів.
 
-## 15. Додаткові критерії приймання та операційна готовність
+## 15. Dashboard authority, onboarding і командна модель
 
-- Dashboard: повторне відкриття майстра, відхилена/відкликана згода, невірний токен, чужа бізнес-сутність, декілька рахунків, зміна реквізитів під час активної оплати; секрет не видно після збереження.
+Цей розділ фіксує погоджені інваріанти для виправлення Dashboard. Він не є готовою SQL/API-реалізацією і не дозволяє віддалену міграцію чи deploy без окремого gate.
+
+### 15.1. Явне ручне підтвердження та audit actor
+
+Ручна оплата — окреме фінансове рішення, а не довільна зміна поля `status` і не банківський доказ. Заборонений універсальний контракт на кшталт `PATCH { "status": "paid" }`. Пропонована команда:
+
+```http
+POST /api/v1/orders/{order_id}/manual-confirmations
+Idempotency-Key: <stable-command-id>
+```
+
+```json
+{
+	"decision_type": "manual_cash_confirmation",
+	"reason_code": "cash_received_at_pos",
+	"comment": "Оплату прийнято касиром",
+	"expected_resource_version": 4
+}
+```
+
+`decision_type` має обмежений серверний enum. Початковий тип для каси — `manual_cash_confirmation`; інші способи не додавати через довільний рядок. Сервер сам визначає merchant, terminal, actor і дозволений перехід. У межах однієї транзакції створюються confirmation, незмінний audit event, нова версія замовлення, merchant event і outbox. Подія зберігає `confirmation_source: "manual_cash"`; її не можна називати `bank_confirmed` або зв'язувати з вигаданим bank evidence.
+
+Audit actor фіксується сервером із перевіреної сесії або machine identity: `actor_type`, `actor_id`, роль, merchant і terminal scope на момент рішення, action/decision type, reason, timestamp, request/correlation ID, попередня й нова версії ресурсу. IP/session metadata зберігати лише за визначеною security/retention політикою. Клієнт не передає довірені `actor_id`, роль чи tenant. Коментар не замінює структурований reason code; чутливі дані в ньому обмежити й очищати.
+
+Команда перевіряє допустимий стан, суму/валюту, terminal scope, `expected_resource_version` та idempotency key. Повтор тієї самої команди повертає первинний результат; інший payload із тим самим ключем — `409`. Конфлікт із уже отриманим банківським доказом не перезаписує історію й переходить у визначений exception/review flow.
+
+### 15.2. Fail-closed API і підтверджений commit
+
+HTTP `2xx` означає, що authoritative БД підтвердила durable mutation і повернула збережений ресурс або результат ідемпотентної попередньої операції. Заборонено:
+
+- повертати synthetic success після помилки/нульового affected-row count;
+- проковтувати помилку persistence або підміняти результат локальним об'єктом;
+- оновлювати authoritative cache до commit;
+- вважати відправлення запиту до БД доказом його виконання;
+- робити production fallback на anonymous/publishable credentials чи локальне сховище.
+
+Мутація виконується однією server-side transaction/RPC. Worker перевіряє JWT, membership, role/scope, команду та idempotency key; успіх повертає лише з рядком/версією, отриманими від транзакції. Після commit cache можна інвалідовувати або оновлювати з committed response. Якщо commit міг відбутися, але відповідь загубилась, повтор із тим самим ключем відновлює записаний результат.
+
+Мінімальна семантика помилок: `401` — немає валідної сесії; `403` — немає ролі/scope; `404` — ресурс відсутній у доступному tenant; `409` — конфлікт версії, стану або idempotency; `422` — недопустима команда; `503` — persistence недоступний або commit неможливо підтвердити. `200/201` з порожнім або неперевіреним persistence result заборонений.
+
+### 15.3. Google self-onboarding без послаблення контролю
+
+Мерчант може без ручного адміністративного допуску увійти через Google і додати власні реквізити:
+
+1. Supabase Auth виконує Google OAuth; backend перевіряє JWT, issuer/audience і підтверджений identity стан.
+2. Автентифікований користувач викликає ідемпотентну onboarding RPC, яка створює merchant лише з ним як початковим `owner` або повертає вже створений результат.
+3. Сервер призначає `owner_id`, membership, tenant і роль; browser не може вибрати їх у payload.
+4. Власник одразу додає бізнес-реквізити. Сервер перевіряє формат, унікальність, доступність і ownership; банківське підтвердження реквізитів залишається окремим кроком.
+5. Створення профілю не активує автоматично live bank confirmation, production webhook чи інші ризикові можливості: для них діють окремі readiness gates.
+
+Відмова зовнішнього API або БД не повинна створювати локальний «успішний» merchant. Повтор OAuth callback/onboarding безпечний і не створює дубль tenant. Для recovery передбачити явний стан незавершеного профілю, а не anonymous fallback.
+
+### 15.4. Shareable invitation без обов'язкової email-прив'язки
+
+Запрошення дозволено надсилати через соціальні мережі, тому email може не бути умовою прийняття. У такому режимі token є single-use capability: високої ентропії, у БД зберігається лише hash, має expiry, revocation, rate limit і атомарне одноразове погашення. Запрошення фіксує merchant, роль, terminal scope та creator; не дозволяє одержувачу розширити ці права.
+
+Перед прийняттям користувач входить через підтримуваний identity provider, бачить merchant, роль і касу та явно підтверджує приєднання. Аудит містить створення, відкликання, успішне прийняття і відхилені/прострочені спроби без збереження raw token. Звичайне shareable invitation не може передати роль `owner`: передача власності — окрема повторно автентифікована команда з аудитом і захистом від втрати останнього власника.
+
+### 15.5. Єдина серверна модель RBAC
+
+Оптимальна модель — один серверний authorization path для Worker, RPC і RLS. Активний merchant context визначається з ownership та membership; роль і terminal scope ніколи не беруться з довіреного client payload.
+
+| Роль / identity | Дозволений scope                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `owner`         | Реквізити, банки, команда, інтеграції, фінансові правила, усі власні каси; передача власності лише окремою командою |
+| `manager`       | Замовлення, звіти, каси й операційні налаштування; без передачі власності та доступу до bank/webhook secret values  |
+| `cashier`       | Замовлення і дозволене manual cash confirmation лише для призначених terminal IDs                                   |
+| `viewer`        | Лише читання дозволених merchant-ресурсів                                                                           |
+| `kso_agent`     | Окрема machine identity конкретної каси з вузькими командами, ротацією credential і без наслідування людських ролей |
+
+Навігація приховує недоступні дії для зручності, але не є security boundary. Кожна mutation повторно перевіряє merchant membership, роль, terminal/entity/environment scope і актуальність membership. Видалення учасника або зміна scope набуває сили серверно незалежно від старого UI/session cache. `owner` і `manager` можуть виконувати дозволене ручне підтвердження у своєму merchant scope, `cashier` — лише у призначеній касі, `viewer` — ніколи; machine flow `kso_agent` має власний контракт.
+
+### 15.6. Єдиний шлях створення рахунку
+
+Рекомендований основний варіант — Worker-only idempotent command: Dashboard передає бізнес-поля й `Idempotency-Key`, Worker перевіряє JWT/RBAC та викликає одну транзакційну RPC. Вона атомарно створює canonical invoice/order, payment attempt і потрібні audit/outbox записи та повертає committed версію.
+
+Допустимий перехідний fallback — browser викликає **ту саму** security-definer RPC з тим самим idempotency contract і серверними `auth.uid()`/membership checks. Це не окремий алгоритм і не raw table insert. Fallback має бути явно контрольованим та спостережуваним; недоступність Worker не дозволяє послабити authorization чи вигадати успіх.
+
+Для справді offline POS можливий третій, складніший варіант: локальна черга підписаних/автентифікованих команд зі стабільними idempotency keys і подальшою серверною синхронізацією. До MVP його не включати без підтвердженої offline-вимоги та окремого conflict/recovery дизайну.
+
+Заборонений стан — дві незалежні write-реалізації, де Worker і browser raw insert можуть створити різні ресурси або різну авторизацію. Після переходу на Worker-only прямий browser write видалити; до того обидва маршрути повинні сходитися в одну RPC і одну транзакційну семантику.
+
+## 16. Додаткові критерії приймання та операційна готовність
+
+- Dashboard: Google sign-in і повторний onboarding не створюють дубль merchant; власник одразу додає власні реквізити, але не може призначити собі чужий tenant/роль. Повторне відкриття майстра, відхилена/відкликана згода, невірний токен, чужа бізнес-сутність, декілька рахунків, зміна реквізитів під час активної оплати; секрет не видно після збереження.
+- API integrity: DB error, zero affected rows, timeout і невизначений commit не повертають synthetic `2xx`; повтор із тим самим idempotency key відновлює єдиний результат; cache не випереджає commit.
+- Manual confirmation: generic paid mutation відхилена; reason/actor/role/terminal/version фіксуються сервером; cashier не підтверджує чуже terminal/order; повтор не створює другого confirmation/event; bank і manual provenance не змішуються.
+- Team/RBAC: shareable invitation одноразове, expiring/revocable і приймається лише після login та явного підтвердження; replay і role/scope escalation відхиляються; invitation не передає ownership. Worker, RPC і RLS дають однаковий результат для owner/manager/cashier/viewer/KSO.
 - Події: crash між confirmation/outbox і після send до acknowledgment; дубль webhook+polling; повторний fan-out; event не губиться і не створює друге фінансове рішення.
 - Доставка: tampered raw body, прострочений підпис, test/live mismatch, ключі під час ротації, DNS rebinding/redirect/private IP, rate limit, timeout, 410, endpoint URL change із backlog, DLQ/replay, cross-tenant спроби.
 - Каса: однаковий event двічі, два різні events для вже виконаного замовлення, закрита сесія, неправильні сума/валюта/reference, події не за порядком, crash під час видачі. Зберігати і event dedupe, і бізнес-ідемпотентність fulfillment.

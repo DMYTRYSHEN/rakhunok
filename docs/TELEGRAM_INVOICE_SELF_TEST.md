@@ -1,3 +1,21 @@
+# Test-domain private Worker rollout — 2026-09-14
+
+The backend is now deployed separately as `letsrealtalk-telegram`, version
+`39648953-3f19-4e2b-93d8-d98e42adee22`. Only `letsrealtalk-dashboard` connects to it
+through the `TELEGRAM` Service Binding (Dashboard version
+`97ce07cd-3121-402e-8047-2b4bc6eea22c`). This supersedes historical local-only notes below.
+
+- Only the exact preview/send invoice endpoints on `https://letsrealtalk.com` are forwarded.
+- No public Worker routes, workers.dev URL, preview URL, cron, KV, service-role key or payment writes.
+- Five encrypted secrets were copied from the approved local self-test configuration without logging values.
+- The same configured operator and personal test chat remain the only supported recipient context.
+- Missing binding fails closed; transport failures never fall back or retry, and send failures remain delivery-uncertain.
+- 279 relevant automated tests passed; existing Dashboard artifacts were reused unchanged.
+- Live unauthenticated preview and send both return JSON `401 unauthorized` with `no-store`, replacing the old empty `405`.
+- The authenticated real-invoice preview still requires an operator login; the shared verification browser was signed out.
+- No real Telegram message was sent during this rollout. Buyer delivery and durable deduplication remain out of scope.
+- All six production Worker versions and shared `rahunok` are unchanged. All 17 production routes are byte-equivalent as parsed objects; test route mappings are unchanged.
+
 # Telegram invoice self-test — local implementation
 
 ## Local activation update — 2026-09-14

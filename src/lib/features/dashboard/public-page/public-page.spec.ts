@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	PUBLIC_PAGE_STORAGE_KEY,
+	defaultPublicPageConfig,
 	loadPublicPageConfig,
 	normalizePublicSlug,
 	validatePublicSlug
@@ -29,6 +30,7 @@ describe('public page configuration', () => {
 		vi.stubGlobal('localStorage', { getItem });
 
 		expect(loadPublicPageConfig()).toEqual({
+			...defaultPublicPageConfig,
 			slug: 'my-shop',
 			displayName: 'My shop',
 			description: 'Послуги'

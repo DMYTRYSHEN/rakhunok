@@ -46,9 +46,9 @@
 				>
 					<div class="min-w-0">
 						<div class="flex items-center gap-2">
-							<p class="truncate text-sm font-bold text-zinc-950">{invoice.title}</p>
+							<p class="truncate text-sm font-bold text-zinc-950">{invoice.reference}</p>
 							<span class="hidden text-[0.6875rem] font-semibold text-zinc-400 sm:inline"
-								>{invoice.reference}</span
+								>{invoice.title}</span
 							>
 						</div>
 						<p class="mt-1 text-xs text-zinc-500">{formatInvoiceDate(invoice.createdAt)}</p>

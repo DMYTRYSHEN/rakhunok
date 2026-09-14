@@ -4,6 +4,7 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
+		"test:telegram-auth:local": "node --experimental-strip-types --test src/telegram-auth-local.test.mjs",
 		"build": "npm --prefix .. run build",
 		"check": "wrangler deploy --dry-run --env=\"\" --outdir .wrangler-dist",
 		"check:production": "node ../scripts/assert-shared-build.mjs && wrangler deploy --dry-run --env production --outdir .wrangler-dist-production",
@@ -41,5 +42,8 @@
 		"@electric-sql/pglite": "0.5.8",
 		"pg": "8.23.0",
 		"wrangler": "^4.129.0"
+	},
+	"dependencies": {
+		"@tma.js/init-data-node": "2.0.8"
 	}
 }

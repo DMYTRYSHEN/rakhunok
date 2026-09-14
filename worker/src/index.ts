@@ -43,6 +43,39 @@ function jsonResponse(data: unknown, status = 200, extraHeaders: HeadersInit = {
 	});
 }
 
+function bearerHeader(request: Request): string | null {
+	const header = request.headers.get('Authorization');
+	return header && /^Bearer\s+\S+$/i.test(header) ? header : null;
+}
+
+function persistenceError(status = 503): Response {
+	const errors: Record<number, string> = {
+		401: 'Unauthorized',
+		403: 'Forbidden',
+		409: 'Conflict',
+		422: 'Unprocessable entity'
+	};
+	return jsonResponse({ error: errors[status] || 'Service unavailable' }, errors[status] ? status : 503);
+}
+
+async function persistedRow(
+	response: Response,
+	emptyError?: string
+): Promise<Record<string, unknown> | Response> {
+	if (!response.ok) return persistenceError(response.status);
+	const rows: unknown = await response.json();
+	if (Array.isArray(rows) && rows.length === 0 && emptyError) {
+		return jsonResponse({ error: emptyError }, 404);
+	}
+	if (!Array.isArray(rows) || rows.length !== 1) return persistenceError();
+	const row = rows[0];
+	if (
+		!row || typeof row !== 'object' || Array.isArray(row) ||
+		typeof row.id !== 'string' || !row.id.trim()
+	) return persistenceError();
+	return row;
+}
+
 export const DEFAULT_BANKS = [
 	{
 		id: 'monobank',
@@ -484,11 +517,12 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 		}
 
 		if (request.method === 'PUT') {
+			const authHeader = bearerHeader(request);
+			if (!authHeader) return persistenceError(401);
 			try {
 				const body = (await request.json()) as Record<string, unknown>;
 				const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
 				const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
-				const authHeader = request.headers.get('Authorization') || `Bearer ${supabaseAnonKey}`;
 				const merchantPayload = {
 					business_name: String(body.business_name || body.name || 'ФОП ДМИТРИШЕН').trim(),
 					business_type: String(body.business_type || 'fop'),
@@ -500,7 +534,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 					updated_at: new Date().toISOString()
 				};
 				try {
-					await fetch(`${supabaseUrl}/rest/v1/merchants`, {
+					const res = await fetch(`${supabaseUrl}/rest/v1/merchants`, {
 						method: 'POST',
 						headers: {
 							apikey: supabaseAnonKey,
@@ -510,8 +544,12 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 						},
 						body: JSON.stringify(merchantPayload)
 					});
-				} catch {}
-				return jsonResponse({ success: true, merchant: merchantPayload });
+					const merchant = await persistedRow(res);
+					if (merchant instanceof Response) return merchant;
+					return jsonResponse({ success: true, merchant });
+				} catch {
+					return persistenceError();
+				}
 			} catch {
 				return jsonResponse({ error: 'Invalid JSON payload' }, 400);
 			}
@@ -520,11 +558,12 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 
 	if (url.pathname === '/api/v1/merchant/onboarding') {
 		if (request.method === 'POST') {
+			const authHeader = bearerHeader(request);
+			if (!authHeader) return persistenceError(401);
 			try {
 				const body = (await request.json()) as Record<string, unknown>;
 				const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
 				const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
-				const authHeader = request.headers.get('Authorization') || `Bearer ${supabaseAnonKey}`;
 				const merchantPayload = {
 					business_name: String(body.business_name || body.name || 'ФОП ДМИТРИШЕН').trim(),
 					business_type: String(body.business_type || 'fop'),
@@ -536,7 +575,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 					updated_at: new Date().toISOString()
 				};
 				try {
-					await fetch(`${supabaseUrl}/rest/v1/merchants`, {
+					const res = await fetch(`${supabaseUrl}/rest/v1/merchants`, {
 						method: 'POST',
 						headers: {
 							apikey: supabaseAnonKey,
@@ -546,8 +585,12 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 						},
 						body: JSON.stringify(merchantPayload)
 					});
-				} catch {}
-				return jsonResponse({ success: true, merchant: merchantPayload });
+					const merchant = await persistedRow(res);
+					if (merchant instanceof Response) return merchant;
+					return jsonResponse({ success: true, merchant });
+				} catch {
+					return persistenceError();
+				}
 			} catch {
 				return jsonResponse({ error: 'Invalid JSON payload' }, 400);
 			}
@@ -1291,10 +1334,11 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 	}
 
 	if (url.pathname === '/api/v1/orders' || url.pathname.startsWith('/api/v1/orders')) {
-		if (request.method === 'POST') {
+		if (request.method === 'POST' && url.pathname === '/api/v1/orders') {
+			const authHeader = bearerHeader(request);
+			if (!authHeader) return persistenceError(401);
 			try {
 				const body = (await request.json()) as Record<string, unknown>;
-				const authHeader = request.headers.get('Authorization') || '';
 				const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
 				const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
 
@@ -1311,12 +1355,14 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 								}
 							}
 						);
-						if (merchantRes.ok) {
-							const merchants = (await merchantRes.json()) as Array<{ id: string }>;
-							merchantId = merchants[0]?.id;
-						}
-					} catch {}
+						const merchant = await persistedRow(merchantRes, 'Merchant not found');
+						if (merchant instanceof Response) return merchant;
+						merchantId = merchant.id as string;
+					} catch {
+						return persistenceError();
+					}
 				}
+				if (!merchantId) return jsonResponse({ error: 'Merchant not found' }, 404);
 
 				const baseAmount = Number(body.amount || body.base_amount || 0);
 				const deliveryFee = Number(body.delivery_fee || 0);
@@ -1359,54 +1405,37 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 							body: JSON.stringify(insertPayload)
 						});
 
-						if (insertRes.ok) {
-							const [insertedOrder] = (await insertRes.json()) as Array<{ id: string }>;
-							if (insertedOrder?.id) {
-								return Response.json(
-									{
-										success: true,
-										order: {
-											...insertedOrder,
-											share_url: `${url.origin}/pay/${insertedOrder.id}`
-										}
-									},
-									{
-										headers: {
-											'Content-Type': 'application/json',
-											'Access-Control-Allow-Origin': '*'
-										}
-									}
-								);
+						const insertedOrder = await persistedRow(insertRes);
+						if (insertedOrder instanceof Response) return insertedOrder;
+						return Response.json(
+							{
+								success: true,
+								order: {
+									...insertedOrder,
+									share_url: `${url.origin}/pay/${insertedOrder.id}`
+								}
+							},
+							{
+								headers: {
+									'Content-Type': 'application/json',
+									'Access-Control-Allow-Origin': '*'
+								}
 							}
-						}
-					} catch {}
+						);
+					} catch {
+						return persistenceError();
+					}
 				}
 
-				const shareUrl = `${url.origin}/pay/${newOrderId}`;
-				return Response.json(
-					{
-						success: true,
-						order: {
-							id: newOrderId,
-							...body,
-							share_url: shareUrl,
-							status: type === 'table' ? 'preparing' : 'pending',
-							created_at: new Date().toISOString()
-						}
-					},
-					{
-						headers: {
-							'Content-Type': 'application/json',
-							'Access-Control-Allow-Origin': '*'
-						}
-					}
-				);
+				return persistenceError();
 			} catch {
 				return Response.json({ error: 'Invalid JSON payload' }, { status: 400 });
 			}
 		}
 
 		if (request.method === 'PATCH') {
+			const authHeader = bearerHeader(request);
+			if (!authHeader) return persistenceError(401);
 			try {
 				const orderIdMatch = url.pathname.match(/^\/api\/v1\/orders\/([a-zA-Z0-9_-]+)$/);
 				const orderId = orderIdMatch ? orderIdMatch[1] : null;
@@ -1430,15 +1459,8 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 					newUpdates.total_amount = amount;
 				}
 
-				const cached = orderCache.get(orderId);
-				if (cached) {
-					cached.data = { ...cached.data, ...newUpdates };
-					orderCache.set(orderId, cached);
-				}
-
 				const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
 				const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
-				const authHeader = request.headers.get('Authorization') || `Bearer ${supabaseAnonKey}`;
 
 				try {
 					const patchRes = await fetch(`${supabaseUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}`, {
@@ -1451,15 +1473,16 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 						},
 						body: JSON.stringify(newUpdates)
 					});
-					if (patchRes.ok) {
-						const [updated] = (await patchRes.json()) as Array<Record<string, unknown>>;
-						if (updated) {
-							return jsonResponse({ success: true, order: updated });
-						}
+					const updated = await persistedRow(patchRes, 'Order not found');
+					if (updated instanceof Response) return updated;
+					if (updated.id !== orderId) return persistenceError();
+					for (const [key, cached] of orderCache) {
+						if (key === orderId || cached.data.id === orderId) orderCache.delete(key);
 					}
-				} catch {}
-
-				return jsonResponse({ success: true, order: { id: orderId, ...newUpdates } });
+					return jsonResponse({ success: true, order: updated });
+				} catch {
+					return persistenceError();
+				}
 			} catch {
 				return jsonResponse({ error: 'Invalid JSON payload' }, 400);
 			}

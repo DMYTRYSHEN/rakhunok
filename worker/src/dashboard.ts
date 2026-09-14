@@ -3,6 +3,7 @@ import { simulateSandboxPayment } from './sandbox.ts';
 interface Env {
 	ASSETS: Fetcher;
 	API?: Fetcher;
+	TELEGRAM?: Fetcher;
 }
 
 function isDashboardPath(pathname: string): boolean {
@@ -47,6 +48,20 @@ export async function routeDashboardRequest(request: Request, env: Env): Promise
 	}
 
 	if (isDashboardApiPath(url.pathname)) {
+		if (url.origin === 'https://letsrealtalk.com' &&
+			['/dashboard/api/v1/telegram/invoices/preview', '/dashboard/api/v1/telegram/invoices/send'].includes(url.pathname)) {
+			if (!env.TELEGRAM) {
+				return json({ ok: false, error: 'self_test_unavailable' }, { status: 503 });
+			}
+			url.pathname = url.pathname.slice('/dashboard'.length);
+			try {
+				return await env.TELEGRAM.fetch(new Request(url, request));
+			} catch {
+				// A dispatched send may have reached Telegram. Never retry or fall back.
+				return json({ ok: false, error: url.pathname.endsWith('/send')
+					? 'delivery_unknown' : 'verification_unavailable' }, { status: 503 });
+			}
+		}
 		if (!env.API) {
 			return Response.json({ error: 'Dashboard API is unavailable.' }, { status: 503 });
 		}

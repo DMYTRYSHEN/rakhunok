@@ -13,6 +13,15 @@ export { CorexProcessWorkflow } from './corex-workflow.ts';
 
 export default {
 	async fetch(request, env): Promise<Response> {
+		const url = new URL(request.url);
+		// The isolated build keeps this prefix on disk; do not strip it or serve the SPA.
+		// This entrypoint is shared with production, whose routing must remain unchanged.
+		if (
+			url.hostname === 'letsrealtalk.com' &&
+			(url.pathname === '/corex/_app' || url.pathname.startsWith('/corex/_app/'))
+		) {
+			return env.ASSETS.fetch(request);
+		}
 		const controlPlane = createSupabaseCorexControlPlane({
 			url: env.SUPABASE_URL,
 			publishableKey: env.SUPABASE_PUBLISHABLE_KEY,

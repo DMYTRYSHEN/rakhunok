@@ -99,15 +99,27 @@ export default defineConfig(({ mode }) => ({
 						outDir: '.svelte-kit-dashboard',
 						paths: { base: '', assets: '', relative: false }
 					}
-				: {}),
+				: mode === 'corex-isolated'
+					? {
+							appDir: 'corex/_app',
+							outDir: '.svelte-kit-corex',
+							paths: { base: '', assets: '', relative: false }
+						}
+					: {}),
 			compilerOptions: {
 				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 			adapter: adapter({
-				pages: mode === 'dashboard-isolated' ? 'build-dashboard' : 'build',
-				assets: mode === 'dashboard-isolated' ? 'build-dashboard' : 'build',
+				pages:
+					mode === 'corex-isolated'
+						? 'build-corex'
+						: mode === 'dashboard-isolated' ? 'build-dashboard' : 'build',
+				assets:
+					mode === 'corex-isolated'
+						? 'build-corex'
+						: mode === 'dashboard-isolated' ? 'build-dashboard' : 'build',
 				fallback: '200.html'
 			})
 		})

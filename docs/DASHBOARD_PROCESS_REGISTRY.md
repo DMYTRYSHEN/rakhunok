@@ -123,7 +123,7 @@ contract or behavior.
 
 ### DASH-AUTH-001 - Authentication And Session Lifecycle
 
-- **Status:** `LOCKED`
+- **Status:** `LOCKED` — local context candidate validated; runtime invariants unchanged.
 - **Reviewed:** 2026-09-04
 - **Owner:** Dashboard root and gateway auth boundary
 - **Files:**
@@ -190,6 +190,31 @@ contract or behavior.
 Separate approval is required before changing any locked invariant, including replacing Supabase
 Auth, persisting a custom session cache, changing merchant ownership resolution, handling token
 refresh as a full restore, or sharing auth state through a new socket/service.
+
+#### Approved Local Context Scope — 2026-09-13
+
+- User explicitly approved owner-or-active-membership context provided simple Google registration
+  and existing functionality are preserved. Only invariant 2 is reopened; no remote SQL or deploy.
+- Inspection found that current `ready` renders owner controls and resources still use owner-only
+  `user_id` boundaries. Therefore membership must NOT enter the existing ready shell yet.
+- Implement and test an isolated server context candidate, with no runtime imports or activation.
+  Preserve owner-first login and the existing no-owner onboarding path without new dependencies.
+- Validate active/suspended/deleted membership, actor versus owner identity, role/terminal scope,
+  multiple contexts and nonrecursive authenticated SQL access using synthetic local fixtures.
+- Activation requires coordinated role-aware UI, Worker/RPC/RLS enforcement and context selection;
+  a context lookup alone is not authorization for financial or administrative commands.
+- Local evidence: `supabase/candidates/dashboard-access-context.sql` (unapplied) and
+  `worker/src/dashboard-access-context.test.mjs`: 55 SQL cases plus parent, 56 Node tests passed;
+  existing gateway suite 31/31 passed, including Google credential exchange and onboarding.
+- No runtime imports, UI edits, auth lifecycle changes, remote reads/writes or deployments.
+  Candidate requires a trusted BYPASSRLS definer and verified JWT-to-`auth.uid()` boundary.
+- Activation blockers: current `ON DELETE SET NULL` loses manager/viewer assignment history;
+  owner-ID terminal mapping assumes existing one-merchant-per-owner boundary; candidate metadata
+  outages fail the whole lookup. Do not replace independent owner restore with this candidate
+  until these contracts and role-aware commands are validated. PGlite is not concurrency proof.
+- This completes the isolated candidate checkpoint, not member-ready access or secure onboarding
+  implementation. The user's local implementation approval is recorded; broader locked changes
+  and any remote rollout still require their own explicit scopes.
 
 ### DASH-INVOICE-ACTIONS-001 - Invoice Header Actions
 
