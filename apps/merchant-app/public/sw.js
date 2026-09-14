@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rahunok-app-shell-v2';
+const CACHE_NAME = 'rahunok-app-shell-v3';
 const APP_SHELL = ['/app/', '/app/manifest.webmanifest', '/app/icon.svg', '/app/icon-192.png', '/app/icon-512.png', '/app/icon-maskable-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -21,7 +21,8 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
 	const requestUrl = new URL(event.request.url);
 	if (event.request.method !== 'GET' || requestUrl.origin !== self.location.origin) return;
-	if (requestUrl.pathname.startsWith('/api/') || requestUrl.pathname.includes('/auth/')) return;
+	if (requestUrl.pathname.startsWith('/api/') || requestUrl.pathname.startsWith('/app/api/') || requestUrl.pathname.includes('/auth/')) return;
+	if (['code', 'error', 'error_code', 'error_description'].some((key) => requestUrl.searchParams.has(key))) return;
 
 	event.respondWith(
 		fetch(event.request)

@@ -5,6 +5,7 @@ type InstallPrompt = Event & {
 
 let installPrompt: InstallPrompt | null = null;
 let waitingWorker: ServiceWorker | null = null;
+let updateRequested = false;
 
 function emit(name: string, detail?: unknown) {
 	window.dispatchEvent(new CustomEvent(name, { detail }));
@@ -43,7 +44,8 @@ export function initializePwa() {
 
 	let reloading = false;
 	navigator.serviceWorker.addEventListener('controllerchange', () => {
-		if (reloading) return;
+		// First install or activation from another tab must not interrupt OAuth.
+		if (!updateRequested || reloading) return;
 		reloading = true;
 		window.location.reload();
 	});
@@ -58,7 +60,14 @@ export async function promptInstall(): Promise<boolean> {
 }
 
 export function applyPwaUpdate() {
-	waitingWorker?.postMessage({ type: 'SKIP_WAITING' });
+	if (!waitingWorker) return;
+	updateRequested = true;
+	try {
+		waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+	} catch (error) {
+		updateRequested = false;
+		throw error;
+	}
 }
 
 export function isStandalone() {

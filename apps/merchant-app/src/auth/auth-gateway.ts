@@ -1,4 +1,6 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
+import { createTelegramLogin, type TelegramConfig } from './telegram-login';
+import type { TelegramTransport } from './telegram-transport';
 
 export type Merchant = {
 	id: string;
@@ -18,8 +20,11 @@ type MerchantRow = {
 	display_name: string | null;
 };
 
-export function createAuthGateway(client: SupabaseClient) {
+export function createAuthGateway(client: SupabaseClient, telegramTransport?: TelegramTransport) {
 	return {
+		createTelegramLogin(config: TelegramConfig) {
+			return createTelegramLogin(client, config, undefined, telegramTransport);
+		},
 		async restore(): Promise<AuthState> {
 			const sessionResult = await client.auth.getSession();
 			if (sessionResult.error) {

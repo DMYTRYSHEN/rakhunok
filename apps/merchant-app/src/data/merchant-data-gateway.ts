@@ -62,10 +62,13 @@ type OrderRow = {
 };
 
 export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeof fetch = fetch, apiBase = '/app') {
-	async function workerRequest(path: string, init: RequestInit) {
+	async function workerRequest(path: string, init: RequestInit, expectedUserId: string, isCurrent: () => boolean) {
 		const session = await client.auth.getSession();
 		const accessToken = session.data.session?.access_token;
-		if (session.error || !accessToken) throw new Error('Сесію втрачено. Увійдіть ще раз.');
+		// Fence only dispatch: never discard or relabel an already-sent outcome.
+		if (session.error || !accessToken || !expectedUserId || session.data.session?.user?.id !== expectedUserId || !isCurrent()) {
+			throw new Error('Сесію втрачено. Увійдіть ще раз.');
+		}
 		const response = await fetcher(`${apiBase}${path}`, {
 			...init,
 			headers: {
@@ -82,7 +85,7 @@ export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeo
 	}
 
 	return {
-		async createOrder(input: CreateOrderInput): Promise<OrderSummary> {
+		async createOrder(input: CreateOrderInput, expectedUserId: string, isCurrent: () => boolean): Promise<OrderSummary> {
 			const response = await workerRequest('/api/v1/orders', {
 				method: 'POST',
 				body: JSON.stringify({
@@ -93,7 +96,7 @@ export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeo
 					amount: input.amount,
 					table_number: input.tableNumber
 				})
-			});
+			}, expectedUserId, isCurrent);
 			const payload = (await response.json()) as { order: OrderRow };
 			const order = payload.order;
 			return {
@@ -163,11 +166,11 @@ export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeo
 			}));
 		},
 
-		async cancelOrder(orderId: string): Promise<void> {
+		async cancelOrder(orderId: string, expectedUserId: string, isCurrent: () => boolean): Promise<void> {
 			await workerRequest(`/api/v1/orders/${encodeURIComponent(orderId)}`, {
 				method: 'PATCH',
 				body: JSON.stringify({ status: 'cancelled' })
-			});
+			}, expectedUserId, isCurrent);
 		},
 
 		subscribeOrders(merchantId: string, onChange: () => void): () => void {

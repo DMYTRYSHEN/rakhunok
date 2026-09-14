@@ -17,7 +17,14 @@
 	import X from '@lucide/svelte/icons/x';
 	import UserRound from '@lucide/svelte/icons/user-round';
 	import type { AuthGateway, AuthState } from './auth/auth-gateway';
+	import { createSessionFence } from './auth/session-fence';
 	import { createGoogleNonce, loadGoogleIdentityServices } from './auth/google-identity';
+	import LoginOptions from './auth/LoginOptions.svelte';
+	import AccountIdentityGuidance from './auth/AccountIdentityGuidance.svelte';
+	import TelegramExternalBrowser from './auth/TelegramExternalBrowser.svelte';
+	import { googleEnvironmentMessage } from './auth/login-availability';
+	import { hasTelegramIdentity, telegramCallbackError, telegramSessionAvailable } from './auth/telegram-session';
+	import type { TelegramStatus } from './auth/telegram-login';
 	import type { BusinessEntity, MerchantDataGateway, OrderSummary, Terminal } from './data/merchant-data-gateway';
 	import { evaluateAmount, formatAmount } from './lib/calculator';
 	import PaymentQr from './lib/PaymentQr.svelte';
@@ -52,6 +59,11 @@
 	let merchantDataGateway: MerchantDataGateway | null = null;
 	let authBusy = $state(false);
 	let googleLoginMessage = $state('');
+	let telegramLoginMessage = $state(telegramCallbackError(window.location.href));
+	const telegramEnabled = telegramSessionAvailable(window.location.origin, import.meta.env.PUBLIC_TELEGRAM_AUTH_ENABLED);
+	let telegramLogin: ReturnType<AuthGateway['createTelegramLogin']> | undefined;
+	let unsubscribeTelegram: (() => void) | undefined;
+	let telegramStatus = $state<TelegramStatus>('loading');
 	let structureLoading = $state(false);
 	let structureError = $state('');
 	let entities = $state<BusinessEntity[]>([]);
@@ -79,6 +91,15 @@
 	let voiceError = $state('');
 	let speechRecognition: ReturnType<typeof createSpeechRecognition> = null;
 	let evaluationTimer: ReturnType<typeof setTimeout> | undefined;
+	const sessionFence = createSessionFence();
+	const restoreFence = createSessionFence();
+	const structureFence = createSessionFence();
+	const historyFence = createSessionFence();
+	const voiceFence = createSessionFence();
+	let accountIdentity = '';
+	let disposed = false;
+	let signingOut = false;
+	let unsubscribeAuth: (() => void) | undefined;
 
 	const result = $derived(evaluateAmount(expression));
 	const amount = $derived(result ?? 0);
@@ -101,13 +122,17 @@
 		if (activeView !== 'history' || authState.status !== 'ready' || !merchantDataGateway) return;
 		const merchantId = authState.merchant.id;
 		const period = historyPeriod;
+		const generation = sessionFence.capture();
 		void loadHistory(merchantId, period);
-		return merchantDataGateway.subscribeOrders(merchantId, () => void loadHistory(merchantId, period));
+		return merchantDataGateway.subscribeOrders(merchantId, () => {
+			if (sessionFence.isCurrent(generation)) void loadHistory(merchantId, period);
+		});
 	});
 
 	$effect(() => {
-		const hasBackTarget = previewOpen || Boolean(selectedOrder) || activeView !== 'kasa';
+		const hasBackTarget = authState.status === 'ready' && (previewOpen || Boolean(selectedOrder) || activeView !== 'kasa');
 		return bindTelegramBackButton(hasBackTarget, () => {
+			if (authState.status !== 'ready') return;
 			if (previewOpen) previewOpen = false;
 			else if (selectedOrder) closeOrder();
 			else activeView = 'kasa';
@@ -115,19 +140,24 @@
 	});
 
 	function initializeGoogleButton(buttonElement: HTMLDivElement) {
+		const environmentMessage = googleEnvironmentMessage(window.isSecureContext, Boolean(window.crypto?.subtle));
+		googleLoginMessage = environmentMessage;
+		if (environmentMessage) return;
 		const clientId = import.meta.env.PUBLIC_GOOGLE_CLIENT_ID?.trim();
 		if (!clientId) {
 			googleLoginMessage = 'Сервіс входу тимчасово недоступний.';
 			return;
 		}
 
+		let active = true;
 		void Promise.all([loadGoogleIdentityServices(), createGoogleNonce()])
 			.then(([google, nonce]) => {
+				if (!active) return;
 				google.accounts.id.initialize({
 					client_id: clientId,
 					nonce: nonce.hashed,
 					callback: (response) => {
-						if (response.credential) void signIn(response.credential, nonce.raw);
+						if (active && response.credential) void signIn(response.credential, nonce.raw);
 					}
 				});
 				google.accounts.id.renderButton(buttonElement, {
@@ -140,13 +170,12 @@
 				});
 			})
 			.catch(() => {
-				googleLoginMessage = 'Не вдалося завантажити вхід через Google. Оновіть сторінку.';
+				if (active) googleLoginMessage = 'Не вдалося завантажити Google. Перевірте інтернет і блокувальник вмісту, потім оновіть сторінку.';
 			});
+		return () => { active = false; };
 	}
 
 	onMount(() => {
-		let mounted = true;
-		let unsubscribe: (() => void) | undefined;
 		online = navigator.onLine;
 		standalone = isStandalone();
 		void refreshMicrophonePermission();
@@ -161,16 +190,16 @@
 		window.addEventListener('rahunok:installed', handleInstalled);
 		window.addEventListener('rahunok:update-available', handleUpdate);
 
-		void restoreSession().then(() => {
-			if (!mounted || !authGateway) return;
-			unsubscribe = authGateway.subscribe(() => void restoreSession());
-		});
+		void restoreSession();
 
 		return () => {
-			mounted = false;
-			unsubscribe?.();
-			if (evaluationTimer) clearTimeout(evaluationTimer);
-			speechRecognition?.abort();
+			disposed = true;
+			restoreFence.advance();
+			sessionFence.advance();
+			unsubscribeAuth?.();
+			unsubscribeTelegram?.();
+			telegramLogin?.dispose();
+			clearAccountState();
 			window.removeEventListener('online', handleOnline);
 			window.removeEventListener('offline', handleOffline);
 			window.removeEventListener('rahunok:install-available', handleInstall);
@@ -184,16 +213,21 @@
 	}
 
 	async function refreshMicrophonePermission() {
-		microphonePermission = await getMicrophonePermission();
+		const permission = await getMicrophonePermission();
+		if (!disposed) microphonePermission = permission;
 	}
 
 	async function requestMicrophone() {
+		const generation = sessionFence.capture();
 		microphoneBusy = true;
-		microphonePermission = await requestMicrophonePermission();
+		const permission = await requestMicrophonePermission();
+		if (!sessionFence.isCurrent(generation)) return;
+		microphonePermission = permission;
 		microphoneBusy = false;
 	}
 
 	async function openVoice() {
+		if (authState.status !== 'ready') return;
 		voiceOpen = true;
 		voiceTranscript = '';
 		voiceCommand = null;
@@ -203,12 +237,17 @@
 	}
 
 	async function startListening() {
+		if (authState.status !== 'ready' || !voiceOpen) return;
+		const generation = sessionFence.capture();
+		const attempt = voiceFence.advance();
+		const current = () => sessionFence.isCurrent(generation) && voiceFence.isCurrent(attempt) && voiceOpen;
 		if (!isSpeechRecognitionSupported()) {
 			voicePhase = 'error';
 			voiceError = 'Цей браузер не підтримує голосове розпізнавання. Спробуйте Chrome або Safari.';
 			return;
 		}
 		if (microphonePermission !== 'granted') await requestMicrophone();
+		if (!current()) return;
 		if (microphonePermission !== 'granted') {
 			voicePhase = 'error';
 			voiceError = microphonePermission === 'denied'
@@ -223,6 +262,7 @@
 		voicePhase = 'listening';
 		speechRecognition = createSpeechRecognition(voiceLocale, {
 			onTranscript: (text, final) => {
+				if (!current()) return;
 				voiceTranscript = text;
 				if (!final) return;
 				voicePhase = 'processing';
@@ -231,10 +271,12 @@
 				voiceError = voiceCommand.validation.errors.join(' ');
 			},
 			onError: (message) => {
+				if (!current()) return;
 				voicePhase = 'error';
 				voiceError = message;
 			},
 			onEnd: () => {
+				if (!current()) return;
 				if (voicePhase === 'listening') {
 					voicePhase = 'error';
 					voiceError = 'Не вдалося почути команду. Спробуйте ще раз.';
@@ -246,6 +288,7 @@
 	}
 
 	function closeVoice() {
+		voiceFence.advance();
 		speechRecognition?.abort();
 		speechRecognition = null;
 		voiceOpen = false;
@@ -253,6 +296,9 @@
 	}
 
 	async function confirmVoiceCommand() {
+		if (authState.status !== 'ready') return;
+		const generation = sessionFence.capture();
+		const attempt = voiceFence.capture();
 		const valueMinor = voiceCommand?.entities.amount?.value_minor;
 		if (!voiceCommand?.validation.valid || valueMinor === undefined || orderCreating) return;
 		const major = Math.floor(valueMinor / 100);
@@ -262,59 +308,148 @@
 		scenario = 'fixed';
 		setExpression(minor ? `${major}.${String(minor).padStart(2, '0')}` : String(major), 1);
 		voiceError = '';
-		if (await submitOrder(voiceAmount, customerName ? `Рахунок для ${customerName}` : undefined)) {
+		const created = await submitOrder(voiceAmount, customerName ? `Рахунок для ${customerName}` : undefined);
+		if (!sessionFence.isCurrent(generation) || !voiceFence.isCurrent(attempt)) return;
+		if (created) {
 			closeVoice();
 		} else {
 			voiceError = orderCreateError;
 		}
 	}
 
+	function clearAccountState() {
+		structureFence.advance();
+		historyFence.advance();
+		if (evaluationTimer) clearTimeout(evaluationTimer);
+		evaluationTimer = undefined;
+		closeVoice();
+		voiceTranscript = '';
+		voiceCommand = null;
+		voiceError = '';
+		voiceLocale = 'uk-UA';
+		microphoneBusy = false;
+		closeOrder();
+		previewOpen = false;
+		orderCreating = false;
+		orderCreateError = '';
+		activeView = 'kasa';
+		expression = '';
+		previousDisplay = '0';
+		wheelDirection = 1;
+		wheelRevision = 0;
+		scenario = 'fixed';
+		qrSwipeStartX = null;
+		entities = [];
+		terminals = [];
+		selectedTerminalId = '';
+		orders = [];
+		historyPeriod = 'today';
+		structureLoading = false;
+		structureError = '';
+		historyLoading = false;
+		historyError = '';
+		merchantDataGateway = null;
+		googleLoginMessage = '';
+		if (accountIdentity) telegramLoginMessage = '';
+	}
+
 	async function restoreSession() {
+		if (disposed || signingOut) return;
+		const request = restoreFence.advance();
+		// Auth events carry no identity here: invalidate old continuations immediately.
+		sessionFence.advance();
+		authBusy = false;
+		closeVoice();
 		authState = { status: 'loading' };
+		const current = () => !disposed && restoreFence.isCurrent(request);
 		try {
 			const { getAuthGateway, getMerchantDataGateway } = await import('./auth/supabase-browser');
-			authGateway = await getAuthGateway();
-			const restoredState: AuthState = authGateway
-				? await authGateway.restore()
-				: { status: 'error', message: 'Не налаштовано підключення Supabase.' };
-			authState = restoredState;
-			if (restoredState.status === 'ready') {
-				merchantDataGateway = await getMerchantDataGateway();
-				await loadStructure(restoredState.user.id);
+			if (!current()) return;
+			const gateway = await getAuthGateway();
+			if (!current()) return;
+			authGateway = gateway;
+			if (gateway && telegramEnabled && !telegramLogin) {
+				telegramLogin = gateway.createTelegramLogin({
+					origin: window.location.origin,
+					enabled: import.meta.env.PUBLIC_TELEGRAM_AUTH_ENABLED,
+					mode: import.meta.env.PUBLIC_TELEGRAM_AUTH_MODE,
+					clientId: import.meta.env.PUBLIC_TELEGRAM_CLIENT_ID
+				});
+				unsubscribeTelegram = telegramLogin.subscribe((status) => { telegramStatus = status; });
+				void telegramLogin.prepare();
 			}
+			// Subscribe before restore/data awaits so an account switch cannot be missed.
+			if (gateway && !unsubscribeAuth) {
+				unsubscribeAuth = gateway.subscribe(() => void restoreSession());
+			}
+			const restoredState: AuthState = gateway
+				? await gateway.restore()
+				: { status: 'error', message: 'Не налаштовано підключення Supabase.' };
+			if (!current()) return;
+			const identity = restoredState.status === 'ready'
+				? JSON.stringify([restoredState.user.id, restoredState.merchant.id]) : '';
+			if (!identity || identity !== accountIdentity) clearAccountState();
+			accountIdentity = identity;
+			if (restoredState.status === 'ready') {
+				const dataGateway = await getMerchantDataGateway();
+				if (!current()) return;
+				merchantDataGateway = dataGateway;
+			}
+			authState = restoredState;
+			// A same-account refresh also invalidated in-flight UI busy indicators.
+			orderCreating = false;
+			orderAction = null;
+			microphoneBusy = false;
+			historyLoading = false;
+			if (restoredState.status === 'ready') await loadStructure(restoredState.user.id);
 		} catch {
+			if (!current()) return;
+			clearAccountState();
+			accountIdentity = '';
 			authState = { status: 'error', message: 'Не вдалося запустити авторизацію.' };
 		}
 	}
 
 	async function loadStructure(userId: string) {
-		if (!merchantDataGateway) return;
+		if (!merchantDataGateway || authState.status !== 'ready' || authState.user.id !== userId) return;
+		const gateway = merchantDataGateway;
+		const generation = sessionFence.capture();
+		const request = structureFence.advance();
+		const current = () => sessionFence.isCurrent(generation) && structureFence.isCurrent(request);
 		structureLoading = true;
 		structureError = '';
 		try {
-			const structure = await merchantDataGateway.getStructure(userId);
+			const structure = await gateway.getStructure(userId);
+			if (!current()) return;
 			entities = structure.entities;
 			terminals = structure.terminals;
 			if (!terminals.some((terminal) => terminal.id === selectedTerminalId)) {
 				selectedTerminalId = terminals[0]?.id ?? '';
 			}
 		} catch (error) {
+			if (!current()) return;
 			structureError = error instanceof Error ? error.message : 'Не вдалося завантажити каси та столи.';
 		} finally {
-			structureLoading = false;
+			if (current()) structureLoading = false;
 		}
 	}
 
 	async function loadHistory(merchantId: string, period: HistoryPeriod = historyPeriod) {
-		if (!merchantDataGateway) return;
+		if (!merchantDataGateway || authState.status !== 'ready' || authState.merchant.id !== merchantId || historyPeriod !== period) return;
+		const gateway = merchantDataGateway;
+		const generation = sessionFence.capture();
+		const request = historyFence.advance();
+		const current = () => sessionFence.isCurrent(generation) && historyFence.isCurrent(request) && historyPeriod === period;
 		historyLoading = true;
 		historyError = '';
 		try {
-			orders = await merchantDataGateway.listOrders(merchantId, historyThreshold(period).toISOString());
+			const loadedOrders = await gateway.listOrders(merchantId, historyThreshold(period).toISOString());
+			if (current()) orders = loadedOrders;
 		} catch (error) {
+			if (!current()) return;
 			historyError = error instanceof Error ? error.message : 'Не вдалося завантажити історію оплат.';
 		} finally {
-			historyLoading = false;
+			if (current()) historyLoading = false;
 		}
 	}
 
@@ -360,6 +495,7 @@
 	}
 
 	function openOrder(order: OrderSummary) {
+		if (authState.status !== 'ready') return;
 		selectedOrder = order;
 		cancelConfirmation = false;
 		haptic('selection');
@@ -372,23 +508,30 @@
 	}
 
 	async function copyOrderLink(order: OrderSummary) {
+		if (authState.status !== 'ready') return;
+		const generation = sessionFence.capture();
+		const current = () => sessionFence.isCurrent(generation) && selectedOrder?.id === order.id;
 		orderAction = 'copy';
 		try {
 			await navigator.clipboard.writeText(order.shareUrl || `${window.location.origin}/pay/${order.id}`);
+			if (!current()) return;
 			haptic('light');
 			setTimeout(() => {
-				if (orderAction === 'copy') orderAction = null;
+				if (current() && orderAction === 'copy') orderAction = null;
 			}, 1400);
 		} catch {
-			orderAction = null;
+			if (current()) orderAction = null;
 		}
 	}
 
 	async function shareOrder(order: OrderSummary) {
+		if (authState.status !== 'ready') return;
+		const generation = sessionFence.capture();
 		const url = order.shareUrl || `${window.location.origin}/pay/${order.id}`;
 		if (!navigator.share) return copyOrderLink(order);
 		try {
 			await navigator.share({ title: `Рахунок ${order.orderNumber}`, text: `${formatAmount(String(order.amount))} ₴`, url });
+			if (!sessionFence.isCurrent(generation)) return;
 			haptic('light');
 		} catch {
 			return;
@@ -396,19 +539,28 @@
 	}
 
 	async function cancelOrder(order: OrderSummary) {
+		if (!merchantDataGateway || authState.status !== 'ready') return;
 		if (!cancelConfirmation) {
 			cancelConfirmation = true;
 			haptic('medium');
 			return;
 		}
-		if (!merchantDataGateway || authState.status !== 'ready') return;
+		const gateway = merchantDataGateway;
+		const merchantId = authState.merchant.id;
+		const expectedUserId = authState.user.id;
+		const generation = sessionFence.capture();
+		const isCurrentSession = () => sessionFence.isCurrent(generation);
+		const current = () => sessionFence.isCurrent(generation) && selectedOrder?.id === order.id;
 		orderAction = 'cancel';
 		try {
-			await merchantDataGateway.cancelOrder(order.id);
-			await loadHistory(authState.merchant.id);
+			await gateway.cancelOrder(order.id, expectedUserId, isCurrentSession);
+			if (!sessionFence.isCurrent(generation)) return;
+			await loadHistory(merchantId);
+			if (!current()) return;
 			closeOrder();
 			haptic('medium');
 		} catch (error) {
+			if (!current()) return;
 			historyError = error instanceof Error ? error.message : 'Не вдалося скасувати рахунок.';
 			orderAction = null;
 		}
@@ -423,32 +575,54 @@
 	}
 
 	async function signIn(credential: string, nonce: string) {
-		if (!authGateway || authBusy) return;
+		if (!authGateway || authBusy || telegramStatus === 'busy' || telegramStatus === 'exchanging') return;
+		const generation = sessionFence.capture();
 		authBusy = true;
 		googleLoginMessage = '';
 		try {
 			await authGateway.signInWithGoogleIdToken(credential, nonce);
 		} catch {
-			googleLoginMessage = 'Не вдалося увійти через Google.';
-			authBusy = false;
+			if (sessionFence.isCurrent(generation)) googleLoginMessage = 'Не вдалося увійти через Google.';
+		} finally {
+			if (sessionFence.isCurrent(generation)) authBusy = false;
+		}
+	}
+
+	async function startTelegram(mode: 'signin' | 'link') {
+		if (!telegramLogin || authBusy || !telegramEnabled || telegramStatus !== 'ready') return;
+		const expectedUserId = authState.status === 'ready' || authState.status === 'onboarding' ? authState.user.id : null;
+		if (mode === 'signin' && authState.status !== 'guest') return;
+		const generation = sessionFence.capture();
+		authBusy = true;
+		telegramLoginMessage = '';
+		try {
+			await telegramLogin.start(mode, expectedUserId);
+		} catch {
+			if (sessionFence.isCurrent(generation)) telegramLoginMessage = 'Вхід через Telegram не завершено або скасовано. Дозвольте спливні вікна та спробуйте знову. Перенаправлення автоматично не запускається.';
+		} finally {
+			if (sessionFence.isCurrent(generation)) authBusy = false;
 		}
 	}
 
 	async function signOut() {
-		if (!authGateway || authBusy) return;
+		if (!authGateway || authBusy || telegramStatus === 'busy' || telegramStatus === 'exchanging') return;
+		const gateway = authGateway;
+		signingOut = true;
+		restoreFence.advance();
+		const generation = sessionFence.advance();
+		clearAccountState();
+		accountIdentity = '';
+		authState = { status: 'loading' };
 		authBusy = true;
 		try {
-			await authGateway.signOut();
+			await gateway.signOut();
+			if (!sessionFence.isCurrent(generation)) return;
 			authState = { status: 'guest' };
-			activeView = 'kasa';
-			entities = [];
-			terminals = [];
-			selectedTerminalId = '';
-			orders = [];
 		} catch {
-			authState = { status: 'error', message: 'Не вдалося вийти з акаунта.' };
+			if (sessionFence.isCurrent(generation)) authState = { status: 'error', message: 'Не вдалося вийти з акаунта.' };
 		} finally {
-			authBusy = false;
+			signingOut = false;
+			if (sessionFence.isCurrent(generation)) authBusy = false;
 		}
 	}
 
@@ -508,7 +682,7 @@
 	}
 
 	function openPreview() {
-		if (!canPreview) return;
+		if (authState.status !== 'ready' || !canPreview) return;
 		orderCreateError = '';
 		previewOpen = true;
 		haptic('medium');
@@ -516,11 +690,15 @@
 
 	async function submitOrder(orderAmount: number, title?: string) {
 		if (!merchantDataGateway || authState.status !== 'ready' || orderCreating) return;
+		const gateway = merchantDataGateway;
+		const expectedUserId = authState.user.id;
+		const generation = sessionFence.capture();
+		const isCurrentSession = () => sessionFence.isCurrent(generation);
 		orderCreating = true;
 		orderCreateError = '';
 		const orderNumber = `APP-${Date.now().toString().slice(-8)}`;
 		try {
-			const order = await merchantDataGateway.createOrder({
+			const order = await gateway.createOrder({
 				type: scenario === 'open' ? 'open_amount' : scenario,
 				amount: orderAmount,
 				orderNumber,
@@ -529,7 +707,9 @@
 				tableNumber: scenario === 'table' && selectedTerminal && /^\d+$/.test(selectedTerminal.code)
 					? Number(selectedTerminal.code)
 					: undefined
-			});
+			}, expectedUserId, isCurrentSession);
+			// Keep the dispatched outcome; only suppress writes into a newer session.
+			if (!sessionFence.isCurrent(generation)) return true;
 			orders = [order, ...orders.filter((existing) => existing.id !== order.id)];
 			previewOpen = false;
 			selectedOrder = order;
@@ -537,10 +717,10 @@
 			haptic('medium');
 			return true;
 		} catch (error) {
-			orderCreateError = error instanceof Error ? error.message : 'Не вдалося створити рахунок.';
+			if (sessionFence.isCurrent(generation)) orderCreateError = error instanceof Error ? error.message : 'Не вдалося створити рахунок.';
 			return false;
 		} finally {
-			orderCreating = false;
+			if (sessionFence.isCurrent(generation)) orderCreating = false;
 		}
 	}
 
@@ -563,15 +743,24 @@
 			{#if authState.status === 'loading'}
 				<div class="auth-progress"><span></span><p>Перевіряємо сесію</p></div>
 			{:else if authState.status === 'guest'}
+				<LoginOptions enabled={telegramEnabled} busy={authBusy || (telegramEnabled && telegramStatus !== 'ready')} onTelegram={() => void startTelegram('signin')}>
+				{#if telegramEnabled && telegramStatus === 'loading'}<p role="status">Готуємо вхід через Telegram…</p>{/if}
+				{#if telegramEnabled && telegramStatus === 'external-required'}<TelegramExternalBrowser />{/if}
+				{#if telegramEnabled && telegramStatus === 'error'}<p role="alert">Telegram недоступний. Перевірте підключення й налаштування, потім оновіть сторінку. Google залишається доступним.</p>{/if}
+				{#if telegramStatus === 'busy'}<button type="button" onclick={() => telegramLogin?.cancel()}>Скасувати Telegram</button>{/if}
+				{#if telegramStatus === 'exchanging'}<p role="status">Завершуємо авторизацію Telegram… Не запускайте інший вхід.</p>{/if}
+				{#if telegramLoginMessage}<p role="alert">{telegramLoginMessage}</p>{/if}
 				<div class="google-login">
 					<div {@attach initializeGoogleButton} class:invisible={authBusy}></div>
 					{#if authBusy}<p>Авторизація...</p>{/if}
 					{#if googleLoginMessage}<p class="google-login-error" role="alert">{googleLoginMessage}</p>{/if}
 				</div>
+				</LoginOptions>
 			{:else if authState.status === 'onboarding'}
 				<div class="auth-message">
-					<strong>Бізнес ще не налаштовано</strong>
-					<p>Створіть профіль бізнесу в особистому кабінеті, після чого поверніться до каси.</p>
+					<strong>У цьому акаунті бізнес не знайдено</strong>
+					<AccountIdentityGuidance context="onboarding" user={authState.user} />
+					<p>Лише якщо ви ще не створювали бізнес, створіть його в особистому кабінеті, після чого поверніться до каси.</p>
 					<a href="/dashboard/">Відкрити особистий кабінет</a>
 					<button type="button" onclick={signOut}>Вийти</button>
 				</div>
@@ -697,7 +886,7 @@
 		<section class="placeholder-view">
 			<p class="eyebrow">Обліковий запис</p>
 			<h1>Профіль касира</h1>
-			<div class="profile-row"><span>R</span><div><strong>{merchantName}</strong><p>{authState.user.email ?? 'Обліковий запис Google'}</p></div></div>
+			<div class="profile-row"><span>R</span><div><strong>{merchantName}</strong><p>{authState.user.email ?? 'Обліковий запис'}</p></div></div>
 			<div class="pwa-settings">
 				<div><strong>Застосунок</strong><p>{standalone ? 'Встановлено на пристрій' : 'Відкрито у браузері'}</p></div>
 				{#if installAvailable && !standalone}<button type="button" onclick={installApp}>Встановити</button>{/if}
@@ -722,7 +911,18 @@
 					<ChevronRight size={18} />
 				</a>
 			</div>
-			<button class="logout-button" type="button" onclick={signOut} disabled={authBusy}>Вийти з акаунта</button>
+			<AccountIdentityGuidance context="profile" user={authState.user} />
+			{#if telegramEnabled}
+				{#if !hasTelegramIdentity(authState.user) && authState.user.email && !authState.user.is_anonymous}
+					<button class="logout-button" type="button" onclick={() => void startTelegram('link')} disabled={authBusy || telegramStatus !== 'ready'}>Прив’язати Telegram до цього акаунта</button>
+				{/if}
+				{#if telegramStatus === 'busy'}<button type="button" onclick={() => telegramLogin?.cancel()}>Скасувати Telegram</button>{/if}
+				{#if telegramStatus === 'exchanging'}<p role="status">Завершуємо прив’язування Telegram… Не запускайте інший вхід.</p>{/if}
+				{#if telegramStatus === 'error'}<p role="alert">Telegram недоступний. Оновіть сторінку після перевірки налаштувань.</p>{/if}
+				{#if telegramStatus === 'external-required'}<TelegramExternalBrowser />{/if}
+				{#if telegramLoginMessage}<p role="alert">{telegramLoginMessage}</p>{/if}
+			{/if}
+			<button class="logout-button" type="button" onclick={signOut} disabled={authBusy || telegramStatus === 'busy' || telegramStatus === 'exchanging'}>Вийти з акаунта</button>
 		</section>
 	{/if}
 
@@ -737,7 +937,7 @@
 	{/if}
 </main>
 
-{#if voiceOpen}
+{#if authState.status === 'ready' && voiceOpen}
 	<div class="modal-backdrop voice-backdrop" role="presentation">
 		<div class="voice-sheet" role="dialog" aria-modal="true" aria-labelledby="voice-title">
 			<div class="sheet-handle" aria-hidden="true"></div>
@@ -768,7 +968,7 @@
 	</div>
 {/if}
 
-{#if previewOpen}
+{#if authState.status === 'ready' && previewOpen}
 	<div class="modal-backdrop intelligence-backdrop" role="presentation">
 		<div class="order-sheet creation-sheet" role="dialog" aria-modal="true" aria-labelledby="preview-title">
 			<div class="sheet-handle" aria-hidden="true"></div>
@@ -816,7 +1016,7 @@
 	</div>
 {/if}
 
-{#if selectedOrder}
+{#if authState.status === 'ready' && selectedOrder}
 	<div class="modal-backdrop intelligence-backdrop" role="presentation">
 		<div class="order-sheet" role="dialog" aria-modal="true" aria-labelledby="order-title">
 			<div class="sheet-handle" aria-hidden="true"></div>

@@ -1,6 +1,8 @@
 type HapticStyle = 'light' | 'medium' | 'selection';
 
 interface TelegramWebApp {
+	initData?: string;
+	platform?: string;
 	colorScheme?: 'light' | 'dark';
 	ready(): void;
 	expand(): void;
