@@ -30,13 +30,9 @@ export type MerchantOnboardingInput = {
 	bankName: string;
 };
 
-export type ScenarioConfig = {
-	allow_loyalty?: boolean;
-	allow_promo?: boolean;
-	allow_tips?: boolean;
-	allow_roundup?: boolean;
-	allow_split?: boolean;
-};
+export type { CheckoutScenarioConfig as ScenarioConfig } from '$lib/features/shared/checkout-scenario-config';
+import type { CheckoutScenarioConfig } from '$lib/features/shared/checkout-scenario-config';
+export type ScenarioConfigInput = Partial<CheckoutScenarioConfig>;
 
 export type InvoiceCreateInput = {
 	type: PersistedInvoiceType;
@@ -48,7 +44,7 @@ export type InvoiceCreateInput = {
 	tableNumber?: number;
 	terminalId?: string;
 	entityId?: string;
-	scenario_config?: ScenarioConfig;
+	scenario_config?: ScenarioConfigInput;
 };
 
 export type InvoiceSummary = {

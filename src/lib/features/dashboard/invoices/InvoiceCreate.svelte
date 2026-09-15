@@ -33,6 +33,8 @@
 		type InvoiceRules
 	} from '../invoice-rules/invoice-rules';
 	import type { BusinessEntity, InvoiceCreateInput, InvoiceType, PosTerminal } from '../types';
+	import type { CheckoutScenarioConfig } from '$lib/features/shared/checkout-scenario-config';
+	import { getScenarioDefaults } from '$lib/features/shared/checkout-scenario-defaults';
 	import { formatMoney } from '../utils/format';
 	import InvoiceBusinessPreview from '../business-settings/InvoiceBusinessPreview.svelte';
 	import { settingsHref } from '../business-settings/business-settings';
@@ -117,6 +119,18 @@
 	let allowLoyalty = $state(true);
 	let allowPromo = $state(true);
 	let allowRoundUp = $state(true);
+	let allowSplit = $state(false);
+	let allowBnpl = $state(true);
+	let allowComplianceCard = $state(false);
+	let allowUpsell = $state(true);
+	let allowDelivery = $state(false);
+	let allowNpsReview = $state(true);
+	let showOtherBanks = $state(true);
+	let promoDiscount = $state(4.0);
+	let tipPresets = $state<number[]>([5, 10, 15, 20]);
+	let quickAmounts = $state<number[]>([50, 100, 200, 500]);
+	let ctaText = $state('Перейти до оплати');
+	let checkoutTheme = $state<'dark' | 'light'>('dark');
 	let deliveryCity = $state('Київ');
 	let deliveryBranch = $state('Відділення №24');
 	let terminalDialogOpen = $state(false);
@@ -242,6 +256,25 @@
 		deliveryFee = '0';
 		minimumAmount = '0';
 		previewOpen = false;
+
+		// Apply scenario-specific checkout config defaults
+		const defaults = getScenarioDefaults(nextScenario);
+		allowTips = defaults.allow_tips;
+		allowLoyalty = defaults.allow_loyalty;
+		allowPromo = defaults.allow_promo;
+		allowRoundUp = defaults.allow_roundup;
+		allowSplit = defaults.allow_split;
+		allowBnpl = defaults.allow_bnpl;
+		allowComplianceCard = defaults.allow_compliance_card;
+		allowUpsell = defaults.allow_upsell;
+		allowDelivery = defaults.allow_delivery;
+		allowNpsReview = defaults.allow_nps_review;
+		showOtherBanks = defaults.show_other_banks;
+		promoDiscount = defaults.promo_discount ?? 4.0;
+		tipPresets = defaults.tip_presets ?? [5, 10, 15, 20];
+		quickAmounts = defaults.quick_amounts ?? [50, 100, 200, 500];
+		ctaText = defaults.cta_text ?? 'Перейти до оплати';
+		checkoutTheme = defaults.theme ?? 'dark';
 	}
 
 	function restoreGeneratedFields() {
@@ -307,7 +340,18 @@
 					allow_promo: allowPromo,
 					allow_roundup: allowRoundUp,
 					allow_tips: scenario === 'table' ? allowTips : false,
-					allow_split: scenario === 'table'
+					allow_split: scenario === 'table' ? allowSplit : false,
+					allow_bnpl: allowBnpl,
+					allow_compliance_card: allowComplianceCard,
+					allow_upsell: allowUpsell,
+					allow_delivery: scenario === 'delivery' ? allowDelivery : false,
+					allow_nps_review: allowNpsReview,
+					show_other_banks: showOtherBanks,
+					promo_discount: promoDiscount,
+					tip_presets: tipPresets,
+					quick_amounts: quickAmounts,
+					cta_text: ctaText,
+					theme: checkoutTheme
 				}
 			});
 			invoiceRules = { ...invoiceRules, nextNumber: invoiceRules.nextNumber + 1 };
@@ -643,16 +687,6 @@
 									>{/each}
 							</select>
 						</div>
-						<label
-							class="flex min-h-12 items-center justify-between gap-4 rounded-md border border-zinc-200 px-3 sm:col-span-2"
-						>
-							<span
-								><strong class="block text-sm">Чайові гостя</strong><span
-									class="text-xs text-zinc-500">5%, 10% або 15% під час оплати</span
-								></span
-							>
-							<input type="checkbox" bind:checked={allowTips} class="size-5 accent-blue-600" />
-						</label>
 					{/if}
 
 					{#if scenario === 'delivery'}
@@ -700,33 +734,151 @@
 					</label>
 
 					<div class="sm:col-span-2 pt-2 border-t border-zinc-100">
-						<span class="mb-3 block text-xs font-bold uppercase tracking-wider text-zinc-500">Опції екрана платника (UX)</span>
-						<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+					<span class="mb-3 block text-xs font-bold uppercase tracking-wider text-zinc-500">Опції екрана платника (UX)</span>
+
+					<!-- Loyalty & Discounts -->
+					<p class="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Лояльність та знижки</p>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-4">
+						<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
+							<div>
+								<strong class="block text-xs font-semibold text-zinc-900">Картка лояльності</strong>
+								<span class="text-[11px] text-zinc-500">Сканер Apple Pass & бонуси</span>
+							</div>
+							<input type="checkbox" bind:checked={allowLoyalty} class="size-4.5 accent-blue-600 rounded" />
+						</label>
+						<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
+							<div>
+								<strong class="block text-xs font-semibold text-zinc-900">Промокод / знижка</strong>
+								<span class="text-[11px] text-zinc-500">Поле введення купона</span>
+							</div>
+							<input type="checkbox" bind:checked={allowPromo} class="size-4.5 accent-blue-600 rounded" />
+						</label>
+						{#if allowPromo}
+							<label class="sm:col-span-2">
+								<span class="mb-1 block text-xs font-bold text-zinc-600">Сума знижки (₴)</span>
+								<input
+									type="number"
+									bind:value={promoDiscount}
+									min="0"
+									step="0.5"
+									class="h-10 w-full rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-blue-600"
+								/>
+							</label>
+						{/if}
+					</div>
+
+					<!-- HoReCa -->
+					{#if scenario === 'table'}
+						<p class="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">HoReCa / Ресторан</p>
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-4">
 							<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
 								<div>
-									<strong class="block text-xs font-semibold text-zinc-900">Картка лояльності</strong>
-									<span class="text-[11px] text-zinc-500">Сканер Apple Pass & бонуси</span>
+									<strong class="block text-xs font-semibold text-zinc-900">Чайові гостя</strong>
+									<span class="text-[11px] text-zinc-500">Пресети % або фіксовані суми</span>
 								</div>
-								<input type="checkbox" bind:checked={allowLoyalty} class="size-4.5 accent-blue-600 rounded" />
+								<input type="checkbox" bind:checked={allowTips} class="size-4.5 accent-blue-600 rounded" />
 							</label>
 							<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
 								<div>
-									<strong class="block text-xs font-semibold text-zinc-900">Промокод / знижка</strong>
-									<span class="text-[11px] text-zinc-500">Поле введення купона</span>
+									<strong class="block text-xs font-semibold text-zinc-900">Поділ рахунку</strong>
+									<span class="text-[11px] text-zinc-500">Split Bill між гостями</span>
 								</div>
-								<input type="checkbox" bind:checked={allowPromo} class="size-4.5 accent-blue-600 rounded" />
+								<input type="checkbox" bind:checked={allowSplit} class="size-4.5 accent-blue-600 rounded" />
 							</label>
 							<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
 								<div>
-									<strong class="block text-xs font-semibold text-zinc-900">Округлення на ЗСУ</strong>
-									<span class="text-[11px] text-zinc-500">Благодійний внесок решти</span>
+									<strong class="block text-xs font-semibold text-zinc-900">DAC7 Compliance</strong>
+									<span class="text-[11px] text-zinc-500">Фіскалізація та розщеплення</span>
 								</div>
-								<input type="checkbox" bind:checked={allowRoundUp} class="size-4.5 accent-blue-600 rounded" />
+								<input type="checkbox" bind:checked={allowComplianceCard} class="size-4.5 accent-blue-600 rounded" />
 							</label>
 						</div>
+					{/if}
+
+					<!-- Charity -->
+					<p class="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Благодійність</p>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-4">
+						<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
+							<div>
+								<strong class="block text-xs font-semibold text-zinc-900">Округлення на ЗСУ</strong>
+								<span class="text-[11px] text-zinc-500">Благодійний внесок решти</span>
+							</div>
+							<input type="checkbox" bind:checked={allowRoundUp} class="size-4.5 accent-blue-600 rounded" />
+						</label>
+					</div>
+
+					<!-- Order Enhancements -->
+					<p class="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Замовлення</p>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-4">
+						<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
+							<div>
+								<strong class="block text-xs font-semibold text-zinc-900">Order Bump / Upsell</strong>
+								<span class="text-[11px] text-zinc-500">Допродаж перед оплатою</span>
+							</div>
+							<input type="checkbox" bind:checked={allowUpsell} class="size-4.5 accent-blue-600 rounded" />
+						</label>
+						{#if scenario === 'delivery'}
+							<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
+								<div>
+									<strong class="block text-xs font-semibold text-zinc-900">Блок доставки</strong>
+									<span class="text-[11px] text-zinc-500">Нова Пошта / кур'єр</span>
+								</div>
+								<input type="checkbox" bind:checked={allowDelivery} class="size-4.5 accent-blue-600 rounded" />
+							</label>
+						{/if}
+					</div>
+
+					<!-- Payment & Post-payment -->
+					<p class="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Оплата та після оплати</p>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-4">
+						<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
+							<div>
+								<strong class="block text-xs font-semibold text-zinc-900">Оплата частинами (BNPL)</strong>
+								<span class="text-[11px] text-zinc-500">Розбити суму на 4 платежі</span>
+							</div>
+							<input type="checkbox" bind:checked={allowBnpl} class="size-4.5 accent-blue-600 rounded" />
+						</label>
+						<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
+							<div>
+								<strong class="block text-xs font-semibold text-zinc-900">Інші способи оплати</strong>
+								<span class="text-[11px] text-zinc-500">Показати додаткові банки</span>
+							</div>
+							<input type="checkbox" bind:checked={showOtherBanks} class="size-4.5 accent-blue-600 rounded" />
+						</label>
+						<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
+							<div>
+								<strong class="block text-xs font-semibold text-zinc-900">NPS відгук</strong>
+								<span class="text-[11px] text-zinc-500">Оцінка після оплати</span>
+							</div>
+							<input type="checkbox" bind:checked={allowNpsReview} class="size-4.5 accent-blue-600 rounded" />
+						</label>
+					</div>
+
+					<!-- UI Customization -->
+					<p class="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Інтерфейс</p>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+						<label>
+							<span class="mb-1 block text-xs font-bold text-zinc-600">Текст кнопки оплати</span>
+							<input
+								bind:value={ctaText}
+								placeholder="Перейти до оплати"
+								class="h-10 w-full rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-blue-600"
+							/>
+						</label>
+						<label>
+							<span class="mb-1 block text-xs font-bold text-zinc-600">Тема чекауту</span>
+							<select
+								bind:value={checkoutTheme}
+								class="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold"
+							>
+								<option value="dark">Темна</option>
+								<option value="light">Світла</option>
+							</select>
+						</label>
 					</div>
 				</div>
-			</section>
+			</div>
+		</section>
 		</div>
 
 		<aside

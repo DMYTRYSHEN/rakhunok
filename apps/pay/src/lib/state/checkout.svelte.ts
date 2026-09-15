@@ -285,6 +285,94 @@ class CheckoutStore {
     return true;
   });
 
+  allowRoundUp = $derived.by(() => {
+    const cfg = this.order?.scenario_config as Record<string, unknown> | undefined;
+    if (cfg && typeof cfg.allow_roundup === 'boolean') {
+      return cfg.allow_roundup;
+    }
+    return true;
+  });
+
+  allowBnpl = $derived.by(() => {
+    const cfg = this.order?.scenario_config as Record<string, unknown> | undefined;
+    if (cfg && typeof cfg.allow_bnpl === 'boolean') {
+      return cfg.allow_bnpl;
+    }
+    return true;
+  });
+
+  allowUpsell = $derived.by(() => {
+    const cfg = this.order?.scenario_config as Record<string, unknown> | undefined;
+    if (cfg && typeof cfg.allow_upsell === 'boolean') {
+      return cfg.allow_upsell;
+    }
+    return true;
+  });
+
+  allowDelivery = $derived.by(() => {
+    const cfg = this.order?.scenario_config as Record<string, unknown> | undefined;
+    if (cfg && typeof cfg.allow_delivery === 'boolean') {
+      return cfg.allow_delivery;
+    }
+    return this.order?.type === 'delivery';
+  });
+
+  allowNpsReview = $derived.by(() => {
+    const cfg = this.order?.scenario_config as Record<string, unknown> | undefined;
+    if (cfg && typeof cfg.allow_nps_review === 'boolean') {
+      return cfg.allow_nps_review;
+    }
+    return true;
+  });
+
+  showOtherBanks = $derived.by(() => {
+    const cfg = this.order?.scenario_config as Record<string, unknown> | undefined;
+    if (cfg && typeof cfg.show_other_banks === 'boolean') {
+      return cfg.show_other_banks;
+    }
+    return true;
+  });
+
+  configQuickAmounts = $derived.by(() => {
+    const cfg = this.order?.scenario_config as Record<string, unknown> | undefined;
+    if (cfg && Array.isArray(cfg.quick_amounts)) {
+      return cfg.quick_amounts as number[];
+    }
+    return null;
+  });
+
+  configTipPresets = $derived.by(() => {
+    const cfg = this.order?.scenario_config as Record<string, unknown> | undefined;
+    if (cfg && Array.isArray(cfg.tip_presets)) {
+      return cfg.tip_presets as number[];
+    }
+    return null;
+  });
+
+  configCtaText = $derived.by(() => {
+    const cfg = this.order?.scenario_config as Record<string, unknown> | undefined;
+    if (cfg && typeof cfg.cta_text === 'string' && cfg.cta_text) {
+      return cfg.cta_text;
+    }
+    return null;
+  });
+
+  configPromoDiscount = $derived.by(() => {
+    const cfg = this.order?.scenario_config as Record<string, unknown> | undefined;
+    if (cfg && typeof cfg.promo_discount === 'number') {
+      return cfg.promo_discount;
+    }
+    return null;
+  });
+
+  configTheme = $derived.by(() => {
+    const cfg = this.order?.scenario_config as Record<string, unknown> | undefined;
+    if (cfg && (cfg.theme === 'dark' || cfg.theme === 'light')) {
+      return cfg.theme as 'dark' | 'light';
+    }
+    return null;
+  });
+
   totalAmount = $derived.by(() => {
     if (
       this.order?.type === 'table' ||

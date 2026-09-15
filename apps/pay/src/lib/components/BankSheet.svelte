@@ -406,40 +406,42 @@
       </button>
 
       <!-- Secondary Action: Other Payment Methods & Promo Coupon -->
-      <button
-        type="button"
-        class="other-methods-trigger-btn"
-        onclick={() => toggleSubView('methods')}
-      >
-        <span class="other-trigger-left">
+      {#if checkout.showOtherBanks}
+        <button
+          type="button"
+          class="other-methods-trigger-btn"
+          onclick={() => toggleSubView('methods')}
+        >
+          <span class="other-trigger-left">
+            <svg
+              viewBox="0 0 24 24"
+              width="15"
+              height="15"
+              stroke="currentColor"
+              stroke-width="2"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+              <line x1="2" y1="10" x2="22" y2="10"></line>
+            </svg>
+            <span>Інші способи оплати та промокод</span>
+          </span>
           <svg
             viewBox="0 0 24 24"
-            width="15"
-            height="15"
+            width="13"
+            height="13"
             stroke="currentColor"
-            stroke-width="2"
+            stroke-width="2.5"
             fill="none"
             stroke-linecap="round"
             stroke-linejoin="round"
           >
-            <rect x="2" y="5" width="20" height="14" rx="2"></rect>
-            <line x1="2" y1="10" x2="22" y2="10"></line>
+            <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
-          <span>Інші способи оплати та промокод</span>
-        </span>
-        <svg
-          viewBox="0 0 24 24"
-          width="13"
-          height="13"
-          stroke="currentColor"
-          stroke-width="2.5"
-          fill="none"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
-      </button>
+        </button>
+      {/if}
 
       <p class="recaptcha-notice">
         Цей сайт захищено reCAPTCHA. Застосовуються
@@ -624,88 +626,92 @@
       </div>
 
       <!-- Promo / Coupon Code Section -->
-      <div class="other-group">
-        <div class="other-group-title">Купон або промокод</div>
-        <div class="coupon-box">
-          <input
-            type="text"
-            class="coupon-input"
-            placeholder="Введіть промокод (напр. DISCOUNT)"
-            bind:value={couponCode}
-          />
-          <button
-            type="button"
-            class="coupon-apply-btn"
-            disabled={!couponCode.trim()}
-            onclick={handleApplyCoupon}
-          >
-            {couponApplied ? 'Застосовано' : 'Застосувати'}
-          </button>
-        </div>
-        {#if couponApplied}
-          <div class="coupon-applied-msg">
-            ✓ Знижку 50 ₴ активовано для цього чекауту
+      {#if checkout.allowPromo}
+        <div class="other-group">
+          <div class="other-group-title">Купон або промокод</div>
+          <div class="coupon-box">
+            <input
+              type="text"
+              class="coupon-input"
+              placeholder="Введіть промокод (напр. DISCOUNT)"
+              bind:value={couponCode}
+            />
+            <button
+              type="button"
+              class="coupon-apply-btn"
+              disabled={!couponCode.trim()}
+              onclick={handleApplyCoupon}
+            >
+              {couponApplied ? 'Застосовано' : 'Застосувати'}
+            </button>
           </div>
-        {/if}
-      </div>
+          {#if couponApplied}
+            <div class="coupon-applied-msg">
+              ✓ Знижку 50 ₴ активовано для цього чекауту
+            </div>
+          {/if}
+        </div>
+      {/if}
 
       <!-- Loyalty Card & Scanner Section -->
-      <div class="other-group">
-        <div class="other-group-title">Картка лояльності та бонуси</div>
-        {#if !checkout.loyaltyCard}
-          <button
-            type="button"
-            class="other-method-item loyalty-trigger-row"
-            onclick={() => {
-              currentSubView = null;
-              checkout.openLoyaltyScanner();
-            }}
-          >
-            <div class="other-method-item-left">
-              <div class="other-wallet-icon loyalty">
-                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
-                  <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
-                  <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
-                  <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
-                  <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
-                  <line x1="7" y1="12" x2="17" y2="12"></line>
-                </svg>
-              </div>
-              <div class="other-item-text">
-                <div class="other-item-title">Зісканувати картку лояльності</div>
-                <div class="other-item-sub">Камера, штрих-код або номер картки</div>
-              </div>
-            </div>
-            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none">
-              <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
-          </button>
-        {:else}
-          <button
-            type="button"
-            class="other-method-item applied-card"
-            onclick={() => {
-              currentSubView = null;
-              checkout.openLoyaltyScanner();
-            }}
-          >
-            <div class="other-method-item-left">
-              <div class="other-wallet-icon loyalty-active">
-                ✓
-              </div>
-              <div class="other-item-text">
-                <div class="other-item-title">{checkout.loyaltyCard.program_name}</div>
-                <div class="other-item-sub">
-                  {checkout.loyaltyCard.use_bonuses
-                    ? `Списано ${formatNumber(checkout.bonusDiscount)} ₴`
-                    : `${formatNumber(checkout.loyaltyCard.bonus_balance)} ₴ бонусів`}
+      {#if checkout.allowLoyalty}
+        <div class="other-group">
+          <div class="other-group-title">Картка лояльності та бонуси</div>
+          {#if !checkout.loyaltyCard}
+            <button
+              type="button"
+              class="other-method-item loyalty-trigger-row"
+              onclick={() => {
+                currentSubView = null;
+                checkout.openLoyaltyScanner();
+              }}
+            >
+              <div class="other-method-item-left">
+                <div class="other-wallet-icon loyalty">
+                  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                    <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+                    <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                    <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+                    <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                    <line x1="7" y1="12" x2="17" y2="12"></line>
+                  </svg>
+                </div>
+                <div class="other-item-text">
+                  <div class="other-item-title">Зісканувати картку лояльності</div>
+                  <div class="other-item-sub">Камера, штрих-код або номер картки</div>
                 </div>
               </div>
-            </div>
-            <span class="other-badge-status">Налаштувати</span>
-          </button>
-        {/if}
-      </div>
+              <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+          {:else}
+            <button
+              type="button"
+              class="other-method-item applied-card"
+              onclick={() => {
+                currentSubView = null;
+                checkout.openLoyaltyScanner();
+              }}
+            >
+              <div class="other-method-item-left">
+                <div class="other-wallet-icon loyalty-active">
+                  ✓
+                </div>
+                <div class="other-item-text">
+                  <div class="other-item-title">{checkout.loyaltyCard.program_name}</div>
+                  <div class="other-item-sub">
+                    {checkout.loyaltyCard.use_bonuses
+                      ? `Списано ${formatNumber(checkout.bonusDiscount)} ₴`
+                      : `${formatNumber(checkout.loyaltyCard.bonus_balance)} ₴ бонусів`}
+                  </div>
+                </div>
+              </div>
+              <span class="other-badge-status">Налаштувати</span>
+            </button>
+          {/if}
+        </div>
+      {/if}
 
       <!-- Optional Digital Wallets & Cards -->
       <div class="other-group">

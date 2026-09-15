@@ -30,7 +30,7 @@
       : 'Очікує на оплату'}
   paid={checkout.order?.status === 'paid'}
   preparing={checkout.order?.status === 'preparing'}
-  ctaText={checkout.resolvedScenario.config?.ctaText || 'Перейти до оплати'}
+  ctaText={checkout.configCtaText || checkout.resolvedScenario.config?.ctaText || 'Перейти до оплати'}
   onpay={() => checkout.openPaymentSheet()}
 >
   {#snippet navigation(merchant)}
@@ -137,7 +137,7 @@
   {/if}
 
   <!-- Quick Upsell (Feature 1: Order Bump in 1-Click) -->
-  {#if checkout.upsellItems.length > 0}
+  {#if checkout.upsellItems.length > 0 && checkout.allowUpsell}
     <div class="upsell-section">
       <div class="upsell-header">
         <span>Рекомендуємо до замовлення:</span>
@@ -155,7 +155,7 @@
   {/if}
 
   <!-- Charity Round-Up for ZSU 🇺🇦 (Feature 2) -->
-  {#if checkout.showRoundUp}
+  {#if checkout.showRoundUp && checkout.allowRoundUp}
     <div class="roundup-card" class:active={checkout.isRoundUpActive}>
       <button class="roundup-btn" onclick={() => checkout.toggleRoundUp()}>
         <div class="roundup-left">

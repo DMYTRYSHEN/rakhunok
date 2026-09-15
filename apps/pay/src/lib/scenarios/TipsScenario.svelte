@@ -2,7 +2,7 @@
   import { checkout, formatNumber, vibrate } from '../state/checkout.svelte.js';
   import Odometer from '../components/Odometer.svelte';
 
-  const presets = [20, 50, 100, 200];
+  const presets = $derived(checkout.configTipPresets || checkout.order?.waiter?.presets || [20, 50, 100, 200]);
   let customMode = $state(false);
   let customValue = $state('');
 

@@ -67,6 +67,22 @@
     </div>
   </div>
 
+  {@const quicks = checkout.configQuickAmounts || (Array.isArray(checkout.resolvedScenario.config?.quickAmounts) ? checkout.resolvedScenario.config.quickAmounts : null)}
+  {#if quicks && quicks.length > 0}
+    <div style="display: flex; gap: 8px; justify-content: center; margin: 8px 0 12px; flex-wrap: wrap;">
+      {#each quicks as amt}
+        <button
+          type="button"
+          class="order-nav-btn"
+          style="width: auto; padding: 6px 14px; font-size: 13px; font-weight: 700; border-radius: 20px;"
+          onclick={() => { checkout.keypadValue = String(amt); }}
+        >
+          {amt} ₴
+        </button>
+      {/each}
+    </div>
+  {/if}
+
   <div class="keypad">
     {#each ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0'] as key}
       <button
@@ -103,6 +119,6 @@
     disabled={!isValidAmount}
     onclick={() => checkout.openPaymentSheet()}
   >
-    {checkout.resolvedScenario.config?.ctaText || 'Перейти до оплати'}
+    {checkout.configCtaText || checkout.resolvedScenario.config?.ctaText || 'Перейти до оплати'}
   </button>
 </div>

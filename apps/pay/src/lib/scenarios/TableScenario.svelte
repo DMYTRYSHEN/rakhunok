@@ -634,7 +634,7 @@
     {/if}
 
     <!-- Charity Round-Up for ZSU 🇺🇦 (Feature 2) -->
-    {#if checkout.showRoundUp}
+    {#if checkout.showRoundUp && checkout.allowRoundUp}
       <div class="roundup-card" class:active={checkout.isRoundUpActive}>
         <button class="roundup-btn" onclick={() => checkout.toggleRoundUp()}>
           <div class="roundup-left">
