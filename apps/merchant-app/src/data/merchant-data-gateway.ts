@@ -26,6 +26,7 @@ export type OrderSummary = {
 	orderNumber: string;
 	type: string;
 	shareUrl: string;
+	terminalId?: string;
 };
 
 export type CreateOrderInput = {
@@ -59,6 +60,7 @@ type OrderRow = {
 	order_number: string;
 	type: string;
 	share_url: string;
+	terminal_id?: string;
 };
 
 export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeof fetch = fetch, apiBase = '/app') {
@@ -106,7 +108,8 @@ export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeo
 				createdAt: order.created_at,
 				orderNumber: order.order_number,
 				type: order.type,
-				shareUrl: order.share_url
+				shareUrl: order.share_url,
+				terminalId: order.terminal_id
 			};
 		},
 
@@ -148,7 +151,7 @@ export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeo
 		async listOrders(merchantId: string, createdAfter?: string): Promise<OrderSummary[]> {
 			let query = client
 				.from('orders')
-				.select('id, total_amount, status, created_at, order_number, type, share_url')
+				.select('id, total_amount, status, created_at, order_number, type, share_url, terminal_id')
 				.eq('merchant_id', merchantId);
 			if (createdAfter) query = query.gte('created_at', createdAfter);
 			const result = await query
@@ -162,7 +165,8 @@ export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeo
 				createdAt: order.created_at,
 				orderNumber: order.order_number,
 				type: order.type,
-				shareUrl: order.share_url
+				shareUrl: order.share_url,
+				terminalId: order.terminal_id
 			}));
 		},
 

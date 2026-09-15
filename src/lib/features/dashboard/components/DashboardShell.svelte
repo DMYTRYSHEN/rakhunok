@@ -46,6 +46,7 @@
 		merchantName: string;
 		activeSection?:
 			| 'overview'
+			| 'proformas'
 			| 'invoices'
 			| 'invoice-rules'
 			| 'payment-methods'
@@ -288,6 +289,16 @@
 			>
 				<HugeiconsIcon icon={Store01Icon} size={17} aria-hidden="true" />
 				Каса
+			</a>
+			<a
+				href={resolve(demo ? '/dashboard/proformas?demo=1' : '/dashboard/proformas')}
+				onclick={() => (menuOpen = false)}
+				aria-current={activeSection === 'proformas' ? 'page' : undefined}
+				class:nav-active={activeSection === 'proformas'}
+				class="mt-1 flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-semibold text-zinc-400 hover:text-white"
+			>
+				<HugeiconsIcon icon={Scroll01Icon} size={17} aria-hidden="true" />
+				Проформи
 			</a>
 			<div class="mt-1">
 				<div

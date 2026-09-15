@@ -28,6 +28,7 @@
 	import type { BusinessEntity, MerchantDataGateway, OrderSummary, Terminal } from './data/merchant-data-gateway';
 	import { evaluateAmount, formatAmount } from './lib/calculator';
 	import PaymentQr from './lib/PaymentQr.svelte';
+	import LiquidPaymentButton from './lib/LiquidPaymentButton.svelte';
 	import { parseVoiceCommand, type VoiceCommand } from './lib/voice-command-parser';
 	import { applyPwaUpdate, isStandalone, promptInstall } from './platform/pwa';
 	import {
@@ -110,8 +111,13 @@
 	const selectedTerminal = $derived(terminals.find((terminal) => terminal.id === selectedTerminalId));
 	const selectedTerminalIndex = $derived(terminals.findIndex((terminal) => terminal.id === selectedTerminalId));
 	const scenarioIndex = $derived(scenario === 'fixed' ? 0 : scenario === 'table' ? 1 : 2);
+	const pendingTerminalOrder = $derived(
+		(scenario === 'table' || scenario === 'kasa') && selectedTerminal
+			? orders.find((o) => o.terminalId === selectedTerminal.id && (o.status === 'pending' || o.status === 'ready' || o.status === 'preparing'))
+			: undefined
+	);
 	const canPreview = $derived(
-		scenario === 'open' || (amount > 0 && (scenario !== 'table' || Boolean(selectedTerminal)))
+		!pendingTerminalOrder && (scenario === 'open' || (amount > 0 && (scenario !== 'table' || Boolean(selectedTerminal))))
 	);
 	const merchantName = $derived(authState.status === 'ready' ? authState.merchant.name : 'Моя каса');
 	const filteredOrders = $derived(orders.filter((order) => isOrderInPeriod(order, historyPeriod)));
@@ -119,7 +125,7 @@
 	const fullDateFormatter = new Intl.DateTimeFormat('uk-UA', { dateStyle: 'long', timeStyle: 'short' });
 
 	$effect(() => {
-		if (activeView !== 'history' || authState.status !== 'ready' || !merchantDataGateway) return;
+		if (authState.status !== 'ready' || !merchantDataGateway) return;
 		const merchantId = authState.merchant.id;
 		const period = historyPeriod;
 		const generation = sessionFence.capture();
@@ -821,6 +827,9 @@
 					<span class="terminal-status" aria-hidden="true"></span>
 					<ChevronDown class="select-chevron" size={17} strokeWidth={2.2} aria-hidden="true" />
 				</label>
+				{#if pendingTerminalOrder}
+					<div class="pending-terminal-warning">На цій точці вже є активний рахунок.</div>
+				{/if}
 				{#if structureError}<button class="structure-error" type="button" onclick={retryStructure}>{structureError} Повторити</button>{/if}
 			{:else if scenario === 'open'}
 				<div class="open-note"><span>∞</span><div><strong>Вільна сума</strong><p>Суму введе покупець</p></div></div>
@@ -929,7 +938,27 @@
 	<div class="dock-container">
 		<nav class="dock" aria-label="Навігація застосунку">
 			<button class:active={activeView !== 'profile'} type="button" onclick={() => (activeView = activeView === 'kasa' ? 'history' : 'kasa')} aria-label={activeView === 'kasa' ? 'Історія' : 'Каса'}>{#if activeView === 'kasa'}<History size={22} />{:else}<Store size={22} />{/if}</button>
-			<button class="pay-button" class:disabled={!canPreview} type="button" onclick={openPreview} aria-label="Створити рахунок"><span>{scenario === 'open' ? 'Вільна сума' : amount > 0 ? `${formatAmount(String(amount))} ₴` : 'Рахунок'}</span><ChevronRight size={21} strokeWidth={2.3} aria-hidden="true" /></button>
+			<LiquidPaymentButton
+				{amount}
+				formattedAmount={formatAmount(String(amount))}
+				{scenario}
+				disabled={!canPreview}
+				{selectedTerminal}
+				{terminals}
+				{selectedTerminalIndex}
+				onSelectTerminal={selectQrTerminal}
+				{orderCreating}
+				{orderCreateError}
+				bind:open={previewOpen}
+				{selectedOrder}
+				{orderAction}
+				{cancelConfirmation}
+				onSubmitOrder={createOrder}
+				onShareOrder={shareOrder}
+				onCopyOrderLink={copyOrderLink}
+				onCancelOrder={cancelOrder}
+				onClose={closeOrder}
+			/>
 			<button class:active={activeView === 'profile'} type="button" onclick={() => (activeView = 'profile')} aria-label="Профіль"><UserRound size={22} /></button>
 		</nav>
 		<button class="voice-button" class:listening={voiceOpen && voicePhase === 'listening'} type="button" aria-label="Створити рахунок голосом" onclick={openVoice}><Mic size={23} strokeWidth={2.1} /></button>
@@ -966,78 +995,4 @@
 			{/if}
 		</div>
 	</div>
-{/if}
-
-{#if authState.status === 'ready' && previewOpen}
-	<div class="modal-backdrop intelligence-backdrop" role="presentation">
-		<div class="order-sheet creation-sheet" role="dialog" aria-modal="true" aria-labelledby="preview-title">
-			<div class="sheet-handle" aria-hidden="true"></div>
-			<button class="sheet-close" type="button" onclick={() => (previewOpen = false)} aria-label="Закрити"><X size={18} /></button>
-			<div class="creation-status"><span></span> Новий рахунок</div>
-			<p class="eyebrow">Перевірка перед створенням</p>
-			<h2 id="preview-title">{scenario === 'open' ? 'Вільна сума' : formatAmount(String(amount))} {#if scenario !== 'open'}<small>₴</small>{/if}</h2>
-			{#if scenario === 'table' && selectedTerminal}
-				<div
-					class="qr-carousel"
-					class:multiple={terminals.length > 1}
-					role="group"
-					aria-label="QR-коди терміналів"
-					onpointerdown={(event) => (qrSwipeStartX = event.clientX)}
-					onpointerup={finishQrSwipe}
-					onpointercancel={() => (qrSwipeStartX = null)}
-				>
-					<div class="qr-carousel-heading">
-						<button type="button" aria-label="Попередній QR-код" disabled={selectedTerminalIndex <= 0} onclick={() => selectQrTerminal(selectedTerminalIndex - 1)}><ChevronLeft size={18} /></button>
-						<p class="terminal-summary"><strong>{selectedTerminal.name}</strong><span>{selectedTerminal.code}</span></p>
-						<button type="button" aria-label="Наступний QR-код" disabled={selectedTerminalIndex >= terminals.length - 1} onclick={() => selectQrTerminal(selectedTerminalIndex + 1)}><ChevronRight size={18} /></button>
-					</div>
-					<PaymentQr value={`${window.location.origin}/pos/${encodeURIComponent(selectedTerminal.code)}`} label="QR столу (багаторазовий)" />
-					{#if terminals.length > 1}
-						<div class="qr-pagination" aria-label={`QR-код ${selectedTerminalIndex + 1} з ${terminals.length}`}>
-							{#each terminals as terminal, index}
-								<button class:active={terminal.id === selectedTerminalId} type="button" aria-label={`Показати QR ${terminal.name}`} onclick={() => selectQrTerminal(index)}></button>
-							{/each}
-							<span>{selectedTerminalIndex + 1} / {terminals.length}</span>
-						</div>
-					{/if}
-				</div>
-			{:else}
-				<div class="creation-mark" aria-hidden="true"><svg viewBox="0 0 208 221"><path d="M108.9 29.2c31.7 0 52.6 20.2 52.6 47.8 0 21.2-12.1 38.8-33.1 46.3l40.9 68.1c-25.3 0-48.6-13.3-61-34.7l-13.7-23.7c-12.1 0-21.9 9.6-21.9 21.3v37.1c-19.4 0-35.2-15.3-35.2-34.3v-20c0-18.9 15.8-34.3 35.2-34.3h28.8c15.8 0 24.7-8.3 24.7-22.4 0-13.1-7.5-19.7-22.4-19.7H72.7c-19.4 0-35.2-14.1-35.2-31.5h71.4Z" /></svg></div>
-			{/if}
-			<div class="order-meta creation-meta">
-				<div><span>Тип</span><strong>{scenario === 'table' ? 'Термінал' : scenario === 'open' ? 'Вільна сума' : 'Фіксований'}</strong></div>
-				<div><span>Статус</span><strong>Не створено</strong></div>
-			</div>
-			{#if orderCreateError}<p class="sheet-copy" role="alert">{orderCreateError}</p>{/if}
-			<button class="primary-button creation-action" type="button" onclick={createOrder} disabled={orderCreating}>
-				{orderCreating ? 'Створення...' : 'Створити рахунок і QR'}
-			</button>
-		</div>
-	</div>
-{/if}
-
-{#if authState.status === 'ready' && selectedOrder}
-	<div class="modal-backdrop intelligence-backdrop" role="presentation">
-		<div class="order-sheet" role="dialog" aria-modal="true" aria-labelledby="order-title">
-			<div class="sheet-handle" aria-hidden="true"></div>
-			<button class="sheet-close" type="button" onclick={closeOrder} aria-label="Закрити"><X size={18} /></button>
-			<p class="eyebrow">{orderType(selectedOrder.type)}</p>
-			<h2 id="order-title">{formatAmount(String(selectedOrder.amount))} <small>₴</small></h2>
-			<p class="order-reference">{selectedOrder.orderNumber || orderIdentifier(selectedOrder.id)}</p>
-			<PaymentQr value={selectedOrder.shareUrl || `${window.location.origin}/pay/${selectedOrder.id}`} label="Рахунок на оплату" />
-			<div class="order-meta">
-				<div><span>Статус</span><strong>{orderStatus(selectedOrder.status)}</strong></div>
-				<div><span>Створено</span><strong>{fullDateFormatter.format(new Date(selectedOrder.createdAt))}</strong></div>
-			</div>
-			<div class="order-actions">
-				<button type="button" onclick={() => shareOrder(selectedOrder!)}><span><Share2 size={20} /></span>Поділитися</button>
-				<button type="button" onclick={() => copyOrderLink(selectedOrder!)}><span>{#if orderAction === 'copy'}<Check size={20} />{:else}<Copy size={20} />{/if}</span>{orderAction === 'copy' ? 'Скопійовано' : 'Копіювати'}</button>
-			</div>
-			{#if !['paid', 'completed', 'cancelled', 'expired'].includes(selectedOrder.status)}
-				<button class:confirming={cancelConfirmation} class="cancel-order" type="button" disabled={orderAction === 'cancel'} onclick={() => cancelOrder(selectedOrder!)}>
-					{orderAction === 'cancel' ? 'Скасування...' : cancelConfirmation ? 'Підтвердити скасування' : 'Скасувати рахунок'}
-				</button>
-			{/if}
-		</div>
-	</div>
-{/if}
+{/if}

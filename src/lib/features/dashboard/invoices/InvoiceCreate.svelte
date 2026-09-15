@@ -36,6 +36,8 @@
 	import { formatMoney } from '../utils/format';
 	import InvoiceBusinessPreview from '../business-settings/InvoiceBusinessPreview.svelte';
 	import { settingsHref } from '../business-settings/business-settings';
+	import { listProformas, saveProforma } from '../proformas/proforma-repository';
+	import type { ProformaDraft } from '../proformas/types';
 
 	type Scenario = {
 		id: InvoiceType;
@@ -195,6 +197,32 @@
 		if (!purposeOverridden) title = generatedPurpose;
 	});
 
+	let linkedProforma = $state<ProformaDraft | null>(null);
+
+	$effect(() => {
+		const proformaId = page.url.searchParams.get('proformaId');
+		if (!proformaId) return;
+
+		const mId = businessContext?.merchantId || 'default-merchant';
+		void listProformas(mId, demo).then((proformas) => {
+			const found = proformas.find((p) => p.id === proformaId);
+			if (found) {
+				linkedProforma = found;
+				scenario = 'fixed';
+				const totalVal = found.totals?.total ?? found.items.reduce((s, i) => s + (i.total || 0), 0);
+				amount = String(totalVal);
+				reference = found.number;
+				referenceOverridden = true;
+				title = `${found.title} № ${found.number}`;
+				purposeOverridden = true;
+				memo = found.purpose || found.notes || '';
+				if (found.seller?.entityId) {
+					selectedEntityId = found.seller.entityId;
+				}
+			}
+		});
+	});
+
 	$effect(() => {
 		const requestedScenario = page.url.searchParams.get('type');
 		if (requestedScenario === appliedScenarioParam) return;
@@ -284,6 +312,16 @@
 			});
 			invoiceRules = { ...invoiceRules, nextNumber: invoiceRules.nextNumber + 1 };
 			saveInvoiceRules(invoiceRules);
+
+			if (linkedProforma) {
+				const mId = businessContext?.merchantId || 'default-merchant';
+				await saveProforma(mId, {
+					...linkedProforma,
+					status: 'invoice_created',
+					invoiceId: result.id
+				}, demo);
+			}
+
 			await goto(resolve(`/dashboard/invoices/${result.id}` as '/'));
 		} catch (error) {
 			submitError = error instanceof Error ? error.message : 'Не вдалося створити рахунок.';
@@ -315,6 +353,30 @@
 			<span class="size-1.5 rounded-full bg-amber-500"></span> Чернетка без запису
 		</span>
 	</header>
+
+	{#if linkedProforma}
+		<div class="mb-7 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50/90 p-4 text-blue-950 shadow-sm">
+			<div class="flex items-center gap-3">
+				<div class="grid size-9 place-items-center rounded-xl bg-blue-600 text-white font-bold text-xs shadow-sm">
+					✓
+				</div>
+				<div>
+					<strong class="block text-sm font-extrabold">
+						Форма заповнена на основі проформи № {linkedProforma.number}
+					</strong>
+					<span class="text-xs text-blue-700">
+						Суму ({amount} ₴), номер, призначення та юридичну особу підтягнуто автоматично.
+					</span>
+				</div>
+			</div>
+			<a
+				href={resolve(demo ? '/dashboard/proformas?demo=1' : '/dashboard/proformas')}
+				class="rounded-xl border border-blue-300 bg-white px-3.5 py-1.5 text-xs font-bold text-blue-800 shadow-sm hover:bg-blue-50 transition"
+			>
+				До журналу проформ
+			</a>
+		</div>
+	{/if}
 
 	<div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_23rem]">
 		<div class="space-y-6">

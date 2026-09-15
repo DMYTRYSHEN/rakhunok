@@ -56,6 +56,7 @@
 	const loadPaymentSandbox = lazyModule(() => import('./sandbox/PaymentSandbox.svelte'));
 	const loadBusinessStructure = lazyModule(() => import('./structure/BusinessStructure.svelte'));
 	const loadInvoiceDetail = lazyModule(() => import('./invoices/InvoiceDetail.svelte'));
+	const loadProformaWorkspace = lazyModule(() => import('./proformas/ProformaWorkspace.svelte'));
 
 	let {
 		view = 'overview',
@@ -63,6 +64,7 @@
 	}: {
 		view?:
 			| 'overview'
+			| 'proformas'
 			| 'invoices'
 			| 'invoice'
 			| 'invoice-create'
@@ -81,6 +83,7 @@
 	function preloadActiveView() {
 		const loaders = {
 			overview: loadDashboardOverview,
+			proformas: loadProformaWorkspace,
 			invoices: loadInvoiceList,
 			invoice: loadInvoiceDetail,
 			'invoice-create': loadInvoiceCreate,
@@ -247,7 +250,7 @@
 		contentError = null;
 
 		try {
-			if (view === 'structure' || view === 'invoice-rules' || view === 'payment-methods') {
+			if (view === 'structure' || view === 'invoice-rules' || view === 'payment-methods' || view === 'proformas') {
 				await refreshStructure();
 			} else if (view === 'invoice-create') {
 				await Promise.all([refreshPosBoard(), refreshStructure()]);
@@ -636,23 +639,25 @@
 			? 'overview'
 			: view === 'pos'
 				? 'pos'
-				: view === 'settings'
-					? 'settings'
-					: view === 'invoice-rules'
-						? 'invoice-rules'
-						: view === 'payment-methods'
-							? 'payment-methods'
-							: view === 'public-page'
-								? 'public-page'
-								: view === 'team'
-									? 'team'
-									: view === 'developer-api'
-										? 'developer-api'
-										: view === 'sandbox'
-											? 'sandbox'
-											: view === 'structure'
-												? 'structure'
-												: 'invoices'}
+				: view === 'proformas'
+					? 'proformas'
+					: view === 'settings'
+						? 'settings'
+						: view === 'invoice-rules'
+							? 'invoice-rules'
+							: view === 'payment-methods'
+								? 'payment-methods'
+								: view === 'public-page'
+									? 'public-page'
+									: view === 'team'
+										? 'team'
+										: view === 'developer-api'
+											? 'developer-api'
+											: view === 'sandbox'
+												? 'sandbox'
+												: view === 'structure'
+													? 'structure'
+													: 'invoices'}
 		demo={sessionState.user.id === 'demo-user'}
 		attentionInvoices={attentionInvoices}
 		attentionError={attentionError}
@@ -687,6 +692,17 @@
 					onCreate={createPosOrder}
 					onMarkPaid={markPosOrderPaid}
 					onCancel={cancelPosOrder}
+					demo={sessionState.user.id === 'demo-user'}
+				/>
+			{/await}
+		{:else if view === 'proformas'}
+			{#await loadProformaWorkspace()}
+				<DashboardStateScreen loading />
+			{:then module}
+				<module.default
+					gateway={gateway!}
+					entities={structureData.entities}
+					businessContext={{ userId: sessionState.user.id, merchantId: sessionState.merchant.id, name: sessionState.merchant.displayName }}
 					demo={sessionState.user.id === 'demo-user'}
 				/>
 			{/await}

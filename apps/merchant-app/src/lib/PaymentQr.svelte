@@ -18,7 +18,7 @@
 </script>
 
 <figure class="payment-qr">
-	<figcaption>{label}</figcaption>
+	{#if label}<figcaption>{label}</figcaption>{/if}
 	<div class="payment-qr-frame" class:error>
 		<canvas bind:this={canvas} aria-label={label}></canvas>
 		<span class="payment-qr-logo" aria-hidden="true">
