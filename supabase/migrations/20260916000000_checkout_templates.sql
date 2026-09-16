@@ -13,9 +13,17 @@ create unique index if not exists checkout_templates_merchant_default_idx
 on public.checkout_templates (merchant_id) 
 where is_default = true;
 
+create or replace function public.set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
 drop trigger if exists handle_updated_at on public.checkout_templates;
 create trigger handle_updated_at before update on public.checkout_templates
-  for each row execute procedure moddatetime (updated_at);
+  for each row execute function public.set_updated_at();
 
 alter table public.checkout_templates enable row level security;
 
