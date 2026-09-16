@@ -252,7 +252,7 @@
 		contentError = null;
 
 		try {
-			if (view === 'structure' || view === 'invoice-rules' || view === 'payment-methods' || view === 'proformas') {
+			if (view === 'structure' || view === 'invoice-rules' || view === 'payment-methods' || view === 'proformas' || view === 'checkout-templates') {
 				await refreshStructure();
 			} else if (view === 'invoice-create') {
 				await Promise.all([refreshPosBoard(), refreshStructure()]);
