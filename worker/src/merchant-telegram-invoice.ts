@@ -184,7 +184,10 @@ export async function handleMerchantTelegramInvoice(request: Request, env: Merch
 			recipient = legalRecipient(entity, true);
 		}
 		if (![order.title, order.description].every(optionalText)) throw new Error('labels');
-	} catch { return failure(503, 'verification_unavailable', 'Не вдалося перевірити рахунок. Нічого не надіслано.'); }
+	} catch (err: unknown) { 
+		console.error('Verification error:', err);
+		return failure(503, 'verification_unavailable', 'Не вдалося перевірити дані. Помилка: ' + (err instanceof Error ? err.message : String(err))); 
+	}
 
 	let form: FormData;
 	try {
