@@ -685,6 +685,7 @@
 		box-shadow: 0 4px 22px rgba(10, 132, 255, 0.32), inset 0 1px 1px rgba(255, 255, 255, 0.28);
 		cursor: pointer;
 		outline: none;
+		touch-action: none;
 		transition: transform 120ms ease, opacity 180ms ease;
 	}
 
