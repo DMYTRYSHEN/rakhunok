@@ -160,7 +160,7 @@
 			<!-- Embed Checkout preview route -->
 			<iframe
 				bind:this={previewIframe}
-				src="https://letsrealtalk.com/pay/preview"
+				src="https://letsrealtalk.com/pay/?demo=all&mode=preview"
 				class="h-full w-full border-none"
 				title="Checkout Preview"
 			></iframe>
