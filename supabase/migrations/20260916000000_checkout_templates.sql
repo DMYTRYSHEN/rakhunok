@@ -31,7 +31,7 @@ create policy "Merchants can view their own templates"
 	on public.checkout_templates for select
 	using (
 		merchant_id in (
-			select merchant_id from public.merchant_team_members where user_id = auth.uid()
+			select merchant_id from public.merchant_memberships where user_id = auth.uid()
 			union
 			select id from public.merchants where user_id = auth.uid()
 		)
@@ -41,7 +41,7 @@ create policy "Merchants can insert their own templates"
 	on public.checkout_templates for insert
 	with check (
 		merchant_id in (
-			select merchant_id from public.merchant_team_members where user_id = auth.uid() and role in ('owner', 'admin')
+			select merchant_id from public.merchant_memberships where user_id = auth.uid() and role in ('owner', 'admin')
 			union
 			select id from public.merchants where user_id = auth.uid()
 		)
@@ -51,7 +51,7 @@ create policy "Merchants can update their own templates"
 	on public.checkout_templates for update
 	using (
 		merchant_id in (
-			select merchant_id from public.merchant_team_members where user_id = auth.uid() and role in ('owner', 'admin')
+			select merchant_id from public.merchant_memberships where user_id = auth.uid() and role in ('owner', 'admin')
 			union
 			select id from public.merchants where user_id = auth.uid()
 		)
@@ -61,7 +61,7 @@ create policy "Merchants can delete their own templates"
 	on public.checkout_templates for delete
 	using (
 		merchant_id in (
-			select merchant_id from public.merchant_team_members where user_id = auth.uid() and role in ('owner', 'admin')
+			select merchant_id from public.merchant_memberships where user_id = auth.uid() and role in ('owner', 'admin')
 			union
 			select id from public.merchants where user_id = auth.uid()
 		)

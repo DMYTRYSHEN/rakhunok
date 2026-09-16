@@ -16,6 +16,7 @@
 		DashboardSquare01Icon,
 		FlaskConicalIcon,
 		Invoice01Icon,
+		Invoice03Icon,
 		Logout01Icon,
 		MailSend01Icon,
 		Menu01Icon,
@@ -405,6 +406,16 @@
 					>
 						<HugeiconsIcon icon={WalletCardsIcon} size={15} className="shrink-0" aria-hidden="true" />
 						Приймання платежів
+					</a>
+					<a
+						href={resolve(demo ? '/dashboard/checkout-templates?demo=1' : '/dashboard/checkout-templates')}
+						onclick={() => (menuOpen = false)}
+						aria-current={activeSection === 'checkout-templates' ? 'page' : undefined}
+						class:nav-active={activeSection === 'checkout-templates'}
+						class="flex min-h-10 items-center gap-2 rounded-md px-2.5 text-xs font-semibold text-zinc-400 hover:bg-white/7 hover:text-white"
+					>
+						<HugeiconsIcon icon={Invoice03Icon} size={15} className="shrink-0" aria-hidden="true" />
+						Шаблони чекауту
 					</a>
 				</div>
 			</details>

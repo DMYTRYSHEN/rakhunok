@@ -69,6 +69,7 @@
 			| 'invoice'
 			| 'invoice-create'
 			| 'invoice-rules'
+			| 'checkout-templates'
 			| 'payment-methods'
 			| 'public-page'
 			| 'pos'
@@ -88,6 +89,7 @@
 			invoice: loadInvoiceDetail,
 			'invoice-create': loadInvoiceCreate,
 			'invoice-rules': loadBusinessSettingsWorkspace,
+			'checkout-templates': loadBusinessSettingsWorkspace,
 			'payment-methods': loadPaymentMethodsSettings,
 			'public-page': loadPublicPageSettings,
 			pos: loadPosBoard,
@@ -645,6 +647,8 @@
 						? 'settings'
 						: view === 'invoice-rules'
 							? 'invoice-rules'
+							: view === 'checkout-templates'
+								? 'checkout-templates'
 							: view === 'payment-methods'
 								? 'payment-methods'
 								: view === 'public-page'
