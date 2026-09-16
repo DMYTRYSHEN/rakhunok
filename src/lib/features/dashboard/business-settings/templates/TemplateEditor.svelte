@@ -2,35 +2,86 @@
 	import type { CheckoutTemplate, TemplateCreateInput } from '../../types';
 	import { createTemplate, updateTemplate } from '../../templates/template-repository';
 	import CheckoutConfigEditor from '../../templates/CheckoutConfigEditor.svelte';
-	import { getScenarioDefaults, resolveCheckoutConfig } from '$lib/features/shared/checkout-scenario-defaults';
-	import { fade } from 'svelte/transition';
+	import CheckoutTemplatePreview from './CheckoutTemplatePreview.svelte';
+	import {
+		isCheckoutTemplateScenario,
+		type CheckoutTemplateScenario
+	} from './checkout-template-preview';
+	import {
+		getScenarioDefaults,
+		resolveCheckoutConfig
+	} from '$lib/features/shared/checkout-scenario-defaults';
+	import { Eye, Settings2, X } from '@lucide/svelte';
+	import { onMount, untrack } from 'svelte';
 
 	let {
 		merchantId,
+		demo = false,
 		template = null,
 		onSave,
 		onCancel
 	}: {
 		merchantId: string;
+		demo?: boolean;
 		template?: CheckoutTemplate | null;
 		onSave: (t: CheckoutTemplate) => void;
 		onCancel: () => void;
 	} = $props();
-
-	let name = $state(template?.name || '');
-	let scenarioType = $state(template?.scenario_type || 'fixed');
-	let isDefault = $state(template?.is_default || false);
-	let config = $state(
-		template?.scenario_config || getScenarioDefaults(scenarioType as any)
-	);
+	const initialTemplate = untrack(() => template);
+	const initialScenario: CheckoutTemplateScenario =
+		initialTemplate && isCheckoutTemplateScenario(initialTemplate.scenario_type)
+			? initialTemplate.scenario_type
+			: 'fixed';
+	let name = $state(initialTemplate?.name ?? '');
+	let scenarioType = $state<CheckoutTemplateScenario>(initialScenario);
+	let confirmedScenario = initialScenario;
+	let isDefault = $state(initialTemplate?.is_default ?? false);
+	let config = $state(initialTemplate?.scenario_config ?? getScenarioDefaults(initialScenario));
+	let mobileView = $state<'settings' | 'preview'>('settings');
 
 	let saving = $state(false);
 	let error = $state<string | null>(null);
-	let previewIframe: HTMLIFrameElement;
+	const initialSnapshot = JSON.stringify({
+		name: initialTemplate?.name ?? '',
+		scenarioType: initialScenario,
+		isDefault: initialTemplate?.is_default ?? false,
+		config: initialTemplate?.scenario_config ?? getScenarioDefaults(initialScenario)
+	});
+	const dirty = $derived(
+		JSON.stringify({ name, scenarioType, isDefault, config }) !== initialSnapshot
+	);
+	const scenarioConfigDirty = $derived(
+		JSON.stringify(config) !== JSON.stringify(getScenarioDefaults(confirmedScenario))
+	);
 
 	function handleScenarioChange() {
-		config = getScenarioDefaults(scenarioType as any);
+		const nextScenario = scenarioType;
+		if (nextScenario === confirmedScenario) return;
+		if (
+			scenarioConfigDirty &&
+			!window.confirm('Змінити тип чекауту? Несумісні налаштування сценарію буде скинуто.')
+		) {
+			scenarioType = confirmedScenario;
+			return;
+		}
+		confirmedScenario = nextScenario;
+		config = getScenarioDefaults(nextScenario);
 	}
+
+	function closeEditor() {
+		if (saving) return;
+		if (dirty && !window.confirm('Закрити редактор і відкинути незбережені зміни?')) return;
+		onCancel();
+	}
+
+	onMount(() => {
+		const guard = (event: BeforeUnloadEvent) => {
+			if (!dirty) return;
+			event.preventDefault();
+		};
+		window.addEventListener('beforeunload', guard);
+		return () => window.removeEventListener('beforeunload', guard);
+	});
 
 	async function save() {
 		if (!name.trim()) {
@@ -42,7 +93,7 @@
 		error = null;
 
 		try {
-			const finalConfig = resolveCheckoutConfig(scenarioType as any, config);
+			const finalConfig = resolveCheckoutConfig(scenarioType, config);
 			const input: TemplateCreateInput = {
 				name: name.trim(),
 				scenario_type: scenarioType,
@@ -52,118 +103,186 @@
 
 			let saved: CheckoutTemplate;
 			if (template) {
-				saved = await updateTemplate(merchantId, template.id, input);
+				saved = await updateTemplate(merchantId, template.id, input, demo);
 			} else {
-				saved = await createTemplate(merchantId, input);
+				saved = await createTemplate(merchantId, input, demo);
 			}
 			onSave(saved);
-		} catch (err: any) {
-			error = err.message || 'Помилка при збереженні';
+		} catch (err: unknown) {
+			error = err instanceof Error ? err.message : 'Помилка при збереженні';
 		} finally {
 			saving = false;
 		}
 	}
-
-	// Send live updates to preview iframe
-	$effect(() => {
-		if (previewIframe && previewIframe.contentWindow) {
-			const finalConfig = resolveCheckoutConfig(scenarioType as any, config);
-			previewIframe.contentWindow.postMessage(
-				{
-					type: 'CHECKOUT_CONFIG_UPDATE',
-					scenario: scenarioType,
-					config: finalConfig
-				},
-				'*'
-			);
-		}
-	});
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-sm" transition:fade>
-	<div class="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl md:flex-row">
-		
-		<!-- Left: Form -->
-		<div class="flex h-full w-full flex-col overflow-y-auto border-r border-zinc-100 bg-white md:w-1/2 p-6">
-			<div class="mb-6 flex items-center justify-between">
-				<h2 class="text-xl font-bold text-zinc-900">{template ? 'Редагування шаблону' : 'Новий шаблон'}</h2>
-				<button type="button" class="text-zinc-400 hover:text-zinc-600" onclick={onCancel}>
-					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-				</button>
+<div
+	class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-0 backdrop-blur-sm sm:p-4"
+>
+	<div
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="template-editor-title"
+		class="flex h-full w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl sm:h-[94vh] sm:rounded-lg md:h-[90vh]"
+	>
+		<header
+			class="flex min-h-16 shrink-0 items-center justify-between gap-4 border-b border-zinc-200 px-4 sm:px-6"
+		>
+			<div class="min-w-0">
+				<h2 id="template-editor-title" class="text-xl font-bold text-zinc-900">
+					{template ? 'Редагування шаблону' : 'Новий шаблон'}
+				</h2>
+				<p class="text-xs font-medium text-zinc-500" aria-live="polite">
+					{dirty ? 'Є незбережені зміни' : 'Усі зміни збережено'}
+				</p>
+			</div>
+			<button
+				type="button"
+				aria-label="Закрити редактор"
+				class="grid size-10 shrink-0 place-items-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+				onclick={closeEditor}
+			>
+				<X size={20} />
+			</button>
+		</header>
+
+		<div
+			class="grid grid-cols-2 gap-1 border-b border-zinc-200 bg-zinc-100 p-1 md:hidden"
+			aria-label="Режим редактора"
+		>
+			<button
+				type="button"
+				class:active={mobileView === 'settings'}
+				onclick={() => (mobileView = 'settings')}
+			>
+				<Settings2 size={16} /> Налаштування
+			</button>
+			<button
+				type="button"
+				class:active={mobileView === 'preview'}
+				onclick={() => (mobileView = 'preview')}
+			>
+				<Eye size={16} /> Прев’ю
+			</button>
+		</div>
+
+		<div class="min-h-0 flex-1 md:grid md:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
+			<div
+				class:hidden={mobileView !== 'settings'}
+				class="h-full overflow-y-auto border-zinc-200 bg-white p-4 pb-28 sm:p-6 sm:pb-28 md:block md:border-r"
+			>
+				<section aria-labelledby="template-basics" class="space-y-4">
+					<div>
+						<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">Крок 1</p>
+						<h3 id="template-basics" class="text-base font-bold text-zinc-900">Основне</h3>
+					</div>
+
+					<label class="block">
+						<span class="mb-1 block text-sm font-semibold text-zinc-700">Назва шаблону</span>
+						<input
+							type="text"
+							bind:value={name}
+							placeholder="Наприклад: Тераса, VIP зал..."
+							class="w-full rounded-lg border border-zinc-200 p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+						/>
+					</label>
+
+					<label class="block">
+						<span class="mb-1 block text-sm font-semibold text-zinc-700">Тип чекауту</span>
+						<select
+							bind:value={scenarioType}
+							onchange={handleScenarioChange}
+							class="w-full rounded-lg border border-zinc-200 bg-white p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+						>
+							<option value="fixed">Фіксована сума (Товар/Послуга)</option>
+							<option value="table">HoReCa (Стіл в ресторані)</option>
+							<option value="delivery">Доставка (Товар + логістика)</option>
+							<option value="tips">Чайові / Донат</option>
+							<option value="open_amount">Відкрита сума</option>
+							<option value="fuel_station">АЗС — пальне на колонці</option>
+						</select>
+					</label>
+
+					<label class="flex cursor-pointer items-center gap-2">
+						<input
+							type="checkbox"
+							bind:checked={isDefault}
+							class="size-4 rounded accent-blue-600"
+						/>
+						<span class="text-sm font-medium text-zinc-700">Встановити за замовчуванням</span>
+					</label>
+				</section>
+
+				<section aria-labelledby="template-options" class="mt-8">
+					<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">Крок 2</p>
+					<h3 id="template-options" class="text-base font-bold text-zinc-900">
+						Можливості чекауту
+					</h3>
+					<p class="mt-1 text-sm text-zinc-500">
+						Показуємо лише параметри, доречні для вибраного сценарію.
+					</p>
+					<CheckoutConfigEditor bind:config scenario={scenarioType} />
+				</section>
 			</div>
 
-			<div class="space-y-4">
-				<label class="block">
-					<span class="mb-1 block text-sm font-semibold text-zinc-700">Назва шаблону</span>
-					<input
-						type="text"
-						bind:value={name}
-						placeholder="Наприклад: Тераса, VIP зал..."
-						class="w-full rounded-lg border border-zinc-200 p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-					/>
-				</label>
-
-				<label class="block">
-					<span class="mb-1 block text-sm font-semibold text-zinc-700">Тип чекауту</span>
-					<select
-						bind:value={scenarioType}
-						onchange={handleScenarioChange}
-						class="w-full rounded-lg border border-zinc-200 bg-white p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-					>
-						<option value="fixed">Фіксована сума (Товар/Послуга)</option>
-						<option value="table">HoReCa (Стіл в ресторані)</option>
-						<option value="delivery">Доставка (Товар + логістика)</option>
-						<option value="tips">Чайові / Донат</option>
-						<option value="open_amount">Відкрита сума</option>
-					</select>
-				</label>
-
-				<label class="flex items-center gap-2 cursor-pointer">
-					<input type="checkbox" bind:checked={isDefault} class="size-4 rounded accent-blue-600" />
-					<span class="text-sm font-medium text-zinc-700">Встановити за замовчуванням</span>
-				</label>
-
-				<div class="pt-4">
-					<CheckoutConfigEditor bind:config={config} scenario={scenarioType} />
+			<div
+				class:hidden={mobileView !== 'preview'}
+				class="relative h-full min-h-0 overflow-y-auto bg-zinc-50 md:block"
+			>
+				<div
+					class="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur-md"
+				>
+					<div>
+						<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">Крок 3</p>
+						<h3 class="text-sm font-bold text-zinc-900">Перевірка вигляду</h3>
+					</div>
+					<span class="text-xs font-medium text-zinc-500">Без реальної оплати</span>
 				</div>
-			</div>
-
-			<div class="mt-auto pt-6">
-				{#if error}
-					<p class="mb-4 text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>
-				{/if}
-				<div class="flex gap-3">
-					<button
-						type="button"
-						onclick={onCancel}
-						class="flex-1 rounded-lg border border-zinc-200 py-3 font-semibold text-zinc-700 hover:bg-zinc-50"
-					>
-						Скасувати
-					</button>
-					<button
-						type="button"
-						onclick={save}
-						disabled={saving}
-						class="flex-1 rounded-lg bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-70"
-					>
-						{saving ? 'Збереження...' : 'Зберегти шаблон'}
-					</button>
-				</div>
+				<CheckoutTemplatePreview scenario={scenarioType} {config} />
 			</div>
 		</div>
 
-		<!-- Right: Live Preview -->
-		<div class="hidden h-full w-full bg-zinc-50 md:block md:w-1/2 relative">
-			<div class="absolute top-4 left-4 right-4 z-10 flex items-center justify-between">
-				<span class="rounded-full bg-zinc-900/70 px-3 py-1 text-xs font-semibold tracking-wider text-white backdrop-blur-md">LIVE PREVIEW</span>
-			</div>
-			<!-- Embed Checkout preview route -->
-			<iframe
-				bind:this={previewIframe}
-				src="https://letsrealtalk.com/pay/?demo=all&mode=preview"
-				class="h-full w-full border-none"
-				title="Checkout Preview"
-			></iframe>
-		</div>
+		<footer
+			class="flex shrink-0 items-center gap-3 border-t border-zinc-200 bg-white px-4 py-3 sm:justify-end sm:px-6"
+		>
+			{#if error}
+				<p class="mr-auto text-sm font-medium text-red-600" role="alert">{error}</p>
+			{/if}
+			<button
+				type="button"
+				onclick={closeEditor}
+				disabled={saving}
+				class="min-h-11 flex-1 rounded-md border border-zinc-300 px-5 font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-60 sm:flex-none"
+			>
+				Скасувати
+			</button>
+			<button
+				type="button"
+				onclick={save}
+				disabled={saving || !dirty}
+				class="min-h-11 flex-1 rounded-md bg-blue-600 px-5 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+			>
+				{saving ? 'Збереження...' : template ? 'Зберегти зміни' : 'Створити шаблон'}
+			</button>
+		</footer>
 	</div>
 </div>
+
+<style>
+	[aria-label='Режим редактора'] button {
+		display: flex;
+		min-height: 40px;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		border-radius: 6px;
+		color: #52525b;
+		font-size: 13px;
+		font-weight: 700;
+	}
+	[aria-label='Режим редактора'] button.active {
+		background: white;
+		color: #18181b;
+		box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+	}
+</style>

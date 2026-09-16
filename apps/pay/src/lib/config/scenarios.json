@@ -28,6 +28,16 @@
         "quickAmounts": [50, 100, 200, 500]
       }
     },
+    "fuel_station": {
+      "id": "fuel_station",
+      "name": "Оплата пального",
+      "screen": "fuel_station",
+      "aliases": ["fuel_station"],
+      "requiresAmount": false,
+      "config": {
+        "ctaText": "Перейти до оплати"
+      }
+    },
     "table": {
       "id": "table",
       "name": "Рахунок за столиком",

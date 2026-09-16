@@ -52,6 +52,26 @@ describe('Checkout Scenario Configuration & Defaults', () => {
 		expect(config.cta_text).toBe('Подякувати');
 	});
 
+	it('provides policy-only defaults for fuel station templates', () => {
+		const config = getScenarioDefaults('fuel_station');
+		expect(config.checkout_flow).toEqual({
+			id: 'fuel_station',
+			version: 1,
+			invoice_type: 'open_amount'
+		});
+		expect(config.flow_data).toEqual({
+			policy: {
+				allowed_input_modes: ['liters', 'amount'],
+				default_input_mode: 'liters',
+				require_connected_nozzle: true,
+				price_change_policy: 'lock_quote',
+				quote_ttl_seconds: 60
+			}
+		});
+		expect(config.allow_promo).toBe(true);
+		expect(config.allow_bnpl).toBe(false);
+	});
+
 	it('provides correct defaults for donation scenario', () => {
 		const config = getScenarioDefaults('donation');
 		expect(config.allow_promo).toBe(false);

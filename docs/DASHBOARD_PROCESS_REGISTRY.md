@@ -65,6 +65,113 @@ changes do not bypass these rules.
 - Status remains `ANALYZING`: known shared auth subscription initialization issue remains outside
   this scope; these local checks do not certify authenticated account-switching or live delivery.
 
+### DASH-CHECKOUT-TEMPLATES-001 — checkout template management (2026-09-16)
+
+- **Status:** `ANALYZING — LOCAL FLOW INTEGRATION APPROVED` — the user separately approved local
+  validation and implementation of the JSON template-to-checkout renderer contract; remote migration
+  and deployment remain unapproved.
+- Current extension scope: preserve the template scenario identity in versioned `scenario_config`,
+  make `apps/pay` resolve its renderer from that identity independently of the persisted invoice type,
+  and prove a forward-compatible path for richer vertical flows such as fuel station dispenser,
+  fuel-grade, and volume selection. Existing payment execution, invoice lifecycle, authentication,
+  remote schema execution, and deployment remain outside this approval.
+- Approved scope: isolate demo storage, repair template CRUD/default consistency and validation,
+  tighten checkout-template RLS for active memberships, add focused tests, and make the minimum
+  `DASH-SHELL-001`/invoice-template integration corrections needed for a clean validated contract.
+  Authentication lifecycle, unrelated invoice behavior, checkout runtime, remote schema changes,
+  and deployment remain locked or out of scope.
+- Implemented merchant-scoped browser storage for demo mode before Supabase client acquisition,
+  repository/persisted-row validation, editor/list mutation fencing and error states, and canonical
+  scenario configuration shared by the editor, preview, repository, and invoice integration.
+- Production create, update, delete, and default reassignment now target one merchant-scoped RPC per
+  operation. The local migration uses advisory transaction locks, active-member RLS, explicit update
+  `WITH CHECK`, `SECURITY INVOKER`, restricted execute grants, and constraints for supported scenario,
+  bounded nonblank name, and complete boolean configuration.
+- Migration compatibility: legacy object configuration is merged over all 11 required defaults;
+  non-object JSON is normalized; the invalid empty-object column default is dropped before the new
+  constraints. The migration contract checks ordering, policy/RPC shape, backfill, and default removal.
+- Invoice integration preserves the separate persisted invoice-type domain: `tips` templates map to
+  `open_amount`; the other four supported scenarios map directly. Version `1` JSON now keeps renderer
+  identity in `checkout_flow.id`, financial behavior in `checkout_flow.invoice_type`, and optional
+  renderer-owned vertical input in `flow_data`. Custom flow slugs require all flow metadata, while
+  built-in scenarios remain compatible without it. Demo invoice creation loads the same merchant-local
+  template repository and does not acquire a Supabase client.
+- At the initial registry stage, `apps/pay` resolved only registered renderer IDs and aliases, so the
+  then-unregistered `fuel_station` and unsupported metadata fell back to persisted invoice behavior.
+  The later validated `fuel_station` registration and unchanged visual-design boundary are recorded below.
+- Evidence: direct Svelte check 0 errors/0 warnings; official Svelte autofixer found no issues in the
+  changed invoice-template path; scoped ESLint and diff whitespace checks clean; 11 focused repository
+  and invoice integration tests pass; 3 migration contract tests pass; pay scenario suite passes 223
+  tests. The pay preview and amount scenario compile with 0 errors/0 warnings, both changed Svelte files
+  pass the official autofixer, and the current pay suite passes 223/223. Earlier full Vitest remains 54
+  files/715 tests, and the isolated Dashboard adapter-static build completed to `build-dashboard`.
+- Focused Chromium demo acceptance in `dashboard.svelte.e2e.ts` passes through normal user actions and
+  covers empty state, create, edit, single-default reassignment, delete, reload persistence, 390 px
+  overflow, and zero remote Supabase REST/RPC requests. Invoice creation applies a `tips` template as
+  `open_amount` with its CTA/configuration. The adjacent cross-app `/apps/pay/src/fonts.css` import was
+  removed and no longer requests a proxied `/apps/pay` resource.
+- The template editor now uses one responsive workspace shell: settings and a sticky live preview are
+  visible side by side on desktop, while mobile uses explicit settings/preview modes and persistent
+  footer actions. It reports dirty state, protects close/navigation, and confirms scenario changes only
+  when scenario-owned configuration would be discarded. Scenario presets are structured controls for
+  `quick_amounts` and `tip_presets`; no executable or arbitrary JSON editor was introduced. The shared
+  dark theme default is now explicit so defaults, form state, preview, and pay resolve identically.
+- Post-editor evidence: official Svelte autofixer reports no issues for both changed components;
+  `svelte-check` reports 0 errors/0 warnings; focused Dashboard repository, invoice, and preview suites
+  pass 19/19; the pay suite passes 223/223 including versioned renderer identity and unknown
+  `fuel_station` fallback before its renderer was registered. Focused 390 px Chromium acceptance passes create/edit/default/delete/reload,
+  mobile mode switching, dirty-state visibility, quick-amount preview, and persisted preset restoration,
+  with zero remote Supabase requests. Scoped Prettier and `git diff --check` are clean apart from Windows
+  line-ending notices.
+- Dashboard `LIVE PREVIEW` now follows the real pay transition: the checkout remains visible beneath a
+  modal bank-selection sheet, and its CTA opens selectable banks before confirmation. The conditional
+  secondary view mirrors `BankSheet.svelte` with alternative wallet/card methods, promo application
+  when `allow_promo` is enabled, and loyalty-card interaction when `allow_loyalty` is enabled. Its close
+  and back controls return from alternative methods to the bank view before dismissing the sheet.
+- Payment-sheet evidence: the official Svelte autofixer reports no issue in the changed preview block,
+  direct `svelte-check` reports 0 errors/0 warnings, and focused 390 px Chromium acceptance passes. The
+  browser test covers checkout visibility behind the sheet, bank selection, fixed-template promo entry
+  and configured 4 ₴ discount, alternative methods, methods-to-bank navigation, sheet dismissal, and
+  promo absence under `tips` defaults. No `apps/pay` visual or runtime code was changed for this preview.
+- The first specialized renderer, `fuel_station`, now proves the versioned extension boundary. Reusable
+  templates persist policy only; operational checkout data carries a revisioned station snapshot,
+  dispenser/nozzle/product topology, limits, current selection, expiring authoritative quote, and
+  optional fulfillment result. Runtime activation fails closed to `open_amount` unless the complete
+  snapshot validates. A connected selection must match the active physical nozzle product.
+- Fuel-station quotes are bound to the exact snapshot ID/revision, dispenser, product, input mode and
+  input value. The CTA opens the existing `BankSheet.svelte` only while that identity, price arithmetic,
+  currency and TTL remain valid; changing liters or amount invalidates the quote. The client estimate is
+  never accepted as an authoritative payment amount. The `/pay` bank-sheet visual design was unchanged;
+  the shared animated amount received only a declarative accessible value.
+- AZS evidence: shared validator tests pass 5/5, including foreign snapshot/selection quote rejection
+  and connected-nozzle/product mismatch; template repository tests preserve policy-only storage; pay
+  Svelte/TypeScript check reports 0 errors/0 warnings; the complete pay suite passes 224/224. Focused 390 px
+  Chromium acceptance runs the real pay app through dispenser, fuel and liters steps, proves stale quote
+  blocking after a value change, restores the exact quote, and opens the existing bank sheet with
+  1190,00 UAH plus its alternative-methods/promo entry. The fixture is DEV localhost-only.
+- Dashboard now exposes `АЗС — пальне на колонці` in the template type selector. Its `LIVE PREVIEW`
+  supplies isolated demonstration station data and supports selecting one of four columns, fuel,
+  liters or amount, then opens the existing payment sheet with the preview total. These volatile
+  columns and prices are not persisted in the reusable template. Focused browser acceptance selects
+  connected column 2, A-95 and 20 liters and passes 1/1; preview/repository contracts pass 13/13,
+  direct Svelte check reports 0 errors/0 warnings, and the new component passes the official Svelte
+  autofixer. A separate full-suite dark-theme route assertion still fails because its Team heading is
+  absent; the other 17 browser tests, including checkout-template management, pass.
+- Supabase MCP read-only preflight against project `mwaeazabpvbxqfrceogr` found zero
+  `checkout_templates` rows and therefore zero current row-compatibility blockers. The remote table has
+  only its primary/merchant foreign-key constraints; the current update policy has no `WITH CHECK`, and
+  none of the four merchant-scoped template RPCs exists remotely. The unique partial merchant-default
+  index already exists. Recent Postgres/PostgREST logs contained no relevant checkout-template, RLS, or
+  permission errors. Migration history does not include local migration
+  `20260916170000_checkout_templates_integrity.sql`.
+- Residual blockers: root `npm run check` stops at five pre-existing documented-but-unimplemented
+  OpenAPI operations; the standard shared root build is locked by active local processes. The SQL is
+  contract-tested, including strict `IS TRUE` handling for nullable JSON predicates, but has not been
+  executed against local or remote Postgres. Remote execution remains outside the approved scope.
+- No authenticated browser mutation, remote migration, Supabase schema execution, or deployment was
+  performed. Those actions require separate explicit approval; existing auth and checkout runtime
+  contracts remain unchanged.
+
 ### DASH-BUSINESS-DRAFTS-002 — authorized isolated rollout (updated 2026-09-09)
 
 - **Status:** `ANALYZING` — authorized migration and isolated Dashboard deployment completed;

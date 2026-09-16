@@ -24,7 +24,8 @@ const BASE_DEFAULTS: CheckoutScenarioConfig = {
 	allow_nps_review: true,
 	show_other_banks: true,
 	promo_discount: 4.0,
-	cta_text: 'Перейти до оплати'
+	cta_text: 'Перейти до оплати',
+	theme: 'dark'
 };
 
 const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
@@ -72,6 +73,33 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		allow_compliance_card: false,
 		tip_presets: [20, 50, 100, 200],
 		cta_text: 'Подякувати'
+	},
+
+	fuel_station: {
+		allow_loyalty: false,
+		allow_promo: true,
+		allow_roundup: false,
+		allow_tips: false,
+		allow_split: false,
+		allow_bnpl: false,
+		allow_upsell: false,
+		allow_delivery: false,
+		allow_compliance_card: false,
+		checkout_flow: {
+			id: 'fuel_station',
+			version: 1,
+			invoice_type: 'open_amount'
+		},
+		flow_data: {
+			policy: {
+				allowed_input_modes: ['liters', 'amount'],
+				default_input_mode: 'liters',
+				require_connected_nozzle: true,
+				price_change_policy: 'lock_quote',
+				quote_ttl_seconds: 60
+			}
+		},
+		cta_text: 'Перейти до оплати'
 	},
 
 	donation: {

@@ -10,6 +10,12 @@
 
   const displayValue = $derived(checkout.keypadValue === '' ? '0' : checkout.keypadValue);
   const isValidAmount = $derived(checkout.baseAmount > 0);
+  const quickAmounts = $derived(
+    checkout.configQuickAmounts ||
+      (Array.isArray(checkout.resolvedScenario.config?.quickAmounts)
+        ? checkout.resolvedScenario.config.quickAmounts
+        : null)
+  );
 </script>
 
 <div class="screen-content">
@@ -67,10 +73,9 @@
     </div>
   </div>
 
-  {@const quicks = checkout.configQuickAmounts || (Array.isArray(checkout.resolvedScenario.config?.quickAmounts) ? checkout.resolvedScenario.config.quickAmounts : null)}
-  {#if quicks && quicks.length > 0}
+  {#if quickAmounts && quickAmounts.length > 0}
     <div style="display: flex; gap: 8px; justify-content: center; margin: 8px 0 12px; flex-wrap: wrap;">
-      {#each quicks as amt}
+      {#each quickAmounts as amt (amt)}
         <button
           type="button"
           class="order-nav-btn"

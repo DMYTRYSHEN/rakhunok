@@ -8,7 +8,25 @@
  * from `order.scenario_config` and renders blocks accordingly.
  */
 
+export interface CheckoutFlowReference {
+	/** Renderer identifier registered by the checkout application. */
+	id: string;
+	/** Contract version for this flow's JSON payload. */
+	version: number;
+	/** Stable financial behavior used when the renderer ID is vertical-specific. */
+	invoice_type?: CheckoutFlowInvoiceType;
+}
+
+export type CheckoutFlowId = string;
+export type CheckoutFlowInvoiceType = 'fixed' | 'open_amount' | 'table' | 'delivery';
+export const CHECKOUT_FLOW_CONTRACT_VERSION = 1;
+
 export interface CheckoutScenarioConfig {
+	/** Keeps UI flow identity separate from the persisted invoice/payment type. */
+	checkout_flow?: CheckoutFlowReference;
+	/** Renderer-owned versioned payload for vertical-specific fields. */
+	flow_data?: Record<string, unknown>;
+
 	// ── Loyalty & Discounts ──────────────────────────────────────
 	/** Show loyalty card scanner (Apple Pass, barcode) */
 	allow_loyalty: boolean;
@@ -59,6 +77,27 @@ export interface CheckoutScenarioConfig {
 
 	/** Allow future extensibility */
 	[key: string]: unknown;
+}
+
+export const CHECKOUT_TEMPLATE_SCENARIOS = [
+	'fixed',
+	'table',
+	'delivery',
+	'tips',
+	'open_amount',
+	'fuel_station'
+] as const;
+export type CheckoutTemplateScenario = (typeof CHECKOUT_TEMPLATE_SCENARIOS)[number];
+
+export function isCheckoutFlowId(value: unknown): value is CheckoutFlowId {
+	return typeof value === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(value);
+}
+
+export function isCheckoutTemplateScenario(value: unknown): value is CheckoutTemplateScenario {
+	return (
+		typeof value === 'string' &&
+		CHECKOUT_TEMPLATE_SCENARIOS.includes(value as CheckoutTemplateScenario)
+	);
 }
 
 /** All boolean keys of CheckoutScenarioConfig for iteration */

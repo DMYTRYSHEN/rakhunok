@@ -27,6 +27,10 @@
     {#await import('./AmountScenario.svelte') then { default: AmountScenario }}
       <AmountScenario />
     {/await}
+  {:else if screen === 'fuel_station'}
+    {#await import('./FuelStationScenario.svelte') then { default: FuelStationScenario }}
+      <FuelStationScenario />
+    {/await}
   {:else if screen === 'delivery'}
     {#await import('./DeliveryScenario.svelte') then { default: DeliveryScenario }}
       <DeliveryScenario />

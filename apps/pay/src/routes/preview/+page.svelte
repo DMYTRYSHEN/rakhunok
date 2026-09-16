@@ -1,50 +1,38 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { checkout } from '$lib/state/checkout.svelte';
-	import ScenarioRenderer from '$lib/scenarios/ScenarioRenderer.svelte';
-	import type { CheckoutScenarioConfig } from '$lib/features/shared/checkout-scenario-config';
+	import { checkout } from '../../lib/state/checkout.svelte.js';
+	import ScenarioRenderer from '../../lib/scenarios/ScenarioRenderer.svelte';
+	import type { Order } from '../../lib/types/order.js';
 
 	let loaded = $state(false);
 
-	onMount(() => {
-		// Mock an initial order so it renders immediately
-		checkout.init({
+	function previewOrder(scenario: string, config: Record<string, unknown>): Order {
+		return {
 			id: 'mock-order-id',
-			reference: 'PREVIEW-001',
-			title: 'Призначення платежу (Прев\'ю)',
-			amount: 500,
-			currency: 'UAH',
+			order_number: 'PREVIEW-001',
+			title: "Призначення платежу (Прев'ю)",
+			type: scenario,
 			status: 'pending',
-			scenario_type: 'fixed',
-			merchant_id: 'mock-merchant',
-			scenario_config: {},
-			created_at: new Date().toISOString(),
-			updated_at: new Date().toISOString()
-		}, {
-			id: 'mock-merchant',
-			user_id: 'mock-user',
-			business_name: 'Назва вашого бізнесу',
-			display_name: 'Ваш бізнес',
-			display_color: '#2563EB',
-			is_active: true,
-			created_at: new Date().toISOString(),
-			updated_at: new Date().toISOString()
-		});
-		
+			total_amount: 500,
+			base_amount: 500,
+			currency: 'UAH',
+			scenario_config: config,
+			merchant: {
+				business_name: 'Назва вашого бізнесу',
+				display_name: 'Ваш бізнес'
+			}
+		};
+	}
+
+	onMount(() => {
+		checkout.order = previewOrder('fixed', {});
 		loaded = true;
 
-		// Listen for config updates from the dashboard iframe parent
 		const listener = (event: MessageEvent) => {
 			if (event.data?.type === 'CHECKOUT_CONFIG_UPDATE') {
 				const scenario = event.data.scenario as string;
-				const config = event.data.config as CheckoutScenarioConfig;
-				
-				// Re-init with new config
-				checkout.init({
-					...checkout.order!,
-					scenario_type: scenario,
-					scenario_config: config
-				}, checkout.merchant!);
+				const config = event.data.config as Record<string, unknown>;
+				checkout.order = previewOrder(scenario, config);
 			}
 		};
 

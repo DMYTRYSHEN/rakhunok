@@ -23,6 +23,118 @@ test('renders the dashboard overview with the financial baseline', async ({ page
 	await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll');
 });
 
+test('manages checkout templates locally in demo mode', async ({ page }) => {
+	const supabaseRequests: string[] = [];
+	page.on('request', (request) => {
+		if (/\.supabase\.co\/|\/rest\/v1\/(?:checkout_templates|rpc\/)/i.test(request.url())) {
+			supabaseRequests.push(request.url());
+		}
+	});
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/dashboard/checkout-templates?demo=1');
+	await page.evaluate(() => localStorage.clear());
+	await page.reload();
+
+	await expect(page).toHaveTitle('Шаблони чекауту — Rahunok');
+	await expect(page.getByRole('heading', { name: 'Шаблони чекауту', level: 1 })).toBeVisible();
+	await expect(page.getByText('Немає шаблонів')).toBeVisible();
+	await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll');
+
+	await page.getByRole('button', { name: '+ Створити шаблон' }).click();
+	const editor = page.getByRole('dialog', { name: 'Новий шаблон' });
+	await editor.getByRole('textbox', { name: 'Назва шаблону' }).fill('Основний чайові');
+	await editor.getByRole('button', { name: 'Прев’ю' }).click();
+	await editor.getByRole('button', { name: 'Перейти до оплати' }).click();
+	const fixedPaymentSheet = editor.getByRole('dialog', { name: 'Вибір способу оплати' });
+	await fixedPaymentSheet.getByRole('button', { name: 'Інші способи оплати та промокод' }).click();
+	await fixedPaymentSheet.getByRole('textbox', { name: 'Промокод' }).fill('SAVE50');
+	await fixedPaymentSheet.getByRole('button', { name: 'Застосувати' }).click();
+	await expect(fixedPaymentSheet.getByText('Знижку 4 ₴ активовано')).toBeVisible();
+	await fixedPaymentSheet.getByRole('button', { name: 'Закрити' }).click();
+	await expect(fixedPaymentSheet.getByRole('button', { name: 'Обрати Monobank' })).toBeVisible();
+	await fixedPaymentSheet.getByRole('button', { name: 'Закрити' }).click();
+	await editor.getByRole('button', { name: 'Налаштування' }).click();
+	await editor.getByRole('combobox', { name: 'Тип чекауту' }).selectOption('tips');
+	await editor.getByRole('checkbox', { name: 'Встановити за замовчуванням' }).check();
+	await expect(editor.getByText('Є незбережені зміни')).toBeVisible();
+	await editor.getByRole('button', { name: 'Прев’ю' }).click();
+	await expect(editor.getByRole('heading', { name: 'Перевірка вигляду' })).toBeVisible();
+	await editor.getByRole('button', { name: 'Подякувати 10 ₴' }).click();
+	const paymentSheet = editor.getByRole('dialog', { name: 'Вибір способу оплати' });
+	await expect(paymentSheet).toBeVisible();
+	await expect(editor.getByText('Очікує на оплату')).toBeVisible();
+	await expect(paymentSheet.getByRole('button', { name: 'Обрати Monobank' })).toBeVisible();
+	await paymentSheet.getByRole('button', { name: 'Інші способи оплати та промокод' }).click();
+	await expect(paymentSheet.getByRole('button', { name: 'Apple Pay' })).toBeVisible();
+	await expect(paymentSheet.getByRole('textbox', { name: 'Промокод' })).toHaveCount(0);
+	await paymentSheet.getByRole('button', { name: 'Pay by Bank' }).click();
+	await paymentSheet.getByRole('button', { name: 'Закрити' }).click();
+	await expect(paymentSheet).toHaveCount(0);
+	await editor.getByRole('button', { name: 'Налаштування' }).click();
+	await editor.getByRole('button', { name: 'Створити шаблон' }).click();
+
+	await expect(page.getByText('Основний чайові')).toBeVisible();
+	await expect(page.getByText('Default')).toHaveCount(1);
+	await page.getByRole('button', { name: '+ Створити шаблон' }).click();
+	const secondEditor = page.getByRole('dialog', { name: 'Новий шаблон' });
+	await secondEditor.getByRole('textbox', { name: 'Назва шаблону' }).fill('АЗС майбутній');
+	await secondEditor.getByRole('combobox', { name: 'Тип чекауту' }).selectOption('fuel_station');
+	await secondEditor.getByRole('button', { name: 'Прев’ю' }).click();
+	await secondEditor.getByRole('button', { name: 'Колонка 2, пістолет підключено' }).click();
+	await secondEditor.getByRole('button', { name: 'Продовжити' }).click();
+	await secondEditor.getByRole('button', { name: /Бензин А-95/ }).click();
+	await secondEditor.getByRole('button', { name: 'Продовжити' }).click();
+	await expect(secondEditor.getByText('20 л')).toBeVisible();
+	await secondEditor.getByRole('button', { name: 'Перейти до оплати · 1 190 ₴' }).click();
+	const fuelPaymentSheet = secondEditor.getByRole('dialog', { name: 'Вибір способу оплати' });
+	await expect(fuelPaymentSheet.getByText('1 190 ₴')).toBeVisible();
+	await fuelPaymentSheet.getByRole('button', { name: 'Закрити' }).click();
+	await secondEditor.getByRole('button', { name: 'Налаштування' }).click();
+	await secondEditor.getByRole('combobox', { name: 'Тип чекауту' }).selectOption('open_amount');
+	await secondEditor.getByRole('spinbutton', { name: 'Швидка сума 1' }).fill('75');
+	await secondEditor.getByRole('button', { name: 'Прев’ю' }).click();
+	await expect(secondEditor.getByRole('button', { name: '75 ₴' })).toBeVisible();
+	await secondEditor.getByRole('button', { name: 'Створити шаблон' }).click();
+
+	const secondCard = page.locator('div.flex.flex-col.overflow-hidden').filter({
+		has: page.getByRole('heading', { name: 'АЗС майбутній', level: 3 })
+	});
+	await secondCard.getByRole('button', { name: 'Зробити основним' }).click();
+	await expect(page.getByText('Default')).toHaveCount(1);
+	await page.reload();
+	await expect(page.getByText('Основний чайові')).toBeVisible();
+	await expect(page.getByText('АЗС майбутній')).toBeVisible();
+	await expect(page.getByText('Default')).toHaveCount(1);
+	await page
+		.locator('div.flex.flex-col.overflow-hidden')
+		.filter({ has: page.getByRole('heading', { name: 'АЗС майбутній', level: 3 }) })
+		.getByRole('button', { name: 'Редагувати' })
+		.click();
+	const persistedPresetEditor = page.getByRole('dialog', { name: 'Редагування шаблону' });
+	await expect(
+		persistedPresetEditor.getByRole('spinbutton', { name: 'Швидка сума 1' })
+	).toHaveValue('75');
+	await persistedPresetEditor.getByRole('button', { name: 'Скасувати' }).click();
+
+	const firstCard = page.locator('div.flex.flex-col.overflow-hidden').filter({
+		has: page.getByRole('heading', { name: 'Основний чайові', level: 3 })
+	});
+	await firstCard.getByRole('button', { name: 'Редагувати' }).click();
+	const editDialog = page.getByRole('dialog', { name: 'Редагування шаблону' });
+	await editDialog.getByRole('textbox', { name: 'Назва шаблону' }).fill('Чайові тераса');
+	await editDialog.getByRole('button', { name: 'Зберегти зміни' }).click();
+	await expect(page.getByText('Чайові тераса')).toBeVisible();
+
+	page.once('dialog', (dialog) => dialog.accept());
+	await page
+		.locator('div.flex.flex-col.overflow-hidden')
+		.filter({ has: page.getByRole('heading', { name: 'Чайові тераса', level: 3 }) })
+		.getByRole('button', { name: 'Видалити' })
+		.click();
+	await expect(page.getByText('Чайові тераса')).toHaveCount(0);
+	await expect.poll(() => supabaseRequests).toEqual([]);
+});
+
 test('documents the current merchant OpenAPI contract', async ({ page, context }) => {
 	await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 	await page.goto('/dashboard/developer-api?demo=1');
@@ -283,7 +395,9 @@ test('saves seller rules as drafts without applying them to invoice fields', asy
 	const purpose = page.getByRole('textbox', { name: 'Призначення платежу' });
 	await expect(reference).not.toHaveValue(/DRAFT/);
 	await expect(purpose).not.toHaveValue(/DRAFT/);
-	await expect(page.getByRole('complementary', { name: 'Чернетка налаштувань продавця' })).toContainText('DRAFT-000001');
+	await expect(
+		page.getByRole('complementary', { name: 'Чернетка налаштувань продавця' })
+	).toContainText('DRAFT-000001');
 
 	await reference.fill('ВЛАСНИЙ-7');
 	await page.getByRole('button', { name: /Рахунок за столиком/ }).click();
@@ -338,9 +452,14 @@ test('keeps the POS route protected outside demo mode', async ({ page }) => {
 test('starts a new draft below the receipt of a paid POS order', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/dashboard/pos?demo=1');
-	const paidCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Бар', exact: true }) });
+	const paidCard = page
+		.getByRole('article')
+		.filter({ has: page.getByRole('heading', { name: 'Бар', exact: true }) });
 	const receipt = paidCard.getByRole('link', { name: 'Відкрити рахунок' });
-	const newDraft = paidCard.getByRole('button', { name: 'Нове замовлення (чернетка)', exact: true });
+	const newDraft = paidCard.getByRole('button', {
+		name: 'Нове замовлення (чернетка)',
+		exact: true
+	});
 	await expect(paidCard.getByText('Оплачено', { exact: true })).toBeVisible();
 	await expect(receipt).toBeVisible();
 	await expect(newDraft).toBeVisible();
@@ -348,8 +467,12 @@ test('starts a new draft below the receipt of a paid POS order', async ({ page }
 	const draftBox = await newDraft.boundingBox();
 	expect(receiptBox).not.toBeNull();
 	expect(draftBox!.y).toBeGreaterThanOrEqual(receiptBox!.y + receiptBox!.height);
-	const pendingCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Стіл 2', exact: true }) });
-	await expect(pendingCard.getByRole('button', { name: 'Нове замовлення (чернетка)' })).toHaveCount(0);
+	const pendingCard = page
+		.getByRole('article')
+		.filter({ has: page.getByRole('heading', { name: 'Стіл 2', exact: true }) });
+	await expect(pendingCard.getByRole('button', { name: 'Нове замовлення (чернетка)' })).toHaveCount(
+		0
+	);
 	await newDraft.click();
 	await expect(page.getByRole('region', { name: 'Чернетка замовлення' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Бар', exact: true })).toBeVisible();
@@ -359,7 +482,9 @@ test('starts a new draft below the receipt of a paid POS order', async ({ page }
 test('previews the future Device Event Gateway for kasa workplaces', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/dashboard/structure?demo=1');
-	await page.getByText('Юридичні реквізити та робочі місця · керування записами', { exact: true }).click();
+	await page
+		.getByText('Юридичні реквізити та робочі місця · керування записами', { exact: true })
+		.click();
 	await page.getByRole('button', { name: /Робочі місця/ }).click();
 
 	const gateway = page.getByRole('region', { name: 'Device Event Gateway' });

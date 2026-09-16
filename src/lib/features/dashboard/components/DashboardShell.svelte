@@ -51,6 +51,7 @@
 			| 'invoices'
 			| 'invoice-rules'
 			| 'payment-methods'
+			| 'checkout-templates'
 			| 'public-page'
 			| 'pos'
 			| 'sandbox'
@@ -371,10 +372,17 @@
 				Керування
 			</p>
 			<details open class="group/business">
-				<summary class="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-md px-3 text-sm font-semibold text-zinc-300 hover:bg-white/7 hover:text-white [&::-webkit-details-marker]:hidden">
+				<summary
+					class="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-md px-3 text-sm font-semibold text-zinc-300 hover:bg-white/7 hover:text-white [&::-webkit-details-marker]:hidden"
+				>
 					<HugeiconsIcon icon={Building03Icon} size={17} className="shrink-0" aria-hidden="true" />
 					<span class="min-w-0 flex-1">Налаштування бізнесу</span>
-					<HugeiconsIcon icon={ArrowDown01Icon} size={16} className="shrink-0 transition-transform group-open/business:rotate-180" aria-hidden="true" />
+					<HugeiconsIcon
+						icon={ArrowDown01Icon}
+						size={16}
+						className="shrink-0 transition-transform group-open/business:rotate-180"
+						aria-hidden="true"
+					/>
 				</summary>
 				<div class="mt-1 ml-5 space-y-0.5 border-l border-white/10 py-1 pl-2">
 					<a
@@ -384,7 +392,12 @@
 						class:nav-active={activeSection === 'structure'}
 						class="flex min-h-10 items-center gap-2 rounded-md px-2.5 text-xs font-semibold text-zinc-400 hover:bg-white/7 hover:text-white"
 					>
-						<HugeiconsIcon icon={Building03Icon} size={15} className="shrink-0" aria-hidden="true" />
+						<HugeiconsIcon
+							icon={Building03Icon}
+							size={15}
+							className="shrink-0"
+							aria-hidden="true"
+						/>
 						Структура бізнесу
 					</a>
 					<a
@@ -398,17 +411,26 @@
 						Правила рахунків
 					</a>
 					<a
-						href={resolve(demo ? '/dashboard/payment-methods?demo=1' : '/dashboard/payment-methods')}
+						href={resolve(
+							demo ? '/dashboard/payment-methods?demo=1' : '/dashboard/payment-methods'
+						)}
 						onclick={() => (menuOpen = false)}
 						aria-current={activeSection === 'payment-methods' ? 'page' : undefined}
 						class:nav-active={activeSection === 'payment-methods'}
 						class="flex min-h-10 items-center gap-2 rounded-md px-2.5 text-xs font-semibold text-zinc-400 hover:bg-white/7 hover:text-white"
 					>
-						<HugeiconsIcon icon={WalletCardsIcon} size={15} className="shrink-0" aria-hidden="true" />
+						<HugeiconsIcon
+							icon={WalletCardsIcon}
+							size={15}
+							className="shrink-0"
+							aria-hidden="true"
+						/>
 						Приймання платежів
 					</a>
 					<a
-						href={resolve(demo ? '/dashboard/checkout-templates?demo=1' : '/dashboard/checkout-templates')}
+						href={resolve(
+							demo ? '/dashboard/checkout-templates?demo=1' : '/dashboard/checkout-templates'
+						)}
 						onclick={() => (menuOpen = false)}
 						aria-current={activeSection === 'checkout-templates' ? 'page' : undefined}
 						class:nav-active={activeSection === 'checkout-templates'}
@@ -465,11 +487,14 @@
 			<a
 				href={resolve(demo ? '/dac7?demo=1' : '/dac7')}
 				onclick={() => (menuOpen = false)}
-				class="mt-1 flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-semibold text-emerald-400 hover:text-white transition"
+				class="mt-1 flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-semibold text-emerald-400 transition hover:text-white"
 			>
 				<HugeiconsIcon icon={Scroll01Icon} size={17} aria-hidden="true" />
 				<span>DAC7 & Платформи</span>
-				<span class="ml-auto rounded bg-emerald-950/80 px-1.5 py-0.5 text-[0.5625rem] font-bold text-emerald-400 border border-emerald-500/30">Н</span>
+				<span
+					class="ml-auto rounded border border-emerald-500/30 bg-emerald-950/80 px-1.5 py-0.5 text-[0.5625rem] font-bold text-emerald-400"
+					>Н</span
+				>
 			</a>
 			<a
 				href={resolve(demo ? '/dashboard/settings?demo=1' : '/dashboard/settings')}
@@ -568,17 +593,24 @@
 						>
 							<header class="border-b border-zinc-200 px-4 py-3">
 								<h2 class="text-sm font-bold text-zinc-950">Потребують уваги</h2>
-								<p class="mt-1 text-xs text-zinc-500">Прострочені рахунки, які ще очікують оплати.</p>
+								<p class="mt-1 text-xs text-zinc-500">
+									Прострочені рахунки, які ще очікують оплати.
+								</p>
 							</header>
 
 							{#if notificationError || attentionError}
-								<p class="border-b border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800" role="alert">
+								<p
+									class="border-b border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800"
+									role="alert"
+								>
 									{notificationError || attentionError}
 								</p>
 							{/if}
 
 							{#if attentionCount === 0}
-								<p class="px-4 py-8 text-center text-sm text-zinc-500">Немає рахунків, що потребують уваги.</p>
+								<p class="px-4 py-8 text-center text-sm text-zinc-500">
+									Немає рахунків, що потребують уваги.
+								</p>
 							{:else}
 								<ul class="max-h-[min(28rem,70vh)] divide-y divide-zinc-100 overflow-y-auto">
 									{#each attentionInvoices as invoice (invoice.id)}
@@ -586,14 +618,34 @@
 											<div class="flex items-start justify-between gap-3">
 												<div class="min-w-0">
 													<p class="truncate text-sm font-bold text-zinc-950">{invoice.title}</p>
-													<p class="mt-1 text-xs text-zinc-500">{invoice.reference} · {formatMoney(invoice.amount)}</p>
-													<p class="mt-1 text-xs font-semibold text-red-700">Прострочено {formatInvoiceDate(invoice.expiresAt!)}</p>
+													<p class="mt-1 text-xs text-zinc-500">
+														{invoice.reference} · {formatMoney(invoice.amount)}
+													</p>
+													<p class="mt-1 text-xs font-semibold text-red-700">
+														Прострочено {formatInvoiceDate(invoice.expiresAt!)}
+													</p>
 												</div>
-												<HugeiconsIcon icon={Invoice01Icon} size={18} className="shrink-0 text-red-600" aria-hidden="true" />
+												<HugeiconsIcon
+													icon={Invoice01Icon}
+													size={18}
+													className="shrink-0 text-red-600"
+													aria-hidden="true"
+												/>
 											</div>
 											<div class="mt-3 flex justify-end gap-2">
-												<a href={resolve(`/dashboard/invoices/${invoice.id}` as '/')} class="inline-flex h-8 items-center rounded-md border border-zinc-200 px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-50">Переглянути</a>
-												<button type="button" disabled={demo || !onCancelAttentionInvoice || Boolean(cancellingAttentionId)} onclick={() => cancelAttentionInvoice(invoice.id)} class="inline-flex h-8 items-center rounded-md bg-red-600 px-3 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50">
+												<a
+													href={resolve(`/dashboard/invoices/${invoice.id}` as '/')}
+													class="inline-flex h-8 items-center rounded-md border border-zinc-200 px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-50"
+													>Переглянути</a
+												>
+												<button
+													type="button"
+													disabled={demo ||
+														!onCancelAttentionInvoice ||
+														Boolean(cancellingAttentionId)}
+													onclick={() => cancelAttentionInvoice(invoice.id)}
+													class="inline-flex h-8 items-center rounded-md bg-red-600 px-3 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
+												>
 													{cancellingAttentionId === invoice.id ? 'Скасовуємо…' : 'Скасувати'}
 												</button>
 											</div>

@@ -34,7 +34,10 @@
 	} from '../invoice-rules/invoice-rules';
 	import type { BusinessEntity, InvoiceCreateInput, InvoiceType, PosTerminal } from '../types';
 	import type { CheckoutScenarioConfig } from '$lib/features/shared/checkout-scenario-config';
-	import { getScenarioDefaults, resolveCheckoutConfig } from '$lib/features/shared/checkout-scenario-defaults';
+	import {
+		getScenarioDefaults,
+		resolveCheckoutConfig
+	} from '$lib/features/shared/checkout-scenario-defaults';
 	import CheckoutConfigEditor from '../templates/CheckoutConfigEditor.svelte';
 	import { formatMoney } from '../utils/format';
 	import InvoiceBusinessPreview from '../business-settings/InvoiceBusinessPreview.svelte';
@@ -43,6 +46,7 @@
 	import type { ProformaDraft } from '../proformas/types';
 
 	import { listTemplates } from '../templates/template-repository';
+	import { buildTemplateInvoiceScenario } from '../templates/template-invoice';
 	import type { CheckoutTemplate } from '../types';
 
 	type Scenario = {
@@ -140,7 +144,8 @@
 		if (!entities || entities.length === 0) return;
 		if (selectedEntityId && entities.some((e) => e.id === selectedEntityId)) return;
 
-		const savedId = typeof window !== 'undefined' ? localStorage.getItem('rahunok_default_entity_id') : null;
+		const savedId =
+			typeof window !== 'undefined' ? localStorage.getItem('rahunok_default_entity_id') : null;
 		if (savedId && entities.some((e) => e.id === savedId)) {
 			selectedEntityId = savedId;
 		} else {
@@ -153,9 +158,9 @@
 
 	const selectedEntity = $derived(
 		(entities && entities.find((e) => e.id === selectedEntityId)) ||
-		(entities && entities.find((e) => e.taxId && e.iban)) ||
-		(entities && entities[0]) ||
-		null
+			(entities && entities.find((e) => e.taxId && e.iban)) ||
+			(entities && entities[0]) ||
+			null
 	);
 
 	$effect(() => {
@@ -241,8 +246,8 @@
 		invoiceRules = loadInvoiceRules();
 		if (businessContext?.merchantId) {
 			try {
-				templates = await listTemplates(businessContext.merchantId);
-				const defaultTemplate = templates.find(t => t.is_default);
+				templates = await listTemplates(businessContext.merchantId, demo);
+				const defaultTemplate = templates.find((t) => t.is_default);
 				if (defaultTemplate) {
 					applyTemplate(defaultTemplate);
 				}
@@ -253,9 +258,10 @@
 	});
 
 	function applyTemplate(t: CheckoutTemplate) {
+		const invoiceScenario = buildTemplateInvoiceScenario(t.scenario_type, t.scenario_config);
 		selectedTemplateId = t.id;
-		scenario = t.scenario_type as InvoiceType;
-		scenarioConfig = t.scenario_config;
+		scenario = invoiceScenario.type;
+		scenarioConfig = invoiceScenario.config;
 		amount = '0';
 		deliveryFee = '0';
 		minimumAmount = '0';
@@ -336,7 +342,7 @@
 		try {
 			// Resolve the config to fill any missing undefined fields with defaults just in case
 			const finalConfig = resolveCheckoutConfig(scenario, scenarioConfig);
-			
+
 			const result = await onCreate({
 				type: scenario,
 				reference: reference.trim(),
@@ -358,11 +364,15 @@
 
 			if (linkedProforma) {
 				const mId = businessContext?.merchantId || 'default-merchant';
-				await saveProforma(mId, {
-					...linkedProforma,
-					status: 'invoice_created',
-					invoiceId: result.id
-				}, demo);
+				await saveProforma(
+					mId,
+					{
+						...linkedProforma,
+						status: 'invoice_created',
+						invoiceId: result.id
+					},
+					demo
+				);
 			}
 
 			await goto(resolve(`/dashboard/invoices/${result.id}` as '/'));
@@ -398,9 +408,13 @@
 	</header>
 
 	{#if linkedProforma}
-		<div class="mb-7 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50/90 p-4 text-blue-950 shadow-sm">
+		<div
+			class="mb-7 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50/90 p-4 text-blue-950 shadow-sm"
+		>
 			<div class="flex items-center gap-3">
-				<div class="grid size-9 place-items-center rounded-xl bg-blue-600 text-white font-bold text-xs shadow-sm">
+				<div
+					class="grid size-9 place-items-center rounded-xl bg-blue-600 text-xs font-bold text-white shadow-sm"
+				>
 					✓
 				</div>
 				<div>
@@ -414,7 +428,7 @@
 			</div>
 			<a
 				href={resolve(demo ? '/dashboard/proformas?demo=1' : '/dashboard/proformas')}
-				class="rounded-xl border border-blue-300 bg-white px-3.5 py-1.5 text-xs font-bold text-blue-800 shadow-sm hover:bg-blue-50 transition"
+				class="rounded-xl border border-blue-300 bg-white px-3.5 py-1.5 text-xs font-bold text-blue-800 shadow-sm transition hover:bg-blue-50"
 			>
 				До журналу проформ
 			</a>
@@ -476,7 +490,7 @@
 				</div>
 
 				<div class="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
-					<div class="sm:col-span-2 space-y-2">
+					<div class="space-y-2 sm:col-span-2">
 						<div class="flex items-center justify-between">
 							<label for="entity-select" class="block text-xs font-bold text-zinc-600">
 								Юридичний продавець · поточний отримувач
@@ -498,32 +512,41 @@
 								>
 									{#each entities as ent (ent.id)}
 										<option value={ent.id}>
-											{ent.businessName} {ent.displayName ? `(${ent.displayName})` : ''} · {ent.bankName || 'Банк'}
+											{ent.businessName}
+											{ent.displayName ? `(${ent.displayName})` : ''} · {ent.bankName || 'Банк'}
 										</option>
 									{/each}
 								</select>
-								<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-zinc-400">
+								<div
+									class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-zinc-400"
+								>
 									<Building2 size={18} />
 								</div>
 							</div>
 						{:else}
-							<div class="flex h-12 items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3">
+							<div
+								class="flex h-12 items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3"
+							>
 								<Building2 size={17} class="text-zinc-500" aria-hidden="true" />
-								<span class="text-sm font-semibold text-zinc-800">
-									ФОП ДМИТРИШЕН · А-Банк
-								</span>
+								<span class="text-sm font-semibold text-zinc-800"> ФОП ДМИТРИШЕН · А-Банк </span>
 							</div>
 						{/if}
 
 						{#if selectedEntity}
-							<div class="rounded-lg border border-zinc-200/80 bg-zinc-50/80 p-3.5 text-xs text-zinc-600 space-y-1.5">
+							<div
+								class="space-y-1.5 rounded-lg border border-zinc-200/80 bg-zinc-50/80 p-3.5 text-xs text-zinc-600"
+							>
 								<div class="flex flex-wrap items-center justify-between gap-2">
 									<span class="font-medium text-zinc-500">Юридична назва:</span>
 									<span class="font-bold text-zinc-900">{selectedEntity.businessName}</span>
 								</div>
 								<div class="flex flex-wrap items-center justify-between gap-2">
-									<span class="font-medium text-zinc-500">{selectedEntity.businessType === 'tov' ? 'ЄДРПОУ' : 'ЄДРПОУ / РНОКПП'}:</span>
-									<span class="font-mono font-semibold text-zinc-900">{selectedEntity.taxId || '—'}</span>
+									<span class="font-medium text-zinc-500"
+										>{selectedEntity.businessType === 'tov' ? 'ЄДРПОУ' : 'ЄДРПОУ / РНОКПП'}:</span
+									>
+									<span class="font-mono font-semibold text-zinc-900"
+										>{selectedEntity.taxId || '—'}</span
+									>
 								</div>
 								<div class="flex flex-wrap items-center justify-between gap-2">
 									<span class="font-medium text-zinc-500">Банк:</span>
@@ -531,7 +554,9 @@
 								</div>
 								<div class="flex flex-wrap items-center justify-between gap-2">
 									<span class="font-medium text-zinc-500">IBAN:</span>
-									<span class="font-mono font-semibold text-blue-900 tracking-tight">{selectedEntity.iban || '—'}</span>
+									<span class="font-mono font-semibold tracking-tight text-blue-900"
+										>{selectedEntity.iban || '—'}</span
+									>
 								</div>
 							</div>
 						{/if}
@@ -732,14 +757,16 @@
 						></textarea>
 					</label>
 
-					<div class="sm:col-span-2 pt-2 border-t border-zinc-100">
+					<div class="border-t border-zinc-100 pt-2 sm:col-span-2">
 						{#if templates.length > 0}
 							<div class="mb-4">
-								<span class="mb-2 block text-xs font-bold text-zinc-600">Застосувати шаблон чекауту</span>
+								<span class="mb-2 block text-xs font-bold text-zinc-600"
+									>Застосувати шаблон чекауту</span
+								>
 								<select
 									bind:value={selectedTemplateId}
 									onchange={(e) => {
-										const t = templates.find(temp => temp.id === e.currentTarget.value);
+										const t = templates.find((temp) => temp.id === e.currentTarget.value);
 										if (t) applyTemplate(t);
 									}}
 									class="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold outline-none focus:border-blue-600"
@@ -925,9 +952,15 @@
 				<p class="mt-4 text-sm font-bold">{title}</p>
 				<strong class="mt-2 text-3xl tabular-nums">{formatMoney(total)}</strong>
 				{#if selectedEntity}
-					<div class="mt-4 w-full rounded-md bg-zinc-900 p-3 text-left text-xs border border-zinc-800">
-						<div class="text-zinc-400">Отримувач: <span class="text-white font-bold">{selectedEntity.businessName}</span></div>
-						<div class="text-zinc-400 mt-1">IBAN: <span class="font-mono text-zinc-200">{selectedEntity.iban}</span></div>
+					<div
+						class="mt-4 w-full rounded-md border border-zinc-800 bg-zinc-900 p-3 text-left text-xs"
+					>
+						<div class="text-zinc-400">
+							Отримувач: <span class="font-bold text-white">{selectedEntity.businessName}</span>
+						</div>
+						<div class="mt-1 text-zinc-400">
+							IBAN: <span class="font-mono text-zinc-200">{selectedEntity.iban}</span>
+						</div>
 					</div>
 				{/if}
 			</div>
