@@ -4,7 +4,7 @@ export const TELEGRAM_PROVIDER = 'custom:telegram' as const;
 
 /** UI feedback only; authorization remains Supabase + owner-scoped RLS. */
 export function hasTelegramIdentity(user: Pick<User, 'identities'>): boolean {
-	return user.identities?.some((identity) => identity.provider === TELEGRAM_PROVIDER) ?? false;
+	return user.identities?.some((identity) => identity.provider === TELEGRAM_PROVIDER || identity.provider === 'telegram') ?? false;
 }
 
 export function telegramCallbackError(href: string): string {

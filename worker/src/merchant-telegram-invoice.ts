@@ -92,7 +92,7 @@ function one(data: unknown): Row | null {
 
 function telegramRecipient(user: Row): number | null {
 	if (!Array.isArray(user.identities)) return null;
-	const matches = user.identities.filter((identity): identity is Row => record(identity) && identity.provider === 'custom:telegram');
+	const matches = user.identities.filter((identity): identity is Row => record(identity) && (identity.provider === 'custom:telegram' || identity.provider === 'telegram'));
 	if (matches.length !== 1) return null;
 	const identity = matches[0];
 	if (!uuid(identity.identity_id) || !uuid(identity.user_id) || identity.user_id !== user.id) return null;
