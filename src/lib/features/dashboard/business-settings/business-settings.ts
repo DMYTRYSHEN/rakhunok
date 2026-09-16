@@ -211,7 +211,7 @@ export function saveBusinessDraft(scope: string, draft: BusinessDraft, baseline?
 }
 
 export function settingsHref(view: BusinessSettingsView, entityId: string, demo: boolean): string {
-	if (!['structure', 'invoice-rules', 'payment-methods'].includes(view)) invalid('сторінка');
+	if (!['structure', 'invoice-rules', 'payment-methods', 'checkout-templates'].includes(view)) invalid('сторінка');
 	const query = new URLSearchParams();
 	if (demo) query.set('demo', '1');
 	if (isSafeSellerId(entityId)) query.set('entityId', entityId);
