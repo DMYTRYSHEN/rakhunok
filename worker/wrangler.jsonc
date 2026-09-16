@@ -31,7 +31,12 @@
 					"pattern": "letsrealtalk.com/*",
 					"zone_name": "letsrealtalk.com"
 				}
-			]
+			],
+			"vars": {
+				"TELEGRAM_INVOICE_PUBLIC_ORIGIN": "https://letsrealtalk.com",
+				"SUPABASE_URL": "https://mwaeazabpvbxqfrceogr.supabase.co",
+				"SUPABASE_ANON_KEY": "sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk"
+			}
 		}
 	}
 }
