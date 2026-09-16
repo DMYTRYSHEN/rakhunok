@@ -11,6 +11,7 @@
 		BusinessDraftConflictError, isBusinessDraftStorageEvent, reconcileBusinessEntities,
 		type BusinessDraft, type BusinessSettingsView, type SellerDraft
 	} from './business-settings';
+	import TemplateList from './templates/TemplateList.svelte';
 
 	let { merchant, entities, userId, demo = false, view }: {
 		merchant: DashboardMerchant; entities: BusinessEntity[]; userId: string;
@@ -18,9 +19,10 @@
 	} = $props();
 	const uid = $props.id();
 	const tabs: { view: BusinessSettingsView; label: string }[] = [
-		{ view: 'structure', label: 'Структура бізнесу' },
+		{ view: 'structure', label: 'Структура' },
 		{ view: 'invoice-rules', label: 'Правила рахунків' },
-		{ view: 'payment-methods', label: 'Приймання платежів' }
+		{ view: 'payment-methods', label: 'Приймання платежів' },
+		{ view: 'checkout-templates', label: 'Шаблони чекауту' }
 	];
 	const modes: { value: BusinessDraft['mode']; title: string; detail: string }[] = [
 		{ value: 'unconfigured', title: 'Ще не налаштовано', detail: 'Без обраної моделі приймання' },
@@ -218,6 +220,8 @@
 		<div class={panel}><p>Чернетка ще не завантажена. Редагування недоступне, щоб не перезаписати дані.</p><button type="button" disabled={busy} class="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-white" onclick={reloadDraft}>Повторити читання</button></div>
 	{:else if !sellers.length}
 		<div class="rounded-2xl border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700"><h2 class="text-lg font-bold">Спочатку додайте продавця</h2><p class="mt-2 text-sm text-zinc-500">Нові записи тут не створюються. Скористайтеся керуванням структурою нижче.</p><a class="mt-4 inline-block text-sm font-semibold text-blue-600 dark:text-blue-300" href={resolve(settingsHref('structure', '', demo) as '/')}>Відкрити структуру бізнесу →</a></div>
+	{:else if view === 'checkout-templates'}
+		<TemplateList merchantId={merchant.id} />
 	{:else}
 		<form onsubmit={(event) => { event.preventDefault(); save(); }} oninput={changed} onchange={changed} class="space-y-5">
 			<fieldset disabled={busy} class="min-w-0 space-y-5 border-0 p-0">

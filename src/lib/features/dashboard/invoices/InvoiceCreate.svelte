@@ -34,12 +34,16 @@
 	} from '../invoice-rules/invoice-rules';
 	import type { BusinessEntity, InvoiceCreateInput, InvoiceType, PosTerminal } from '../types';
 	import type { CheckoutScenarioConfig } from '$lib/features/shared/checkout-scenario-config';
-	import { getScenarioDefaults } from '$lib/features/shared/checkout-scenario-defaults';
+	import { getScenarioDefaults, resolveCheckoutConfig } from '$lib/features/shared/checkout-scenario-defaults';
+	import CheckoutConfigEditor from '../templates/CheckoutConfigEditor.svelte';
 	import { formatMoney } from '../utils/format';
 	import InvoiceBusinessPreview from '../business-settings/InvoiceBusinessPreview.svelte';
 	import { settingsHref } from '../business-settings/business-settings';
 	import { listProformas, saveProforma } from '../proformas/proforma-repository';
 	import type { ProformaDraft } from '../proformas/types';
+
+	import { listTemplates } from '../templates/template-repository';
+	import type { CheckoutTemplate } from '../types';
 
 	type Scenario = {
 		id: InvoiceType;
@@ -115,22 +119,9 @@
 	let purposeOverridden = $state(false);
 	let memo = $state('');
 	let terminalId = $state('');
-	let allowTips = $state(true);
-	let allowLoyalty = $state(true);
-	let allowPromo = $state(true);
-	let allowRoundUp = $state(true);
-	let allowSplit = $state(false);
-	let allowBnpl = $state(true);
-	let allowComplianceCard = $state(false);
-	let allowUpsell = $state(true);
-	let allowDelivery = $state(false);
-	let allowNpsReview = $state(true);
-	let showOtherBanks = $state(true);
-	let promoDiscount = $state(4.0);
-	let tipPresets = $state<number[]>([5, 10, 15, 20]);
-	let quickAmounts = $state<number[]>([50, 100, 200, 500]);
-	let ctaText = $state('Перейти до оплати');
-	let checkoutTheme = $state<'dark' | 'light'>('dark');
+	let scenarioConfig = $state<CheckoutScenarioConfig>(getScenarioDefaults('fixed'));
+	let templates = $state<CheckoutTemplate[]>([]);
+	let selectedTemplateId = $state<string>('');
 	let deliveryCity = $state('Київ');
 	let deliveryBranch = $state('Відділення №24');
 	let terminalDialogOpen = $state(false);
@@ -246,9 +237,29 @@
 		}
 	});
 
-	onMount(() => {
+	onMount(async () => {
 		invoiceRules = loadInvoiceRules();
+		if (businessContext?.merchantId) {
+			try {
+				templates = await listTemplates(businessContext.merchantId);
+				const defaultTemplate = templates.find(t => t.is_default);
+				if (defaultTemplate) {
+					applyTemplate(defaultTemplate);
+				}
+			} catch (err) {
+				console.error('Failed to load templates', err);
+			}
+		}
 	});
+
+	function applyTemplate(t: CheckoutTemplate) {
+		selectedTemplateId = t.id;
+		scenario = t.scenario_type as InvoiceType;
+		scenarioConfig = t.scenario_config;
+		amount = '0';
+		deliveryFee = '0';
+		minimumAmount = '0';
+	}
 
 	function chooseScenario(nextScenario: InvoiceType) {
 		scenario = nextScenario;
@@ -259,22 +270,24 @@
 
 		// Apply scenario-specific checkout config defaults
 		const defaults = getScenarioDefaults(nextScenario);
-		allowTips = defaults.allow_tips;
-		allowLoyalty = defaults.allow_loyalty;
-		allowPromo = defaults.allow_promo;
-		allowRoundUp = defaults.allow_roundup;
-		allowSplit = defaults.allow_split;
-		allowBnpl = defaults.allow_bnpl;
-		allowComplianceCard = defaults.allow_compliance_card;
-		allowUpsell = defaults.allow_upsell;
-		allowDelivery = defaults.allow_delivery;
-		allowNpsReview = defaults.allow_nps_review;
-		showOtherBanks = defaults.show_other_banks;
-		promoDiscount = defaults.promo_discount ?? 4.0;
-		tipPresets = defaults.tip_presets ?? [5, 10, 15, 20];
-		quickAmounts = defaults.quick_amounts ?? [50, 100, 200, 500];
-		ctaText = defaults.cta_text ?? 'Перейти до оплати';
-		checkoutTheme = defaults.theme ?? 'dark';
+		scenarioConfig = {
+			allow_tips: defaults.allow_tips,
+			allow_loyalty: defaults.allow_loyalty,
+			allow_promo: defaults.allow_promo,
+			allow_roundup: defaults.allow_roundup,
+			allow_split: defaults.allow_split,
+			allow_bnpl: defaults.allow_bnpl,
+			allow_compliance_card: defaults.allow_compliance_card,
+			allow_upsell: defaults.allow_upsell,
+			allow_delivery: defaults.allow_delivery,
+			allow_nps_review: defaults.allow_nps_review,
+			show_other_banks: defaults.show_other_banks,
+			promo_discount: defaults.promo_discount ?? 4.0,
+			tip_presets: defaults.tip_presets ?? [5, 10, 15, 20],
+			quick_amounts: defaults.quick_amounts ?? [50, 100, 200, 500],
+			cta_text: defaults.cta_text ?? 'Перейти до оплати',
+			theme: defaults.theme ?? 'dark'
+		};
 	}
 
 	function restoreGeneratedFields() {
@@ -321,6 +334,9 @@
 		submitting = true;
 		submitError = null;
 		try {
+			// Resolve the config to fill any missing undefined fields with defaults just in case
+			const finalConfig = resolveCheckoutConfig(scenario, scenarioConfig);
+			
 			const result = await onCreate({
 				type: scenario,
 				reference: reference.trim(),
@@ -335,24 +351,7 @@
 						: undefined,
 				terminalId: scenario === 'table' ? selectedTerminal?.id : undefined,
 				entityId: selectedEntity?.id,
-				scenario_config: {
-					allow_loyalty: allowLoyalty,
-					allow_promo: allowPromo,
-					allow_roundup: allowRoundUp,
-					allow_tips: scenario === 'table' ? allowTips : false,
-					allow_split: scenario === 'table' ? allowSplit : false,
-					allow_bnpl: allowBnpl,
-					allow_compliance_card: allowComplianceCard,
-					allow_upsell: allowUpsell,
-					allow_delivery: scenario === 'delivery' ? allowDelivery : false,
-					allow_nps_review: allowNpsReview,
-					show_other_banks: showOtherBanks,
-					promo_discount: promoDiscount,
-					tip_presets: tipPresets,
-					quick_amounts: quickAmounts,
-					cta_text: ctaText,
-					theme: checkoutTheme
-				}
+				scenario_config: finalConfig
 			});
 			invoiceRules = { ...invoiceRules, nextNumber: invoiceRules.nextNumber + 1 };
 			saveInvoiceRules(invoiceRules);
@@ -734,151 +733,28 @@
 					</label>
 
 					<div class="sm:col-span-2 pt-2 border-t border-zinc-100">
-					<span class="mb-3 block text-xs font-bold uppercase tracking-wider text-zinc-500">Опції екрана платника (UX)</span>
-
-					<!-- Loyalty & Discounts -->
-					<p class="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Лояльність та знижки</p>
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-4">
-						<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
-							<div>
-								<strong class="block text-xs font-semibold text-zinc-900">Картка лояльності</strong>
-								<span class="text-[11px] text-zinc-500">Сканер Apple Pass & бонуси</span>
+						{#if templates.length > 0}
+							<div class="mb-4">
+								<span class="mb-2 block text-xs font-bold text-zinc-600">Застосувати шаблон чекауту</span>
+								<select
+									bind:value={selectedTemplateId}
+									onchange={(e) => {
+										const t = templates.find(temp => temp.id === e.currentTarget.value);
+										if (t) applyTemplate(t);
+									}}
+									class="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold outline-none focus:border-blue-600"
+								>
+									<option value="" disabled>Оберіть шаблон...</option>
+									{#each templates as t (t.id)}
+										<option value={t.id}>{t.name} ({t.scenario_type})</option>
+									{/each}
+								</select>
 							</div>
-							<input type="checkbox" bind:checked={allowLoyalty} class="size-4.5 accent-blue-600 rounded" />
-						</label>
-						<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
-							<div>
-								<strong class="block text-xs font-semibold text-zinc-900">Промокод / знижка</strong>
-								<span class="text-[11px] text-zinc-500">Поле введення купона</span>
-							</div>
-							<input type="checkbox" bind:checked={allowPromo} class="size-4.5 accent-blue-600 rounded" />
-						</label>
-						{#if allowPromo}
-							<label class="sm:col-span-2">
-								<span class="mb-1 block text-xs font-bold text-zinc-600">Сума знижки (₴)</span>
-								<input
-									type="number"
-									bind:value={promoDiscount}
-									min="0"
-									step="0.5"
-									class="h-10 w-full rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-blue-600"
-								/>
-							</label>
 						{/if}
-					</div>
-
-					<!-- HoReCa -->
-					{#if scenario === 'table'}
-						<p class="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">HoReCa / Ресторан</p>
-						<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-4">
-							<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
-								<div>
-									<strong class="block text-xs font-semibold text-zinc-900">Чайові гостя</strong>
-									<span class="text-[11px] text-zinc-500">Пресети % або фіксовані суми</span>
-								</div>
-								<input type="checkbox" bind:checked={allowTips} class="size-4.5 accent-blue-600 rounded" />
-							</label>
-							<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
-								<div>
-									<strong class="block text-xs font-semibold text-zinc-900">Поділ рахунку</strong>
-									<span class="text-[11px] text-zinc-500">Split Bill між гостями</span>
-								</div>
-								<input type="checkbox" bind:checked={allowSplit} class="size-4.5 accent-blue-600 rounded" />
-							</label>
-							<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
-								<div>
-									<strong class="block text-xs font-semibold text-zinc-900">DAC7 Compliance</strong>
-									<span class="text-[11px] text-zinc-500">Фіскалізація та розщеплення</span>
-								</div>
-								<input type="checkbox" bind:checked={allowComplianceCard} class="size-4.5 accent-blue-600 rounded" />
-							</label>
-						</div>
-					{/if}
-
-					<!-- Charity -->
-					<p class="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Благодійність</p>
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-4">
-						<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
-							<div>
-								<strong class="block text-xs font-semibold text-zinc-900">Округлення на ЗСУ</strong>
-								<span class="text-[11px] text-zinc-500">Благодійний внесок решти</span>
-							</div>
-							<input type="checkbox" bind:checked={allowRoundUp} class="size-4.5 accent-blue-600 rounded" />
-						</label>
-					</div>
-
-					<!-- Order Enhancements -->
-					<p class="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Замовлення</p>
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-4">
-						<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
-							<div>
-								<strong class="block text-xs font-semibold text-zinc-900">Order Bump / Upsell</strong>
-								<span class="text-[11px] text-zinc-500">Допродаж перед оплатою</span>
-							</div>
-							<input type="checkbox" bind:checked={allowUpsell} class="size-4.5 accent-blue-600 rounded" />
-						</label>
-						{#if scenario === 'delivery'}
-							<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
-								<div>
-									<strong class="block text-xs font-semibold text-zinc-900">Блок доставки</strong>
-									<span class="text-[11px] text-zinc-500">Нова Пошта / кур'єр</span>
-								</div>
-								<input type="checkbox" bind:checked={allowDelivery} class="size-4.5 accent-blue-600 rounded" />
-							</label>
-						{/if}
-					</div>
-
-					<!-- Payment & Post-payment -->
-					<p class="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Оплата та після оплати</p>
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-4">
-						<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
-							<div>
-								<strong class="block text-xs font-semibold text-zinc-900">Оплата частинами (BNPL)</strong>
-								<span class="text-[11px] text-zinc-500">Розбити суму на 4 платежі</span>
-							</div>
-							<input type="checkbox" bind:checked={allowBnpl} class="size-4.5 accent-blue-600 rounded" />
-						</label>
-						<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
-							<div>
-								<strong class="block text-xs font-semibold text-zinc-900">Інші способи оплати</strong>
-								<span class="text-[11px] text-zinc-500">Показати додаткові банки</span>
-							</div>
-							<input type="checkbox" bind:checked={showOtherBanks} class="size-4.5 accent-blue-600 rounded" />
-						</label>
-						<label class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 cursor-pointer">
-							<div>
-								<strong class="block text-xs font-semibold text-zinc-900">NPS відгук</strong>
-								<span class="text-[11px] text-zinc-500">Оцінка після оплати</span>
-							</div>
-							<input type="checkbox" bind:checked={allowNpsReview} class="size-4.5 accent-blue-600 rounded" />
-						</label>
-					</div>
-
-					<!-- UI Customization -->
-					<p class="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Інтерфейс</p>
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-						<label>
-							<span class="mb-1 block text-xs font-bold text-zinc-600">Текст кнопки оплати</span>
-							<input
-								bind:value={ctaText}
-								placeholder="Перейти до оплати"
-								class="h-10 w-full rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-blue-600"
-							/>
-						</label>
-						<label>
-							<span class="mb-1 block text-xs font-bold text-zinc-600">Тема чекауту</span>
-							<select
-								bind:value={checkoutTheme}
-								class="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold"
-							>
-								<option value="dark">Темна</option>
-								<option value="light">Світла</option>
-							</select>
-						</label>
+						<CheckoutConfigEditor bind:config={scenarioConfig} {scenario} />
 					</div>
 				</div>
-			</div>
-		</section>
+			</section>
 		</div>
 
 		<aside

@@ -34,6 +34,19 @@ export type { CheckoutScenarioConfig as ScenarioConfig } from '$lib/features/sha
 import type { CheckoutScenarioConfig } from '$lib/features/shared/checkout-scenario-config';
 export type ScenarioConfigInput = Partial<CheckoutScenarioConfig>;
 
+export type CheckoutTemplate = {
+	id: string;
+	merchant_id: string;
+	name: string;
+	scenario_type: string;
+	scenario_config: CheckoutScenarioConfig;
+	is_default: boolean;
+	created_at: string;
+	updated_at: string;
+};
+
+export type TemplateCreateInput = Omit<CheckoutTemplate, 'id' | 'merchant_id' | 'created_at' | 'updated_at'>;
+
 export type InvoiceCreateInput = {
 	type: PersistedInvoiceType;
 	reference: string;

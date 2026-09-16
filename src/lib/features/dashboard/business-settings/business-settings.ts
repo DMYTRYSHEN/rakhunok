@@ -1,7 +1,7 @@
 import type { BusinessEntity } from '../types';
 import { defaultFinancePurposeTemplate, previewFinancePurpose, validateFinancePurposeTemplate } from './finance-purpose';
 
-export type BusinessSettingsView = 'structure' | 'invoice-rules' | 'payment-methods';
+export type BusinessSettingsView = 'structure' | 'invoice-rules' | 'payment-methods' | 'checkout-templates';
 export type SellerDraft = {
 	vatStatus: 'unknown' | 'vat' | 'no-vat';
 	prefix: string;
