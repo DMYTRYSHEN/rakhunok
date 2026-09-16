@@ -42,6 +42,9 @@ console.log(`Building production assets for ${supabaseUrl.hostname}...`);
 runNpmScript('check');
 runNpmScript('build');
 
+console.log('\n--- Building Sub-apps (merchant-app) ---');
+runNpmScript('build:app');
+
 const generatedEnv = readFileSync('build/_app/env.js', 'utf8');
 for (const name of requiredPublicEnv) {
 	if (!generatedEnv.includes(name)) {
@@ -52,8 +55,11 @@ for (const name of requiredPublicEnv) {
 runNpmScript('worker:check:production');
 runNpmScript('worker:check:dashboard:production');
 runNpmScript('worker:check:corex:production');
+runNpmScript('worker:check:app:production');
+
 runNpmScript('worker:deploy:production');
 runNpmScript('worker:deploy:dashboard:production');
 runNpmScript('worker:deploy:corex:production');
+runNpmScript('worker:deploy:app:production');
 
-console.log('Root, Dashboard, and Corex Workers now serve the same production build.');
+console.log('Root, Dashboard, Corex, and App Workers now serve the same production build.');
