@@ -193,15 +193,17 @@
 		<h1 class="mt-2 text-2xl font-extrabold sm:text-3xl">{title}</h1>
 		<p class="mt-3 break-words text-lg font-semibold">{merchant.businessName || merchant.displayName}</p>
 		<p class="mt-2 max-w-3xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">Один бізнес — окремі правила для кожного ТОВ та ФОП. У цій версії доступний поточний бізнес кабінету; додавання інших бізнесів потребує серверної інтеграції.</p>
-		<div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-			<label class="block w-full text-sm font-semibold sm:max-w-sm" for={`${uid}-seller`}>Продавець
-				<select id={`${uid}-seller`} class={input} value={draft.selectedSellerId} disabled={busy || !ready || !sameScope || !sellers.length} onchange={(event) => selectSeller(event.currentTarget.value)}>
-					{#if !sellers.length}<option value="">Немає продавців</option>{/if}
-					{#each sellers as entity (entity.id)}<option value={entity.id}>{entity.displayName || entity.businessName}</option>{/each}
-				</select>
-			</label>
-			<span class="w-fit rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">{busy ? 'Обмін зі сховищем…' : dirty ? 'Є незбережені зміни' : demo ? 'Лише локальні налаштування' : `Не застосовано до платежів · версія ${revision}`}</span>
-		</div>
+		{#if view !== 'checkout-templates'}
+			<div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+				<label class="block w-full text-sm font-semibold sm:max-w-sm" for={`${uid}-seller`}>Продавець
+					<select id={`${uid}-seller`} class={input} value={draft.selectedSellerId} disabled={busy || !ready || !sameScope || !sellers.length} onchange={(event) => selectSeller(event.currentTarget.value)}>
+						{#if !sellers.length}<option value="">Немає продавців</option>{/if}
+						{#each sellers as entity (entity.id)}<option value={entity.id}>{entity.displayName || entity.businessName}</option>{/each}
+					</select>
+				</label>
+				<span class="w-fit rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">{busy ? 'Обмін зі сховищем…' : dirty ? 'Є незбережені зміни' : demo ? 'Лише локальні налаштування' : `Не застосовано до платежів · версія ${revision}`}</span>
+			</div>
+		{/if}
 		<nav class="mt-5 flex flex-wrap gap-2" aria-label="Розділи налаштувань бізнесу">
 			{#each tabs as tab (tab.view)}
 				<a href={resolve(settingsHref(tab.view, sameScope ? draft.selectedSellerId : '', demo) as '/')} aria-current={view === tab.view ? 'page' : undefined} class="rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors {view === tab.view ? 'bg-blue-600 text-white' : 'bg-white/70 text-zinc-700 hover:bg-blue-100 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700'}">{tab.label}</a>
