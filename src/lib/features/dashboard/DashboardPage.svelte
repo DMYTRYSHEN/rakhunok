@@ -814,6 +814,12 @@
 			{/await}
 				</div>
 			</details>
+		{:else if view === 'checkout-templates'}
+			{#await loadBusinessSettingsWorkspace() then module}
+				{#key `${sessionState.user.id}:${sessionState.merchant.id}`}
+					<module.default merchant={sessionState.merchant} entities={structureData.entities} userId={sessionState.user.id} demo={sessionState.user.id === 'demo-user'} view="checkout-templates" />
+				{/key}
+			{/await}
 		{:else if selectedInvoice}
 			{#await loadInvoiceDetail()}
 				<DashboardStateScreen loading />
