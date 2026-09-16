@@ -297,6 +297,7 @@ describe('dashboard gateway', () => {
 
 		await expect(
 			gateway.createInvoice({
+				merchantId: 'merchant-1',
 				type: 'delivery',
 				reference: 'RHK-1',
 				title: 'Оплата замовлення',
@@ -314,14 +315,83 @@ describe('dashboard gateway', () => {
 			'https://api.example.com/api/v1/orders',
 			expect.objectContaining({
 				method: 'POST',
-					body: expect.stringContaining('"terminal_id":"terminal-1"')
+				body: expect.stringContaining('"merchant_id":"merchant-1"')
 			})
 		);
+		expect(fetcher.mock.calls[0]?.[1]?.body).toContain('"terminal_id":"terminal-1"');
 		expect(fetcher).toHaveBeenNthCalledWith(
 			2,
 			'https://api.example.com/api/v1/orders/invoice-new',
 			expect.objectContaining({ method: 'PATCH', body: '{"status":"cancelled"}' })
 		);
+	});
+
+	it('keeps the ready-session merchant scope in the direct invoice fallback', async () => {
+		const merchantFilters: Array<[string, unknown]> = [];
+		let insertedPayload: Record<string, unknown> | null = null;
+		const merchantQuery = {
+			select: vi.fn(() => merchantQuery),
+			eq: vi.fn((column: string, value: unknown) => {
+				merchantFilters.push([column, value]);
+				return merchantQuery;
+			}),
+			maybeSingle: vi.fn(async () => ({ data: { id: 'merchant-ready' }, error: null }))
+		};
+		const orderQuery = {
+			insert: vi.fn((payload: Record<string, unknown>) => {
+				insertedPayload = payload;
+				return orderQuery;
+			}),
+			select: vi.fn(() => orderQuery),
+			single: vi.fn(async () => ({ data: { id: 'invoice-fallback' }, error: null }))
+		};
+		const client = {
+			auth: {
+				getSession: vi.fn(async () => ({
+					data: { session: { ...session, access_token: 'access-token' } },
+					error: null
+				})),
+				getUser: vi.fn(async () => ({ data: { user: session.user }, error: null }))
+			},
+			from: vi.fn((table: string) => (table === 'merchants' ? merchantQuery : orderQuery))
+		} as unknown as SupabaseClient;
+		const gateway = createDashboardGateway(client, {
+			fetcher: vi.fn<typeof fetch>().mockRejectedValue(new TypeError('network unavailable'))
+		});
+		const scenarioConfig = {
+			allow_tips: false,
+			allow_loyalty: false,
+			allow_promo: false,
+			allow_roundup: false,
+			allow_split: false,
+			allow_bnpl: false,
+			allow_compliance_card: false,
+			allow_upsell: false,
+			allow_delivery: false,
+			allow_nps_review: false,
+			show_other_banks: true
+		};
+
+		await expect(
+			gateway.createInvoice({
+				merchantId: 'merchant-ready',
+				type: 'fixed',
+				reference: 'INV-TEMPLATE',
+				title: 'Template invoice',
+				amount: 100,
+				scenario_config: scenarioConfig
+			})
+		).resolves.toEqual({ id: 'invoice-fallback' });
+
+		expect(merchantFilters).toEqual([
+			['id', 'merchant-ready'],
+			['user_id', 'user-1']
+		]);
+		expect(insertedPayload).toMatchObject({
+			merchant_id: 'merchant-ready',
+			order_number: 'INV-TEMPLATE',
+			scenario_config: scenarioConfig
+		});
 	});
 
 	it('loads and saves merchant settings through an owner-keyed row', async () => {
@@ -376,6 +446,7 @@ describe('dashboard gateway', () => {
 
 		await expect(
 			gateway.createInvoice({
+				merchantId: 'merchant-1',
 				type: 'fixed',
 				reference: 'INV-1',
 				title: 'Test invoice',
@@ -399,6 +470,7 @@ describe('dashboard gateway', () => {
 		const gateway = createDashboardGateway(client, { fetcher });
 
 		await gateway.createInvoice({
+			merchantId: 'merchant-1',
 			type: 'fixed',
 			reference: 'INV-1',
 			title: 'Test invoice',

@@ -174,6 +174,7 @@ export async function convertProformaToInvoice(
 
 	// 1. Create real payable invoice via Gateway
 	const { id: invoiceId } = await gateway.createInvoice({
+		merchantId,
 		type: 'fixed',
 		reference: proforma.number,
 		title: `${proforma.title} № ${proforma.number}`,

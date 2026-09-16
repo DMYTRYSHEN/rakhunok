@@ -5,6 +5,7 @@
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Copy from '@lucide/svelte/icons/copy';
 	import QrCode from '@lucide/svelte/icons/qr-code';
+	import Send from '@lucide/svelte/icons/send';
 	import Share2 from '@lucide/svelte/icons/share-2';
 	import X from '@lucide/svelte/icons/x';
 	import { haptic } from '../platform/telegram';
@@ -36,10 +37,13 @@
 		open?: boolean;
 		selectedOrder?: OrderSummary | null;
 		orderAction?: 'copy' | 'cancel' | null;
+		telegramAction?: 'sending' | 'sent' | 'error' | 'unknown' | null;
+		telegramActionMessage?: string;
 		cancelConfirmation?: boolean;
 		origin?: string;
 		onSubmitOrder: () => void;
 		onShareOrder?: (order: OrderSummary) => void;
+		onSendTelegramInvoice?: (order: OrderSummary) => void;
 		onCopyOrderLink?: (order: OrderSummary) => void;
 		onCancelOrder?: (order: OrderSummary) => void;
 		onClose?: () => void;
@@ -59,25 +63,34 @@
 		open = $bindable(false),
 		selectedOrder = null,
 		orderAction = null,
+		telegramAction = null,
+		telegramActionMessage = '',
 		cancelConfirmation = false,
 		origin = '',
 		onSubmitOrder,
 		onShareOrder,
+		onSendTelegramInvoice,
 		onCopyOrderLink,
 		onCancelOrder,
 		onClose
 	}: Props = $props();
 
 	let containerEl: HTMLElement | null = $state(null);
+	let cardEl: HTMLElement | null = $state(null);
 	let buttonWidth = $state(180);
 	let windowWidth = $state(380);
 	let windowHeight = $state(520);
+	let viewportWidth = $state(360);
+	let viewportHeight = $state(640);
 	let startCenterX = $state(0);
 	let startCenterY = $state(0);
 
-	let cachedOrder = $state<OrderSummary | null>(null);
-	let createdQrIndex = $state(0);
+	function initialOrder() {
+		return selectedOrder;
+	}
 
+	let cachedOrder = $state<OrderSummary | null>(initialOrder());
+	let qrEntryIndex = $state(0);
 	let spring = $state<SpringState>({ value: 0, velocity: 0, target: 0 });
 	let isDragging = $state(false);
 	let isHolding = $state(false);
@@ -114,6 +127,7 @@
 	$effect(() => {
 		if (selectedOrder) {
 			cachedOrder = selectedOrder;
+			updateDimensions();
 		}
 		if (selectedOrder || open) {
 			updateAnchorCoords();
@@ -136,12 +150,12 @@
 		computeLiquidGeometry(spring.value, buttonWidth, windowWidth, windowHeight)
 	);
 
-	let screenCenterX = $derived(typeof window !== 'undefined' ? window.innerWidth / 2 : 180);
-	let screenCenterY = $derived(typeof window !== 'undefined' ? window.innerHeight / 2 : 320);
+	let screenCenterX = $derived(viewportWidth / 2);
+	let sheetCenterY = $derived(viewportHeight - windowHeight / 2 - 10);
 
 	let t = $derived(smoothstep(spring.value));
 	let currentCenterX = $derived(lerp(startCenterX || screenCenterX, screenCenterX, t));
-	let currentCenterY = $derived(lerp(startCenterY || screenCenterY + 200, screenCenterY, t));
+	let currentCenterY = $derived(lerp(startCenterY || sheetCenterY + 200, sheetCenterY, t));
 
 	let isOverlayActive = $derived(Boolean(cachedOrder) || open || spring.value > 0.005 || spring.target > 0 || isPressed);
 	let isExpanded = $derived(spring.value >= 0.82);
@@ -155,6 +169,31 @@
 	);
 
 	let shareOrigin = $derived(origin || (typeof window !== 'undefined' ? window.location.origin : ''));
+	let paymentComplete = $derived(cachedOrder?.status === 'paid' || cachedOrder?.status === 'completed');
+	let paymentClosed = $derived(cachedOrder?.status === 'cancelled' || cachedOrder?.status === 'expired');
+	let paymentUrl = $derived(cachedOrder?.shareUrl || (cachedOrder ? `${shareOrigin}/pay/${cachedOrder.id}` : ''));
+	let orderTerminal = $derived(terminals.find((terminal) => terminal.id === cachedOrder?.terminalId));
+	let qrEntries = $derived(
+		cachedOrder
+			? [
+					...(cachedOrder.type === 'table' && orderTerminal
+						? [{ label: `Точка ${orderTerminal.name}`, detail: 'Багаторазовий вхід', url: `${shareOrigin}/tag/${encodeURIComponent(orderTerminal.code)}` }]
+						: []),
+					{
+						label: cachedOrder.type === 'table' ? 'Одноразовий чек' : cachedOrder.type === 'open_amount' ? 'Вільна сума' : 'Коротке посилання',
+						detail: 'Швидка оплата',
+						url: `${shareOrigin}/${cachedOrder.type === 'table' ? 'pos' : cachedOrder.type === 'open_amount' ? 't' : 'o'}/${cachedOrder.id}`
+					},
+					{ label: 'Рахунок', detail: 'Повне посилання', url: paymentUrl }
+				]
+			: []
+	);
+	let activeQrIndex = $derived(Math.min(qrEntryIndex, Math.max(0, qrEntries.length - 1)));
+	let activeQrEntry = $derived(qrEntries[activeQrIndex]);
+
+	$effect(() => {
+		if (isExpanded) cardEl?.focus();
+	});
 
 	function portal(node: HTMLElement) {
 		document.body.appendChild(node);
@@ -171,6 +210,7 @@
 		reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 		updateDimensions();
 		window.addEventListener('resize', updateDimensions);
+		window.addEventListener('keydown', handleKeydown);
 		lastTime = performance.now();
 		animFrame = requestAnimationFrame(loop);
 	});
@@ -178,6 +218,7 @@
 	onDestroy(() => {
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('resize', updateDimensions);
+			window.removeEventListener('keydown', handleKeydown);
 		}
 		if (animFrame) cancelAnimationFrame(animFrame);
 		if (holdTimer) clearTimeout(holdTimer);
@@ -195,9 +236,15 @@
 	function updateDimensions() {
 		updateAnchorCoords();
 		if (typeof window !== 'undefined') {
-			windowWidth = Math.min(window.innerWidth - 24, 430);
-			windowHeight = Math.min(window.innerHeight - 32, cachedOrder ? 540 : 500);
+			viewportWidth = window.innerWidth;
+			viewportHeight = window.innerHeight;
+			windowWidth = Math.min(viewportWidth - 16, 440);
+			windowHeight = Math.min(viewportHeight - 20, cachedOrder ? 720 : 560);
 		}
+	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape' && isOverlayActive) closeWindow();
 	}
 
 	function loop(time: number) {
@@ -304,6 +351,28 @@
 		if (!open && !selectedOrder) spring.target = 0;
 	}
 
+	function handleDockKeydown(event: KeyboardEvent) {
+		if (disabled || (event.key !== 'Enter' && event.key !== ' ')) return;
+		event.preventDefault();
+		updateAnchorCoords();
+		open = true;
+		spring = { value: spring.value, velocity: 0, target: 1 };
+		haptic('medium');
+	}
+
+	function selectQrEntry(index: number) {
+		qrEntryIndex = Math.max(0, Math.min(index, qrEntries.length - 1));
+		haptic('selection');
+	}
+
+	function finishQrSwipe(event: PointerEvent) {
+		if (qrSwipeStartX === null) return;
+		const distance = event.clientX - qrSwipeStartX;
+		qrSwipeStartX = null;
+		if (Math.abs(distance) < 40) return;
+		selectQrEntry(activeQrIndex + (distance < 0 ? 1 : -1));
+	}
+
 	function handleCardPointerDown(e: PointerEvent) {
 		if (e.clientY > startCenterY - 80) return;
 		pointerStartY = e.clientY;
@@ -337,18 +406,7 @@
 		onClose?.();
 		spring = { value: spring.value, velocity: 0, target: 0 };
 		haptic('light');
-	}
-
-	function finishQrSwipe(e: PointerEvent) {
-		if (qrSwipeStartX === null) return;
-		const diff = e.clientX - qrSwipeStartX;
-		qrSwipeStartX = null;
-		if (Math.abs(diff) < 40) return;
-		if (diff < 0 && selectedTerminalIndex < terminals.length - 1) {
-			onSelectTerminal?.(selectedTerminalIndex + 1);
-		} else if (diff > 0 && selectedTerminalIndex > 0) {
-			onSelectTerminal?.(selectedTerminalIndex - 1);
-		}
+		containerEl?.querySelector('button')?.focus();
 	}
 </script>
 
@@ -364,6 +422,7 @@
 		onpointermove={handleDockPointerMove}
 		onpointerup={handleDockPointerUp}
 		onpointercancel={handleDockPointerCancel}
+		onkeydown={handleDockKeydown}
 	>
 		<span class="dock-btn-label">{displayText}</span>
 		<ChevronRight size={18} strokeWidth={2.2} aria-hidden="true" />
@@ -383,9 +442,11 @@
 
 		<!-- Morphing Glass Surface -->
 		<div
+			bind:this={cardEl}
 			class="liquid-card"
 			class:expanded={isExpanded}
 			role="dialog"
+			tabindex="-1"
 			aria-modal="true"
 			aria-labelledby="liquid-title"
 			style:left="{currentCenterX}px"
@@ -436,109 +497,54 @@
 					style:transform="translateY({cachedOrder ? 0 : (1 - geo.windowContentOpacity) * 14}px)"
 				>
 					{#if cachedOrder}
-						{@const orderShortRef = cachedOrder.shareUrl ? cachedOrder.shareUrl.split('/').pop() : cachedOrder.id.split('-')[0]}
-						{@const createdLinks = [
-							...((scenario === 'table' || cachedOrder.type === 'table') && selectedTerminal ? [{
-								label: 'Багаторазовий QR терміналу або столу',
-								path: `/tag/${encodeURIComponent(selectedTerminal.code)}`
-							}] : []),
-							...(scenario === 'table' || cachedOrder.type === 'table' ? [{
-								label: 'Одноразовий чек для клієнта',
-								path: `/pos/${orderShortRef}`
-							}] : [{
-								label: 'Вільна сума або переказ',
-								path: `/t/${orderShortRef}`
-							}]),
-							{
-								label: 'Повне посилання',
-								path: `/pay/${cachedOrder.id}`
-							}
-						]}
-						<!-- CREATED ORDER VIEW (with PaymentQr, Share, Copy) -->
-						<div class="created-order-view">
-							<p class="creation-eyebrow">{orderType(cachedOrder.type)}</p>
+						<div class="created-order-view" class:complete={paymentComplete} class:closed={paymentClosed}>
+							<div class="payment-state" aria-live="polite">
+								<span class="payment-state-mark">
+									{#if paymentComplete}<Check size={18} strokeWidth={2.6} />{:else if paymentClosed}<X size={18} />{:else}<span></span>{/if}
+								</span>
+								<strong>{paymentComplete ? 'Оплату отримано' : paymentClosed ? orderStatus(cachedOrder.status) : 'Очікуємо оплату'}</strong>
+							</div>
+							<p class="creation-eyebrow">{orderTerminal?.name || orderType(cachedOrder.type)}</p>
 							<h2 id="liquid-title" class="creation-amount">
 								{formatAmount(String(cachedOrder.amount))} <small>₴</small>
 							</h2>
-							
-							<div class="order-status-pill">
-								<span class="status-indicator-dot" class:paid={cachedOrder.status === 'paid' || cachedOrder.status === 'completed'}></span>
-								<span class="status-text">{orderStatus(cachedOrder.status)}</span>
-								<span class="status-bullet">•</span>
-								<span class="order-ref-code">{cachedOrder.orderNumber || orderIdentifier(cachedOrder.id)}</span>
-							</div>
 
-							<!-- The Payment QR code Carousel -->
-
-							<div
-								class="qr-wrapper created-qr-carousel"
-								role="group"
-								aria-label="QR-коди рахунку"
-								onpointerdown={(e) => (qrSwipeStartX = e.clientX)}
-								onpointerup={(e) => {
-									if (qrSwipeStartX !== null) {
-										const diff = e.clientX - qrSwipeStartX;
-										if (diff > 40 && createdQrIndex > 0) createdQrIndex--;
-										if (diff < -40 && createdQrIndex < createdLinks.length - 1) createdQrIndex++;
-									}
-									qrSwipeStartX = null;
-								}}
-								onpointercancel={() => (qrSwipeStartX = null)}
-							>
-								<PaymentQr
-									value={`${shareOrigin}${createdLinks[createdQrIndex]?.path || `/pay/${cachedOrder.id}`}`}
-									label=""
-								/>
-
-								{#if createdLinks.length > 1}
-									<div class="carousel-nav" style="margin-top: 12px; margin-bottom: 8px;">
-										<button
-											type="button"
-											aria-label="Попередній QR-код"
-											disabled={createdQrIndex <= 0}
-											onclick={(e) => { e.stopPropagation(); createdQrIndex--; }}
-										>
-											<ChevronLeft size={18} />
-										</button>
-										<div class="terminal-info" style="font-size: 11px; max-width: 160px; white-space: normal; line-height: 1.3; text-align: center;">
-											<strong style="display:block; color: var(--text);">{createdLinks[createdQrIndex]?.label}</strong>
-											<span style="display:block; margin-top: 4px; color: var(--color-zinc-500, #71717a); word-break: break-all;">{createdLinks[createdQrIndex]?.path}</span>
-										</div>
-										<button
-											type="button"
-											aria-label="Наступний QR-код"
-											disabled={createdQrIndex >= createdLinks.length - 1}
-											onclick={(e) => { e.stopPropagation(); createdQrIndex++; }}
-										>
-											<ChevronRight size={18} />
-										</button>
+							{#if !paymentClosed}
+								<div
+									class="qr-carousel"
+									role="group"
+									aria-label="Варіанти QR для оплати"
+									data-qr-routes={qrEntries.map((entry) => entry.url).join(' ')}
+									onpointerdown={(event) => (qrSwipeStartX = event.clientX)}
+									onpointerup={finishQrSwipe}
+									onpointercancel={() => (qrSwipeStartX = null)}
+								>
+									<div class="qr-entry-heading">
+										<button type="button" aria-label="Попередній QR" disabled={activeQrIndex === 0} onclick={() => selectQrEntry(activeQrIndex - 1)}><ChevronLeft size={19} /></button>
+										<div><strong>{activeQrEntry?.label}</strong><span>{activeQrEntry?.detail}</span></div>
+										<button type="button" aria-label="Наступний QR" disabled={activeQrIndex >= qrEntries.length - 1} onclick={() => selectQrEntry(activeQrIndex + 1)}><ChevronRight size={19} /></button>
 									</div>
-
-									<div class="carousel-dots" style="margin-top: 8px;" aria-label={`QR-код ${createdQrIndex + 1} з ${createdLinks.length}`}>
-										{#each createdLinks as link, idx}
-											<button
-												class:active={idx === createdQrIndex}
-												type="button"
-												aria-label={`Показати ${link.label}`}
-												onclick={(e) => { e.stopPropagation(); createdQrIndex = idx; }}
-											></button>
+									<div class="qr-wrapper" class:complete={paymentComplete} data-payment-url={activeQrEntry?.url}>
+										<PaymentQr value={activeQrEntry?.url || paymentUrl} label={`QR-код: ${activeQrEntry?.label || 'Оплата'}`} />
+									</div>
+									<div class="qr-pagination" aria-label={`QR ${activeQrIndex + 1} з ${qrEntries.length}`}>
+										{#each qrEntries as entry, index (entry.url)}
+											<button type="button" class:active={index === activeQrIndex} aria-label={`Показати ${entry.label}`} onclick={() => selectQrEntry(index)}></button>
 										{/each}
-										<span>{createdQrIndex + 1} / {createdLinks.length}</span>
+										<span>{activeQrIndex + 1} / {qrEntries.length}</span>
 									</div>
-								{:else}
-									<div class="terminal-info" style="font-size: 11px; max-width: 200px; margin: 12px auto 8px; white-space: normal; line-height: 1.3; text-align: center;">
-										<strong style="display:block; color: var(--text);">{createdLinks[0]?.label}</strong>
-										<span style="display:block; margin-top: 4px; color: var(--color-zinc-500, #71717a); word-break: break-all;">{createdLinks[0]?.path}</span>
-									</div>
-								{/if}
+								</div>
+								<p class="payment-instruction">{paymentComplete ? 'Платіж підтверджено' : 'Проведіть убік, щоб змінити QR'}</p>
+							{:else}
+								<div class="closed-payment-mark"><X size={34} /></div>
+							{/if}
+
+							<div class="order-reference">
+								<span>{cachedOrder.orderNumber || orderIdentifier(cachedOrder.id)}</span>
+								<span>{fullDateFormatter.format(new Date(cachedOrder.createdAt))}</span>
 							</div>
 
-							<p class="order-created-time">
-								{fullDateFormatter.format(new Date(cachedOrder.createdAt))}
-							</p>
-
-							<!-- Share & Copy actions -->
-							<div class="order-actions-grid">
+							{#if !paymentClosed}<div class="order-actions-grid">
 								<button
 									type="button"
 									class="action-btn share-btn"
@@ -546,6 +552,15 @@
 								>
 									<span><Share2 size={18} /></span>
 									Поділитися
+								</button>
+								<button
+									type="button"
+									class="action-btn telegram-btn"
+									disabled={telegramAction === 'sending'}
+									onclick={() => onSendTelegramInvoice?.(cachedOrder!)}
+								>
+									<span>{#if telegramAction === 'sent'}<Check size={18} />{:else}<Send size={18} />{/if}</span>
+									{telegramAction === 'sending' ? 'Надсилаємо...' : telegramAction === 'sent' ? 'Надіслано' : 'Надіслати в Telegram'}
 								</button>
 								<button
 									type="button"
@@ -562,6 +577,10 @@
 									{orderAction === 'copy' ? 'Скопійовано' : 'Копіювати'}
 								</button>
 							</div>
+								{#if telegramActionMessage}
+									<p class:telegram-unknown={telegramAction === 'unknown'} class="telegram-delivery-message" role={telegramAction === 'sent' ? 'status' : 'alert'}>{telegramActionMessage}</p>
+								{/if}
+							{/if}
 
 							<!-- Cancel option -->
 							{#if !['paid', 'completed', 'cancelled', 'expired'].includes(cachedOrder.status)}
@@ -580,74 +599,18 @@
 					{:else}
 						<!-- CREATION PREVIEW VIEW -->
 						<div class="creation-preview-view">
-							<div class="creation-status"><span></span> Новий рахунок</div>
-							<p class="creation-eyebrow">Перевірка перед створенням</p>
+							<div class="creation-status"><QrCode size={15} /> Готово до створення</div>
+							<p class="creation-eyebrow">До сплати</p>
 
 							<h2 id="liquid-title" class="creation-amount">
 								{scenario === 'open' ? 'Вільна сума' : formattedAmount}
 								{#if scenario !== 'open'}<small>₴</small>{/if}
 							</h2>
 
-							<!-- Table QR or Carousel -->
-							{#if scenario === 'table' && terminals.length > 0}
-								{@const displayTerminals = selectedTerminal ? [selectedTerminal] : terminals}
-								<div
-									class="table-qr-carousel"
-									class:multiple={displayTerminals.length > 1}
-									role="group"
-									aria-label="QR-коди терміналів"
-									onpointerdown={(e) => (qrSwipeStartX = e.clientX)}
-									onpointerup={finishQrSwipe}
-									onpointercancel={() => (qrSwipeStartX = null)}
-								>
-									{#if displayTerminals.length > 1}
-										<div class="carousel-nav">
-											<button
-												type="button"
-												aria-label="Попередній QR-код"
-												disabled={selectedTerminalIndex <= 0}
-												onclick={() => onSelectTerminal?.(selectedTerminalIndex - 1)}
-											>
-												<ChevronLeft size={18} />
-											</button>
-											<div class="terminal-info">
-												<strong>{terminals[selectedTerminalIndex]?.name}</strong>
-												<span>{terminals[selectedTerminalIndex]?.code}</span>
-											</div>
-											<button
-												type="button"
-												aria-label="Наступний QR-код"
-												disabled={selectedTerminalIndex >= terminals.length - 1}
-												onclick={() => onSelectTerminal?.(selectedTerminalIndex + 1)}
-											>
-												<ChevronRight size={18} />
-											</button>
-										</div>
-									{:else}
-										<div class="terminal-info-static" style="margin-bottom: 12px;">
-											<strong>{displayTerminals[0].name}</strong>
-											<span>{displayTerminals[0].code}</span>
-										</div>
-									{/if}
-
-									<div class="draft-qr-placeholder">
-										<QrCode size={112} strokeWidth={1.2} aria-hidden="true" class="text-zinc-300" />
-										<p class="mt-3 text-xs font-bold text-zinc-500">Чернетка</p>
-									</div>
-
-									{#if displayTerminals.length > 1}
-										<div class="carousel-dots" aria-label={`Термінал ${selectedTerminalIndex + 1} з ${displayTerminals.length}`}>
-											{#each displayTerminals as terminal, idx}
-												<button
-													class:active={terminal.id === (terminals[selectedTerminalIndex]?.id)}
-													type="button"
-													aria-label={`Вибрати ${terminal.name}`}
-													onclick={() => onSelectTerminal?.(idx)}
-												></button>
-											{/each}
-											<span>{selectedTerminalIndex + 1} / {displayTerminals.length}</span>
-										</div>
-									{/if}
+							{#if scenario === 'table' && selectedTerminal}
+								<div class="terminal-summary">
+									<span><QrCode size={20} /></span>
+									<div><small>Точка приймання</small><strong>{selectedTerminal.name}</strong><em>{selectedTerminal.code}</em></div>
 								</div>
 							{:else}
 								<div class="creation-brand-mark" aria-hidden="true">
@@ -675,7 +638,7 @@
 									disabled={orderCreating}
 									onclick={(e) => { e.stopPropagation(); onSubmitOrder(); }}
 								>
-									<span>{orderCreating ? 'Створення...' : 'Створити рахунок і QR'}</span>
+									<span>{orderCreating ? 'Створюємо рахунок...' : 'Створити QR для оплати'}</span>
 									{#if !orderCreating}
 										<ChevronRight size={18} strokeWidth={2.4} />
 									{/if}
@@ -757,9 +720,9 @@
 	.liquid-backdrop {
 		position: absolute;
 		inset: 0;
-		background: rgba(8, 9, 13, 0.65);
-		backdrop-filter: blur(14px);
-		-webkit-backdrop-filter: blur(14px);
+		background: rgba(8, 9, 13, 0.72);
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
 		pointer-events: auto;
 		transition: opacity 200ms ease;
 	}
@@ -778,21 +741,15 @@
 		-webkit-overflow-scrolling: touch;
 		pointer-events: auto;
 		outline: none;
-		border: 1px solid rgba(255, 255, 255, 0.18);
-		border-top-color: rgba(255, 255, 255, 0.38);
-		background: linear-gradient(
-			155deg,
-			rgba(255, 255, 255, 0.14) 0%,
-			rgba(255, 255, 255, 0.04) 38%,
-			rgba(10, 132, 255, 0.16) 75%,
-			rgba(159, 122, 234, 0.12) 100%
-		), rgba(18, 20, 28, 0.92);
-		backdrop-filter: blur(var(--blur)) saturate(180%);
-		-webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
+		border: 1px solid rgba(255, 255, 255, 0.14);
+		border-top-color: rgba(255, 255, 255, 0.26);
+		background: rgba(18, 19, 23, 0.97);
+		backdrop-filter: blur(var(--blur)) saturate(125%);
+		-webkit-backdrop-filter: blur(var(--blur)) saturate(125%);
 		box-shadow:
 			0 var(--shadow-y) var(--shadow-blur) rgba(0, 0, 0, var(--shadow-opacity)),
-			0 12px 36px rgba(10, 132, 255, 0.24),
-			inset 0 1px 1px rgba(255, 255, 255, calc(0.28 + var(--rim-opacity) * 0.22)),
+			0 12px 36px rgba(0, 0, 0, 0.34),
+			inset 0 1px 1px rgba(255, 255, 255, calc(0.18 + var(--rim-opacity) * 0.16)),
 			inset 0 -1px 2px rgba(0, 0, 0, 0.2);
 		color: #ffffff;
 		will-change: left, top, width, height, border-radius;
@@ -800,6 +757,8 @@
 
 	.liquid-card.expanded {
 		border-color: rgba(255, 255, 255, 0.25);
+		border-bottom-right-radius: 22px !important;
+		border-bottom-left-radius: 22px !important;
 	}
 
 	/* Top Drag Handle */
@@ -865,7 +824,7 @@
 		display: flex;
 		flex-direction: column;
 		width: 100%;
-		padding: 28px 18px 18px;
+		padding: 34px 20px 20px;
 		text-align: center;
 		box-sizing: border-box;
 		will-change: opacity, transform;
@@ -876,6 +835,62 @@
 		flex-direction: column;
 		width: 100%;
 		align-items: center;
+		min-height: 100%;
+	}
+
+	.qr-carousel {
+		display: flex;
+		width: 100%;
+		flex-direction: column;
+		align-items: center;
+		touch-action: pan-y;
+	}
+
+	.qr-entry-heading {
+		display: grid;
+		width: 100%;
+		grid-template-columns: 36px 1fr 36px;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.qr-entry-heading > div {
+		display: grid;
+		gap: 2px;
+		min-width: 0;
+	}
+
+	.qr-entry-heading strong,
+	.qr-entry-heading span {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.qr-entry-heading strong {
+		font-size: 14px;
+	}
+
+	.qr-entry-heading span {
+		color: rgba(255, 255, 255, 0.5);
+		font-size: 11px;
+	}
+
+	.qr-entry-heading button {
+		display: grid;
+		width: 36px;
+		height: 36px;
+		place-items: center;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.07);
+		color: #ffffff;
+		cursor: pointer;
+	}
+
+	.qr-entry-heading button:disabled {
+		opacity: 0.28;
+		cursor: default;
 	}
 
 	.creation-preview-view {
@@ -885,57 +900,70 @@
 		height: 100%;
 	}
 
-	.order-status-pill {
+	.payment-state {
 		display: inline-flex;
 		align-items: center;
-		gap: 6px;
-		margin: -2px 0 10px;
-		padding: 4px 12px;
+		gap: 8px;
+		margin: 0 0 14px;
+		padding: 6px 11px 6px 7px;
 		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.08);
-		border: 1px solid rgba(255, 255, 255, 0.12);
-		font-size: 11px;
-		color: rgba(255, 255, 255, 0.75);
+		background: rgba(255, 255, 255, 0.07);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		font-size: 12px;
+		color: rgba(255, 255, 255, 0.86);
 	}
 
-	.status-indicator-dot {
-		width: 6px;
-		height: 6px;
+	.payment-state-mark {
+		display: grid;
+		width: 26px;
+		height: 26px;
+		place-items: center;
 		border-radius: 50%;
-		background: #ffcc00;
-		box-shadow: 0 0 6px rgba(255, 204, 0, 0.6);
+		background: rgba(255, 204, 0, 0.14);
+		color: #ffd54a;
 	}
 
-	.status-indicator-dot.paid {
-		background: #30d158;
-		box-shadow: 0 0 6px rgba(48, 209, 88, 0.7);
+	.payment-state-mark > span {
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: #ffd54a;
+		box-shadow: 0 0 0 4px rgba(255, 213, 74, 0.14);
 	}
 
-	.status-text {
-		font-weight: 650;
-		color: #ffffff;
+	.created-order-view.complete .payment-state-mark {
+		background: rgba(48, 209, 88, 0.15);
+		color: #55dc77;
 	}
 
-	.status-bullet {
-		color: rgba(255, 255, 255, 0.35);
+	.created-order-view.closed .payment-state-mark {
+		background: rgba(255, 105, 97, 0.14);
+		color: #ff6961;
 	}
 
-	.order-ref-code {
-		font-variant-numeric: tabular-nums;
-		color: rgba(255, 255, 255, 0.55);
-		font-size: 10.5px;
-	}
-
-	.order-created-time {
-		margin: -2px 0 8px;
+	.order-reference {
+		display: flex;
+		width: 100%;
+		justify-content: space-between;
+		gap: 12px;
+		margin: 2px 0 8px;
+		color: rgba(255, 255, 255, 0.43);
 		font-size: 11px;
-		color: rgba(255, 255, 255, 0.42);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.order-reference span:last-child {
+		text-align: right;
 	}
 
 	.qr-wrapper {
 		display: flex;
 		justify-content: center;
-		margin: 4px auto 10px;
+		margin: 8px auto 12px;
+		padding: 8px;
+		border-radius: 20px;
+		background: #ffffff;
+		box-shadow: 0 16px 34px rgba(0, 0, 0, 0.32);
 	}
 
 	.qr-wrapper :global(.payment-qr) {
@@ -947,10 +975,63 @@
 	}
 
 	.qr-wrapper :global(.payment-qr-frame) {
-		width: min(174px, 46vw);
+		width: min(256px, 66vw, 34svh);
 		aspect-ratio: 1;
-		border-radius: 16px;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+		border-radius: 12px;
+		box-shadow: none;
+	}
+
+	.qr-wrapper.complete {
+		outline: 3px solid rgba(48, 209, 88, 0.5);
+	}
+
+	.qr-pagination {
+		display: flex;
+		height: 22px;
+		align-items: center;
+		justify-content: center;
+		gap: 7px;
+	}
+
+	.qr-pagination button {
+		width: 7px;
+		height: 7px;
+		padding: 0;
+		border: 0;
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.25);
+		cursor: pointer;
+		transition: width 160ms ease, border-radius 160ms ease, background 160ms ease;
+	}
+
+	.qr-pagination button.active {
+		width: 20px;
+		border-radius: 999px;
+		background: #ffffff;
+	}
+
+	.qr-pagination span {
+		margin-left: 3px;
+		color: rgba(255, 255, 255, 0.48);
+		font-size: 10px;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.payment-instruction {
+		margin: 0 0 12px;
+		color: rgba(255, 255, 255, 0.67);
+		font-size: 13px;
+	}
+
+	.closed-payment-mark {
+		display: grid;
+		width: 88px;
+		height: 88px;
+		place-items: center;
+		margin: 42px auto;
+		border-radius: 50%;
+		background: rgba(255, 105, 97, 0.1);
+		color: #ff6961;
 	}
 
 	.creation-status {
@@ -966,14 +1047,6 @@
 		color: #48d7e8;
 	}
 
-	.creation-status span {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: #48d7e8;
-		box-shadow: 0 0 8px #48d7e8;
-	}
-
 	.creation-eyebrow {
 		margin: 0 0 4px;
 		color: rgba(255, 255, 255, 0.48);
@@ -986,7 +1059,7 @@
 		font-weight: 750;
 		line-height: 1.05;
 		font-variant-numeric: tabular-nums;
-		letter-spacing: -0.02em;
+		letter-spacing: 0;
 		text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
 	}
 
@@ -994,13 +1067,6 @@
 		font-size: 22px;
 		font-weight: 550;
 		color: rgba(255, 255, 255, 0.55);
-	}
-
-
-	.qr-wrapper {
-		display: flex;
-		justify-content: center;
-		margin: 4px auto 14px;
 	}
 
 	.creation-brand-mark {
@@ -1020,88 +1086,48 @@
 		fill: rgba(255, 255, 255, 0.85);
 	}
 
-	.table-qr-carousel {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		margin: 0 0 14px;
-	}
-
-	.carousel-nav {
+	.terminal-summary {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		gap: 12px;
 		width: 100%;
-		margin-bottom: 8px;
-	}
-
-	.carousel-nav button {
-		display: grid;
-		place-items: center;
-		width: 32px;
-		height: 32px;
+		margin: 8px 0 18px;
+		padding: 13px 14px;
 		border: 1px solid rgba(255, 255, 255, 0.12);
-		border-radius: 50%;
+		border-radius: 14px;
 		background: rgba(255, 255, 255, 0.06);
-		color: rgba(255, 255, 255, 0.8);
-		cursor: pointer;
+		text-align: left;
 	}
 
-	.carousel-nav button:disabled {
-		opacity: 0.3;
-		cursor: default;
+	.terminal-summary > span {
+		display: grid;
+		width: 38px;
+		height: 38px;
+		flex: 0 0 38px;
+		place-items: center;
+		border-radius: 10px;
+		background: rgba(72, 215, 232, 0.12);
+		color: #48d7e8;
 	}
 
-	.terminal-info strong {
-		display: block;
-		font-size: 13px;
+	.terminal-summary div {
+		display: grid;
+		gap: 2px;
+		min-width: 0;
 	}
 
-	.terminal-info span {
+	.terminal-summary small,
+	.terminal-summary em {
 		font-size: 11px;
 		color: rgba(255, 255, 255, 0.5);
+		font-style: normal;
 	}
 
-	.draft-qr-placeholder {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		width: 220px;
-		height: 220px;
-		margin: 0 auto;
-		background: #f5f6f7;
-		border-radius: 16px;
-		border: 1px dashed #d4d4d8;
-	}
-
-	.carousel-dots {
-		display: flex;
-		align-items: center;
-		gap: 5px;
-		margin-top: 8px;
-	}
-
-	.carousel-dots button {
-		width: 6px;
-		height: 6px;
-		border: 0;
-		border-radius: 50%;
-		background: rgba(255, 255, 255, 0.25);
-		padding: 0;
-		cursor: pointer;
-	}
-
-	.carousel-dots button.active {
-		background: #0a84ff;
-		width: 16px;
-		border-radius: 999px;
-	}
-
-	.carousel-dots span {
-		font-size: 10px;
-		color: rgba(255, 255, 255, 0.45);
-		margin-left: 4px;
+	.terminal-summary strong {
+		overflow: hidden;
+		font-size: 14px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.creation-meta {
@@ -1175,6 +1201,24 @@
 		transform: scale(0.97);
 	}
 
+	.action-btn:disabled {
+		cursor: wait;
+		opacity: 0.62;
+	}
+
+	.telegram-delivery-message {
+		width: 100%;
+		margin: 2px 0 6px;
+		color: #ff9f0a;
+		font-size: 12px;
+		line-height: 1.4;
+		text-align: left;
+	}
+
+	.telegram-delivery-message:not(.telegram-unknown)[role='status'] {
+		color: #55dc77;
+	}
+
 	.cancel-btn {
 		display: flex;
 		width: 100%;
@@ -1208,6 +1252,7 @@
 
 	.creation-actions {
 		margin-top: auto;
+		padding-bottom: max(0px, env(safe-area-inset-bottom));
 		width: 100%;
 	}
 
@@ -1238,6 +1283,33 @@
 	.creation-submit-btn:disabled {
 		opacity: 0.65;
 		cursor: default;
+	}
+
+	@media (max-height: 700px) {
+		.layer-creation-content {
+			padding-top: 30px;
+			padding-bottom: 14px;
+		}
+
+		.payment-state {
+			margin-bottom: 8px;
+		}
+
+		.order-reference {
+			margin-bottom: 4px;
+		}
+
+		.qr-wrapper {
+			margin: 5px auto 7px;
+		}
+
+		.qr-wrapper :global(.payment-qr-frame) {
+			width: min(220px, 58vw, 29svh);
+		}
+
+		.payment-instruction {
+			margin-bottom: 7px;
+		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {

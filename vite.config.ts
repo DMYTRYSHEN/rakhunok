@@ -89,6 +89,7 @@ function apiDocsDevServer(): Plugin {
 }
 
 export default defineConfig(({ mode }) => ({
+	cacheDir: process.env.VITEST ? 'node_modules/.vite-vitest' : 'node_modules/.vite',
 	plugins: [
 		apiDocsDevServer(),
 		tailwindcss(),

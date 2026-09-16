@@ -596,6 +596,7 @@ export function createDashboardGateway(
 				const response = await workerRequest('/api/v1/orders', {
 					method: 'POST',
 					body: JSON.stringify({
+						merchant_id: input.merchantId,
 						type: input.type,
 						order_number: input.reference,
 						title: input.title,
@@ -639,6 +640,7 @@ export function createDashboardGateway(
 				? await client
 						.from('merchants')
 						.select('id')
+						.eq('id', input.merchantId)
 						.eq('user_id', userId)
 						.maybeSingle<{ id: string }>()
 				: { data: null };
@@ -647,11 +649,9 @@ export function createDashboardGateway(
 				if (workerError) throw workerError;
 				throw new Error('Профіль мерчанта не знайдено.');
 			}
-			const merchantId = merchantRes.data.id;
-
 			const totalAmount = input.amount + (input.deliveryFee ?? 0);
 			const insertPayload: Record<string, unknown> = {
-				merchant_id: merchantId,
+				merchant_id: input.merchantId,
 				entity_id: input.entityId ?? null,
 				order_number: input.reference,
 				title: input.title,

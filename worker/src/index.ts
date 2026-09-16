@@ -1,6 +1,7 @@
 import { simulateSandboxPayment } from './sandbox.ts';
 import { handleAiWorkerRequest } from './ai-worker-core.ts';
 import { handleTelegramInvoice, handleTelegramInvoicePreview, type TelegramInvoiceEnv } from './telegram-invoice.ts';
+import { handleMerchantTelegramInvoice, type MerchantTelegramInvoiceEnv } from './merchant-telegram-invoice.ts';
 import {
 	handleTelegramWebhook,
 	handleVerificationStatus,
@@ -10,7 +11,7 @@ import {
 	sendNotificationToTelegramUser
 } from './telegram-bot.ts';
 
-interface Env extends TelegramInvoiceEnv {
+interface Env extends TelegramInvoiceEnv, MerchantTelegramInvoiceEnv {
 	ASSETS: Fetcher;
 	BANKS_KV?: KVNamespace;
 	ORDERS_KV?: KVNamespace;
@@ -873,6 +874,9 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 	if (url.pathname === '/api/v1/telegram/invoices/send') {
 		return handleTelegramInvoice(request, env);
 	}
+	if (url.pathname === '/api/v1/merchant/telegram/invoices/send') {
+		return handleMerchantTelegramInvoice(request, env);
+	}
 
 	if (url.pathname === '/api/v1/telegram/webhook') {
 		return handleTelegramWebhook(request, env);
@@ -1342,11 +1346,14 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 				const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
 				const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
 
-				let merchantId = body.merchant_id as string | undefined;
-				if (!merchantId && authHeader) {
+				let merchantId = typeof body.merchant_id === 'string' && body.merchant_id.trim()
+					? body.merchant_id.trim()
+					: undefined;
+				let merchant: Record<string, unknown> | undefined;
+				if (merchantId) {
 					try {
 						const merchantRes = await fetch(
-							`${supabaseUrl}/rest/v1/merchants?select=id&limit=1`,
+							`${supabaseUrl}/rest/v1/merchants?select=id,user_id&id=eq.${encodeURIComponent(merchantId)}&limit=1`,
 							{
 								headers: {
 									apikey: supabaseAnonKey,
@@ -1355,28 +1362,80 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 								}
 							}
 						);
-						const merchant = await persistedRow(merchantRes, 'Merchant not found');
-						if (merchant instanceof Response) return merchant;
-						merchantId = merchant.id as string;
+						const merchantResult = await persistedRow(merchantRes, 'Merchant not found');
+						if (merchantResult instanceof Response) return merchantResult;
+						merchant = merchantResult;
+					} catch {
+						return persistenceError();
+					}
+				}
+				if (!merchantId && authHeader) {
+					try {
+						const merchantRes = await fetch(
+							`${supabaseUrl}/rest/v1/merchants?select=id,user_id&limit=1`,
+							{
+								headers: {
+									apikey: supabaseAnonKey,
+									Authorization: authHeader,
+									'Content-Type': 'application/json'
+								}
+							}
+						);
+						const merchantResult = await persistedRow(merchantRes, 'Merchant not found');
+						if (merchantResult instanceof Response) return merchantResult;
+						merchant = merchantResult;
+						merchantId = merchantResult.id as string;
 					} catch {
 						return persistenceError();
 					}
 				}
 				if (!merchantId) return jsonResponse({ error: 'Merchant not found' }, 404);
 
-				const baseAmount = Number(body.amount || body.base_amount || 0);
-				const deliveryFee = Number(body.delivery_fee || 0);
+				const type = (body.type as string) || 'fixed';
+				if (!['fixed', 'table', 'open_amount'].includes(type)) return persistenceError(422);
+				const baseAmount = Number(body.amount ?? body.base_amount ?? 0);
+				const deliveryFee = Number(body.delivery_fee ?? 0);
 				const totalAmount = baseAmount + deliveryFee;
+				if (
+					!Number.isFinite(baseAmount) || !Number.isFinite(deliveryFee) ||
+					baseAmount < 0 || deliveryFee < 0 || totalAmount < 0 ||
+					(type !== 'open_amount' && totalAmount <= 0)
+				) return persistenceError(422);
+
+				const entityId = typeof body.entity_id === 'string' && body.entity_id.trim() ? body.entity_id.trim() : undefined;
+				const terminalId = typeof body.terminal_id === 'string' && body.terminal_id.trim() ? body.terminal_id.trim() : undefined;
+				if (type === 'table' && (!entityId || !terminalId)) return persistenceError(422);
+				if ((entityId && !terminalId) || (!entityId && terminalId)) return persistenceError(422);
+				if (terminalId && entityId) {
+					const ownerUserId = typeof merchant?.user_id === 'string' ? merchant.user_id : '';
+					if (!ownerUserId) return persistenceError();
+					try {
+						const terminalRes = await fetch(
+							`${supabaseUrl}/rest/v1/terminals?select=id&id=eq.${encodeURIComponent(terminalId)}` +
+							`&entity_id=eq.${encodeURIComponent(entityId)}&user_id=eq.${encodeURIComponent(ownerUserId)}&is_active=eq.true&limit=1`,
+							{
+								headers: {
+									apikey: supabaseAnonKey,
+									Authorization: authHeader,
+									'Content-Type': 'application/json'
+								}
+							}
+						);
+						const terminal = await persistedRow(terminalRes, 'Terminal not found');
+						if (terminal instanceof Response) return terminal;
+					} catch {
+						return persistenceError();
+					}
+				}
 				const orderNumber = String(body.order_number || `RHK-${Date.now().toString().slice(-6)}`);
 				const title = String(body.title || `Рахунок ${orderNumber}`);
-				const type = (body.type as string) || 'fixed';
 				const newOrderId = crypto.randomUUID();
 
 				if (merchantId && authHeader) {
 					const insertPayload: Record<string, unknown> = {
 						id: newOrderId,
 						merchant_id: merchantId,
-						entity_id: body.entity_id ? String(body.entity_id) : null,
+						entity_id: entityId ?? null,
 						type,
 						order_number: orderNumber,
 						title,
@@ -1386,7 +1445,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 						total_amount: totalAmount,
 						status: type === 'table' ? 'preparing' : 'pending',
 						table_number: body.table_number ? parseInt(String(body.table_number), 10) : null,
-						terminal_id: body.terminal_id ? String(body.terminal_id) : null,
+						terminal_id: terminalId ?? null,
 						currency: 'UAH'
 					};
 					if (body.scenario_config) {

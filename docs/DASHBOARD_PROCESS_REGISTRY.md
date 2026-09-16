@@ -67,9 +67,9 @@ changes do not bypass these rules.
 
 ### DASH-CHECKOUT-TEMPLATES-001 — checkout template management (2026-09-16)
 
-- **Status:** `ANALYZING — LOCAL FLOW INTEGRATION APPROVED` — the user separately approved local
-  validation and implementation of the JSON template-to-checkout renderer contract; remote migration
-  and deployment remain unapproved.
+- **Status:** `ANALYZING — REMOTE TEMPLATE STORAGE MIGRATED` — the user separately approved the
+  checkout-template migration after the production repository reported its RPC boundary was absent.
+  Application deployment remains unapproved.
 - Current extension scope: preserve the template scenario identity in versioned `scenario_config`,
   make `apps/pay` resolve its renderer from that identity independently of the persisted invoice type,
   and prove a forward-compatible path for richer vertical flows such as fuel station dispenser,
@@ -164,13 +164,18 @@ changes do not bypass these rules.
   index already exists. Recent Postgres/PostgREST logs contained no relevant checkout-template, RLS, or
   permission errors. Migration history does not include local migration
   `20260916170000_checkout_templates_integrity.sql`.
+- After explicit approval, Supabase MCP applied only `checkout_templates_integrity`; remote migration
+  history records it as `20260916182932_checkout_templates_integrity`. Postflight found the table still
+  empty, `scenario_config` without a column default, all 3 expected integrity constraints, all 4
+  authenticated RLS policies, and an explicit `WITH CHECK` on update. All 4 merchant-scoped RPCs are
+  `SECURITY INVOKER` with an empty `search_path`; `authenticated` has execute permission while `PUBLIC`
+  and `anon` do not. Post-DDL security and performance advisors reported no checkout-template finding.
 - Residual blockers: root `npm run check` stops at five pre-existing documented-but-unimplemented
   OpenAPI operations; the standard shared root build is locked by active local processes. The SQL is
-  contract-tested, including strict `IS TRUE` handling for nullable JSON predicates, but has not been
-  executed against local or remote Postgres. Remote execution remains outside the approved scope.
-- No authenticated browser mutation, remote migration, Supabase schema execution, or deployment was
-  performed. Those actions require separate explicit approval; existing auth and checkout runtime
-  contracts remain unchanged.
+  contract-tested, including strict `IS TRUE` handling for nullable JSON predicates. An authenticated
+  browser mutation has not yet been repeated after the migration.
+- No Worker/application deployment or test-data mutation was performed. Existing auth and checkout
+  runtime contracts remain unchanged outside the approved template-storage migration.
 
 ### DASH-BUSINESS-DRAFTS-002 — authorized isolated rollout (updated 2026-09-09)
 
@@ -225,6 +230,23 @@ Audit one process at a time in this order unless the user selects another proces
 
 Unreviewed processes are not implicitly safe to redesign. Analyze them before changing their
 contract or behavior.
+
+### DASH-SHELL-001 - Dynamic Module Load Recovery (2026-09-16)
+
+- **Status:** `ANALYZING - LOCAL RECOVERY VALIDATED`.
+- Browser reproduction traced the failed `PublicPageSettings.svelte` import to its transitive
+  `qrcode` dependency returning `504 Outdated Optimize Dep`. Vitest and the live dev server shared
+  `node_modules/.vite`, allowing focused test runs to replace dependency metadata while the server
+  retained an older browser hash. Vitest now uses an isolated `.vite-vitest` cache.
+- A failed dependency request could also reject a lazy module import once and leave that Promise
+  cached for the lifetime of the Dashboard root. Later navigation to the same view reused the
+  rejection instead of requesting the module again.
+- The shared lazy loader now clears only failed module Promises. Successful and in-flight imports
+  remain cached and deduplicated; route ownership, auth/session lifecycle, APIs and view contracts are
+  unchanged.
+- Direct Vite fetch of `PublicPageSettings.svelte` returned transformed JavaScript with HTTP 200;
+  editor diagnostics and official Svelte autofixer reported no issues. Focused recovery coverage
+  passes 2/2 and the neighboring Telegram scope suite passes 14/14. No deployment was performed.
 
 ## Locked Processes
 
@@ -371,7 +393,10 @@ Invoice route as part of another process.
   - `src/lib/features/dashboard/pos/pos-order-contract.ts`
   - `src/lib/features/dashboard/invoices/InvoiceCreate.svelte`
   - `src/lib/features/dashboard/api/dashboard-gateway.ts`
+  - `apps/merchant-app/src/App.svelte`
+  - `apps/merchant-app/src/data/merchant-data-gateway.ts`
   - `apps/checkout/js/order-expiry.js`
+  - `worker/src/index.ts`
   - `supabase/migrations/20260903235104_merchant_settings.sql`
 
 #### Conclusions
@@ -386,6 +411,27 @@ Invoice route as part of another process.
   unlimited; only a missing field uses the legacy `created_at` fallback.
 - Manual TABLE invoices carry the selected immutable `terminal_id`; parsed table text is not a
   substitute for terminal identity.
+- Merchant POS captures the selected terminal at dispatch and sends its immutable `terminal_id`
+  and `entity_id` with the authenticated merchant claim. The Worker verifies the exact merchant
+  and active terminal/entity/owner tuple through the caller's RLS-scoped Supabase session before
+  inserting the order.
+- Merchant POS scopes that identity to TABLE creation. Fixed and `open_amount` invoices omit
+  `terminal_id` and `entity_id`, even when a table remains selected from an earlier scenario.
+- Fixed and TABLE orders require a finite positive total. `open_amount` intentionally retains its
+  zero-total creation semantics, and malformed persisted totals are rejected by the Merchant
+  gateway instead of being displayed as zero.
+- The Merchant payment sheet exposes every supported invoice entry point as a QR carousel:
+  TABLE uses `/tag`, `/pos`, and `/pay`; fixed uses `/o` and `/pay`; `open_amount` uses `/t` and
+  `/pay`. Preview and created-order surfaces remain anchored to the viewport bottom.
+- Active Merchant fixed and TABLE invoices expose a separate `Надіслати в Telegram` action while
+  generic `Поділитися` keeps the existing Web Share behavior. The Merchant action calls its own
+  authenticated Worker endpoint; it does not reuse or weaken Dashboard's operator-only self-test.
+- The Worker derives the destination from exactly one trusted `custom:telegram` Auth identity,
+  rejects browser-provided `chat_id`, and verifies the order, active owner/entity, positive UAH
+  total, pending status, and expiry through the caller's RLS-scoped Supabase session.
+- Telegram receives the existing invoice PNG, escaped caption, and inline canonical `/pay/{id}`
+  button. The Worker never retries a bot call; an ambiguous transport result is surfaced as
+  `delivery_unknown`, and the UI tells the user to inspect the chat before a manual retry.
 
 #### Locked Invariants
 
@@ -404,6 +450,27 @@ Invoice route as part of another process.
 - Checkout suite: 10 tests passed.
 - `npm run check`: OpenAPI coverage clean and Svelte reported 0 errors and 0 warnings.
 - Svelte autofixer: no issues for Dashboard root, settings, or POS components.
+- Merchant gateway suite: 41 tests passed, including the exact Telegram `{ order_id }` payload,
+  refreshed bearer token, immutable identity payloads, invalid created totals, and session fences.
+- Worker write suite: 122 tests passed, including exact merchant and active terminal authorization,
+  amount validation, sanitized lookup failures, and `open_amount` zero semantics.
+- Merchant app check: Svelte reported 0 errors and 0 warnings; TypeScript node check passed.
+- Merchant payment-sheet focused suite: 12 tests passed, covering the three-entry TABLE carousel,
+  fixed/open route isolation, paid/cancelled states, separate generic share, and Telegram
+  sending/sent/unknown states. Telegram host helper suite passes 2/2 after chooser removal.
+- Combined Merchant Telegram and unchanged Dashboard self-test Worker suites pass 275/275,
+  including identity trust boundaries, RLS ownership failures, invalid/expired totals, rich card
+  payload, rate limit/rejection handling, and no retry after an ambiguous delivery.
+- OpenAPI coverage includes the Merchant Telegram endpoint as documented, implemented, and consumed
+  with no missing consumed or undocumented implemented operations. The five Team/Invitation routes
+  already existed in the Worker; their explicit audit inventory is now synchronized, and invitation
+  acceptance is documented with its implemented `PATCH` method. Root `npm run check` passes with
+  30 documented/implemented operations and Svelte reports 0 errors and 0 warnings.
+- Isolated browser verification at 1008x836 and 390x844 confirmed a 10px bottom gap, no horizontal
+  or card overflow, nonblank QR canvas pixels, reachable actions, and live `/tag` to `/pos`
+  carousel switching after viewport resize.
+- Merchant app full Vitest run: 204 tests passed, but the command remains non-zero because the
+  pre-existing empty `src/lib/liquid-payment.test.ts` contains no test suite.
 - Local database lint was unavailable because Docker is not installed. The migration remains local
   and requires an approved remote migration before production UI rollout.
 
@@ -516,6 +583,34 @@ reinterpret explicit null expiry, or derive TABLE identity without `terminal_id`
 - Validation: 81 Dashboard unit tests passed; Svelte check 0 errors / 0 warnings. Browser demo
   invoice displayed the reusable label, terminal path, and copy button, while checkout retained
   `/pay/demo-1047`. Demo verification does not establish production authorization or route resolution.
+
+#### Authenticated Invoice Creation RLS Repair
+
+- **Status:** `ANALYZING — LOCAL FIX VALIDATED`; investigated and repaired locally on 2026-09-16.
+- Production logs identified `POST /rest/v1/orders` returning 403 / PostgreSQL `42501`, with two
+  `new row violates row-level security policy for table "orders"` entries. The second failure was
+  the compatibility retry without `scenario_config`, excluding the saved template JSON as cause.
+- The authenticated user directly owns the active merchant, has the required table and column
+  privileges, and passes the current owner-only `orders` policy. A rollback-only insert under the
+  same authenticated JWT subject, merchant and scenario config succeeded, so no RLS weakening or
+  database migration was required.
+- Root cause: invoice creation discarded the ready session's merchant ID. The Worker fallback then
+  queried `/merchants?select=id&limit=1`; the public active-profile SELECT policy can expose merchants
+  other than the caller's, so an arbitrary merchant could be selected and the subsequent insert was
+  correctly rejected by owner RLS.
+- `InvoiceCreateInput` now requires the merchant ID already established by `gateway.restore()`.
+  `InvoiceCreate` passes it to the gateway, the Worker request includes it, and the direct Supabase
+  fallback verifies that exact ID against both `merchants.id` and authenticated `user_id` before
+  inserting. Existing auth lifecycle, owner-only RLS and template `scenario_config` are unchanged.
+- Regression coverage verifies the explicit Worker payload and direct fallback insert retain the
+  same merchant ID and scenario config. Dashboard gateway tests pass 32/32; Worker write-route tests
+  pass 114/114; official Svelte autofixer and editor diagnostics report no issues.
+- Proforma conversion now passes its existing merchant-scoped argument into the same required
+  `InvoiceCreateInput.merchantId` field. This closes the compile-time caller gap without changing
+  proforma persistence, invoice fields, authentication, or RLS; Svelte check passes with 0 errors
+  and 0 warnings.
+- No Dashboard or Worker deployment was performed. Production remains on the previous client bundle
+  until a separately approved deployment and authenticated smoke test.
 
 ## Process Record Template
 

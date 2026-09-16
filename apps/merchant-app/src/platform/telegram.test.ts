@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bindTelegramBackButton } from './telegram';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 afterEach(() => {
 	vi.unstubAllGlobals();

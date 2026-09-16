@@ -14,10 +14,18 @@ function sessionResult(userId = 'user-1', accessToken = 'refreshed-token') {
 	return { data: { session: { access_token: accessToken, user: { id: userId } } }, error: null };
 }
 
-const orderInput = { type: 'fixed' as const, amount: 125.5, orderNumber: 'APP-1', title: 'Рахунок APP-1' };
+const orderInput = {
+	type: 'fixed' as const,
+	amount: 125.5,
+	orderNumber: 'APP-1',
+	title: 'Рахунок APP-1',
+	merchantId: 'merchant-1',
+	entityId: 'entity-1',
+	terminalId: 'terminal-1'
+};
 const orderRow = {
 	id: 'order-1', total_amount: 125.5, status: 'pending', created_at: '2026-08-28T08:00:00Z',
-	order_number: 'APP-1', type: 'fixed', share_url: 'https://example.test/pay/order-1'
+	order_number: 'APP-1', type: 'fixed', share_url: 'https://example.test/pay/order-1', terminal_id: 'terminal-1'
 };
 
 describe.each(['create', 'cancel'] as const)('%s order dispatch session fence', (operation) => {
@@ -87,7 +95,15 @@ describe.each(['create', 'cancel'] as const)('%s order dispatch session fence', 
 				method: operation === 'create' ? 'POST' : 'PATCH',
 				headers: { Authorization: 'Bearer refreshed-token', 'Content-Type': 'application/json' },
 				body: JSON.stringify(operation === 'create'
-					? { type: 'fixed', order_number: 'APP-1', title: 'Рахунок APP-1', amount: 125.5 }
+					? {
+						type: 'fixed',
+						order_number: 'APP-1',
+						title: 'Рахунок APP-1',
+						merchant_id: 'merchant-1',
+						entity_id: 'entity-1',
+						terminal_id: 'terminal-1',
+						amount: 125.5
+					}
 					: { status: 'cancelled' })
 			}
 		);
@@ -149,24 +165,45 @@ describe('merchant data gateway', () => {
 		const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
 			order: {
 				id: 'order-1', total_amount: 125.5, status: 'pending', created_at: '2026-08-28T08:00:00Z',
-				order_number: 'APP-1', type: 'fixed', share_url: 'https://rakhunok.com/pay/order-1'
+				order_number: 'APP-1', type: 'fixed', share_url: 'https://rakhunok.com/pay/order-1',
+				terminal_id: 'terminal-1'
 			}
 		}), { status: 201 }));
 		const client = { auth: { getSession } } as unknown as SupabaseClient;
 
 		const result = await createMerchantDataGateway(client, fetcher).createOrder({
-			type: 'fixed', amount: 125.5, orderNumber: 'APP-1', title: 'Рахунок APP-1'
+			type: 'fixed', amount: 125.5, orderNumber: 'APP-1', title: 'Рахунок APP-1',
+			merchantId: 'merchant-1', entityId: 'entity-1', terminalId: 'terminal-1'
 		}, 'user-1', () => true);
 
 		expect(fetcher).toHaveBeenCalledWith('/app/api/v1/orders', expect.objectContaining({
 			method: 'POST',
 			headers: expect.objectContaining({ Authorization: 'Bearer token-1' }),
-			body: expect.stringContaining('"amount":125.5')
+			body: JSON.stringify({
+				type: 'fixed',
+				order_number: 'APP-1',
+				title: 'Рахунок APP-1',
+				merchant_id: 'merchant-1',
+				entity_id: 'entity-1',
+				terminal_id: 'terminal-1',
+				amount: 125.5
+			})
 		}));
 		expect(result).toEqual({
 			id: 'order-1', amount: 125.5, status: 'pending', createdAt: '2026-08-28T08:00:00Z',
-			orderNumber: 'APP-1', type: 'fixed', shareUrl: 'https://rakhunok.com/pay/order-1'
+			orderNumber: 'APP-1', type: 'fixed', shareUrl: 'https://rakhunok.com/pay/order-1', terminalId: 'terminal-1'
 		});
+	});
+
+	it.each([undefined, null, 'not-a-number', 0, -1])('rejects an invalid fixed-order response amount: %s', async (totalAmount) => {
+		const getSession = vi.fn().mockResolvedValue(sessionResult('user-1', 'token-1'));
+		const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+			order: { ...orderRow, total_amount: totalAmount }
+		}), { status: 201 }));
+		const client = { auth: { getSession } } as unknown as SupabaseClient;
+
+		await expect(createMerchantDataGateway(client, fetcher).createOrder(orderInput, 'user-1', () => true))
+			.rejects.toThrow('Сервер повернув некоректну суму рахунку.');
 	});
 
 	it('surfaces structured Worker API errors', async () => {
@@ -178,7 +215,8 @@ describe('merchant data gateway', () => {
 		const client = { auth: { getSession } } as unknown as SupabaseClient;
 
 		await expect(createMerchantDataGateway(client, fetcher).createOrder({
-			type: 'fixed', amount: 125.5, orderNumber: 'APP-1', title: 'Рахунок APP-1'
+			type: 'fixed', amount: 125.5, orderNumber: 'APP-1', title: 'Рахунок APP-1',
+			merchantId: 'merchant-1', entityId: 'entity-1', terminalId: 'terminal-1'
 		}, 'user-1', () => true)).rejects.toThrow('Реквізити мерчанта не налаштовані.');
 	});
 
@@ -219,7 +257,7 @@ describe('merchant data gateway', () => {
 		expect(orders.eq).toHaveBeenCalledWith('merchant_id', 'merchant-1');
 		expect(orders.gte).toHaveBeenCalledWith('created_at', '2026-08-01T00:00:00.000Z');
 		expect(orders.limit).toHaveBeenCalledWith(250);
-		expect(orders.select).toHaveBeenCalledWith('id, total_amount, status, created_at, order_number, type, share_url');
+		expect(orders.select).toHaveBeenCalledWith('id, total_amount, status, created_at, order_number, type, share_url, terminal_id');
 		expect(result[0]).toEqual({ id: 'order-1', amount: 125.5, status: 'paid', createdAt: '2026-08-26T10:00:00Z', orderNumber: 'INV-1', type: 'fixed', shareUrl: 'https://example.com/pay/order-1' });
 	});
 
@@ -235,6 +273,20 @@ describe('merchant data gateway', () => {
 			headers: expect.objectContaining({ Authorization: 'Bearer token-1' }),
 			body: JSON.stringify({ status: 'cancelled' })
 		}));
+	});
+
+	it('sends only the order id to the Telegram Worker endpoint with the current session', async () => {
+		const getSession = vi.fn().mockResolvedValue(sessionResult());
+		const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, delivery: 'sent' })));
+		const client = { auth: { getSession } } as unknown as SupabaseClient;
+
+		await createMerchantDataGateway(client, fetcher).sendTelegramInvoice('order/1', 'user-1', () => true);
+
+		expect(fetcher).toHaveBeenCalledExactlyOnceWith('/app/api/v1/merchant/telegram/invoices/send', {
+			method: 'POST',
+			headers: { Authorization: 'Bearer refreshed-token', 'Content-Type': 'application/json' },
+			body: JSON.stringify({ order_id: 'order/1' })
+		});
 	});
 
 	it('subscribes to orders for one merchant and removes the channel', () => {

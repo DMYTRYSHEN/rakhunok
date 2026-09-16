@@ -34,7 +34,15 @@
 
 	function lazyModule<T>(loader: () => Promise<T>) {
 		let modulePromise: Promise<T> | undefined;
-		return () => (modulePromise ??= loader());
+		return () => {
+			if (!modulePromise) {
+				modulePromise = loader().catch((error) => {
+					modulePromise = undefined;
+					throw error;
+				});
+			}
+			return modulePromise;
+		};
 	}
 
 	const loadDashboardOverview = lazyModule(() => import('./overview/DashboardOverview.svelte'));

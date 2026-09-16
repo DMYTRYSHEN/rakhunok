@@ -49,18 +49,27 @@ export function legalRecipient(row: Row, entity: boolean): string {
 	return `${prefix} ${name}`;
 }
 
-export function invoiceCard(order: Row, recipient: string, amount: bigint, origin: string, now: number): TelegramInvoiceRenderData {
+function buildInvoiceCard(order: Row, recipient: string, amount: bigint, origin: string, now: number, checkoutPath: string): TelegramInvoiceRenderData {
 	if (typeof order.order_number !== 'string' || !captionLabel(order.order_number, 128)) throw new Error('reference');
 	// Missing projected fields are a schema failure, not silently invented defaults.
 	if (!Object.hasOwn(order, 'short_id')) throw new Error('short_id');
 	const issued = timestamp(order.created_at);
 	const expiry = order.expires_at === null ? now + DISPLAY_TTL_MS : Math.min(timestamp(order.expires_at), now + DISPLAY_TTL_MS);
 	if (!Number.isFinite(now) || issued > now || expiry <= now) throw new Error('date');
-	const alias = typeof order.short_id === 'string' && /^[A-Za-z0-9-]{3,36}$/.test(order.short_id) ? order.short_id : order.id;
 	return {
 		amount: `${amount / 100n}.${String(amount % 100n).padStart(2, '0')}`,
 		reference: captionLabel(order.order_number, 128), recipient,
 		issuedAt: new Date(issued).toISOString(), displayExpiresAt: new Date(expiry).toISOString(),
-		checkoutUrl: `${origin}/o/${alias}`
+		checkoutUrl: `${origin}${checkoutPath}`
 	};
+}
+
+export function invoiceCard(order: Row, recipient: string, amount: bigint, origin: string, now: number): TelegramInvoiceRenderData {
+	const alias = typeof order.short_id === 'string' && /^[A-Za-z0-9-]{3,36}$/.test(order.short_id) ? order.short_id : order.id;
+	return buildInvoiceCard(order, recipient, amount, origin, now, `/o/${alias}`);
+}
+
+export function merchantInvoiceCard(order: Row, recipient: string, amount: bigint, origin: string, now: number): TelegramInvoiceRenderData {
+	if (typeof order.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(order.id)) throw new Error('order id');
+	return buildInvoiceCard(order, recipient, amount, origin, now, `/pay/${order.id}`);
 }

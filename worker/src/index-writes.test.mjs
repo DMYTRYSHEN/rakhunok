@@ -86,8 +86,8 @@ for (const [method, path] of endpoints) {
 	test(`${method} ${path}: zero rows never succeeds`, async () => {
 		respond = () => Response.json([]);
 		await failure(await routeWebRequest(request(method, path), env),
-			method === 'PATCH' ? 404 : 503,
-			method === 'PATCH' ? 'Order not found' : 'Service unavailable');
+			path === '/api/v1/orders' || method === 'PATCH' ? 404 : 503,
+			path === '/api/v1/orders' ? 'Merchant not found' : method === 'PATCH' ? 'Order not found' : 'Service unavailable');
 	});
 }
 
@@ -142,7 +142,23 @@ for (const [label, response, status, error] of [
 		respond = response;
 		await failure(await routeWebRequest(request('POST', '/api/v1/orders', {}), env), status, error);
 		assert.equal(calls.length, 1);
-		assert.ok(calls[0].url.endsWith('/merchants?select=id&limit=1'));
+			assert.ok(calls[0].url.endsWith('/merchants?select=id,user_id&limit=1'));
+	});
+}
+
+for (const [label, body] of [
+	['zero table amount', { type: 'table', amount: 0, merchant_id: 'merchant-test', entity_id: 'entity-test', terminal_id: 'terminal-test' }],
+	['nonfinite fixed amount', { type: 'fixed', amount: 'NaN', merchant_id: 'merchant-test' }],
+	['table without terminal', { type: 'table', amount: 12, merchant_id: 'merchant-test', entity_id: 'entity-test' }],
+	['terminal without entity', { type: 'fixed', amount: 12, merchant_id: 'merchant-test', terminal_id: 'terminal-test' }]
+]) {
+	test(`POST orders: rejects ${label} before insertion`, async () => {
+		respond = (url) => {
+			assert.match(url, /\/merchants\?/);
+			return Response.json([{ id: 'merchant-test', user_id: 'owner-test' }]);
+		};
+		await failure(await routeWebRequest(request('POST', '/api/v1/orders', body), env), 422, 'Unprocessable entity');
+		assert.equal(calls.length, 1);
 	});
 }
 
@@ -151,7 +167,14 @@ for (const explicitMerchant of [true, false]) {
 		let inserted;
 		respond = (url, init) => {
 			assert.equal(init.headers.Authorization, authorization);
-			if (url.includes('/merchants?')) return Response.json([{ id: 'merchant-test' }]);
+			if (url.includes('/merchants?')) return Response.json([{ id: 'merchant-test', user_id: 'owner-test' }]);
+			if (url.includes('/terminals?')) {
+				assert.match(url, /id=eq\.terminal-test/);
+				assert.match(url, /entity_id=eq\.entity-test/);
+				assert.match(url, /user_id=eq\.owner-test/);
+				assert.match(url, /is_active=eq\.true/);
+				return Response.json([{ id: 'terminal-test' }]);
+			}
 			assert.ok(url.endsWith('/rest/v1/orders'));
 			assert.equal(init.method, 'POST');
 			assert.equal(init.headers.Prefer, 'return=representation');
@@ -175,9 +198,51 @@ for (const explicitMerchant of [true, false]) {
 		assert.deepEqual(await response.json(), {
 			success: true, order: { ...inserted, share_url: `https://example.com/pay/${inserted.id}` }
 		});
-		assert.equal(calls.length, explicitMerchant ? 1 : 2);
+		assert.equal(calls.length, 3);
 	});
 }
+
+test('POST orders: inaccessible terminal stops insertion', async () => {
+	respond = (url) => url.includes('/merchants?')
+		? Response.json([{ id: 'merchant-test', user_id: 'owner-test' }])
+		: Response.json([]);
+	await failure(await routeWebRequest(request('POST', '/api/v1/orders', {
+		merchant_id: 'merchant-test', entity_id: 'entity-test', terminal_id: 'terminal-test',
+		type: 'table', amount: 12
+	}), env), 404, 'Terminal not found');
+	assert.equal(calls.length, 2);
+});
+
+for (const [label, terminalResponse] of [
+	['network failure', () => { throw new Error('private'); }],
+	['malformed response', () => new Response('{')]
+]) {
+	test(`POST orders: terminal ${label} stops insertion`, async () => {
+		respond = (url) => url.includes('/merchants?')
+			? Response.json([{ id: 'merchant-test', user_id: 'owner-test' }])
+			: terminalResponse();
+		await failure(await routeWebRequest(request('POST', '/api/v1/orders', {
+			merchant_id: 'merchant-test', entity_id: 'entity-test', terminal_id: 'terminal-test',
+			type: 'table', amount: 12
+		}), env), 503, 'Service unavailable');
+		assert.equal(calls.length, 2);
+	});
+}
+
+test('POST orders: open amount preserves zero semantics', async () => {
+	respond = (url, init) => {
+		if (url.includes('/merchants?')) return Response.json([{ id: 'merchant-test', user_id: 'owner-test' }]);
+		const payload = JSON.parse(init.body);
+		assert.equal(payload.base_amount, 0);
+		assert.equal(payload.total_amount, 0);
+		return Response.json([{ ...payload, id: payload.id }]);
+	};
+	const response = await routeWebRequest(request('POST', '/api/v1/orders', {
+		merchant_id: 'merchant-test', type: 'open_amount', amount: 0
+	}), env);
+	assert.equal(response.status, 200);
+	assert.equal(calls.length, 2);
+});
 
 test('PATCH rejects a different returned row id', async () => {
 	respond = () => Response.json([{ id: 'wrong-order', status: 'cancelled' }]);

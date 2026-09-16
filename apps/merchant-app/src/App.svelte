@@ -25,7 +25,7 @@
 	import { googleEnvironmentMessage } from './auth/login-availability';
 	import { hasTelegramIdentity, telegramCallbackError, telegramSessionAvailable } from './auth/telegram-session';
 	import type { TelegramStatus } from './auth/telegram-login';
-	import type { BusinessEntity, MerchantDataGateway, OrderSummary, Terminal } from './data/merchant-data-gateway';
+	import { MerchantApiError, type BusinessEntity, type MerchantDataGateway, type OrderSummary, type Terminal } from './data/merchant-data-gateway';
 	import { evaluateAmount, formatAmount } from './lib/calculator';
 	import PaymentQr from './lib/PaymentQr.svelte';
 	import LiquidPaymentButton from './lib/LiquidPaymentButton.svelte';
@@ -75,6 +75,8 @@
 	let historyPeriod = $state<HistoryPeriod>('today');
 	let selectedOrder = $state<OrderSummary | null>(null);
 	let orderAction = $state<'copy' | 'cancel' | null>(null);
+	let telegramAction = $state<'sending' | 'sent' | 'error' | 'unknown' | null>(null);
+	let telegramActionMessage = $state('');
 	let cancelConfirmation = $state(false);
 	let historyLoading = $state(false);
 	let historyError = $state('');
@@ -112,7 +114,7 @@
 	const selectedTerminalIndex = $derived(terminals.findIndex((terminal) => terminal.id === selectedTerminalId));
 	const scenarioIndex = $derived(scenario === 'fixed' ? 0 : scenario === 'table' ? 1 : 2);
 	const pendingTerminalOrder = $derived(
-		(scenario === 'table' || scenario === 'kasa') && selectedTerminal
+		scenario === 'table' && selectedTerminal
 			? orders.find((o) => o.terminalId === selectedTerminal.id && (o.status === 'pending' || o.status === 'ready' || o.status === 'preparing'))
 			: undefined
 	);
@@ -405,6 +407,8 @@
 			// A same-account refresh also invalidated in-flight UI busy indicators.
 			orderCreating = false;
 			orderAction = null;
+			telegramAction = null;
+			telegramActionMessage = '';
 			microphoneBusy = false;
 			historyLoading = false;
 			if (restoredState.status === 'ready') await loadStructure(restoredState.user.id);
@@ -504,6 +508,8 @@
 		if (authState.status !== 'ready') return;
 		selectedOrder = order;
 		cancelConfirmation = false;
+		telegramAction = null;
+		telegramActionMessage = '';
 		haptic('selection');
 	}
 
@@ -511,6 +517,8 @@
 		selectedOrder = null;
 		cancelConfirmation = false;
 		orderAction = null;
+		telegramAction = null;
+		telegramActionMessage = '';
 	}
 
 	async function copyOrderLink(order: OrderSummary) {
@@ -536,11 +544,37 @@
 		const url = order.shareUrl || `${window.location.origin}/pay/${order.id}`;
 		if (!navigator.share) return copyOrderLink(order);
 		try {
-			await navigator.share({ title: `Рахунок ${order.orderNumber}`, text: `${formatAmount(String(order.amount))} ₴`, url });
+			await navigator.share({
+				title: `Рахунок ${order.orderNumber}`,
+				text: `${formatAmount(String(order.amount))} ₴`,
+				url
+			});
 			if (!sessionFence.isCurrent(generation)) return;
 			haptic('light');
 		} catch {
 			return;
+		}
+	}
+
+	async function sendOrderToTelegram(order: OrderSummary) {
+		if (!merchantDataGateway || authState.status !== 'ready' || telegramAction === 'sending') return;
+		const gateway = merchantDataGateway;
+		const expectedUserId = authState.user.id;
+		const generation = sessionFence.capture();
+		const current = () => sessionFence.isCurrent(generation) && selectedOrder?.id === order.id;
+		telegramAction = 'sending';
+		telegramActionMessage = '';
+		try {
+			await gateway.sendTelegramInvoice(order.id, expectedUserId, () => sessionFence.isCurrent(generation));
+			if (!current()) return;
+			telegramAction = 'sent';
+			telegramActionMessage = 'Рахунок надіслано в Telegram.';
+			haptic('light');
+		} catch (error) {
+			if (!current()) return;
+			telegramAction = error instanceof MerchantApiError && error.code === 'delivery_unknown' ? 'unknown' : 'error';
+			telegramActionMessage = error instanceof Error ? error.message : 'Не вдалося надіслати рахунок.';
+			haptic('medium');
 		}
 	}
 
@@ -698,6 +732,8 @@
 		if (!merchantDataGateway || authState.status !== 'ready' || orderCreating) return;
 		const gateway = merchantDataGateway;
 		const expectedUserId = authState.user.id;
+		const merchantId = authState.merchant.id;
+		const terminal = scenario === 'table' ? selectedTerminal : undefined;
 		const generation = sessionFence.capture();
 		const isCurrentSession = () => sessionFence.isCurrent(generation);
 		orderCreating = true;
@@ -708,10 +744,13 @@
 				type: scenario === 'open' ? 'open_amount' : scenario,
 				amount: orderAmount,
 				orderNumber,
-				title: title || (scenario === 'table' && selectedTerminal ? selectedTerminal.name : `Рахунок ${orderNumber}`),
-				description: scenario === 'table' && selectedTerminal ? `Оплата через ${selectedTerminal.name}` : undefined,
-				tableNumber: scenario === 'table' && selectedTerminal && /^\d+$/.test(selectedTerminal.code)
-					? Number(selectedTerminal.code)
+				title: title || (scenario === 'table' && terminal ? terminal.name : `Рахунок ${orderNumber}`),
+				merchantId,
+				entityId: terminal?.entityId,
+				terminalId: terminal?.id,
+				description: scenario === 'table' && terminal ? `Оплата через ${terminal.name}` : undefined,
+				tableNumber: scenario === 'table' && terminal && /^\d+$/.test(terminal.code)
+					? Number(terminal.code)
 					: undefined
 			}, expectedUserId, isCurrentSession);
 			// Keep the dispatched outcome; only suppress writes into a newer session.
@@ -955,6 +994,9 @@
 				{cancelConfirmation}
 				onSubmitOrder={createOrder}
 				onShareOrder={shareOrder}
+				onSendTelegramInvoice={sendOrderToTelegram}
+				{telegramAction}
+				{telegramActionMessage}
 				onCopyOrderLink={copyOrderLink}
 				onCancelOrder={cancelOrder}
 				onClose={closeOrder}
@@ -995,4 +1037,4 @@
 			{/if}
 		</div>
 	</div>
-{/if}
+{/if}

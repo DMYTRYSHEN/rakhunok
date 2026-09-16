@@ -54,6 +54,7 @@ export type TemplateCreateInput = Omit<
 >;
 
 export type InvoiceCreateInput = {
+	merchantId: string;
 	type: PersistedInvoiceType;
 	reference: string;
 	title: string;

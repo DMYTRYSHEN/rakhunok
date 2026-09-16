@@ -35,10 +35,36 @@ const implementedOperations: ImplementedOperation[] = [
 		path: '/api/v1/merchant/onboarding',
 		source: 'worker/src/index.ts'
 	},
+	{ method: 'GET', path: '/api/v1/merchant/team', source: 'worker/src/index.ts' },
+	{
+		method: 'DELETE',
+		path: '/api/v1/merchant/team/{memberId}',
+		source: 'worker/src/index.ts'
+	},
+	{
+		method: 'GET',
+		path: '/api/v1/merchant/invitations',
+		source: 'worker/src/index.ts'
+	},
+	{
+		method: 'POST',
+		path: '/api/v1/merchant/invitations',
+		source: 'worker/src/index.ts'
+	},
+	{
+		method: 'PATCH',
+		path: '/api/v1/merchant/invitations/{token}/accept',
+		source: 'worker/src/index.ts'
+	},
 	{ method: 'GET', path: '/api/v1/orders', source: 'worker/src/index.ts' },
 	{ method: 'POST', path: '/api/v1/orders', source: 'worker/src/index.ts' },
 	{ method: 'GET', path: '/api/v1/orders/{id}', source: 'worker/src/index.ts' },
 	{ method: 'PATCH', path: '/api/v1/orders/{id}', source: 'worker/src/index.ts' },
+	{
+		method: 'POST',
+		path: '/api/v1/merchant/telegram/invoices/send',
+		source: 'worker/src/index.ts'
+	},
 	{ method: 'GET', path: '/api/v1/checkout/{id}', source: 'worker/src/index.ts' },
 	{
 		method: 'POST',
@@ -141,6 +167,12 @@ const apiUses: ApiUse[] = [
 		consumer: 'merchant-app',
 		method: 'PATCH',
 		path: '/api/v1/orders/{id}',
+		source: 'apps/merchant-app/src/data/merchant-data-gateway.ts'
+	},
+	{
+		consumer: 'merchant-app',
+		method: 'POST',
+		path: '/api/v1/merchant/telegram/invoices/send',
 		source: 'apps/merchant-app/src/data/merchant-data-gateway.ts'
 	},
 	{

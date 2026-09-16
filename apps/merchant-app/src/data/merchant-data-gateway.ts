@@ -34,6 +34,9 @@ export type CreateOrderInput = {
 	amount: number;
 	orderNumber: string;
 	title: string;
+	merchantId: string;
+	entityId?: string;
+	terminalId?: string;
 	description?: string;
 	tableNumber?: number;
 };
@@ -63,6 +66,13 @@ type OrderRow = {
 	terminal_id?: string;
 };
 
+export class MerchantApiError extends Error {
+	constructor(message: string, readonly code: string | null) {
+		super(message);
+		this.name = 'MerchantApiError';
+	}
+}
+
 export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeof fetch = fetch, apiBase = '/app') {
 	async function workerRequest(path: string, init: RequestInit, expectedUserId: string, isCurrent: () => boolean) {
 		const session = await client.auth.getSession();
@@ -81,7 +91,10 @@ export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeo
 		});
 		if (!response.ok) {
 			const payload = (await response.json().catch(() => null)) as { error?: string | boolean; message?: string } | null;
-			throw new Error(payload?.message || (typeof payload?.error === 'string' ? payload.error : null) || 'Запит не виконано.');
+			throw new MerchantApiError(
+				payload?.message || (typeof payload?.error === 'string' ? payload.error : null) || 'Запит не виконано.',
+				typeof payload?.error === 'string' ? payload.error : null
+			);
 		}
 		return response;
 	}
@@ -94,6 +107,9 @@ export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeo
 					type: input.type,
 					order_number: input.orderNumber,
 					title: input.title,
+					merchant_id: input.merchantId,
+					entity_id: input.entityId,
+					terminal_id: input.terminalId,
 					description: input.description,
 					amount: input.amount,
 					table_number: input.tableNumber
@@ -101,9 +117,13 @@ export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeo
 			}, expectedUserId, isCurrent);
 			const payload = (await response.json()) as { order: OrderRow };
 			const order = payload.order;
+			const amount = Number(order?.total_amount);
+			if (!Number.isFinite(amount) || amount < 0 || (input.type !== 'open_amount' && amount <= 0)) {
+				throw new Error('Сервер повернув некоректну суму рахунку.');
+			}
 			return {
 				id: order.id,
-				amount: Number(order.total_amount) || 0,
+				amount,
 				status: order.status,
 				createdAt: order.created_at,
 				orderNumber: order.order_number,
@@ -174,6 +194,13 @@ export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeo
 			await workerRequest(`/api/v1/orders/${encodeURIComponent(orderId)}`, {
 				method: 'PATCH',
 				body: JSON.stringify({ status: 'cancelled' })
+			}, expectedUserId, isCurrent);
+		},
+
+		async sendTelegramInvoice(orderId: string, expectedUserId: string, isCurrent: () => boolean): Promise<void> {
+			await workerRequest('/api/v1/merchant/telegram/invoices/send', {
+				method: 'POST',
+				body: JSON.stringify({ order_id: orderId })
 			}, expectedUserId, isCurrent);
 		},
 

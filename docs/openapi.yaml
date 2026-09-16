@@ -274,7 +274,7 @@ paths:
           $ref: '#/components/responses/BadRequest'
 
   /merchant/invitations/{token}/accept:
-    post:
+    patch:
       operationId: acceptInvitation
       summary: Прийняття запрошення користувачем та активація членства
       tags: [Team]
@@ -461,6 +461,62 @@ paths:
                   success: { type: boolean, example: true }
                   order:
                     $ref: '#/components/schemas/Order'
+
+  /merchant/telegram/invoices/send:
+    post:
+      operationId: sendMerchantTelegramInvoice
+      summary: Надіслати активний рахунок власника як Telegram bot card
+      description: |
+        Worker визначає Telegram destination лише з єдиного прив’язаного
+        `custom:telegram` identity поточної Supabase-сесії. Клієнт не передає
+        `chat_id`. Перед надсиланням Worker через caller RLS перевіряє рахунок,
+        активного власника, отримувача, суму, валюту, статус і строк дії.
+        Автоматичних повторів після виклику Telegram API немає.
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [order_id]
+              properties:
+                order_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Telegram підтвердив доставку bot card із PNG, текстом і кнопкою `/pay/{order_id}`
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, delivery, order_id, message_id]
+                properties:
+                  ok: { type: boolean, const: true }
+                  delivery: { type: string, const: sent }
+                  order_id: { type: string, format: uuid }
+                  message_id: { type: integer, minimum: 1 }
+        '400':
+          description: Тіло містить не лише валідний `order_id`
+        '401':
+          description: Bearer JWT відсутній або має некоректний формат
+        '403':
+          description: Сесія не має доступу до рахунку, merchant або entity
+        '404':
+          description: Рахунок не знайдено через caller RLS
+        '409':
+          description: Telegram identity відсутній/неоднозначний або рахунок не можна надіслати
+        '429':
+          description: Telegram обмежив надсилання; автоматичного повтору не було
+        '502':
+          description: Telegram явно відхилив повідомлення
+        '503':
+          description: |
+            Перевірка чи рендеринг недоступні, або доставка має невідомий результат.
+            Для `delivery_unknown` клієнт має попросити користувача перевірити чат
+            перед ручним повтором.
 
   # =========================================================================
   # 5. ПУБЛІЧНИЙ ЧЕКАУТ ТА ОПЛАТА (ДЛЯ ПЛАТНИКА / APP CLIP / WEB)

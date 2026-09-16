@@ -342,8 +342,10 @@
 		try {
 			// Resolve the config to fill any missing undefined fields with defaults just in case
 			const finalConfig = resolveCheckoutConfig(scenario, scenarioConfig);
+			if (!businessContext?.merchantId) throw new Error('Профіль мерчанта не знайдено.');
 
 			const result = await onCreate({
+				merchantId: businessContext.merchantId,
 				type: scenario,
 				reference: reference.trim(),
 				title: title.trim() || reference.trim(),

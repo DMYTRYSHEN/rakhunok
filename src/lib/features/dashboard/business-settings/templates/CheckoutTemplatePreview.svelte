@@ -6,10 +6,10 @@
 		CreditCard,
 		Gift,
 		Heart,
+		Info,
 		MapPin,
 		ReceiptText,
 		ShieldCheck,
-		Sparkles,
 		Star,
 		Truck,
 		Users,
@@ -215,7 +215,7 @@
 					{#if model.config.allow_upsell}
 						<section class="feature">
 							<div class="feature-title">
-								<Sparkles size={16} /><strong>Додати до замовлення</strong>
+								<Info size={16} /><strong>Додати до замовлення</strong>
 							</div>
 							<button class="row-action"><span>Десерт дня · +120 ₴</span><span>+</span></button>
 						</section>

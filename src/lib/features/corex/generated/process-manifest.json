@@ -774,6 +774,48 @@
 				},
 				{
 					"method": "DELETE",
+					"path": "/api/v1/merchant/telegram/invoices/send",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/merchant/telegram/invoices/send",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/merchant/telegram/invoices/send",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/merchant/telegram/invoices/send",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/merchant/telegram/invoices/send",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/merchant/telegram/invoices/send",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
 					"path": "/api/v1/orders",
 					"match": "exact",
 					"status": "implemented",
@@ -2431,7 +2473,7 @@
 					"source": "docs/openapi.yaml"
 				},
 				{
-					"method": "POST",
+					"method": "PATCH",
 					"path": "/api/v1/merchant/invitations/{token}/accept",
 					"operationId": "acceptInvitation",
 					"summary": "Прийняття запрошення користувачем та активація членства",
@@ -2471,6 +2513,15 @@
 					"path": "/api/v1/orders/{id}",
 					"operationId": "updateOrder",
 					"summary": "Оновити статус або суму рахунку",
+					"tags": ["Orders"],
+					"status": "planned",
+					"source": "docs/openapi.yaml"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/merchant/telegram/invoices/send",
+					"operationId": "sendMerchantTelegramInvoice",
+					"summary": "Надіслати активний рахунок власника як Telegram bot card",
 					"tags": ["Orders"],
 					"status": "planned",
 					"source": "docs/openapi.yaml"
