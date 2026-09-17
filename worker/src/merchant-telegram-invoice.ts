@@ -206,9 +206,10 @@ export async function handleMerchantTelegramInvoice(request: Request, env: Merch
 			return failure(502, 'telegram_rejected', 'Telegram відхилив рахунок. Перевірте діалог із ботом.');
 		const message = record(sent.data) && sent.data.ok === true && record(sent.data.result) ? sent.data.result : null;
 		if (sent.status !== 200 || !message || !Number.isSafeInteger(message.message_id) || Number(message.message_id) <= 0 ||
-			!record(message.chat)) throw new Error('unconfirmed');
+			!record(message.chat)) throw new Error('unconfirmed: ' + sent.status + ' ' + JSON.stringify(sent.data));
 		return reply(200, { ok: true, delivery: 'sent', order_id: orderId, message_id: message.message_id });
-	} catch {
-		return failure(503, 'delivery_unknown', 'Не вдалося підтвердити доставку. Перевірте чат із ботом перед повтором, щоб не створити дублікат.');
+	} catch (err: unknown) {
+		console.error('Telegram delivery error:', err);
+		return failure(503, 'delivery_unknown', 'DEBUG DELIVERY: ' + (err instanceof Error ? err.message : String(err)));
 	}
 }
