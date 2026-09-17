@@ -78,8 +78,8 @@ async function remote(url: string, init: RequestInit): Promise<{ status: number;
 		return await Promise.race([deadline, (async () => {
 			const response = await fetch(url, { ...init, redirect: 'manual', signal: controller.signal });
 			if (response.status !== 200) {
-				await response.body?.cancel();
-				return { status: response.status, data: null };
+				const data = await response.json().catch(() => null);
+				return { status: response.status, data };
 			}
 			return { status: response.status, data: await boundedJson(response.body, 32_768) };
 		})()]);
@@ -90,7 +90,7 @@ function one(data: unknown): Row | null {
 	return Array.isArray(data) && data.length === 1 && record(data[0]) ? data[0] : null;
 }
 
-function telegramRecipient(user: Row): string | null {
+function telegramRecipient(user: Row): { chatId: string; username: string | null } | null {
 	if (!Array.isArray(user.identities)) return null;
 	const matches = user.identities.filter((identity): identity is Row => record(identity) && (identity.provider === 'custom:telegram' || identity.provider === 'telegram'));
 	if (matches.length !== 1) return null;
@@ -99,7 +99,8 @@ function telegramRecipient(user: Row): string | null {
 	if (identity.provider_id !== undefined && identity.id !== undefined && identity.provider_id !== identity.id) return null;
 	const providerId = identity.provider_id ?? identity.id;
 	if (typeof providerId !== 'string' || !TELEGRAM_ID.test(providerId)) return null;
-	return providerId;
+	const username = record(identity.identity_data) && typeof identity.identity_data.preferred_username === 'string' ? identity.identity_data.preferred_username : null;
+	return { chatId: providerId, username };
 }
 
 function validateOrder(row: Row, now: number): bigint | null {
@@ -147,8 +148,18 @@ export async function handleMerchantTelegramInvoice(request: Request, env: Merch
 		if (auth.status === 401 || auth.status === 403) return failure(403, 'forbidden', 'Сесія більше не має доступу до цього рахунку.');
 		if (auth.status !== 200 || !record(auth.data) || !uuid(auth.data.id)) throw new Error('auth');
 		const destination = telegramRecipient(auth.data);
-		if (destination === null) return failure(409, 'telegram_identity_required', 'DEBUG IDENTITIES: ' + JSON.stringify(auth.data?.identities));
-		chatId = destination;
+		if (destination === null) return failure(409, 'telegram_identity_required', 'Прив\'яжіть один Telegram-акаунт у профілі та повторіть спробу.');
+		
+		chatId = destination.chatId;
+		if (chatId.length > 15 && destination.username && (env as any).ORDERS_KV) {
+			try {
+				const realChatId = await (env as any).ORDERS_KV.get(`tg:username:${destination.username.toLowerCase()}`);
+				if (realChatId) chatId = realChatId;
+			} catch (e) {
+				console.error('KV lookup error:', e);
+			}
+		}
+		
 		const ordersUrl = new URL(`${config.supabase}/rest/v1/orders`);
 		ordersUrl.search = new URLSearchParams({ select: ORDER_FIELDS, id: `eq.${orderId}`, limit: '2' }).toString();
 		const orderResult = await remote(ordersUrl.href, { headers });
@@ -206,7 +217,7 @@ export async function handleMerchantTelegramInvoice(request: Request, env: Merch
 			return failure(502, 'telegram_rejected', 'Telegram відхилив рахунок. Перевірте діалог із ботом.');
 		const message = record(sent.data) && sent.data.ok === true && record(sent.data.result) ? sent.data.result : null;
 		if (sent.status !== 200 || !message || !Number.isSafeInteger(message.message_id) || Number(message.message_id) <= 0 ||
-			!record(message.chat)) throw new Error('unconfirmed: ' + sent.status + ' ' + JSON.stringify(sent.data));
+			!record(message.chat)) throw new Error('unconfirmed: chat_id=' + chatId + ' status=' + sent.status + ' ' + JSON.stringify(sent.data));
 		return reply(200, { ok: true, delivery: 'sent', order_id: orderId, message_id: message.message_id });
 	} catch (err: unknown) {
 		console.error('Telegram delivery error:', err);

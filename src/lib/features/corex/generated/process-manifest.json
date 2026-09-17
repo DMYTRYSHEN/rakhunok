@@ -1998,7 +1998,7 @@
 			"config": "worker/wrangler.app.jsonc",
 			"publicRoutes": ["letsrealtalk.com/app*"],
 			"bindings": [
-				{ "name": "API", "type": "service", "target": "rahunok" },
+				{ "name": "API", "type": "service", "target": "letsrealtalk-web" },
 				{ "name": "ASSETS", "type": "assets", "target": "../apps/merchant-app/dist" }
 			],
 			"routes": [

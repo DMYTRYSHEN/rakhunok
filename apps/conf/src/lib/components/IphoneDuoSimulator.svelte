@@ -1,7 +1,7 @@
 <script lang="ts">
     import {
         Smartphone, Globe, Wifi, Battery, ShieldCheck, Check,
-        ExternalLink, Play, Copy, Sparkles, ArrowRight, Lock,
+        ExternalLink, Play, Copy, ArrowRight, Lock,
         RefreshCw, Layers, Store, QrCode, Zap, CheckCircle2,
         ChevronLeft, Share2, Info
     } from '@lucide/svelte';
@@ -232,7 +232,7 @@
                                         <RefreshCw size={16} class="animate-spin" />
                                         <span>Face ID розпізнавання...</span>
                                     {:else}
-                                        <Sparkles size={16} />
+                                        <Info size={16} />
                                         <span>Підтвердити Face ID</span>
                                     {/if}
                                 </button>

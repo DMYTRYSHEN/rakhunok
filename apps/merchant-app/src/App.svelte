@@ -280,14 +280,28 @@
 			},
 			onError: (message) => {
 				if (!current()) return;
-				voicePhase = 'error';
-				voiceError = message;
+				if (message.includes('Не вдалося почути команду') && voiceTranscript.trim()) {
+					voicePhase = 'processing';
+					voiceCommand = parseVoiceCommand(voiceTranscript.trim());
+					voicePhase = voiceCommand.validation.valid ? 'result' : 'error';
+					voiceError = voiceCommand.validation.errors.join(' ');
+				} else {
+					voicePhase = 'error';
+					voiceError = message;
+				}
 			},
 			onEnd: () => {
 				if (!current()) return;
 				if (voicePhase === 'listening') {
-					voicePhase = 'error';
-					voiceError = 'Не вдалося почути команду. Спробуйте ще раз.';
+					if (voiceTranscript.trim()) {
+						voicePhase = 'processing';
+						voiceCommand = parseVoiceCommand(voiceTranscript.trim());
+						voicePhase = voiceCommand.validation.valid ? 'result' : 'error';
+						voiceError = voiceCommand.validation.errors.join(' ');
+					} else {
+						voicePhase = 'error';
+						voiceError = 'Не вдалося почути команду. Спробуйте ще раз.';
+					}
 				}
 			}
 		});
@@ -316,12 +330,13 @@
 		scenario = 'fixed';
 		setExpression(minor ? `${major}.${String(minor).padStart(2, '0')}` : String(major), 1);
 		voiceError = '';
-		const created = await submitOrder(voiceAmount, customerName ? `Рахунок для ${customerName}` : undefined);
+		const created = await submitOrder(voiceAmount, customerName ? `Замовлення від ${customerName}` : undefined);
 		if (!sessionFence.isCurrent(generation) || !voiceFence.isCurrent(attempt)) return;
 		if (created) {
 			closeVoice();
 		} else {
-			voiceError = orderCreateError;
+			voiceError = orderCreateError || 'Помилка створення рахунку.';
+			voicePhase = 'error';
 		}
 	}
 
@@ -557,25 +572,16 @@
 	}
 
 	async function sendOrderToTelegram(order: OrderSummary) {
-		if (!merchantDataGateway || authState.status !== 'ready' || telegramAction === 'sending') return;
-		const gateway = merchantDataGateway;
-		const expectedUserId = authState.user.id;
-		const generation = sessionFence.capture();
-		const current = () => sessionFence.isCurrent(generation) && selectedOrder?.id === order.id;
-		telegramAction = 'sending';
-		telegramActionMessage = '';
-		try {
-			await gateway.sendTelegramInvoice(order.id, expectedUserId, () => sessionFence.isCurrent(generation));
-			if (!current()) return;
-			telegramAction = 'sent';
-			telegramActionMessage = 'Рахунок надіслано в Telegram.';
-			haptic('light');
-		} catch (error) {
-			if (!current()) return;
-			telegramAction = error instanceof MerchantApiError && error.code === 'delivery_unknown' ? 'unknown' : 'error';
-			telegramActionMessage = error instanceof Error ? error.message : 'Не вдалося надіслати рахунок.';
-			haptic('medium');
-		}
+		haptic('light');
+		const text = encodeURIComponent('@RhnkBot ' + order.id);
+		
+		// Attempt native deep link first (forces app open)
+		window.location.assign(`tg://msg?text=${text}`);
+		
+		// Fallback to t.me if deep link fails (after a short delay)
+		setTimeout(() => {
+			window.location.assign(`https://t.me/share/url?text=${text}`);
+		}, 500);
 	}
 
 	async function cancelOrder(order: OrderSummary) {

@@ -792,6 +792,7 @@
 		display: grid;
 		width: 32px;
 		height: 32px;
+		padding: 0;
 		place-items: center;
 		border: 1px solid rgba(255, 255, 255, 0.14);
 		border-radius: 50%;

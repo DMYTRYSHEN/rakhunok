@@ -10,6 +10,7 @@ import {
 	registerTelegramWebhook,
 	sendNotificationToTelegramUser
 } from './telegram-bot.ts';
+import { handleInvoiceImageGet } from './invoice-image.ts';
 
 interface Env extends TelegramInvoiceEnv, MerchantTelegramInvoiceEnv {
 	ASSETS: Fetcher;
@@ -874,12 +875,16 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 	if (url.pathname === '/api/v1/telegram/invoices/send') {
 		return handleTelegramInvoice(request, env);
 	}
-	if (url.pathname === '/api/v1/merchant/telegram/invoices/send') {
-		return handleMerchantTelegramInvoice(request, env);
+	if (url.pathname === '/api/v1/merchant/telegram-invoice') {
+		return handleMerchantTelegramInvoice(request, env as unknown as MerchantTelegramInvoiceEnv);
 	}
 
 	if (url.pathname === '/api/v1/telegram/webhook') {
 		return handleTelegramWebhook(request, env);
+	}
+
+	if (request.method === 'GET' && url.pathname.startsWith('/api/v1/orders/invoice-image/')) {
+		return handleInvoiceImageGet(request, env as unknown as TelegramInvoiceEnv);
 	}
 
 	if (url.pathname === '/api/v1/verification/status') {

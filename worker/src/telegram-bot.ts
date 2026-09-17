@@ -136,8 +136,47 @@ export async function handleTelegramWebhook(request: Request, env?: TelegramEnv)
 	let update: any;
 	try {
 		update = await request.json();
+		if (env?.ORDERS_KV) {
+			await env.ORDERS_KV.put('tg:debug:last_update', JSON.stringify(update));
+		}
 	} catch {
 		return new Response('Bad Request', { status: 400 });
+	}
+
+	if (update.inline_query) {
+		const inlineQuery = update.inline_query;
+		const orderId = inlineQuery.query.trim();
+		
+		if (!orderId) {
+			return new Response(JSON.stringify({
+				method: 'answerInlineQuery',
+				inline_query_id: inlineQuery.id,
+				results: []
+			}), { headers: { 'Content-Type': 'application/json' } });
+		}
+
+		const photoUrl = `https://letsrealtalk.com/api/v1/orders/invoice-image/${orderId}?v=${Date.now()}`;
+		const checkoutUrl = `https://letsrealtalk.com/pay/${orderId}`;
+		
+		const results = [{
+			type: 'photo',
+			id: orderId,
+			photo_url: photoUrl,
+			thumb_url: photoUrl,
+			caption: `<b>Рахунок RHK-${orderId.slice(0,6)}</b>\nВідкрито для оплати.`,
+			parse_mode: 'HTML',
+			reply_markup: {
+				inline_keyboard: [[{ text: '💳 Оплатити рахунок', url: checkoutUrl }]]
+			}
+		}];
+
+		return new Response(JSON.stringify({
+			method: 'answerInlineQuery',
+			inline_query_id: inlineQuery.id,
+			results,
+			cache_time: 0,
+			is_personal: false
+		}), { headers: { 'Content-Type': 'application/json' } });
 	}
 
 	const message = update?.message;
@@ -166,6 +205,9 @@ export async function handleTelegramWebhook(request: Request, env?: TelegramEnv)
 		if (env?.ORDERS_KV) {
 			try {
 				await env.ORDERS_KV.put(`tg:pending:${chatId}`, token, { expirationTtl: 1800 });
+				if (username) {
+					await env.ORDERS_KV.put(`tg:username:${username.toLowerCase()}`, String(chatId), { expirationTtl: 60 * 60 * 24 * 30 });
+				}
 			} catch {}
 		}
 

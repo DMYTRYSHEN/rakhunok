@@ -70,10 +70,12 @@ const intentPatterns = [
 export function normalizeSpeechText(text: string) {
 	return text
 		.toLocaleLowerCase('uk-UA')
-		.replace(/ё/g, 'е')
-		.replace(/[’`ʼ]/g, "'")
-		.replace(/[^\p{L}\p{N}'₴$.,\s-]/gu, ' ')
-		.replace(/\bдл\s+я\b/g, 'для')
+		.replace(/₴/g, ' гривень ')
+		.replace(/[$€]/g, ' ')
+		.replace(/’/g, 'ʼ')
+		.replace(/[ʼ'`‘]/g, "'")
+		.replace(/[^\p{L}\p{N}'ʼ$.,\s-]/gu, ' ')
+		.replace(/\bсорок\s+а\b/g, 'сорока')
 		.replace(/\s+/g, ' ')
 		.trim();
 }
@@ -81,12 +83,13 @@ export function normalizeSpeechText(text: string) {
 export function parseVoiceCommand(text: string): VoiceCommand {
 	const normalized = normalizeSpeechText(text);
 	const language = detectLanguage(normalized);
-	const negated = /(?:^|\s)(не|не треба|не потрібно|не нужно)\s+(створюй|створити|створи|створювати|создавай|создать|создай|выставляй|виставляй)(?=\s|$)/.test(normalized);
-	const hasIntent = !negated && intentPatterns.some((pattern) => pattern.test(normalized));
+	const negated = /(?:^|\s)(не|не треба|не створюй|не роби)\s+(рахунок|замовлення|чек|оплату|запит|переказ)(?=\s|$)/.test(normalized);
+	const explicitIntent = intentPatterns.some((pattern) => pattern.test(normalized)) || /(?:^|\s)рахунок(?=\s|$)/.test(normalized);
 	const amount = parseAmount(normalized);
+	const hasIntent = !negated && (explicitIntent || amount !== null);
 	const customer = hasIntent ? parseCustomer(normalized) : null;
 	const errors: string[] = [];
-	if (!hasIntent) errors.push(negated ? 'Команда містить заперечення.' : 'Не вдалося визначити намір створити рахунок.');
+	if (!hasIntent) errors.push(negated ? 'Скасовано користувачем.' : 'Не вдалося визначити намір створити рахунок.');
 	if (!amount) errors.push('Не вдалося визначити суму.');
 	else if (amount.currency !== 'UAH') errors.push(`Валюта ${amount.currency} не підтримується checkout.`);
 	else if (amount.value_minor <= 0) errors.push('Сума повинна бути більшою за нуль.');
