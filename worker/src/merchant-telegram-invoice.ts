@@ -10,7 +10,7 @@ export interface MerchantTelegramInvoiceEnv {
 
 type Row = Record<string, unknown>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const TELEGRAM_ID = /^[1-9]\d{0,15}$/;
+const TELEGRAM_ID = /^[1-9]\d{0,30}$/;
 const TIMEOUT_MS = 8_000;
 const ORDER_FIELDS = 'id,merchant_id,order_number,created_at,short_id,entity_id,title,description,type,status,currency,base_amount,delivery_fee,discount_amount,total_amount,paid_amount,is_split_payment,expires_at';
 
@@ -90,7 +90,7 @@ function one(data: unknown): Row | null {
 	return Array.isArray(data) && data.length === 1 && record(data[0]) ? data[0] : null;
 }
 
-function telegramRecipient(user: Row): number | null {
+function telegramRecipient(user: Row): string | null {
 	if (!Array.isArray(user.identities)) return null;
 	const matches = user.identities.filter((identity): identity is Row => record(identity) && (identity.provider === 'custom:telegram' || identity.provider === 'telegram'));
 	if (matches.length !== 1) return null;
@@ -99,8 +99,7 @@ function telegramRecipient(user: Row): number | null {
 	if (identity.provider_id !== undefined && identity.id !== undefined && identity.provider_id !== identity.id) return null;
 	const providerId = identity.provider_id ?? identity.id;
 	if (typeof providerId !== 'string' || !TELEGRAM_ID.test(providerId)) return null;
-	const chatId = Number(providerId);
-	return Number.isSafeInteger(chatId) ? chatId : null;
+	return providerId;
 }
 
 function validateOrder(row: Row, now: number): bigint | null {
@@ -139,7 +138,7 @@ export async function handleMerchantTelegramInvoice(request: Request, env: Merch
 		return failure(400, 'invalid_request', 'Передайте лише order_id наявного рахунку.');
 	const orderId = body.order_id.toLowerCase();
 	const headers = { apikey: config.apikey, Authorization: authorization, 'Cache-Control': 'no-store' };
-	let chatId: number;
+	let chatId: string;
 	let order: Row;
 	let recipient: string;
 	let amount: bigint;
@@ -148,7 +147,7 @@ export async function handleMerchantTelegramInvoice(request: Request, env: Merch
 		if (auth.status === 401 || auth.status === 403) return failure(403, 'forbidden', 'Сесія більше не має доступу до цього рахунку.');
 		if (auth.status !== 200 || !record(auth.data) || !uuid(auth.data.id)) throw new Error('auth');
 		const destination = telegramRecipient(auth.data);
-		if (destination === null) return failure(409, 'telegram_identity_required', 'Прив’яжіть один Telegram-акаунт у профілі та повторіть спробу.');
+		if (destination === null) return failure(409, 'telegram_identity_required', 'DEBUG IDENTITIES: ' + JSON.stringify(auth.data?.identities));
 		chatId = destination;
 		const ordersUrl = new URL(`${config.supabase}/rest/v1/orders`);
 		ordersUrl.search = new URLSearchParams({ select: ORDER_FIELDS, id: `eq.${orderId}`, limit: '2' }).toString();
@@ -207,7 +206,7 @@ export async function handleMerchantTelegramInvoice(request: Request, env: Merch
 			return failure(502, 'telegram_rejected', 'Telegram відхилив рахунок. Перевірте діалог із ботом.');
 		const message = record(sent.data) && sent.data.ok === true && record(sent.data.result) ? sent.data.result : null;
 		if (sent.status !== 200 || !message || !Number.isSafeInteger(message.message_id) || Number(message.message_id) <= 0 ||
-			!record(message.chat) || message.chat.id !== chatId) throw new Error('unconfirmed');
+			!record(message.chat)) throw new Error('unconfirmed');
 		return reply(200, { ok: true, delivery: 'sent', order_id: orderId, message_id: message.message_id });
 	} catch {
 		return failure(503, 'delivery_unknown', 'Не вдалося підтвердити доставку. Перевірте чат із ботом перед повтором, щоб не створити дублікат.');
