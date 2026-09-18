@@ -41,29 +41,157 @@
 		[key: string]: unknown;
 	};
 
-	let {
-		scenario = 'vertical_auto',
-		flowData = $bindable({})
-	}: {
-		scenario?: string;
-		flowData: Record<string, unknown>;
-	} = $props();
+	type VerticalMeta = {
+		categoryTitle: string;
+		categorySubtitle: string;
+		categoryIcon: string;
+		serviceTitle: string;
+		serviceSubtitle: string;
+		scheduleTitle: string;
+		defaultCategories: BookingCategory[];
+		defaultServices: BookingService[];
+		defaultDeposit: number;
+	};
+
+	function getVerticalProfile(type: string): VerticalMeta {
+		if (type === 'vertical_education') {
+			return {
+				categoryTitle: 'Викладачі / Напрямки',
+				categorySubtitle: 'Вкажіть викладачів або предмети (наприклад: Англійська, Математика, IT)',
+				categoryIcon: '🎓',
+				serviceTitle: 'Пакети занять та курси',
+				serviceSubtitle: 'Пробний урок, індивідуальні заняття або абонемент на курс',
+				scheduleTitle: 'Графік проведення занять',
+				defaultCategories: [
+					{ id: 'tutor_1', title: 'Марія — Англійська (B1-C1)', subtitle: 'Розмовна практика', icon: '👩‍🏫', modifier: 1.0 },
+					{ id: 'tutor_2', title: 'Олександр — НМТ / IELTS', subtitle: 'Підготовка до іспитів', icon: '👨‍🏫', modifier: 1.25 }
+				],
+				defaultServices: [
+					{ id: 'edu_1', name: 'Пробне заняття (45 хв)', durationMinutes: 45, basePrice: 250 },
+					{ id: 'edu_2', name: 'Індивідуальний урок (60 хв)', durationMinutes: 60, basePrice: 500 },
+					{ id: 'edu_3', name: 'Курс / Абонемент (8 уроків)', durationMinutes: 60, basePrice: 3600 }
+				],
+				defaultDeposit: 250
+			};
+		}
+
+		if (type === 'vertical_beauty') {
+			return {
+				categoryTitle: 'Спеціалісти / Майстри',
+				categorySubtitle: 'Категорії майстрів (наприклад: Майстер, Топ-стиліст)',
+				categoryIcon: '💇',
+				serviceTitle: 'Послуги краси та догляду',
+				serviceSubtitle: 'Стрижка, укладка, манікюр, фарбування',
+				scheduleTitle: 'Робочий розклад майстра',
+				defaultCategories: [
+					{ id: 'm_1', title: 'Майстер Анна', subtitle: 'Стиліст-перукар', icon: '✂️', modifier: 1.0 },
+					{ id: 'm_2', title: 'Топ-стиліст Олена', subtitle: 'Колорист експерт', icon: '✨', modifier: 1.3 }
+				],
+				defaultServices: [
+					{ id: 'b_1', name: 'Стрижка та моделювання', durationMinutes: 45, basePrice: 600 },
+					{ id: 'b_2', name: 'Комплексний манікюр', durationMinutes: 75, basePrice: 500 },
+					{ id: 'b_3', name: 'Догляд та відновлення волосся', durationMinutes: 60, basePrice: 850 }
+				],
+				defaultDeposit: 200
+			};
+		}
+
+		if (type === 'vertical_pets') {
+			return {
+				categoryTitle: 'Вид та розмір тварини',
+				categorySubtitle: 'Котики або собаки різної ваги (впливає на час і косметику)',
+				categoryIcon: '🐕',
+				serviceTitle: 'Послуги грумінгу та гігієни',
+				serviceSubtitle: 'Комплекс, купання, експрес-линька',
+				scheduleTitle: 'Графік грумінг-салону',
+				defaultCategories: [
+					{ id: 'pet_cat', title: 'Котик', subtitle: 'Усі породи', icon: '🐱', modifier: 1.0 },
+					{ id: 'pet_small', title: 'Собака до 5 кг', subtitle: 'Йорк, шпіц, мальтезе', icon: '🐶', modifier: 1.0 },
+					{ id: 'pet_med', title: 'Собака 5–15 кг', subtitle: 'Коргі, кокер, пудель', icon: '🐕', modifier: 1.3 }
+				],
+				defaultServices: [
+					{ id: 'p_1', name: 'Комплексний грумінг (купання + стрижка)', durationMinutes: 90, basePrice: 750 },
+					{ id: 'p_2', name: 'Гігієнічний догляд та кігті', durationMinutes: 45, basePrice: 400 },
+					{ id: 'p_3', name: 'Експрес-линька', durationMinutes: 60, basePrice: 600 }
+				],
+				defaultDeposit: 200
+			};
+		}
+
+		if (type === 'vertical_cleaning') {
+			return {
+				categoryTitle: 'Тип приміщення',
+				categorySubtitle: 'Кількість кімнат або площа житла',
+				categoryIcon: '🧹',
+				serviceTitle: 'Пакети прибирання',
+				serviceSubtitle: 'Підтримуюче, генеральне, після ремонту',
+				scheduleTitle: 'Графік виїзду клінінгової бригади',
+				defaultCategories: [
+					{ id: 'cl_1', title: '1-кімнатна квартира', subtitle: 'До 45 м²', icon: '🛋️', modifier: 1.0 },
+					{ id: 'cl_2', title: '2-кімнатна квартира', subtitle: 'До 70 м²', icon: '🏠', modifier: 1.4 },
+					{ id: 'cl_3', title: '3-кімнатна або будинок', subtitle: 'Від 80 м²', icon: '🏡', modifier: 1.8 }
+				],
+				defaultServices: [
+					{ id: 'c_1', name: 'Базове підтримуюче прибирання', durationMinutes: 120, basePrice: 800 },
+					{ id: 'c_2', name: 'Генеральне комплексне прибирання', durationMinutes: 240, basePrice: 1500 },
+					{ id: 'c_3', name: 'Прибирання після ремонту', durationMinutes: 300, basePrice: 2200 }
+				],
+				defaultDeposit: 300
+			};
+		}
+
+		if (type === 'vertical_rental') {
+			return {
+				categoryTitle: 'Категорії спорядження',
+				categorySubtitle: 'Типи товарів для прокату',
+				categoryIcon: '🏕️',
+				serviceTitle: 'Об’єкти оренди (тариф/доба)',
+				serviceSubtitle: 'Вартість за 1 добу користування',
+				scheduleTitle: 'Графік пункту прокату / видачі',
+				defaultCategories: [
+					{ id: 'r_camp', title: 'Туризм та кемпінг', subtitle: 'Намети, спальники', icon: '⛺', modifier: 1.0 },
+					{ id: 'r_water', title: 'Водний спорт', subtitle: 'Сапборди, байдарки', icon: '🏄', modifier: 1.2 }
+				],
+				defaultServices: [
+					{ id: 'rent_1', name: 'Намет 2-місний туристичний', durationMinutes: 1440, basePrice: 350 },
+					{ id: 'rent_2', name: 'Сапборд надувний у комплекті', durationMinutes: 1440, basePrice: 500 },
+					{ id: 'rent_3', name: 'Спальний мішок демісезонний', durationMinutes: 1440, basePrice: 150 }
+				],
+				defaultDeposit: 500
+			};
+		}
+
+		// За замовчуванням СТО / Автосервіс
+		return {
+			categoryTitle: 'Категорії авто / Коліс',
+			categorySubtitle: 'Типи авто (впливає на вартість робіт та матеріалів)',
+			categoryIcon: '🚗',
+			serviceTitle: 'Перелік послуг СТО та прайс',
+			serviceSubtitle: 'Клієнт зможе обрати ці послуги під час запису',
+			scheduleTitle: 'Робочий розклад боксу СТО',
+			defaultCategories: [
+				{ id: 'sedan', title: 'Легкове авто', subtitle: 'Седан, хетчбек', icon: '🚗', modifier: 1.0 },
+				{ id: 'suv', title: 'Кросовер / SUV', subtitle: 'Позашляховик', icon: '🚙', modifier: 1.25 },
+				{ id: 'van', title: 'Мікроавтобус', subtitle: 'Бус, комерційний', icon: '🚐', modifier: 1.5 }
+			],
+			defaultServices: [
+				{ id: 'srv_1', name: 'Комплексний шиномонтаж (4 шт)', durationMinutes: 45, basePrice: 800 },
+				{ id: 'srv_2', name: 'Балансування коліс', durationMinutes: 30, basePrice: 400 },
+				{ id: 'srv_3', name: 'Діагностика ходової частини', durationMinutes: 30, basePrice: 350 }
+			],
+			defaultDeposit: 200
+		};
+	}
+
+	const meta = $derived(getVerticalProfile(scenario));
 
 	// Ініціалізація структури, якщо порожня
 	if (!flowData.services || !Array.isArray(flowData.services)) {
-		flowData.services = [
-			{ id: 'srv_1', name: 'Комплексний шиномонтаж (4 шт)', durationMinutes: 45, basePrice: 800 },
-			{ id: 'srv_2', name: 'Балансування коліс', durationMinutes: 30, basePrice: 400 },
-			{ id: 'srv_3', name: 'Діагностика ходової частини', durationMinutes: 30, basePrice: 350 }
-		];
+		flowData.services = getVerticalProfile(scenario).defaultServices;
 	}
 
 	if (!flowData.categories || !Array.isArray(flowData.categories)) {
-		flowData.categories = [
-			{ id: 'sedan', title: 'Легкове авто', subtitle: 'Седан, хетчбек', icon: '🚗', modifier: 1.0 },
-			{ id: 'suv', title: 'Кросовер / SUV', subtitle: 'Позашляховик', icon: '🚙', modifier: 1.25 },
-			{ id: 'van', title: 'Мікроавтобус', subtitle: 'Бус, комерційний', icon: '🚐', modifier: 1.5 }
-		];
+		flowData.categories = getVerticalProfile(scenario).defaultCategories;
 	}
 
 	if (!flowData.schedule || typeof flowData.schedule !== 'object') {
@@ -72,7 +200,7 @@
 			endHour: '19:00',
 			slotDurationMinutes: 45,
 			workDays: 'mon_sat',
-			depositAmount: 200,
+			depositAmount: getVerticalProfile(scenario).defaultDeposit,
 			calendarSyncUrl: ''
 		};
 	}
@@ -82,9 +210,21 @@
 	let schedule = $state<BookingSchedule>(flowData.schedule as BookingSchedule);
 	let enableCategories = $state(categories.length > 0);
 
+	// Оновлення при зміні сценарію, якщо дані ще дефолтні
+	$effect(() => {
+		const nextProfile = getVerticalProfile(scenario);
+		if (!flowData._customized) {
+			services = nextProfile.defaultServices;
+			categories = nextProfile.defaultCategories;
+			schedule.depositAmount = nextProfile.defaultDeposit;
+			syncToFlowData();
+		}
+	});
+
 	function syncToFlowData() {
 		flowData = {
 			...flowData,
+			_customized: true,
 			services: [...services],
 			categories: enableCategories ? [...categories] : [],
 			schedule: { ...schedule }
@@ -123,16 +263,16 @@
 			<div>
 				<div class="flex items-center gap-2">
 					<Wrench size={16} class="text-blue-600" />
-					<h4 class="text-sm font-bold text-zinc-900">Перелік послуг та вартість</h4>
+					<h4 class="text-sm font-bold text-zinc-900">{meta.serviceTitle}</h4>
 				</div>
-				<p class="text-xs text-zinc-500">Клієнт зможе обрати ці послуги під час запису.</p>
+				<p class="text-xs text-zinc-500">{meta.serviceSubtitle}</p>
 			</div>
 			<button
 				type="button"
 				onclick={addService}
 				class="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
 			>
-				<Plus size={14} /> Додати послугу
+				<Plus size={14} /> Додати позицію
 			</button>
 		</div>
 
@@ -140,12 +280,12 @@
 			{#each services as item, index (item.id)}
 				<div class="flex items-center gap-2 rounded-lg border border-zinc-100 bg-zinc-50 p-2 sm:gap-3">
 					<div class="flex-1 min-w-0">
-						<span class="sr-only">Назва послуги</span>
+						<span class="sr-only">Назва</span>
 						<input
 							type="text"
 							bind:value={item.name}
 							oninput={syncToFlowData}
-							placeholder="Назва послуги"
+							placeholder="Назва послуги / пакету"
 							class="w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-900 outline-none focus:border-blue-500"
 						/>
 					</div>
@@ -194,7 +334,7 @@
 		</div>
 	</section>
 
-	<!-- Секція 2: Категорії / Типи авто -->
+	<!-- Секція 2: Категорії / Варіанти -->
 	<section class="rounded-xl border border-zinc-200 bg-white p-4 shadow-xs">
 		<div class="mb-3 flex items-center justify-between">
 			<label class="flex cursor-pointer items-center gap-2">
@@ -207,9 +347,9 @@
 				<div>
 					<div class="flex items-center gap-2">
 						<Layers size={16} class="text-indigo-600" />
-						<strong class="text-sm font-bold text-zinc-900">Категорії / Варіанти об'єктів</strong>
+						<strong class="text-sm font-bold text-zinc-900">{meta.categoryTitle}</strong>
 					</div>
-					<p class="text-xs text-zinc-500">Наприклад, типи авто (Седан, SUV, Бус) з коефіцієнтом вартості.</p>
+					<p class="text-xs text-zinc-500">{meta.categorySubtitle}</p>
 				</div>
 			</label>
 
@@ -239,7 +379,7 @@
 							type="text"
 							bind:value={cat.title}
 							oninput={syncToFlowData}
-							placeholder="Назва категорії"
+							placeholder="Назва (наприклад: Викладач / Тип авто)"
 							class="flex-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-900"
 						/>
 						<div class="w-28 flex items-center gap-1">
@@ -272,7 +412,7 @@
 	<section class="rounded-xl border border-zinc-200 bg-white p-4 shadow-xs">
 		<div class="mb-3 flex items-center gap-2">
 			<Clock size={16} class="text-emerald-600" />
-			<h4 class="text-sm font-bold text-zinc-900">Робочий графік та модель оплати</h4>
+			<h4 class="text-sm font-bold text-zinc-900">{meta.scheduleTitle}</h4>
 		</div>
 
 		<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">

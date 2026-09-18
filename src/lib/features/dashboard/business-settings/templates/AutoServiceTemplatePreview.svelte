@@ -12,9 +12,11 @@
 
 	let {
 		onPay,
+		scenario = 'vertical_auto',
 		flowData = {}
 	}: {
 		onPay: (amount: number) => void;
+		scenario?: string;
 		flowData?: Record<string, unknown>;
 	} = $props();
 
@@ -32,6 +34,68 @@
 		duration: string;
 		basePrice: number;
 	};
+
+	const uiLabels = $derived.by(() => {
+		if (scenario === 'vertical_education') {
+			return {
+				step1Title: 'Оберіть викладача або курс',
+				step1Desc: 'Вкажіть спеціаліста чи напрямок для занять',
+				step2Title: 'Оберіть пакет занять',
+				step2Desc: 'Пробне, разове або абонемент зі знижкою',
+				step3Title: 'Оберіть дату та час першого уроку',
+				step3Desc: 'Вільні вікна в графіку викладача',
+				customFieldLabel: 'Мета навчання / Рівень учня:',
+				customFieldPlaceholder: 'Наприклад: B1, підготовка до НМТ'
+			};
+		}
+		if (scenario === 'vertical_beauty') {
+			return {
+				step1Title: 'Оберіть майстра',
+				step1Desc: 'Спеціаліст, до якого ви бажаєте записатись',
+				step2Title: 'Оберіть послугу салону',
+				step2Desc: 'Процедури моделювання та догляду',
+				step3Title: 'Оберіть дату та час візиту',
+				step3Desc: 'Вільні години у розкладі майстра',
+				customFieldLabel: 'Побажання для майстра:',
+				customFieldPlaceholder: 'Бажаний стиль або довжина'
+			};
+		}
+		if (scenario === 'vertical_pets') {
+			return {
+				step1Title: 'Оберіть улюбленця',
+				step1Desc: 'Вид та розмір вашої тварини',
+				step2Title: 'Оберіть послугу грумінгу',
+				step2Desc: 'Комплексний догляд, купання або линька',
+				step3Title: 'Оберіть дату та час прийому',
+				step3Desc: 'Вільні місця на столі грумера',
+				customFieldLabel: 'Кличка та порода тварини:',
+				customFieldPlaceholder: 'Наприклад: Чак, бігль, 2 роки'
+			};
+		}
+		if (scenario === 'vertical_cleaning') {
+			return {
+				step1Title: 'Оберіть тип приміщення',
+				step1Desc: 'Кількість кімнат або площа житла',
+				step2Title: 'Оберіть пакет прибирання',
+				step2Desc: 'Базове, генеральне або після ремонту',
+				step3Title: 'Оберіть дату виїзду бригади',
+				step3Desc: 'Зручний час початку прибирання',
+				customFieldLabel: 'Адреса приміщення (вулиця, кв):',
+				customFieldPlaceholder: 'вул. Хрещатик, 1, кв. 15'
+			};
+		}
+		// За замовчуванням СТО
+		return {
+			step1Title: 'Оберіть тип авто',
+			step1Desc: 'Впливає на вартість матеріалів та час роботи.',
+			step2Title: 'Оберіть послугу СТО',
+			step2Desc: 'Розраховано для обраного типу авто.',
+			step3Title: 'Оберіть дату та час',
+			step3Desc: 'Вільні слоти на шиномонтажному боксі.',
+			customFieldLabel: 'Номерний знак авто:',
+			customFieldPlaceholder: 'КА 0000 АА'
+		};
+	});
 
 	const defaultVehicleTypes: VehicleType[] = [
 		{ id: 'sedan', title: 'Легкове авто', subtitle: 'Седан, хетчбек, купе', icon: '🚗', baseModifier: 1.0 },
@@ -170,8 +234,8 @@
 	{#if step === 1}
 		<div class="heading">
 			<span class="step-badge">Крок 1 з 4</span>
-			<h3>Оберіть тип авто</h3>
-			<p>Впливає на вартість матеріалів та час роботи.</p>
+			<h3>{uiLabels.step1Title}</h3>
+			<p>{uiLabels.step1Desc}</p>
 		</div>
 
 		<div class="vehicle-options">
@@ -185,7 +249,7 @@
 					<span class="v-icon">{v.icon}</span>
 					<div class="v-info">
 						<strong>{v.title}</strong>
-						<small>{v.subtitle}</small>
+						{#if v.subtitle}<small>{v.subtitle}</small>{/if}
 					</div>
 					{#if v.id === selectedVehicleId}
 						<div class="check-circle"><Check size={14} /></div>
@@ -200,18 +264,18 @@
 
 	{:else if step === 2}
 		<button type="button" class="btn-back" onclick={() => (step = 1)}>
-			&larr; Змінити авто ({selectedVehicle.title})
+			&larr; Змінити {selectedVehicle.title}
 		</button>
 
 		<div class="heading">
 			<span class="step-badge">Крок 2 з 4</span>
-			<h3>Оберіть послугу СТО</h3>
-			<p>Розраховано для {selectedVehicle.title.toLowerCase()}.</p>
+			<h3>{uiLabels.step2Title}</h3>
+			<p>{uiLabels.step2Desc}</p>
 		</div>
 
 		<div class="service-list">
 			{#each services as s (s.id)}
-				{@const price = Math.round(s.basePrice * selectedVehicle.baseModifier)}
+				{@const price = Math.round(s.basePrice * (selectedVehicle?.baseModifier ?? 1.0))}
 				<button
 					type="button"
 					class="service-card"
@@ -238,13 +302,13 @@
 
 	{:else if step === 3}
 		<button type="button" class="btn-back" onclick={() => (step = 2)}>
-			&larr; Змінити послугу
+			&larr; Змінити вибір
 		</button>
 
 		<div class="heading">
 			<span class="step-badge">Крок 3 з 4</span>
-			<h3>Оберіть дату та час</h3>
-			<p>Вільні слоти на шиномонтажному боксі.</p>
+			<h3>{uiLabels.step3Title}</h3>
+			<p>{uiLabels.step3Desc}</p>
 		</div>
 
 		<!-- Календарний скрол днів -->
@@ -300,7 +364,7 @@
 				<strong>{selectedService.name}</strong>
 			</div>
 			<div class="sum-row">
-				<span>Авто:</span>
+				<span>Категорія:</span>
 				<strong>{selectedVehicle.title}</strong>
 			</div>
 			<div class="sum-row">
@@ -316,8 +380,8 @@
 		<!-- Введення контактів -->
 		<div class="inputs-group">
 			<label class="field">
-				<span>Номерний знак авто:</span>
-				<input type="text" bind:value={carPlate} placeholder="КА 0000 АА" />
+				<span>{uiLabels.customFieldLabel}</span>
+				<input type="text" bind:value={carPlate} placeholder={uiLabels.customFieldPlaceholder} />
 			</label>
 			<label class="field">
 				<span>Номер телефону клієнта:</span>
@@ -331,16 +395,16 @@
 				<input type="radio" name="pay_mode" value="deposit" bind:group={paymentMode} />
 				<div>
 					<strong>Завдаток (передоплата)</strong>
-					<small>Бронює слот. Решта ({totalPrice - depositAmount} ₴) на СТО</small>
+					<small>Фіксує бронювання. Решта ({Math.max(0, totalPrice - depositAmount)} ₴) на місці</small>
 				</div>
-				<span class="amount-badge">200 ₴</span>
+				<span class="amount-badge">{depositAmount} ₴</span>
 			</label>
 
 			<label class="mode-card" class:active={paymentMode === 'full'}>
 				<input type="radio" name="pay_mode" value="full" bind:group={paymentMode} />
 				<div>
 					<strong>Оплатити повністю</strong>
-					<small>Швидкий виїзд без розрахунку на місці</small>
+					<small>Швидкий розрахунок 100% суми онлайн</small>
 				</div>
 				<span class="amount-badge">{totalPrice} ₴</span>
 			</label>
