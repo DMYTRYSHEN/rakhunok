@@ -75,7 +75,7 @@
 				</label>
 
 				<label class="flex flex-col gap-1">
-					<span class="text-xs font-bold text-emerald-950">Сума завдатку (₴)</span>
+					<span class="text-xs font-bold text-emerald-950">Розмір завдатку (₴)</span>
 					<input
 						type="number"
 						min="50"
@@ -87,6 +87,26 @@
 						}}
 						class="h-9 rounded-md border border-emerald-300 bg-white px-2.5 text-xs text-zinc-900 outline-none focus:border-emerald-600"
 					/>
+				</label>
+
+				<label class="sm:col-span-2 flex flex-col gap-1 mt-1">
+					<div class="flex items-center justify-between">
+						<span class="text-xs font-bold text-emerald-950">Синхронізація: Google Calendar / iCal URL</span>
+						<span class="text-[10px] text-emerald-800">Варіант В: Зовнішній календар</span>
+					</div>
+					<input
+						type="url"
+						placeholder="https://calendar.google.com/calendar/ical/.../basic.ics"
+						value={(config.flow_data?.calendar_sync_url as string) ?? ''}
+						oninput={(e) => {
+							const url = e.currentTarget.value;
+							config.flow_data = { ...(config.flow_data ?? {}), calendar_sync_url: url };
+						}}
+						class="h-9 w-full rounded-md border border-emerald-300 bg-white px-2.5 text-xs text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-600"
+					/>
+					<span class="text-[10px] text-emerald-800">
+						Вставте секретну iCal-адресу вашого календаря. Зайняті події автоматично блокуватимуть вибір відповідних годин.
+					</span>
 				</label>
 			</div>
 		</div>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import {
 		ArrowLeft,
+		Calendar,
 		Check,
 		ChevronRight,
 		CreditCard,
@@ -274,6 +275,23 @@
 					<h3>Оплату успішно проведено</h3>
 					<p>{model.contextLabel}</p>
 				</section>
+
+				{#if scenario === 'vertical_auto' || scenario === 'engine_book'}
+					<section class="feature feature-center">
+						<div class="booking-receipt">
+							<strong class="text-xs text-emerald-400">Слот зафіксовано за клієнтом</strong>
+							<span class="text-[11px] text-zinc-300">Завдаток: {autoServiceAmount} ₴ · СТО Профі Авто</span>
+						</div>
+						<a
+							href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=%D0%A8%D0%B8%D0%BD%D0%BE%D0%BC%D0%BE%D0%BD%D1%82%D0%B0%D0%B6+%D0%A1%D0%A2%D0%9E&details=%D0%97%D0%B0%D0%BF%D0%B8%D1%81+%D0%BD%D0%B0+%D1%88%D0%B8%D0%BD%D0%BE%D0%BC%D0%BE%D0%BD%D1%82%D0%B0%D0%B6.+%D0%97%D0%B0%D0%B2%D0%B4%D0%B0%D1%82%D0%BE%D0%BA+%D1%81%D0%BF%D0%BB%D0%B0%D1%87%D0%B5%D0%BD%D0%BE."
+							target="_blank"
+							rel="noreferrer"
+							class="calendar-add-btn"
+						>
+							<Calendar size={14} /> Додати в Google Calendar
+						</a>
+					</section>
+				{/if}
 				{#if model.config.allow_nps_review}
 					<section class="feature feature-center">
 						<strong>Як вам обслуговування?</strong>
@@ -703,6 +721,30 @@
 	}
 	.compliance {
 		border-color: #2563eb66;
+	}
+	.booking-receipt {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		margin-bottom: 8px;
+	}
+	.calendar-add-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		width: 100%;
+		padding: 9px 12px;
+		border-radius: 8px;
+		background: #2563eb;
+		color: #ffffff;
+		font-size: 11px;
+		font-weight: 700;
+		text-decoration: none;
+		transition: background 0.2s;
+	}
+	.calendar-add-btn:hover {
+		background: #1d4ed8;
 	}
 	.primary,
 	.secondary {
