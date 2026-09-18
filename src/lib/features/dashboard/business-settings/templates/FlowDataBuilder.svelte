@@ -208,7 +208,7 @@
 	let services = $state<BookingService[]>(flowData.services as BookingService[]);
 	let categories = $state<BookingCategory[]>(flowData.categories as BookingCategory[]);
 	let schedule = $state<BookingSchedule>(flowData.schedule as BookingSchedule);
-	let enableCategories = $state(categories.length > 0);
+	let enableCategories = $state(((flowData.categories as BookingCategory[]) || []).length > 0);
 
 	// Оновлення при зміні сценарію, якщо дані ще дефолтні
 	$effect(() => {

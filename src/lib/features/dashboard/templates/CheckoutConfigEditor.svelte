@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { CheckoutScenarioConfig } from '$lib/features/shared/checkout-scenario-config';
+	import FlowDataBuilder from '../business-settings/templates/FlowDataBuilder.svelte';
 	import { Plus, Trash2 } from '@lucide/svelte';
 
 	let {
@@ -46,69 +47,19 @@
 	{/if}
 
 	{#if ['vertical_auto', 'vertical_education', 'vertical_beauty', 'vertical_cleaning', 'vertical_pets', 'vertical_rental', 'vertical_services', 'engine_book'].includes(scenario)}
-		<div class="mb-4 rounded-md border border-emerald-200 bg-emerald-50/80 p-3.5 text-sm text-emerald-950">
-			<div class="flex items-center gap-2">
-				<span class="text-base">📅</span>
-				<strong class="font-semibold">
-					{scenario === 'vertical_auto' ? 'Запис на СТО / Шиномонтаж' : 'Онлайн-запис та бронювання часу'}
-				</strong>
+		<div class="mb-6 rounded-xl border border-zinc-200 bg-white p-4 shadow-xs">
+			<div class="mb-3">
+				<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">
+					Налаштування сценарію ({scenario === 'vertical_auto' ? 'СТО / Шиномонтаж' : 'Бронювання часу'})
+				</p>
+				<h4 class="text-sm font-bold text-zinc-900">
+					Прайс робіт, категорії та режим роботи
+				</h4>
+				<p class="mt-0.5 text-xs text-zinc-500">
+					Вкажіть актуальний перелік послуг вашого бізнесу. Зміни миттєво відображаються у телефоні праворуч.
+				</p>
 			</div>
-			<p class="mt-1 text-xs leading-5 text-emerald-900">
-				Клієнт обирає послугу, параметри (тип авто), дату з інтерактивного календаря та вільний слот часу. 
-				Оплата фіксує бронь за клієнтом та виключає подвійні записи.
-			</p>
-
-			<div class="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 pt-2 border-t border-emerald-200/60">
-				<label class="flex flex-col gap-1">
-					<span class="text-xs font-bold text-emerald-950">Модель оплати</span>
-					<select
-						class="h-9 rounded-md border border-emerald-300 bg-white px-2.5 text-xs text-zinc-900 outline-none focus:border-emerald-600"
-						value={config.flow_data?.booking_payment_mode ?? 'deposit'}
-						onchange={(e) => {
-							const mode = e.currentTarget.value;
-							config.flow_data = { ...(config.flow_data ?? {}), booking_payment_mode: mode };
-						}}
-					>
-						<option value="deposit">Фіксований завдаток (передоплата)</option>
-						<option value="full">Повна вартість обраної послуги</option>
-					</select>
-				</label>
-
-				<label class="flex flex-col gap-1">
-					<span class="text-xs font-bold text-emerald-950">Розмір завдатку (₴)</span>
-					<input
-						type="number"
-						min="50"
-						step="50"
-						value={config.flow_data?.deposit_amount ?? 200}
-						oninput={(e) => {
-							const val = Number(e.currentTarget.value);
-							config.flow_data = { ...(config.flow_data ?? {}), deposit_amount: val };
-						}}
-						class="h-9 rounded-md border border-emerald-300 bg-white px-2.5 text-xs text-zinc-900 outline-none focus:border-emerald-600"
-					/>
-				</label>
-
-				<label class="sm:col-span-2 flex flex-col gap-1 mt-1">
-					<div class="flex items-center justify-between">
-						<span class="text-xs font-bold text-emerald-950">Синхронізація: Google Calendar / iCal URL</span>
-						<span class="text-[10px] text-emerald-800">Варіант В: Зовнішній календар</span>
-					</div>
-					<input
-						type="url"
-						placeholder="https://calendar.google.com/calendar/ical/.../basic.ics"
-						value={(config.flow_data?.calendar_sync_url as string) ?? ''}
-						oninput={(e) => {
-							const url = e.currentTarget.value;
-							config.flow_data = { ...(config.flow_data ?? {}), calendar_sync_url: url };
-						}}
-						class="h-9 w-full rounded-md border border-emerald-300 bg-white px-2.5 text-xs text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-600"
-					/>
-					<span class="text-[10px] text-emerald-800">
-						Вставте секретну iCal-адресу вашого календаря. Зайняті події автоматично блокуватимуть вибір відповідних годин.
-					</span>
-				</label>
-			</div>
+			<FlowDataBuilder {scenario} bind:flowData={config.flow_data} />
 		</div>
 	{/if}
 

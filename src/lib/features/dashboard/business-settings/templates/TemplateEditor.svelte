@@ -4,15 +4,14 @@
 	import CheckoutConfigEditor from '../../templates/CheckoutConfigEditor.svelte';
 	import CheckoutTemplatePreview from './CheckoutTemplatePreview.svelte';
 	import {
-		isCheckoutTemplateScenario,
+		CHECKOUT_CONFIG_BOOLEAN_KEYS,
 		type CheckoutTemplateScenario
-	} from './checkout-template-preview';
+	} from '$lib/features/shared/checkout-scenario-config';
 	import {
 		getScenarioDefaults,
 		resolveCheckoutConfig
 	} from '$lib/features/shared/checkout-scenario-defaults';
 	import { templateInvoiceType } from '../../templates/template-invoice';
-	import FlowDataBuilder from './FlowDataBuilder.svelte';
 	import { Eye, Settings2, X } from '@lucide/svelte';
 	import { onMount, untrack } from 'svelte';
 
@@ -254,25 +253,10 @@
 					</label>
 				</section>
 
-				{#if ['vertical_auto', 'vertical_education', 'vertical_beauty', 'vertical_cleaning', 'vertical_pets', 'vertical_rental', 'vertical_services', 'engine_book'].includes(scenarioType)}
-					<section aria-labelledby="template-flow-builder" class="mt-8 border-t border-zinc-200 pt-6">
-						<div class="mb-2">
-							<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">Конфігуратор послуг</p>
-							<h3 id="template-flow-builder" class="text-base font-bold text-zinc-900">
-								Прайс робіт, категорії та режим роботи
-							</h3>
-							<p class="mt-1 text-sm text-zinc-500">
-								Вкажіть актуальний перелік послуг вашого бізнесу. Вони миттєво з'являться на прев'ю праворуч.
-							</p>
-						</div>
-						<FlowDataBuilder scenario={scenarioType} bind:flowData={config.flow_data} />
-					</section>
-				{/if}
-
 				<section aria-labelledby="template-options" class="mt-8 border-t border-zinc-200 pt-6">
-					<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">Опції чекауту</p>
+					<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">Крок 2</p>
 					<h3 id="template-options" class="text-base font-bold text-zinc-900">
-						Додаткові налаштування
+						Опції чекауту
 					</h3>
 					<p class="mt-1 text-sm text-zinc-500">
 						Лояльність, чайові, промокоди та інші параметри.
