@@ -21,6 +21,7 @@
 	import AutoServiceTemplatePreview from './AutoServiceTemplatePreview.svelte';
 	import BeautyStudioTemplatePreview from './BeautyStudioTemplatePreview.svelte';
 	import GroomingTemplatePreview from './GroomingTemplatePreview.svelte';
+	import FlowerShopTemplatePreview from './FlowerShopTemplatePreview.svelte';
 	import FoodOrderTemplatePreview from './FoodOrderTemplatePreview.svelte';
 	import FlowerGiftTemplatePreview from './FlowerGiftTemplatePreview.svelte';
 	import CourierDeliveryTemplatePreview from './CourierDeliveryTemplatePreview.svelte';
@@ -175,6 +176,8 @@
 					<AutoServiceTemplatePreview {scenario} onPay={openAutoServicePayment} flowData={config.flow_data} />
 				{:else if isFoodScenario(scenario)}
 					<FoodOrderTemplatePreview {scenario} onPay={(amt) => { foodAmount = amt; selectStep('payment'); }} />
+				{:else if scenario === 'vertical_flowers'}
+					<FlowerShopTemplatePreview flowData={config.flow_data} onPay={openAutoServicePayment} />
 				{:else if isFlowerScenario(scenario)}
 					<FlowerGiftTemplatePreview {scenario} onPay={(amt) => { flowerAmount = amt; selectStep('payment'); }} />
 				{:else if isCourierScenario(scenario)}

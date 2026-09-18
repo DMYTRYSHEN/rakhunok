@@ -283,3 +283,93 @@ export interface GroomingStudioFlowData {
 	};
 	[key: string]: unknown;
 }
+
+// ── Flower Shop Scenario Contract ─────────────────────────────────
+export interface FlowerBouquetSize {
+	id: string;
+	name: string;
+	price: number;
+	description?: string;
+	isDefault?: boolean;
+}
+
+export interface FlowerBouquet {
+	id: string;
+	name: string;
+	category: string;
+	description: string;
+	sizes: FlowerBouquetSize[];
+	isAvailable: boolean;
+	icon?: string;
+	imageUrl?: string;
+}
+
+export interface FlowerAddon {
+	id: string;
+	name: string;
+	price: number;
+	description?: string;
+	icon?: string;
+	isPostcard?: boolean;
+}
+
+export interface FlowerPickupPoint {
+	id: string;
+	name: string;
+	address: string;
+	workingHours: string;
+}
+
+export interface FlowerDeliveryZone {
+	id: string;
+	name: string;
+	price: number;
+	eta?: string;
+	description?: string;
+}
+
+export interface FlowerCustomOrderConfig {
+	minBudget: number;
+	defaultBudget: number;
+	palettes: Array<{ id: string; name: string; colors: string[] }>;
+	flowerOptions: string[];
+}
+
+export interface FlowerShopFlowData {
+	shopName?: string;
+	tagline?: string;
+	description?: string;
+	contacts?: {
+		phone?: string;
+		instagram?: string;
+		telegram?: string;
+		address?: string;
+	};
+	modes: {
+		catalogEnabled: boolean;
+		customOrderEnabled: boolean;
+		inStorePayEnabled: boolean;
+		catalogButtonText?: string;
+		customOrderButtonText?: string;
+		inStoreButtonText?: string;
+	};
+	bouquets: FlowerBouquet[];
+	addons: FlowerAddon[];
+	pickupPoints: FlowerPickupPoint[];
+	deliveryZones: FlowerDeliveryZone[];
+	customOrder: FlowerCustomOrderConfig;
+	approval: {
+		autoApprovalEnabled: boolean;
+		requireManualForCustom: boolean;
+		requireManualOutOfZone: boolean;
+		replacementPolicy: 'no_replacements' | 'same_palette' | 'manual_approval';
+		telegramChat?: string;
+		responseTimeNotice?: string;
+	};
+	payment: {
+		depositType: 'full' | 'fixed' | 'percent';
+		depositValue?: number;
+		paymentTimeoutMinutes?: number;
+	};
+	[key: string]: unknown;
+}

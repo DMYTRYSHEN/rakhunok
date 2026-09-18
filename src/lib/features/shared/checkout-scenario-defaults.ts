@@ -208,7 +208,150 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		allow_delivery: true,
 		allow_tips: true,
 		allow_upsell: true,
-		cta_text: 'Замовити букет'
+		cta_text: 'Замовити букет',
+		flow_data: {
+			shopName: 'Floris Квіти',
+			tagline: 'Авторська флористика та свіжі букети',
+			description: 'Свіжі квіти з швидкою доставкою по місту або самовивозом за 30 хвилин',
+			contacts: {
+				phone: '+380 67 444 55 66',
+				instagram: '@floris.kyiv',
+				telegram: '@floris_kyiv_bot',
+				address: 'вул. Саксаганського, 42'
+			},
+			modes: {
+				catalogEnabled: true,
+				customOrderEnabled: true,
+				inStorePayEnabled: true,
+				catalogButtonText: 'Обрати готовий букет',
+				customOrderButtonText: 'Індивідуальний букет',
+				inStoreButtonText: 'Оплатити в магазині'
+			},
+			bouquets: [
+				{
+					id: 'bq_tenderness',
+					name: 'Ніжність',
+					category: 'Авторські',
+					description: 'Французькі півонії, біла еустома, евкаліпт та ніжна маттіола',
+					icon: '🌸',
+					isAvailable: true,
+					sizes: [
+						{ id: 'standard', name: 'Стандартний', price: 900, isDefault: true },
+						{ id: 'large', name: 'Великий (Пишний)', price: 1300 },
+						{ id: 'vip', name: 'VIP Преміум', price: 1900 }
+					]
+				},
+				{
+					id: 'bq_roses_25',
+					name: '25 червоних троянд Grand Prix',
+					category: 'Монобукети',
+					description: 'Класичні еквадорські оксамитові троянди 60 см у фірмовому крафті',
+					icon: '🌹',
+					isAvailable: true,
+					sizes: [
+						{ id: 'standard', name: 'Стандартний (60 см)', price: 1250, isDefault: true },
+						{ id: 'large', name: 'Преміум (70 см)', price: 1850 }
+					]
+				},
+				{
+					id: 'bq_mix_box',
+					name: 'Сезонний мікс у капелюшній коробці',
+					category: 'Композиції',
+					description: 'Гортензія, півонієподібні троянди, оксіпеталум та евкаліпт',
+					icon: '💐',
+					isAvailable: true,
+					sizes: [
+						{ id: 'standard', name: 'Стандарт (діаметр 22 см)', price: 1100, isDefault: true },
+						{ id: 'large', name: 'Великий (діаметр 30 см)', price: 1650 }
+					]
+				}
+			],
+			addons: [
+				{
+					id: 'addon_postcard',
+					name: 'Фірмова листівка з підписом від руки',
+					price: 50,
+					isPostcard: true,
+					description: 'Каліграфічний теплий підпис флористом перед доставкою',
+					icon: '✉️'
+				},
+				{
+					id: 'addon_vase',
+					name: 'Скляна дизайнерська ваза',
+					price: 250,
+					description: 'Ідеально підібрана за висотою букета, щоб квіти довше залишались свіжими',
+					icon: '🏺'
+				},
+				{
+					id: 'addon_box',
+					name: 'Преміальне пакування та атласна стрічка',
+					price: 80,
+					description: 'Захисний вологостійкий аквабокс для тривалого транспортування',
+					icon: '🎀'
+				},
+				{
+					id: 'addon_sweets',
+					name: 'Крафтові макаруни (6 шт)',
+					price: 180,
+					description: 'Свіжі десерти від шеф-кондитера у подарунковій коробці',
+					icon: '🍬'
+				}
+			],
+			pickupPoints: [
+				{
+					id: 'point_1',
+					name: 'Салон Центр (Саксаганського)',
+					address: 'вул. Саксаганського, 42',
+					workingHours: '08:00 - 21:00'
+				},
+				{
+					id: 'point_2',
+					name: 'Студія Поділ (Спаська)',
+					address: 'вул. Спаська, 12',
+					workingHours: '09:00 - 20:00'
+				}
+			],
+			deliveryZones: [
+				{
+					id: 'zone_a',
+					name: 'Зона А (Центр, Печерськ, Шевченківський)',
+					price: 150,
+					eta: 'до 60 хв',
+					description: 'Швидка доставка кур’єром салону'
+				},
+				{
+					id: 'zone_b',
+					name: 'Зона B (Оболонь, Позняки, Теремки, Академмістечко)',
+					price: 250,
+					eta: 'до 90 хв',
+					description: 'Доставка по всьому місту'
+				}
+			],
+			customOrder: {
+				minBudget: 800,
+				defaultBudget: 1500,
+				palettes: [
+					{ id: 'pastel', name: 'Ніжна пастельна', colors: ['#fce7f3', '#fed7aa', '#e0e7ff'] },
+					{ id: 'bright', name: 'Яскрава соковита', colors: ['#f43f5e', '#f59e0b', '#8b5cf6'] },
+					{ id: 'white', name: 'Білосніжна класика', colors: ['#ffffff', '#f1f5f9', '#86efac'] },
+					{ id: 'passion', name: 'Пристрасна червона', colors: ['#991b1b', '#ef4444', '#fbcfe8'] }
+				],
+				flowerOptions: ['Півонії', 'Гортензії', 'Кущові троянди', 'Еустоми', 'Тюльпани', 'Евкаліпт']
+			},
+			approval: {
+				autoApprovalEnabled: true,
+				requireManualForCustom: true,
+				requireManualOutOfZone: true,
+				replacementPolicy: 'same_palette',
+				telegramChat: '@floris_kyiv_bot',
+				responseTimeNotice: 'до 10 хвилин'
+			},
+			payment: {
+				depositType: 'full',
+				depositValue: 100,
+				paymentTimeoutMinutes: 30
+			}
+		}
 	},
 	vertical_auto: {
 		checkout_flow: { id: 'vertical_auto', version: 1, invoice_type: 'fixed' },

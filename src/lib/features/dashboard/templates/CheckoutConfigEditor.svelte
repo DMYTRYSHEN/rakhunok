@@ -3,6 +3,7 @@
 	import FlowDataBuilder from '../business-settings/templates/FlowDataBuilder.svelte';
 	import BeautyStudioConfigEditor from '../business-settings/templates/BeautyStudioConfigEditor.svelte';
 	import GroomingStudioConfigEditor from '../business-settings/templates/GroomingStudioConfigEditor.svelte';
+	import FlowerShopConfigEditor from '../business-settings/templates/FlowerShopConfigEditor.svelte';
 	import { Plus, Trash2 } from '@lucide/svelte';
 
 	let {
@@ -81,6 +82,21 @@
 				</p>
 			</div>
 			<GroomingStudioConfigEditor bind:flowData={config.flow_data} />
+		</div>
+	{:else if scenario === 'vertical_flowers'}
+		<div class="mb-6 rounded-xl border border-pink-200 bg-white p-4 shadow-xs">
+			<div class="mb-3">
+				<p class="text-xs font-bold tracking-wider text-pink-700 uppercase">
+					Конфігуратор Магазину Квітів
+				</p>
+				<h4 class="text-sm font-bold text-zinc-900">
+					Каталог букетів, розміри, листівки, зони доставки та погодження
+				</h4>
+				<p class="mt-0.5 text-xs text-zinc-500">
+					Налаштуйте готові композиції, фіксовані ціни для кожного розміру, листівки з привітаннями, автопогодження та Telegram.
+				</p>
+			</div>
+			<FlowerShopConfigEditor bind:flowData={config.flow_data} />
 		</div>
 	{:else if ['vertical_auto', 'vertical_education', 'vertical_cleaning', 'vertical_rental', 'vertical_services', 'engine_book'].includes(scenario)}
 		<div class="mb-6 rounded-xl border border-zinc-200 bg-white p-4 shadow-xs">
