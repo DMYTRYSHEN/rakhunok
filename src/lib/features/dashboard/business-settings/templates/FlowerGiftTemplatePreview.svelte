@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
 	import {
 		Calendar,
 		Check,
@@ -25,21 +25,23 @@
 		icon: string;
 	};
 
-	const products: ProductItem[] = scenario === 'vertical_gifts' ? [
-		{ id: 'g_1', name: 'Бокс «Premium Relax»', description: 'Аромасвічка, натуральний мед, чай, шовкова маска', basePrice: 1150, icon: '🎁' },
-		{ id: 'g_2', name: 'Бокс «Sweet Delight»', description: 'Бельгійський шоколад, макаруни, горіхи в карамелі', basePrice: 850, icon: '🍫' },
-		{ id: 'g_3', name: 'Бокс «Gentleman Set»', description: 'Шкіряний кардхолдер, кава, крафтовий шоколад', basePrice: 1400, icon: '💼' }
-	] : scenario === 'vertical_print' ? [
-		{ id: 'pr_1', name: 'Фірмові футболки з принтом (від 5 шт)', description: 'Преміум бавовна 100%, стійкий DTF друк', basePrice: 850, icon: '👕' },
-		{ id: 'pr_2', name: 'Візитки Touch Cover (100 шт)', description: 'Оксамитовий папір + шовкотрафарет / тиснення', basePrice: 650, icon: '💳' },
-		{ id: 'pr_3', name: 'Брендовані горнятка (від 10 шт)', description: 'Кераміка, сублімаційний повноколірний друк', basePrice: 950, icon: '☕' }
-	] : [
-		{ id: 'fl_1', name: 'Букет «Ніжний світанок»', description: 'Півонії Сара Бернар, біла еустома, евкаліпт', basePrice: 950, icon: '🌸' },
-		{ id: 'fl_2', name: '25 червоних троянд Grand Prix', description: 'Класичні еквадорські троянди 60 см у крафті', basePrice: 1250, icon: '🌹' },
-		{ id: 'fl_3', name: 'Сезонний квітковий мікс у капелюшній коробці', description: 'Гортензія, кущова півонієподібна троянда', basePrice: 750, icon: '💐' }
-	];
+	const products = $derived<ProductItem[]>(
+		scenario === 'vertical_gifts' ? [
+			{ id: 'g_1', name: 'Бокс «Premium Relax»', description: 'Аромасвічка, натуральний мед, чай, шовкова маска', basePrice: 1150, icon: '🎁' },
+			{ id: 'g_2', name: 'Бокс «Sweet Delight»', description: 'Бельгійський шоколад, макаруни, горіхи в карамелі', basePrice: 850, icon: '🍫' },
+			{ id: 'g_3', name: 'Бокс «Gentleman Set»', description: 'Шкіряний кардхолдер, кава, крафтовий шоколад', basePrice: 1400, icon: '💼' }
+		] : scenario === 'vertical_print' ? [
+			{ id: 'pr_1', name: 'Фірмові футболки з принтом (від 5 шт)', description: 'Преміум бавовна 100%, стійкий DTF друк', basePrice: 850, icon: '👕' },
+			{ id: 'pr_2', name: 'Візитки Touch Cover (100 шт)', description: 'Оксамитовий папір + шовкотрафарет / тиснення', basePrice: 650, icon: '💳' },
+			{ id: 'pr_3', name: 'Брендовані горнятка (від 10 шт)', description: 'Кераміка, сублімаційний повноколірний друк', basePrice: 950, icon: '☕' }
+		] : [
+			{ id: 'fl_1', name: 'Букет «Ніжний світанок»', description: 'Півонії Сара Бернар, біла еустома, евкаліпт', basePrice: 950, icon: '🌸' },
+			{ id: 'fl_2', name: '25 червоних троянд Grand Prix', description: 'Класичні еквадорські троянди 60 см у крафті', basePrice: 1250, icon: '🌹' },
+			{ id: 'fl_3', name: 'Сезонний квітковий мікс у капелюшній коробці', description: 'Гортензія, кущова півонієподібна троянда', basePrice: 750, icon: '💐' }
+		]
+	);
 
-	let selectedProductId = $state(products[0].id);
+	let selectedProductId = $state('fl_1');
 	let selectedSize = $state<'standard' | 'large' | 'premium'>('standard');
 	let addPostcard = $state(true);
 	let postcardText = $state('З днем народження, найкраща у світі! Нехай твої очі сяють від щастя! ❤️');

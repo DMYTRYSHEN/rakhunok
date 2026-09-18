@@ -246,22 +246,60 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		allow_tips: true,
 		allow_upsell: true,
 		flow_data: {
-			categories: [
-				{ id: 'm_1', title: 'Майстер Анна', subtitle: 'Стиліст-перукар', icon: '✂️', modifier: 1.0 },
-				{ id: 'm_2', title: 'Топ-стиліст Олена', subtitle: 'Колорист експерт', icon: '✨', modifier: 1.3 }
-			],
+			studioName: 'Beauty Studio',
+			title: 'Салон краси та стилю',
+			description: 'Стрижки, догляд та фарбування',
+			contacts: {
+				phone: '+380 67 000 00 00',
+				instagram: '@beauty.studio',
+				address: 'вул. Хрещатик, 15'
+			},
+			modes: {
+				bookingEnabled: true,
+				inSalonPayEnabled: true,
+				bookingButtonText: 'Записатися на візит',
+				inSalonButtonText: 'Оплатити в салоні'
+			},
 			services: [
-				{ id: 'b_1', name: 'Стрижка та моделювання', durationMinutes: 45, basePrice: 600 },
-				{ id: 'b_2', name: 'Комплексний манікюр', durationMinutes: 75, basePrice: 500 },
-				{ id: 'b_3', name: 'Догляд та відновлення волосся', durationMinutes: 60, basePrice: 850 }
+				{ id: 'srv_female', name: 'Жіноча стрижка', durationMinutes: 60, basePrice: 600 },
+				{ id: 'srv_male', name: 'Чоловіча стрижка', durationMinutes: 45, basePrice: 400 },
+				{ id: 'srv_child', name: 'Дитяча стрижка', durationMinutes: 30, basePrice: 350 }
 			],
-			schedule: {
-				startHour: '10:00',
-				endHour: '20:00',
-				slotDurationMinutes: 45,
-				workDays: 'everyday',
-				depositAmount: 200,
-				calendarSyncUrl: ''
+			questions: [
+				{
+					id: 'q_hair_length',
+					title: 'Довжина волосся',
+					hint: 'Тільки для жіночої стрижки',
+					required: true,
+					dependsOnServiceId: 'srv_female',
+					options: [
+						{ id: 'opt_short', title: 'Коротке волосся', extraPrice: 0 },
+						{ id: 'opt_medium', title: 'Середнє волосся', extraPrice: 150 },
+						{ id: 'opt_long', title: 'Довге волосся', extraPrice: 300 }
+					]
+				}
+			],
+			masters: [
+				{ id: 'm_any', name: 'Будь-який вільний майстер', role: 'Спеціаліст', extraPrice: 0 },
+				{ id: 'm_reg', name: 'Звичайний майстер', role: 'Стиліст', extraPrice: 0 },
+				{ id: 'm_lead', name: 'Провідний майстер', role: 'Топ-стиліст', extraPrice: 200 }
+			],
+			addons: [
+				{
+					id: 'add_care',
+					name: 'Догляд та маска для волосся',
+					description: 'Глибоке відновлення та живлення',
+					price: 250
+				}
+			],
+			paymentModel: {
+				type: 'percent',
+				percentValue: 30,
+				fixedAmount: 200
+			},
+			approval: {
+				channel: 'telegram',
+				responseTimeNotice: 'до 15 хвилин'
 			}
 		},
 		cta_text: 'Підтвердити запис'

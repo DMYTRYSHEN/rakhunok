@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { CheckoutScenarioConfig } from '$lib/features/shared/checkout-scenario-config';
 	import FlowDataBuilder from '../business-settings/templates/FlowDataBuilder.svelte';
+	import BeautyStudioConfigEditor from '../business-settings/templates/BeautyStudioConfigEditor.svelte';
 	import { Plus, Trash2 } from '@lucide/svelte';
 
 	let {
@@ -50,7 +51,22 @@
 		</div>
 	{/if}
 
-	{#if ['vertical_auto', 'vertical_education', 'vertical_beauty', 'vertical_cleaning', 'vertical_pets', 'vertical_rental', 'vertical_services', 'engine_book'].includes(scenario)}
+	{#if scenario === 'vertical_beauty'}
+		<div class="mb-6 rounded-xl border border-rose-200 bg-white p-4 shadow-xs">
+			<div class="mb-3">
+				<p class="text-xs font-bold tracking-wider text-rose-700 uppercase">
+					Конфігуратор Салону Краси
+				</p>
+				<h4 class="text-sm font-bold text-zinc-900">
+					Послуги, розгалуження цін, майстри та погодження
+				</h4>
+				<p class="mt-0.5 text-xs text-zinc-500">
+					Налаштуйте прайс, залежні запитання (довжина волосся), майстрів та модель передоплати.
+				</p>
+			</div>
+			<BeautyStudioConfigEditor bind:flowData={config.flow_data} />
+		</div>
+	{:else if ['vertical_auto', 'vertical_education', 'vertical_cleaning', 'vertical_pets', 'vertical_rental', 'vertical_services', 'engine_book'].includes(scenario)}
 		<div class="mb-6 rounded-xl border border-zinc-200 bg-white p-4 shadow-xs">
 			<div class="mb-3">
 				<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">

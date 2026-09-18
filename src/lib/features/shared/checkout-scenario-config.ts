@@ -139,3 +139,73 @@ export const CHECKOUT_CONFIG_BOOLEAN_KEYS = [
 ] as const satisfies ReadonlyArray<keyof CheckoutScenarioConfig>;
 
 export type CheckoutConfigBooleanKey = (typeof CHECKOUT_CONFIG_BOOLEAN_KEYS)[number];
+
+// ── Beauty Studio Scenario Contract ───────────────────────────
+export interface BeautyOption {
+	id: string;
+	title: string;
+	subtitle?: string;
+	extraPrice: number; // in UAH
+}
+
+export interface BeautyQuestion {
+	id: string;
+	title: string;
+	hint?: string;
+	required: boolean;
+	dependsOnServiceId?: string; // e.g. 'female_haircut'
+	options: BeautyOption[];
+}
+
+export interface BeautyMaster {
+	id: string;
+	name: string;
+	role: string; // 'Стиліст', 'Провідний майстер', 'Топ-стиліст'
+	extraPrice: number; // e.g. +200 UAH
+	availableServiceIds?: string[];
+}
+
+export interface BeautyAddon {
+	id: string;
+	name: string;
+	description?: string;
+	price: number; // e.g. +250 UAH
+}
+
+export interface BeautyStudioFlowData {
+	studioName?: string;
+	title?: string;
+	description?: string;
+	contacts?: {
+		phone?: string;
+		instagram?: string;
+		address?: string;
+	};
+	modes: {
+		bookingEnabled: boolean; // Шлях "Записатися"
+		inSalonPayEnabled: boolean; // Шлях "Оплатити в салоні"
+		bookingButtonText?: string;
+		inSalonButtonText?: string;
+	};
+	services: Array<{
+		id: string;
+		name: string;
+		category?: string;
+		durationMinutes: number;
+		basePrice: number;
+		description?: string;
+	}>;
+	questions: BeautyQuestion[];
+	masters: BeautyMaster[];
+	addons: BeautyAddon[];
+	paymentModel: {
+		type: 'none' | 'fixed' | 'percent' | 'full';
+		percentValue?: number; // e.g. 30
+		fixedAmount?: number;  // e.g. 200
+	};
+	approval: {
+		channel: 'telegram' | 'dashboard';
+		responseTimeNotice?: string;
+	};
+	[key: string]: unknown;
+}

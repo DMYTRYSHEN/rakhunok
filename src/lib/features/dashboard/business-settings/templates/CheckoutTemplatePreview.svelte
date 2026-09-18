@@ -19,6 +19,7 @@
 	import type { CheckoutScenarioConfig } from '$lib/features/shared/checkout-scenario-config';
 	import FuelStationTemplatePreview from './FuelStationTemplatePreview.svelte';
 	import AutoServiceTemplatePreview from './AutoServiceTemplatePreview.svelte';
+	import BeautyStudioTemplatePreview from './BeautyStudioTemplatePreview.svelte';
 	import FoodOrderTemplatePreview from './FoodOrderTemplatePreview.svelte';
 	import FlowerGiftTemplatePreview from './FlowerGiftTemplatePreview.svelte';
 	import CourierDeliveryTemplatePreview from './CourierDeliveryTemplatePreview.svelte';
@@ -165,6 +166,8 @@
 			{#if step === 'checkout'}
 				{#if scenario === 'fuel_station'}
 					<FuelStationTemplatePreview onPay={openFuelStationPayment} />
+				{:else if scenario === 'vertical_beauty'}
+					<BeautyStudioTemplatePreview flowData={config.flow_data} onPay={openAutoServicePayment} />
 				{:else if isBookingScenario(scenario)}
 					<AutoServiceTemplatePreview {scenario} onPay={openAutoServicePayment} flowData={config.flow_data} />
 				{:else if isFoodScenario(scenario)}
