@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import {
 		Calendar,
 		Clock,
@@ -183,47 +184,80 @@
 		};
 	}
 
+	let {
+		scenario = 'vertical_auto',
+		flowData = $bindable({})
+	}: {
+		scenario?: string;
+		flowData?: ConfiguratorFlowData;
+	} = $props();
+
 	const meta = $derived(getVerticalProfile(scenario));
 
-	// Ініціалізація структури, якщо порожня
-	if (!flowData.services || !Array.isArray(flowData.services)) {
-		flowData.services = getVerticalProfile(scenario).defaultServices;
-	}
+	const initialProfile = getVerticalProfile(scenario);
 
-	if (!flowData.categories || !Array.isArray(flowData.categories)) {
-		flowData.categories = getVerticalProfile(scenario).defaultCategories;
-	}
+	let services = $state<BookingService[]>(
+		Array.isArray(flowData?.services) && flowData.services.length > 0
+			? (flowData.services as BookingService[])
+			: initialProfile.defaultServices
+	);
 
-	if (!flowData.schedule || typeof flowData.schedule !== 'object') {
-		flowData.schedule = {
-			startHour: '09:00',
-			endHour: '19:00',
-			slotDurationMinutes: 45,
-			workDays: 'mon_sat',
-			depositAmount: getVerticalProfile(scenario).defaultDeposit,
-			calendarSyncUrl: ''
-		};
-	}
+	let categories = $state<BookingCategory[]>(
+		Array.isArray(flowData?.categories) && flowData.categories.length > 0
+			? (flowData.categories as BookingCategory[])
+			: initialProfile.defaultCategories
+	);
 
-	let services = $state<BookingService[]>(flowData.services as BookingService[]);
-	let categories = $state<BookingCategory[]>(flowData.categories as BookingCategory[]);
-	let schedule = $state<BookingSchedule>(flowData.schedule as BookingSchedule);
-	let enableCategories = $state(((flowData.categories as BookingCategory[]) || []).length > 0);
+	let schedule = $state<BookingSchedule>(
+		flowData?.schedule && typeof flowData.schedule === 'object'
+			? (flowData.schedule as BookingSchedule)
+			: {
+				startHour: '09:00',
+				endHour: '19:00',
+				slotDurationMinutes: 45,
+				workDays: 'mon_sat',
+				depositAmount: initialProfile.defaultDeposit,
+				calendarSyncUrl: ''
+			}
+	);
 
-	// Оновлення при зміні сценарію, якщо дані ще дефолтні
+	let enableCategories = $state(
+		(Array.isArray(flowData?.categories) && flowData.categories.length > 0) || initialProfile.defaultCategories.length > 0
+	);
+
+	onMount(() => {
+		if (!flowData) {
+			flowData = {};
+		}
+		if (!flowData.services || !flowData.categories || !flowData.schedule) {
+			syncToFlowData();
+		}
+	});
+
+	// При зміні сценарію оновлюємо дефолтні набори
+	let lastScenario = scenario;
 	$effect(() => {
-		const nextProfile = getVerticalProfile(scenario);
-		if (!flowData._customized) {
-			services = nextProfile.defaultServices;
-			categories = nextProfile.defaultCategories;
-			schedule.depositAmount = nextProfile.defaultDeposit;
+		if (scenario !== lastScenario) {
+			lastScenario = scenario;
+			const profile = getVerticalProfile(scenario);
+			services = [...profile.defaultServices];
+			categories = [...profile.defaultCategories];
+			schedule = {
+				startHour: '09:00',
+				endHour: '19:00',
+				slotDurationMinutes: 45,
+				workDays: 'mon_sat',
+				depositAmount: profile.defaultDeposit,
+				calendarSyncUrl: ''
+			};
+			enableCategories = categories.length > 0;
 			syncToFlowData();
 		}
 	});
 
 	function syncToFlowData() {
 		flowData = {
-			...flowData,
+			...(flowData ?? {}),
 			_customized: true,
 			services: [...services],
 			categories: enableCategories ? [...categories] : [],

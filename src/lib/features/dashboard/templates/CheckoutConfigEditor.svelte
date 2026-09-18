@@ -11,6 +11,10 @@
 		scenario?: string;
 	} = $props();
 
+	if (!config.flow_data) {
+		config.flow_data = {};
+	}
+
 	type PresetKey = 'quick_amounts' | 'tip_presets';
 
 	function updatePreset(key: PresetKey, index: number, event: Event) {

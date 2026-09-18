@@ -5,6 +5,7 @@
 	import CheckoutTemplatePreview from './CheckoutTemplatePreview.svelte';
 	import {
 		CHECKOUT_CONFIG_BOOLEAN_KEYS,
+		isCheckoutTemplateScenario,
 		type CheckoutTemplateScenario
 	} from '$lib/features/shared/checkout-scenario-config';
 	import {
