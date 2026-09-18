@@ -1,7 +1,6 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import {
 		Calendar,
-		Car,
 		Check,
 		ChevronRight,
 		Clock,
@@ -38,69 +37,107 @@
 	const uiLabels = $derived.by(() => {
 		if (scenario === 'vertical_education') {
 			return {
-				step1Title: 'Оберіть викладача або курс',
-				step1Desc: 'Вкажіть спеціаліста чи напрямок для занять',
-				step2Title: 'Оберіть пакет занять',
-				step2Desc: 'Пробне, разове або абонемент зі знижкою',
-				step3Title: 'Оберіть дату та час першого уроку',
-				step3Desc: 'Вільні вікна в графіку викладача',
+				tab1: 'Курс / Викладач',
+				tab2: 'Дата і час',
+				tab3: 'Оплата',
+				categoryHeading: 'Викладач / Напрямок навчання:',
+				serviceHeading: 'Перелік занять та курсів',
+				serviceSubtitle: 'Оберіть пробний урок, разове заняття або абонемент',
+				scheduleHeading: 'Вільні години викладача',
+				scheduleSubtitle: 'Оберіть дату та час першого уроку',
 				customFieldLabel: 'Мета навчання / Рівень учня:',
 				customFieldPlaceholder: 'Наприклад: B1, підготовка до НМТ'
 			};
 		}
 		if (scenario === 'vertical_beauty') {
 			return {
-				step1Title: 'Оберіть майстра',
-				step1Desc: 'Спеціаліст, до якого ви бажаєте записатись',
-				step2Title: 'Оберіть послугу салону',
-				step2Desc: 'Процедури моделювання та догляду',
-				step3Title: 'Оберіть дату та час візиту',
-				step3Desc: 'Вільні години у розкладі майстра',
+				tab1: 'Послуги салону',
+				tab2: 'Дата і час',
+				tab3: 'Оплата',
+				categoryHeading: 'Спеціаліст / Майстер:',
+				serviceHeading: 'Прайс-лист послуг краси',
+				serviceSubtitle: 'Оберіть процедуру моделювання, фарбування чи догляду',
+				scheduleHeading: 'Вільний розклад майстра',
+				scheduleSubtitle: 'Оберіть зручний час для запису',
 				customFieldLabel: 'Побажання для майстра:',
-				customFieldPlaceholder: 'Бажаний стиль або довжина'
+				customFieldPlaceholder: 'Бажаний стиль, довжина або колір'
 			};
 		}
 		if (scenario === 'vertical_pets') {
 			return {
-				step1Title: 'Оберіть улюбленця',
-				step1Desc: 'Вид та розмір вашої тварини',
-				step2Title: 'Оберіть послугу грумінгу',
-				step2Desc: 'Комплексний догляд, купання або линька',
-				step3Title: 'Оберіть дату та час прийому',
-				step3Desc: 'Вільні місця на столі грумера',
-				customFieldLabel: 'Кличка та порода тварини:',
-				customFieldPlaceholder: 'Наприклад: Чак, бігль, 2 роки'
+				tab1: 'Грумінг',
+				tab2: 'Дата і час',
+				tab3: 'Оплата',
+				categoryHeading: 'Розмір та вид тварини:',
+				serviceHeading: 'Послуги грумінгу та гігієни',
+				serviceSubtitle: 'Оберіть комплекс або гігієнічну процедуру',
+				scheduleHeading: 'Вільні місця на грумінг-столі',
+				scheduleSubtitle: 'Оберіть дату та час прийому',
+				customFieldLabel: 'Кличка та порода улюбленця:',
+				customFieldPlaceholder: 'Чак, бігль, 2 роки'
 			};
 		}
 		if (scenario === 'vertical_cleaning') {
 			return {
-				step1Title: 'Оберіть тип приміщення',
-				step1Desc: 'Кількість кімнат або площа житла',
-				step2Title: 'Оберіть пакет прибирання',
-				step2Desc: 'Базове, генеральне або після ремонту',
-				step3Title: 'Оберіть дату виїзду бригади',
-				step3Desc: 'Зручний час початку прибирання',
-				customFieldLabel: 'Адреса приміщення (вулиця, кв):',
+				tab1: 'Клінінг',
+				tab2: 'Дата виїзду',
+				tab3: 'Оплата',
+				categoryHeading: 'Тип житла / площа:',
+				serviceHeading: 'Пакети прибирання',
+				serviceSubtitle: 'Оберіть необхідний обсяг клінінгових робіт',
+				scheduleHeading: 'Графік виїзду бригади',
+				scheduleSubtitle: 'Оберіть дату та зручний час прибуття клінерів',
+				customFieldLabel: 'Адреса об’єкта (вулиця, кв):',
 				customFieldPlaceholder: 'вул. Хрещатик, 1, кв. 15'
 			};
 		}
-		// За замовчуванням СТО
+		if (scenario === 'vertical_rental') {
+			return {
+				tab1: 'Спорядження',
+				tab2: 'Дати прокату',
+				tab3: 'Оплата',
+				categoryHeading: 'Категорія товарів:',
+				serviceHeading: 'Об’єкти прокату (добовий тариф)',
+				serviceSubtitle: 'Оберіть намет, сапборд або інструмент',
+				scheduleHeading: 'Графік пункту видачі',
+				scheduleSubtitle: 'Оберіть дату та час отримання спорядження',
+				customFieldLabel: 'Адреса видачі / номер паспорта:',
+				customFieldPlaceholder: 'Самовивіз або доставка додому'
+			};
+		}
+		if (scenario === 'vertical_services') {
+			return {
+				tab1: 'Послуги майстра',
+				tab2: 'Дата візиту',
+				tab3: 'Оплата',
+				categoryHeading: 'Спеціалізація майстра:',
+				serviceHeading: 'Перелік ремонтних послуг',
+				serviceSubtitle: 'Сантехніка, електрика, дрібний побутовий ремонт',
+				scheduleHeading: 'Графік виїзду майстра',
+				scheduleSubtitle: 'Оберіть зручний час для візиту спеціаліста',
+				customFieldLabel: 'Адреса та опис несправності:',
+				customFieldPlaceholder: 'вул. Садова, 5, тече кран у ванній'
+			};
+		}
+		// За замовчуванням СТО / Шиномонтаж
 		return {
-			step1Title: 'Оберіть тип авто',
-			step1Desc: 'Впливає на вартість матеріалів та час роботи.',
-			step2Title: 'Оберіть послугу СТО',
-			step2Desc: 'Розраховано для обраного типу авто.',
-			step3Title: 'Оберіть дату та час',
-			step3Desc: 'Вільні слоти на шиномонтажному боксі.',
+			tab1: 'Послуги СТО',
+			tab2: 'Дата і час',
+			tab3: 'Оплата',
+			categoryHeading: 'Тип авто (впливає на вартість):',
+			serviceHeading: 'Перелік послуг СТО та шиномонтажу',
+			serviceSubtitle: 'Оберіть потрібні роботи для вашого автомобіля',
+			scheduleHeading: 'Вільні слоти на боксі СТО',
+			scheduleSubtitle: 'Оберіть дату та час для заїзду',
 			customFieldLabel: 'Номерний знак авто:',
 			customFieldPlaceholder: 'КА 0000 АА'
 		};
 	});
 
 	const defaultVehicleTypes: VehicleType[] = [
-		{ id: 'sedan', title: 'Легкове авто', subtitle: 'Седан, хетчбек, купе', icon: '🚗', baseModifier: 1.0 },
-		{ id: 'suv', title: 'Кросовер / SUV', subtitle: 'Позашляховик, паркетник', icon: '🚙', baseModifier: 1.25 },
-		{ id: 'van', title: 'Мікроавтобус', subtitle: 'Бус, комерційний транспорт', icon: '🚐', baseModifier: 1.5 }
+		{ id: 'sedan', title: 'Легкове', subtitle: 'Седан, хетчбек', icon: '🚗', baseModifier: 1.0 },
+		{ id: 'suv', title: 'Кросовер / SUV', subtitle: 'Позашляховик', icon: '🚙', baseModifier: 1.25 },
+		{ id: 'van', title: 'Мікроавтобус', subtitle: 'Бус, комерційний', icon: '🚐', baseModifier: 1.5 }
 	];
 
 	const defaultServices: AutoService[] = [
@@ -169,7 +206,6 @@
 		while (currentMinutes + stepMins <= stopMinutes && count < 16) {
 			const h = Math.floor(currentMinutes / 60).toString().padStart(2, '0');
 			const m = (currentMinutes % 60).toString().padStart(2, '0');
-			// Симуляція пари зайнятих слотів для реалізму
 			const available = !(count === 2 || count === 6);
 			slots.push({ time: `${h}:${m}`, available });
 			currentMinutes += stepMins;
@@ -178,14 +214,17 @@
 
 		return slots.length > 0 ? slots : [
 			{ time: '09:00', available: true },
-			{ time: '10:30', available: true },
-			{ time: '12:00', available: false },
-			{ time: '14:00', available: true },
-			{ time: '15:30', available: true }
+			{ time: '10:15', available: true },
+			{ time: '11:30', available: false },
+			{ time: '13:00', available: true },
+			{ time: '14:30', available: true },
+			{ time: '16:00', available: true },
+			{ time: '17:30', available: false },
+			{ time: '18:45', available: true }
 		];
 	});
 
-	let step = $state<1 | 2 | 3 | 4>(1);
+	let step = $state<1 | 2 | 3>(1);
 	let selectedVehicleId = $state<string>('');
 	let selectedServiceId = $state<string>('');
 	let selectedDateIso = $state<string>(days[0].iso);
@@ -224,53 +263,72 @@
 </script>
 
 <div class="booking-preview">
-	<!-- Progress bar -->
-	<div class="progress-steps" aria-label={`Крок ${step} з 4`}>
-		{#each [1, 2, 3, 4] as s}
-			<span class:active={s <= step} class:current={s === step}></span>
-		{/each}
+	<!-- Interactive 3-step navigation bar -->
+	<div class="step-nav" role="tablist">
+		<button
+			type="button"
+			role="tab"
+			class="step-tab"
+			class:active={step === 1}
+			onclick={() => (step = 1)}
+		>
+			<span class="tab-badge">1</span>
+			<span class="tab-text">{uiLabels.tab1}</span>
+		</button>
+		<button
+			type="button"
+			role="tab"
+			class="step-tab"
+			class:active={step === 2}
+			onclick={() => (step = 2)}
+		>
+			<span class="tab-badge">2</span>
+			<span class="tab-text">{uiLabels.tab2}</span>
+		</button>
+		<button
+			type="button"
+			role="tab"
+			class="step-tab"
+			class:active={step === 3}
+			onclick={() => (step = 3)}
+		>
+			<span class="tab-badge">3</span>
+			<span class="tab-text">{uiLabels.tab3}</span>
+		</button>
 	</div>
 
+	<!-- Step 1: Services & Categories -->
 	{#if step === 1}
-		<div class="heading">
-			<span class="step-badge">Крок 1 з 4</span>
-			<h3>{uiLabels.step1Title}</h3>
-			<p>{uiLabels.step1Desc}</p>
-		</div>
-
-		<div class="vehicle-options">
-			{#each vehicleTypes as v (v.id)}
-				<button
-					type="button"
-					class="vehicle-card"
-					class:selected={v.id === selectedVehicleId}
-					onclick={() => (selectedVehicleId = v.id)}
-				>
-					<span class="v-icon">{v.icon}</span>
-					<div class="v-info">
-						<strong>{v.title}</strong>
-						{#if v.subtitle}<small>{v.subtitle}</small>{/if}
-					</div>
-					{#if v.id === selectedVehicleId}
-						<div class="check-circle"><Check size={14} /></div>
-					{/if}
-				</button>
-			{/each}
-		</div>
-
-		<button type="button" class="btn-next" onclick={() => (step = 2)}>
-			Обрати послугу <ChevronRight size={16} />
-		</button>
-
-	{:else if step === 2}
-		<button type="button" class="btn-back" onclick={() => (step = 1)}>
-			&larr; Змінити {selectedVehicle.title}
-		</button>
+		{#if vehicleTypes.length > 0}
+			<div class="category-block">
+				<span class="sub-label">{uiLabels.categoryHeading}</span>
+				<div class="cat-pills">
+					{#each vehicleTypes as v (v.id)}
+						<button
+							type="button"
+							class="cat-chip"
+							class:selected={v.id === selectedVehicleId}
+							onclick={() => (selectedVehicleId = v.id)}
+						>
+							<span class="chip-icon">{v.icon}</span>
+							<span class="chip-title">{v.title}</span>
+							{#if v.baseModifier !== 1.0}
+								<span class="chip-mod">
+									{v.baseModifier > 1 ? `+${Math.round((v.baseModifier - 1) * 100)}%` : `${Math.round((v.baseModifier - 1) * 100)}%`}
+								</span>
+							{/if}
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
 
 		<div class="heading">
-			<span class="step-badge">Крок 2 з 4</span>
-			<h3>{uiLabels.step2Title}</h3>
-			<p>{uiLabels.step2Desc}</p>
+			<div class="flex items-center gap-1.5">
+				<Wrench size={15} class="text-blue-600" />
+				<h3>{uiLabels.serviceHeading}</h3>
+			</div>
+			<p>{uiLabels.serviceSubtitle}</p>
 		</div>
 
 		<div class="service-list">
@@ -296,19 +354,28 @@
 			{/each}
 		</div>
 
-		<button type="button" class="btn-next" onclick={() => (step = 3)}>
-			Обрати дату та час <ChevronRight size={16} />
+		<div class="selected-summary-bar">
+			<div class="summary-text">
+				<small>Обрана послуга:</small>
+				<strong>{selectedService.name}</strong>
+			</div>
+			<div class="summary-price">
+				<strong>{totalPrice} ₴</strong>
+			</div>
+		</div>
+
+		<button type="button" class="btn-next" onclick={() => (step = 2)}>
+			Обрати дату та час ({timeSlots.filter(t => t.available).length} слотів) <ChevronRight size={16} />
 		</button>
 
-	{:else if step === 3}
-		<button type="button" class="btn-back" onclick={() => (step = 2)}>
-			&larr; Змінити вибір
-		</button>
-
+	<!-- Step 2: Date & Time Calendar -->
+	{:else if step === 2}
 		<div class="heading">
-			<span class="step-badge">Крок 3 з 4</span>
-			<h3>{uiLabels.step3Title}</h3>
-			<p>{uiLabels.step3Desc}</p>
+			<div class="flex items-center gap-1.5">
+				<Calendar size={15} class="text-emerald-600" />
+				<h3>{uiLabels.scheduleHeading}</h3>
+			</div>
+			<p>{uiLabels.scheduleSubtitle}</p>
 		</div>
 
 		<!-- Календарний скрол днів -->
@@ -327,7 +394,11 @@
 		</div>
 
 		<!-- Слоти часу -->
-		<span class="slots-label"><Clock size={13} /> Доступні слоти:</span>
+		<div class="slots-header">
+			<Clock size={13} class="text-zinc-600" />
+			<span>Вільний час на {days.find(d => d.iso === selectedDateIso)?.dayName ?? 'обрану дату'}:</span>
+		</div>
+
 		<div class="slots-grid">
 			{#each timeSlots as slot (slot.time)}
 				<button
@@ -342,38 +413,50 @@
 			{/each}
 		</div>
 
-		<button type="button" class="btn-next" onclick={() => (step = 4)}>
-			Вказати контакти <ChevronRight size={16} />
-		</button>
+		<div class="selected-summary-bar">
+			<div class="summary-text">
+				<small>Запис на:</small>
+				<strong>{days.find(d => d.iso === selectedDateIso)?.dateStr} о {selectedTime}</strong>
+			</div>
+			<span class="badge-slot">Слот заброньовано</span>
+		</div>
 
-	{:else if step === 4}
-		<button type="button" class="btn-back" onclick={() => (step = 3)}>
-			&larr; Змінити час ({selectedTime})
-		</button>
+		<div class="flex gap-2">
+			<button type="button" class="btn-back-half" onclick={() => (step = 1)}>
+				&larr; Послуги
+			</button>
+			<button type="button" class="btn-next-half" onclick={() => (step = 3)}>
+				Далі до оплати <ChevronRight size={16} />
+			</button>
+		</div>
 
+	<!-- Step 3: Confirmation & Payment -->
+	{:else if step === 3}
 		<div class="heading">
-			<span class="step-badge">Крок 4 з 4</span>
-			<h3>Підтвердження запису</h3>
-			<p>Перевірте дані та оберіть варіант оплати.</p>
+			<div class="flex items-center gap-1.5">
+				<ShieldCheck size={15} class="text-blue-600" />
+				<h3>Підтвердження та завдаток</h3>
+			</div>
+			<p>Перевірте деталі запису та оберіть спосіб оплати.</p>
 		</div>
 
 		<!-- Резюме запису -->
-		<div class="summary-card">
+		<div class="booking-summary-card">
 			<div class="sum-row">
 				<span>Послуга:</span>
 				<strong>{selectedService.name}</strong>
 			</div>
 			<div class="sum-row">
-				<span>Категорія:</span>
+				<span>Параметри:</span>
 				<strong>{selectedVehicle.title}</strong>
 			</div>
 			<div class="sum-row">
-				<span>Час запису:</span>
-				<strong class="highlight">{days.find((d) => d.iso === selectedDateIso)?.dayName}, {selectedTime}</strong>
+				<span>Дата та час:</span>
+				<strong>{days.find(d => d.iso === selectedDateIso)?.dateStr} о {selectedTime}</strong>
 			</div>
 			<div class="sum-row total">
-				<span>Загальна сума робіт:</span>
-				<strong class="price">{totalPrice} ₴</strong>
+				<span>Повна вартість робіт:</span>
+				<strong>{totalPrice} ₴</strong>
 			</div>
 		</div>
 
@@ -385,366 +468,351 @@
 			</label>
 			<label class="field">
 				<span>Номер телефону клієнта:</span>
-				<input type="tel" bind:value={clientPhone} placeholder="+380" />
+				<input type="text" bind:value={clientPhone} placeholder="+380..." />
 			</label>
 		</div>
 
-		<!-- Варіант оплати: Завдаток чи Вся сума -->
-		<div class="payment-mode-selector">
+		<!-- Модель оплати -->
+		<div class="payment-modes">
 			<label class="mode-card" class:active={paymentMode === 'deposit'}>
 				<input type="radio" name="pay_mode" value="deposit" bind:group={paymentMode} />
-				<div>
-					<strong>Завдаток (передоплата)</strong>
-					<small>Фіксує бронювання. Решта ({Math.max(0, totalPrice - depositAmount)} ₴) на місці</small>
+				<div class="mode-info">
+					<strong>Фіксований завдаток (передоплата)</strong>
+					<small>Бронює слот у системі. Решта ({Math.max(0, totalPrice - depositAmount)} ₴) на місці</small>
 				</div>
 				<span class="amount-badge">{depositAmount} ₴</span>
 			</label>
 
 			<label class="mode-card" class:active={paymentMode === 'full'}>
 				<input type="radio" name="pay_mode" value="full" bind:group={paymentMode} />
-				<div>
-					<strong>Оплатити повністю</strong>
-					<small>Швидкий розрахунок 100% суми онлайн</small>
+				<div class="mode-info">
+					<strong>Оплатити 100% онлайн</strong>
+					<small>Повний розрахунок онлайн без готівки на місці</small>
 				</div>
 				<span class="amount-badge">{totalPrice} ₴</span>
 			</label>
 		</div>
 
 		<button type="button" class="btn-pay" onclick={proceedToPay}>
-			<span>Сплатити {paymentAmount} ₴</span>
-			<ShieldCheck size={18} />
+			Забронювати за {paymentAmount} ₴
 		</button>
 	{/if}
 </div>
 
 <style>
 	.booking-preview {
+		padding: 12px 14px 20px;
 		display: flex;
 		flex-direction: column;
-		gap: 16px;
-		color: #f4f4f5;
-	}
-
-	.progress-steps {
-		display: flex;
-		gap: 6px;
-	}
-	.progress-steps span {
-		flex: 1;
-		height: 4px;
-		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.12);
-		transition: all 0.3s;
-	}
-	.progress-steps span.active {
-		background: #2563eb;
-	}
-	.progress-steps span.current {
-		background: #60a5fa;
-		box-shadow: 0 0 8px rgba(96, 165, 250, 0.5);
-	}
-
-	.heading {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-	}
-	.step-badge {
-		font-size: 11px;
-		font-weight: 700;
-		color: #60a5fa;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-	.heading h3 {
-		font-size: 17px;
-		font-weight: 700;
-		color: #ffffff;
-		margin: 0;
-	}
-	.heading p {
-		font-size: 12px;
-		color: #a1a1aa;
-		margin: 0;
-	}
-
-	.btn-back {
-		align-self: flex-start;
-		background: transparent;
-		border: none;
-		color: #a1a1aa;
-		font-size: 12px;
-		font-weight: 600;
-		cursor: pointer;
-		padding: 0;
-		transition: color 0.2s;
-	}
-	.btn-back:hover {
-		color: #ffffff;
-	}
-
-	/* Vehicle Cards */
-	.vehicle-options {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-	.vehicle-card {
-		display: flex;
-		align-items: center;
 		gap: 12px;
-		padding: 12px 14px;
-		border-radius: 12px;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		cursor: pointer;
-		text-align: left;
-		transition: all 0.2s;
-		color: #f4f4f5;
 	}
-	.vehicle-card:hover {
-		background: rgba(255, 255, 255, 0.07);
+
+	/* Step Nav Bar */
+	.step-nav {
+		display: grid;
+		grid-template-columns: 1fr 1fr 1fr;
+		gap: 6px;
+		background: #f4f4f5;
+		padding: 3px;
+		border-radius: 10px;
 	}
-	.vehicle-card.selected {
-		background: rgba(37, 99, 235, 0.15);
-		border-color: #3b82f6;
-	}
-	.v-icon {
-		font-size: 24px;
-	}
-	.v-info {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-	}
-	.v-info strong {
-		font-size: 14px;
-		color: #ffffff;
-	}
-	.v-info small {
-		font-size: 11px;
-		color: #a1a1aa;
-	}
-	.check-circle {
-		width: 22px;
-		height: 22px;
-		border-radius: 50%;
-		background: #2563eb;
-		color: white;
+	.step-tab {
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		gap: 6px;
+		padding: 7px 4px;
+		font-size: 11px;
+		font-weight: 700;
+		color: #71717a;
+		border-radius: 8px;
+		border: none;
+		background: transparent;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+	.step-tab.active {
+		background: #ffffff;
+		color: #18181b;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+	}
+	.tab-badge {
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: #e4e4e7;
+		color: #52525b;
+		font-size: 10px;
+		display: grid;
+		place-items: center;
+		font-weight: 800;
+	}
+	.step-tab.active .tab-badge {
+		background: #2563eb;
+		color: #ffffff;
 	}
 
-	/* Services */
+	/* Category Pills */
+	.category-block {
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+	}
+	.sub-label {
+		font-size: 10px;
+		font-weight: 700;
+		color: #52525b;
+	}
+	.cat-pills {
+		display: flex;
+		gap: 6px;
+		overflow-x: auto;
+		padding-bottom: 2px;
+	}
+	.cat-chip {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		background: #ffffff;
+		border: 1px solid #e4e4e7;
+		border-radius: 8px;
+		padding: 6px 10px;
+		cursor: pointer;
+		white-space: nowrap;
+		font-size: 11px;
+		font-weight: 600;
+		color: #3f3f46;
+		transition: all 0.15s;
+	}
+	.cat-chip.selected {
+		border-color: #2563eb;
+		background: #eff6ff;
+		color: #1d4ed8;
+	}
+	.chip-mod {
+		font-size: 9px;
+		font-weight: 700;
+		background: #dbeafe;
+		color: #1e40af;
+		padding: 1px 4px;
+		border-radius: 4px;
+	}
+
+	.heading h3 {
+		margin: 0;
+		font-size: 13px;
+		font-weight: 800;
+		color: #18181b;
+	}
+	.heading p {
+		margin: 2px 0 0;
+		font-size: 11px;
+		color: #71717a;
+	}
+
 	.service-list {
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
+		gap: 6px;
 	}
 	.service-card {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 12px 14px;
-		border-radius: 12px;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: #ffffff;
+		border: 1px solid #e4e4e7;
+		border-radius: 10px;
+		padding: 9px 12px;
 		cursor: pointer;
 		text-align: left;
-		transition: all 0.2s;
-		color: #f4f4f5;
-	}
-	.service-card:hover {
-		background: rgba(255, 255, 255, 0.07);
+		transition: all 0.15s ease;
 	}
 	.service-card.selected {
-		background: rgba(37, 99, 235, 0.15);
-		border-color: #3b82f6;
-	}
-	.s-main {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
+		border-color: #2563eb;
+		background: #eff6ff;
 	}
 	.s-main strong {
-		font-size: 13px;
-		color: #ffffff;
+		display: block;
+		font-size: 11px;
+		color: #18181b;
 	}
 	.duration {
-		display: flex;
+		display: inline-flex;
 		align-items: center;
-		gap: 4px;
-		font-size: 11px;
-		color: #a1a1aa;
+		gap: 3px;
+		font-size: 10px;
+		color: #71717a;
+		margin-top: 1px;
 	}
 	.s-price {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 6px;
 	}
 	.s-price strong {
-		font-size: 14px;
-		color: #60a5fa;
+		font-size: 12px;
+		font-weight: 800;
+		color: #18181b;
 	}
 	.check-pill {
 		width: 18px;
 		height: 18px;
 		border-radius: 50%;
 		background: #2563eb;
-		color: white;
+		color: #ffffff;
+		display: grid;
+		place-items: center;
+	}
+
+	.selected-summary-bar {
+		background: #f4f4f5;
+		border-radius: 8px;
+		padding: 7px 10px;
 		display: flex;
 		align-items: center;
-		justify-content: center;
+		justify-content: space-between;
+	}
+	.summary-text small {
+		display: block;
+		font-size: 9px;
+		color: #71717a;
+	}
+	.summary-text strong {
+		font-size: 11px;
+		color: #18181b;
+	}
+	.summary-price strong {
+		font-size: 13px;
+		font-weight: 800;
+		color: #2563eb;
+	}
+	.badge-slot {
+		font-size: 10px;
+		font-weight: 700;
+		color: #15803d;
+		background: #dcfce7;
+		padding: 2px 6px;
+		border-radius: 4px;
 	}
 
 	/* Days Strip */
 	.days-strip {
 		display: flex;
-		gap: 8px;
+		gap: 5px;
 		overflow-x: auto;
-		padding-bottom: 6px;
-		scrollbar-width: thin;
+		padding-bottom: 2px;
 	}
 	.day-chip {
-		flex: 0 0 68px;
+		flex: 1;
+		min-width: 44px;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		padding: 8px 6px;
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: #ffffff;
+		border: 1px solid #e4e4e7;
+		border-radius: 8px;
+		padding: 6px 2px;
 		cursor: pointer;
-		transition: all 0.2s;
-		color: #f4f4f5;
-	}
-	.day-chip:hover {
-		background: rgba(255, 255, 255, 0.08);
 	}
 	.day-chip.selected {
-		background: #2563eb;
-		border-color: #3b82f6;
-		color: white;
+		border-color: #2563eb;
+		background: #eff6ff;
 	}
 	.day-name {
-		font-size: 10px;
-		text-transform: uppercase;
-		opacity: 0.8;
+		font-size: 9px;
+		color: #71717a;
 	}
 	.day-date {
-		font-size: 12px;
-		margin-top: 2px;
+		font-size: 11px;
+		color: #18181b;
+	}
+	.day-chip.selected .day-date {
+		color: #2563eb;
 	}
 
-	/* Slots Grid */
-	.slots-label {
+	.slots-header {
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		font-size: 12px;
-		font-weight: 600;
-		color: #a1a1aa;
-		margin-top: 4px;
+		gap: 4px;
+		font-size: 10px;
+		font-weight: 700;
+		color: #52525b;
 	}
 	.slots-grid {
 		display: grid;
 		grid-template-columns: repeat(4, 1fr);
-		gap: 6px;
+		gap: 5px;
 	}
 	.slot-chip {
-		padding: 9px 4px;
-		border-radius: 8px;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		color: #ffffff;
-		font-size: 13px;
-		font-weight: 600;
+		padding: 6px 2px;
+		font-size: 11px;
+		font-weight: 700;
+		background: #ffffff;
+		border: 1px solid #e4e4e7;
+		border-radius: 6px;
 		cursor: pointer;
-		text-align: center;
-		transition: all 0.2s;
-	}
-	.slot-chip:hover:not(:disabled) {
-		background: rgba(255, 255, 255, 0.1);
+		color: #18181b;
 	}
 	.slot-chip.selected {
+		border-color: #2563eb;
 		background: #2563eb;
-		border-color: #3b82f6;
-		box-shadow: 0 0 10px rgba(37, 99, 235, 0.4);
+		color: #ffffff;
 	}
 	.slot-chip:disabled {
-		opacity: 0.25;
-		cursor: not-allowed;
+		opacity: 0.4;
 		text-decoration: line-through;
+		cursor: not-allowed;
 	}
 
 	/* Summary Card */
-	.summary-card {
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		border-radius: 12px;
-		padding: 12px 14px;
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-		font-size: 12px;
-	}
-	.sum-row {
-		display: flex;
-		justify-content: space-between;
-		color: #a1a1aa;
-	}
-	.sum-row strong {
-		color: #f4f4f5;
-	}
-	.sum-row .highlight {
-		color: #60a5fa;
-	}
-	.sum-row.total {
-		margin-top: 4px;
-		padding-top: 8px;
-		border-top: 1px solid rgba(255, 255, 255, 0.08);
-		font-size: 13px;
-	}
-	.sum-row.total .price {
-		font-size: 15px;
-		color: #34d399;
-	}
-
-	/* Inputs */
-	.inputs-group {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-	.field {
+	.booking-summary-card {
+		background: #fafafa;
+		border: 1px solid #e4e4e7;
+		border-radius: 10px;
+		padding: 9px 12px;
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
 	}
-	.field span {
+	.sum-row {
+		display: flex;
+		justify-content: space-between;
 		font-size: 11px;
-		color: #a1a1aa;
-		font-weight: 500;
+		color: #52525b;
 	}
-	.field input {
-		width: 100%;
-		box-sizing: border-box;
-		background: rgba(0, 0, 0, 0.25);
-		border: 1px solid rgba(255, 255, 255, 0.12);
-		border-radius: 8px;
-		padding: 8px 10px;
-		color: #ffffff;
-		font-size: 13px;
-		outline: none;
-		transition: border-color 0.2s;
-	}
-	.field input:focus {
-		border-color: #3b82f6;
+	.sum-row.total {
+		border-top: 1px solid #e4e4e7;
+		padding-top: 4px;
+		margin-top: 2px;
+		font-weight: 800;
+		color: #18181b;
 	}
 
-	/* Payment Mode Selector */
-	.payment-mode-selector {
+	.inputs-group {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.field {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.field span {
+		font-size: 10px;
+		font-weight: 700;
+		color: #52525b;
+	}
+	.field input {
+		background: #ffffff;
+		border: 1px solid #d4d4d8;
+		border-radius: 6px;
+		padding: 6px 8px;
+		font-size: 11px;
+		outline: none;
+	}
+
+	.payment-modes {
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
@@ -752,71 +820,78 @@
 	.mode-card {
 		display: flex;
 		align-items: center;
-		gap: 10px;
-		padding: 10px 12px;
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		gap: 8px;
+		background: #ffffff;
+		border: 1px solid #e4e4e7;
+		border-radius: 8px;
+		padding: 8px 10px;
 		cursor: pointer;
-		transition: all 0.2s;
 	}
 	.mode-card.active {
-		border-color: #3b82f6;
-		background: rgba(37, 99, 235, 0.12);
+		border-color: #2563eb;
+		background: #eff6ff;
 	}
-	.mode-card input {
-		accent-color: #2563eb;
-	}
-	.mode-card div {
+	.mode-info {
 		flex: 1;
-		display: flex;
-		flex-direction: column;
+		min-width: 0;
 	}
-	.mode-card strong {
-		font-size: 12px;
-		color: #ffffff;
+	.mode-info strong {
+		display: block;
+		font-size: 11px;
+		color: #18181b;
 	}
-	.mode-card small {
-		font-size: 10px;
-		color: #a1a1aa;
+	.mode-info small {
+		font-size: 9px;
+		color: #71717a;
 	}
 	.amount-badge {
-		font-size: 13px;
-		font-weight: 700;
-		color: #60a5fa;
+		font-size: 12px;
+		font-weight: 800;
+		color: #2563eb;
 	}
 
 	/* Buttons */
 	.btn-next,
 	.btn-pay {
+		width: 100%;
+		background: #2563eb;
+		color: #ffffff;
+		border: none;
+		border-radius: 10px;
+		padding: 11px;
+		font-size: 13px;
+		font-weight: 700;
+		cursor: pointer;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		gap: 8px;
-		width: 100%;
-		padding: 12px;
+		gap: 6px;
+		box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+	}
+	.btn-back-half {
+		flex: 1;
+		background: #f4f4f5;
+		color: #52525b;
+		border: 1px solid #e4e4e7;
 		border-radius: 10px;
-		background: #2563eb;
-		color: white;
-		font-size: 14px;
+		padding: 10px;
+		font-size: 12px;
 		font-weight: 700;
-		border: none;
 		cursor: pointer;
-		transition: background 0.2s, transform 0.1s;
-		margin-top: 4px;
 	}
-	.btn-next:hover,
-	.btn-pay:hover {
-		background: #1d4ed8;
-	}
-	.btn-next:active,
-	.btn-pay:active {
-		transform: scale(0.98);
-	}
-	.btn-pay {
-		background: linear-gradient(135deg, #059669, #10b981);
-	}
-	.btn-pay:hover {
-		background: linear-gradient(135deg, #047857, #059669);
+	.btn-next-half {
+		flex: 2;
+		background: #2563eb;
+		color: #ffffff;
+		border: none;
+		border-radius: 10px;
+		padding: 10px;
+		font-size: 12px;
+		font-weight: 700;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 4px;
 	}
 </style>

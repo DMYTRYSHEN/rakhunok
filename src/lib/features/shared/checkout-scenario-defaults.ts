@@ -216,6 +216,27 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		allow_promo: false,
 		allow_delivery: false,
 		allow_upsell: true,
+		flow_data: {
+			categories: [
+				{ id: 'sedan', title: 'Легкове авто', subtitle: 'Седан, хетчбек', icon: '🚗', modifier: 1.0 },
+				{ id: 'suv', title: 'Кросовер / SUV', subtitle: 'Позашляховик', icon: '🚙', modifier: 1.25 },
+				{ id: 'van', title: 'Мікроавтобус', subtitle: 'Бус, комерційний', icon: '🚐', modifier: 1.5 }
+			],
+			services: [
+				{ id: 'srv_1', name: 'Комплексний шиномонтаж (4 шт)', durationMinutes: 45, basePrice: 800 },
+				{ id: 'srv_2', name: 'Балансування коліс', durationMinutes: 30, basePrice: 400 },
+				{ id: 'srv_3', name: 'Діагностика ходової частини', durationMinutes: 30, basePrice: 350 },
+				{ id: 'srv_4', name: 'Заміна мастила та фільтрів', durationMinutes: 40, basePrice: 450 }
+			],
+			schedule: {
+				startHour: '09:00',
+				endHour: '19:00',
+				slotDurationMinutes: 45,
+				workDays: 'mon_sat',
+				depositAmount: 200,
+				calendarSyncUrl: ''
+			}
+		},
 		cta_text: 'Сплатити послуги'
 	},
 	vertical_beauty: {
@@ -224,6 +245,25 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		allow_promo: true,
 		allow_tips: true,
 		allow_upsell: true,
+		flow_data: {
+			categories: [
+				{ id: 'm_1', title: 'Майстер Анна', subtitle: 'Стиліст-перукар', icon: '✂️', modifier: 1.0 },
+				{ id: 'm_2', title: 'Топ-стиліст Олена', subtitle: 'Колорист експерт', icon: '✨', modifier: 1.3 }
+			],
+			services: [
+				{ id: 'b_1', name: 'Стрижка та моделювання', durationMinutes: 45, basePrice: 600 },
+				{ id: 'b_2', name: 'Комплексний манікюр', durationMinutes: 75, basePrice: 500 },
+				{ id: 'b_3', name: 'Догляд та відновлення волосся', durationMinutes: 60, basePrice: 850 }
+			],
+			schedule: {
+				startHour: '10:00',
+				endHour: '20:00',
+				slotDurationMinutes: 45,
+				workDays: 'everyday',
+				depositAmount: 200,
+				calendarSyncUrl: ''
+			}
+		},
 		cta_text: 'Підтвердити запис'
 	},
 	vertical_cleaning: {
@@ -232,6 +272,26 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		allow_delivery: false,
 		allow_tips: true,
 		allow_upsell: true,
+		flow_data: {
+			categories: [
+				{ id: 'cl_1', title: '1-кімнатна квартира', subtitle: 'До 45 м²', icon: '🛋️', modifier: 1.0 },
+				{ id: 'cl_2', title: '2-3 кімнатна квартира', subtitle: 'До 85 м²', icon: '🏠', modifier: 1.35 },
+				{ id: 'cl_3', title: 'Приватний будинок', subtitle: 'Від 100 м²', icon: '🏡', modifier: 1.8 }
+			],
+			services: [
+				{ id: 'c_1', name: 'Базове підтримуюче прибирання', durationMinutes: 180, basePrice: 1200 },
+				{ id: 'c_2', name: 'Генеральне еко-прибирання', durationMinutes: 300, basePrice: 2400 },
+				{ id: 'c_3', name: 'Прибирання після ремонту', durationMinutes: 360, basePrice: 3800 }
+			],
+			schedule: {
+				startHour: '08:00',
+				endHour: '18:00',
+				slotDurationMinutes: 120,
+				workDays: 'everyday',
+				depositAmount: 300,
+				calendarSyncUrl: ''
+			}
+		},
 		cta_text: 'Замовити клінінг'
 	},
 	vertical_pets: {
@@ -240,6 +300,26 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		allow_promo: true,
 		allow_tips: true,
 		allow_upsell: true,
+		flow_data: {
+			categories: [
+				{ id: 'pet_cat', title: 'Котик', subtitle: 'Усі породи', icon: '🐱', modifier: 1.0 },
+				{ id: 'pet_small', title: 'Собака до 5 кг', subtitle: 'Йорк, шпіц, мальтезе', icon: '🐶', modifier: 1.0 },
+				{ id: 'pet_med', title: 'Собака 5–15 кг', subtitle: 'Коргі, кокер, пудель', icon: '🐕', modifier: 1.3 }
+			],
+			services: [
+				{ id: 'p_1', name: 'Комплексний грумінг (купання + стрижка)', durationMinutes: 90, basePrice: 750 },
+				{ id: 'p_2', name: 'Гігієнічний догляд та кігті', durationMinutes: 45, basePrice: 400 },
+				{ id: 'p_3', name: 'Експрес-линька', durationMinutes: 60, basePrice: 600 }
+			],
+			schedule: {
+				startHour: '10:00',
+				endHour: '19:00',
+				slotDurationMinutes: 60,
+				workDays: 'mon_sat',
+				depositAmount: 200,
+				calendarSyncUrl: ''
+			}
+		},
 		cta_text: 'Сплатити прийом'
 	},
 	vertical_rental: {
@@ -247,6 +327,25 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		allow_promo: true,
 		allow_delivery: true,
 		allow_upsell: true,
+		flow_data: {
+			categories: [
+				{ id: 'r_camp', title: 'Туризм та кемпінг', subtitle: 'Намети, спальники', icon: '⛺', modifier: 1.0 },
+				{ id: 'r_water', title: 'Водний спорт', subtitle: 'Сапборди, байдарки', icon: '🏄', modifier: 1.2 }
+			],
+			services: [
+				{ id: 'rent_1', name: 'Намет 2-місний туристичний', durationMinutes: 1440, basePrice: 350 },
+				{ id: 'rent_2', name: 'Сапборд надувний у комплекті', durationMinutes: 1440, basePrice: 500 },
+				{ id: 'rent_3', name: 'Спальний мішок демісезонний', durationMinutes: 1440, basePrice: 150 }
+			],
+			schedule: {
+				startHour: '09:00',
+				endHour: '19:00',
+				slotDurationMinutes: 60,
+				workDays: 'everyday',
+				depositAmount: 500,
+				calendarSyncUrl: ''
+			}
+		},
 		cta_text: 'Оплатити оренду'
 	},
 	vertical_education: {
@@ -254,6 +353,25 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		allow_loyalty: false,
 		allow_promo: true,
 		allow_upsell: true,
+		flow_data: {
+			categories: [
+				{ id: 'tutor_1', title: 'Марія — Англійська (B1-C1)', subtitle: 'Розмовна практика', icon: '👩‍🏫', modifier: 1.0 },
+				{ id: 'tutor_2', title: 'Олександр — НМТ / IELTS', subtitle: 'Підготовка до іспитів', icon: '👨‍🏫', modifier: 1.25 }
+			],
+			services: [
+				{ id: 'edu_1', name: 'Пробне заняття (45 хв)', durationMinutes: 45, basePrice: 250 },
+				{ id: 'edu_2', name: 'Індивідуальний урок (60 хв)', durationMinutes: 60, basePrice: 500 },
+				{ id: 'edu_3', name: 'Курс / Абонемент (8 уроків)', durationMinutes: 60, basePrice: 3600 }
+			],
+			schedule: {
+				startHour: '10:00',
+				endHour: '20:00',
+				slotDurationMinutes: 60,
+				workDays: 'everyday',
+				depositAmount: 250,
+				calendarSyncUrl: ''
+			}
+		},
 		cta_text: 'Оплатити заняття'
 	},
 	vertical_services: {
@@ -261,6 +379,25 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		allow_promo: true,
 		allow_tips: true,
 		allow_upsell: true,
+		flow_data: {
+			categories: [
+				{ id: 's_plumb', title: 'Сантехніка', subtitle: 'Крані, труби, сифони', icon: '🚰', modifier: 1.0 },
+				{ id: 's_electr', title: 'Електрика', subtitle: 'Розетки, щитки, люстри', icon: '⚡', modifier: 1.2 }
+			],
+			services: [
+				{ id: 's_1', name: 'Діагностика та дрібний ремонт', durationMinutes: 45, basePrice: 350 },
+				{ id: 's_2', name: 'Встановлення або заміна змішувача', durationMinutes: 60, basePrice: 500 },
+				{ id: 's_3', name: 'Монтаж розетки / вимикача', durationMinutes: 30, basePrice: 200 }
+			],
+			schedule: {
+				startHour: '09:00',
+				endHour: '19:00',
+				slotDurationMinutes: 45,
+				workDays: 'mon_sat',
+				depositAmount: 200,
+				calendarSyncUrl: ''
+			}
+		},
 		cta_text: 'Сплатити послугу'
 	},
 	vertical_delivery: {

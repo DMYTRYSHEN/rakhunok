@@ -19,6 +19,9 @@
 	import type { CheckoutScenarioConfig } from '$lib/features/shared/checkout-scenario-config';
 	import FuelStationTemplatePreview from './FuelStationTemplatePreview.svelte';
 	import AutoServiceTemplatePreview from './AutoServiceTemplatePreview.svelte';
+	import FoodOrderTemplatePreview from './FoodOrderTemplatePreview.svelte';
+	import FlowerGiftTemplatePreview from './FlowerGiftTemplatePreview.svelte';
+	import CourierDeliveryTemplatePreview from './CourierDeliveryTemplatePreview.svelte';
 	import {
 		buildCheckoutPreviewModel,
 		type CheckoutPreviewStep,
@@ -45,6 +48,37 @@
 	let loyaltyApplied = $state(false);
 	let fuelStationAmount = $state(1190);
 	let autoServiceAmount = $state(200);
+	let foodAmount = $state(430);
+	let flowerAmount = $state(1050);
+	let courierAmount = $state(200);
+
+	const isBookingScenario = (s: string) => [
+		'vertical_auto',
+		'vertical_education',
+		'vertical_beauty',
+		'vertical_cleaning',
+		'vertical_pets',
+		'vertical_rental',
+		'vertical_services',
+		'engine_book'
+	].includes(s);
+
+	const isFoodScenario = (s: string) => [
+		'vertical_food',
+		'engine_order',
+		'engine_buy'
+	].includes(s);
+
+	const isFlowerScenario = (s: string) => [
+		'vertical_flowers',
+		'vertical_gifts',
+		'vertical_print'
+	].includes(s);
+
+	const isCourierScenario = (s: string) => [
+		'vertical_delivery',
+		'engine_deliver'
+	].includes(s);
 
 	const previewBanks = [
 		{ name: 'Monobank', code: 'UNJS', background: 'linear-gradient(135deg, #050505, #343438)' },
@@ -61,9 +95,15 @@
 	const paymentAmount = $derived(
 		scenario === 'fuel_station'
 			? fuelStationAmount
-			: scenario === 'vertical_auto' || scenario === 'engine_book'
+			: isBookingScenario(scenario)
 				? autoServiceAmount
-				: total
+				: isFoodScenario(scenario)
+					? foodAmount
+					: isFlowerScenario(scenario)
+						? flowerAmount
+						: isCourierScenario(scenario)
+							? courierAmount
+							: total
 	);
 	const theme = $derived(model.config.theme === 'light' ? 'light' : 'dark');
 
@@ -121,12 +161,18 @@
 			<div class="secure"><ShieldCheck size={13} /> Захищено</div>
 		</header>
 
-		<main class:dimmed={paymentSheetOpen} class:fuel-main={scenario === 'fuel_station' || scenario === 'vertical_auto' || scenario === 'engine_book'}>
+		<main class:dimmed={paymentSheetOpen} class:fuel-main={scenario === 'fuel_station' || isBookingScenario(scenario) || isFoodScenario(scenario) || isFlowerScenario(scenario) || isCourierScenario(scenario)}>
 			{#if step === 'checkout'}
 				{#if scenario === 'fuel_station'}
 					<FuelStationTemplatePreview onPay={openFuelStationPayment} />
-				{:else if scenario === 'vertical_auto' || scenario === 'engine_book'}
-					<AutoServiceTemplatePreview onPay={openAutoServicePayment} flowData={config.flow_data} />
+				{:else if isBookingScenario(scenario)}
+					<AutoServiceTemplatePreview {scenario} onPay={openAutoServicePayment} flowData={config.flow_data} />
+				{:else if isFoodScenario(scenario)}
+					<FoodOrderTemplatePreview {scenario} onPay={(amt) => { foodAmount = amt; selectStep('payment'); }} />
+				{:else if isFlowerScenario(scenario)}
+					<FlowerGiftTemplatePreview {scenario} onPay={(amt) => { flowerAmount = amt; selectStep('payment'); }} />
+				{:else if isCourierScenario(scenario)}
+					<CourierDeliveryTemplatePreview {scenario} onPay={(amt) => { courierAmount = amt; selectStep('payment'); }} />
 				{:else}
 					<section class="hero">
 						<span class="eyebrow">{model.contextLabel}</span>
@@ -276,20 +322,41 @@
 					<p>{model.contextLabel}</p>
 				</section>
 
-				{#if scenario === 'vertical_auto' || scenario === 'engine_book'}
+				{#if isBookingScenario(scenario)}
 					<section class="feature feature-center">
 						<div class="booking-receipt">
 							<strong class="text-xs text-emerald-400">Слот зафіксовано за клієнтом</strong>
-							<span class="text-[11px] text-zinc-300">Завдаток: {autoServiceAmount} ₴ · СТО Профі Авто</span>
+							<span class="text-[11px] text-zinc-300">Завдаток: {autoServiceAmount} ₴ · {model.merchantName}</span>
 						</div>
 						<a
-							href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=%D0%A8%D0%B8%D0%BD%D0%BE%D0%BC%D0%BE%D0%BD%D1%82%D0%B0%D0%B6+%D0%A1%D0%A2%D0%9E&details=%D0%97%D0%B0%D0%BF%D0%B8%D1%81+%D0%BD%D0%B0+%D1%88%D0%B8%D0%BD%D0%BE%D0%BC%D0%BE%D0%BD%D1%82%D0%B0%D0%B6.+%D0%97%D0%B0%D0%B2%D0%B4%D0%B0%D1%82%D0%BE%D0%BA+%D1%81%D0%BF%D0%BB%D0%B0%D1%87%D0%B5%D0%BD%D0%BE."
+							href="https://calendar.google.com/calendar/render?action=TEMPLATE&text={encodeURIComponent(model.merchantName + ': ' + model.contextLabel)}&details={encodeURIComponent('Запис успішно підтверджено та внесено завдаток через Rahunok.')}"
 							target="_blank"
 							rel="noreferrer"
 							class="calendar-add-btn"
 						>
 							<Calendar size={14} /> Додати в Google Calendar
 						</a>
+					</section>
+				{:else if isFoodScenario(scenario)}
+					<section class="feature feature-center">
+						<div class="booking-receipt">
+							<strong class="text-xs text-orange-400">Кухня вже готує ваше замовлення!</strong>
+							<span class="text-[11px] text-zinc-300">Орієнтовний час доставки: 35-45 хв · {foodAmount} ₴</span>
+						</div>
+					</section>
+				{:else if isFlowerScenario(scenario)}
+					<section class="feature feature-center">
+						<div class="booking-receipt">
+							<strong class="text-xs text-pink-400">Флорист збирає свіжу композицію</strong>
+							<span class="text-[11px] text-zinc-300">Кур’єр доставить у вказаний інтервал · {flowerAmount} ₴</span>
+						</div>
+					</section>
+				{:else if isCourierScenario(scenario)}
+					<section class="feature feature-center">
+						<div class="booking-receipt">
+							<strong class="text-xs text-blue-400">Кур’єра призначено на маршрут</strong>
+							<span class="text-[11px] text-zinc-300">Очікуйте прибуття кур’єра · {courierAmount} ₴</span>
+						</div>
 					</section>
 				{/if}
 				{#if model.config.allow_nps_review}

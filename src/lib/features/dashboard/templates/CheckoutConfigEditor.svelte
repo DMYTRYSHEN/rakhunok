@@ -45,7 +45,7 @@
 		</div>
 	{/if}
 
-	{#if scenario === 'vertical_auto' || scenario === 'engine_book' || scenario === 'vertical_beauty' || scenario === 'vertical_pets'}
+	{#if ['vertical_auto', 'vertical_education', 'vertical_beauty', 'vertical_cleaning', 'vertical_pets', 'vertical_rental', 'vertical_services', 'engine_book'].includes(scenario)}
 		<div class="mb-4 rounded-md border border-emerald-200 bg-emerald-50/80 p-3.5 text-sm text-emerald-950">
 			<div class="flex items-center gap-2">
 				<span class="text-base">📅</span>

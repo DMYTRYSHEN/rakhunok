@@ -254,7 +254,7 @@
 					</label>
 				</section>
 
-				{#if scenarioType === 'vertical_auto' || scenarioType === 'engine_book' || scenarioType === 'vertical_beauty' || scenarioType === 'vertical_pets' || scenarioType === 'vertical_services'}
+				{#if ['vertical_auto', 'vertical_education', 'vertical_beauty', 'vertical_cleaning', 'vertical_pets', 'vertical_rental', 'vertical_services', 'engine_book'].includes(scenarioType)}
 					<section aria-labelledby="template-flow-builder" class="mt-8 border-t border-zinc-200 pt-6">
 						<div class="mb-2">
 							<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">Конфігуратор послуг</p>
