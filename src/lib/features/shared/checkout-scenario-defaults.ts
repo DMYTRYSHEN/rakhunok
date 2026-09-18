@@ -339,26 +339,123 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		allow_tips: true,
 		allow_upsell: true,
 		flow_data: {
-			categories: [
-				{ id: 'pet_cat', title: 'Котик', subtitle: 'Усі породи', icon: '🐱', modifier: 1.0 },
-				{ id: 'pet_small', title: 'Собака до 5 кг', subtitle: 'Йорк, шпіц, мальтезе', icon: '🐶', modifier: 1.0 },
-				{ id: 'pet_med', title: 'Собака 5–15 кг', subtitle: 'Коргі, кокер, пудель', icon: '🐕', modifier: 1.3 }
+			studioName: 'Happy Paws Грумінг',
+			title: 'Салон краси та догляду для тварин',
+			description: 'Комплексний грумінг, купання, експрес-линька та СПА-догляд',
+			contacts: {
+				phone: '+380 67 111 22 33',
+				instagram: '@happypaws.groom',
+				address: 'вул. Саксаганського, 42'
+			},
+			modes: {
+				bookingEnabled: true,
+				inSalonPayEnabled: true,
+				bookingButtonText: 'Записати улюбленця',
+				inSalonButtonText: 'Оплатити в салоні'
+			},
+			supportedPets: ['dog', 'cat'],
+			weightTiers: [
+				{ id: 'under_5', label: 'до 5 кг включно', maxWeightKg: 5, basePrice: 700 },
+				{ id: '5_to_10', label: 'понад 5 до 10 кг включно', maxWeightKg: 10, basePrice: 900 },
+				{ id: '10_to_20', label: 'понад 10 до 20 кг включно', maxWeightKg: 20, basePrice: 1200 }
 			],
 			services: [
-				{ id: 'p_1', name: 'Комплексний грумінг (купання + стрижка)', durationMinutes: 90, basePrice: 750 },
-				{ id: 'p_2', name: 'Гігієнічний догляд та кігті', durationMinutes: 45, basePrice: 400 },
-				{ id: 'p_3', name: 'Експрес-линька', durationMinutes: 60, basePrice: 600 }
+				{
+					id: 'srv_complex',
+					name: 'Комплексний грумінг (купання + стрижка)',
+					petTypes: ['dog', 'cat'],
+					requiresCoatDetails: true,
+					weightTierPrices: {
+						under_5: 700,
+						'5_to_10': 900,
+						'10_to_20': 1200
+					},
+					durationMinutes: 90
+				},
+				{
+					id: 'srv_bath',
+					name: 'Купання та сушка',
+					petTypes: ['dog', 'cat'],
+					requiresCoatDetails: true,
+					weightTierPrices: {
+						under_5: 450,
+						'5_to_10': 600,
+						'10_to_20': 800
+					},
+					durationMinutes: 60
+				},
+				{
+					id: 'srv_deshed',
+					name: 'Експрес-линька / Вичісування',
+					petTypes: ['dog', 'cat'],
+					requiresCoatDetails: true,
+					weightTierPrices: {
+						under_5: 600,
+						'5_to_10': 800,
+						'10_to_20': 1100
+					},
+					durationMinutes: 75
+				},
+				{
+					id: 'srv_nails',
+					name: 'Стрижка кігтів та догляд лапок',
+					petTypes: ['dog', 'cat'],
+					requiresCoatDetails: false,
+					weightTierPrices: {},
+					fixedPrice: 150,
+					durationMinutes: 15
+				}
 			],
-			schedule: {
-				startHour: '10:00',
-				endHour: '19:00',
-				slotDurationMinutes: 60,
-				workDays: 'mon_sat',
-				depositAmount: 200,
-				calendarSyncUrl: ''
+			coatOptions: [
+				{ id: 'short', label: 'Коротка шерсть', extraPrice: 0 },
+				{ id: 'medium', label: 'Середня шерсть', extraPrice: 100 },
+				{ id: 'long', label: 'Довга шерсть', extraPrice: 200 }
+			],
+			addons: [
+				{
+					id: 'add_spa',
+					name: 'Додаткова доглядова процедура (СПА)',
+					description: 'Гідромасажна ванна та шовкова маска',
+					price: 150
+				},
+				{
+					id: 'add_teeth',
+					name: 'Ультразвукове чищення зубів',
+					description: 'Гігієнічне зняття нальоту без наркозу',
+					price: 250
+				}
+			],
+			masters: [
+				{
+					id: 'm_natali',
+					name: 'Топ-грумер Наталія',
+					role: 'Стиліст котів та собак',
+					extraPrice: 0,
+					allowedPetTypes: ['dog', 'cat']
+				},
+				{
+					id: 'm_oleg',
+					name: 'Грумер Олег',
+					role: 'Майстер великих порід',
+					extraPrice: 100,
+					allowedPetTypes: ['dog']
+				}
+			],
+			autoApproval: {
+				enabled: true,
+				noticeText: 'Автопогодження діє для стандартних заявок без ковтунів'
+			},
+			paymentModel: {
+				type: 'percent',
+				percentValue: 30,
+				fixedAmount: 200
+			},
+			approval: {
+				channel: 'telegram',
+				responseTimeNotice: 'до 15 хвилин'
 			}
 		},
-		cta_text: 'Сплатити прийом'
+		cta_text: 'Записати улюбленця'
 	},
 	vertical_rental: {
 		checkout_flow: { id: 'vertical_rental', version: 1, invoice_type: 'fixed' },

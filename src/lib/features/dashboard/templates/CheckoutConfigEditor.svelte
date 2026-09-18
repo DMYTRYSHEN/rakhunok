@@ -2,6 +2,7 @@
 	import type { CheckoutScenarioConfig } from '$lib/features/shared/checkout-scenario-config';
 	import FlowDataBuilder from '../business-settings/templates/FlowDataBuilder.svelte';
 	import BeautyStudioConfigEditor from '../business-settings/templates/BeautyStudioConfigEditor.svelte';
+	import GroomingStudioConfigEditor from '../business-settings/templates/GroomingStudioConfigEditor.svelte';
 	import { Plus, Trash2 } from '@lucide/svelte';
 
 	let {
@@ -66,7 +67,22 @@
 			</div>
 			<BeautyStudioConfigEditor bind:flowData={config.flow_data} />
 		</div>
-	{:else if ['vertical_auto', 'vertical_education', 'vertical_cleaning', 'vertical_pets', 'vertical_rental', 'vertical_services', 'engine_book'].includes(scenario)}
+	{:else if scenario === 'vertical_pets'}
+		<div class="mb-6 rounded-xl border border-amber-200 bg-white p-4 shadow-xs">
+			<div class="mb-3">
+				<p class="text-xs font-bold tracking-wider text-amber-700 uppercase">
+					Конфігуратор Грумінг-Салону
+				</p>
+				<h4 class="text-sm font-bold text-zinc-900">
+					Вагові категорії, шерсть, ковтуни (оцінка vs точна ціна) та майстри
+				</h4>
+				<p class="mt-0.5 text-xs text-zinc-500">
+					Налаштуйте прайс за вагою тварини, доплати за довжину шерсті, попередню оцінку при ковтунах та передоплату.
+				</p>
+			</div>
+			<GroomingStudioConfigEditor bind:flowData={config.flow_data} />
+		</div>
+	{:else if ['vertical_auto', 'vertical_education', 'vertical_cleaning', 'vertical_rental', 'vertical_services', 'engine_book'].includes(scenario)}
 		<div class="mb-6 rounded-xl border border-zinc-200 bg-white p-4 shadow-xs">
 			<div class="mb-3">
 				<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">

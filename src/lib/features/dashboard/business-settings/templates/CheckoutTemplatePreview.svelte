@@ -20,6 +20,7 @@
 	import FuelStationTemplatePreview from './FuelStationTemplatePreview.svelte';
 	import AutoServiceTemplatePreview from './AutoServiceTemplatePreview.svelte';
 	import BeautyStudioTemplatePreview from './BeautyStudioTemplatePreview.svelte';
+	import GroomingTemplatePreview from './GroomingTemplatePreview.svelte';
 	import FoodOrderTemplatePreview from './FoodOrderTemplatePreview.svelte';
 	import FlowerGiftTemplatePreview from './FlowerGiftTemplatePreview.svelte';
 	import CourierDeliveryTemplatePreview from './CourierDeliveryTemplatePreview.svelte';
@@ -168,6 +169,8 @@
 					<FuelStationTemplatePreview onPay={openFuelStationPayment} />
 				{:else if scenario === 'vertical_beauty'}
 					<BeautyStudioTemplatePreview flowData={config.flow_data} onPay={openAutoServicePayment} />
+				{:else if scenario === 'vertical_pets'}
+					<GroomingTemplatePreview flowData={config.flow_data} onPay={openAutoServicePayment} />
 				{:else if isBookingScenario(scenario)}
 					<AutoServiceTemplatePreview {scenario} onPay={openAutoServicePayment} flowData={config.flow_data} />
 				{:else if isFoodScenario(scenario)}

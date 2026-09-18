@@ -209,3 +209,77 @@ export interface BeautyStudioFlowData {
 	};
 	[key: string]: unknown;
 }
+
+// ── Grooming Scenario Contract ─────────────────────────────────
+export type GroomingPetType = 'dog' | 'cat';
+export type GroomingCoatLength = 'short' | 'medium' | 'long';
+export type GroomingCoatCondition = 'clean' | 'matted' | 'unsure';
+
+export interface GroomingWeightTier {
+	id: string;
+	label: string; // "до 5 кг включно", "понад 5 до 10 кг включно", "понад 10 до 20 кг включно"
+	maxWeightKg: number; // 5, 10, 20
+	basePrice: number; // 700, 900, 1200
+}
+
+export interface GroomingService {
+	id: string;
+	name: string;
+	petTypes: GroomingPetType[];
+	requiresCoatDetails: boolean; // чи потрібні запитання про довжину шерсті та стан ковтунів
+	weightTierPrices: Record<string, number>; // tierId -> price
+	fixedPrice?: number; // для послуг без градації ваги (наприклад стрижка кігтів)
+	durationMinutes: number;
+}
+
+export interface GroomingAddon {
+	id: string;
+	name: string;
+	description?: string;
+	price: number;
+}
+
+export interface GroomingMaster {
+	id: string;
+	name: string;
+	role: string;
+	extraPrice: number;
+	allowedPetTypes: GroomingPetType[];
+}
+
+export interface GroomingStudioFlowData {
+	studioName?: string;
+	title?: string;
+	description?: string;
+	contacts?: {
+		phone?: string;
+		instagram?: string;
+		address?: string;
+	};
+	modes: {
+		bookingEnabled: boolean;
+		inSalonPayEnabled: boolean;
+		bookingButtonText?: string;
+		inSalonButtonText?: string;
+	};
+	supportedPets: GroomingPetType[];
+	weightTiers: GroomingWeightTier[];
+	services: GroomingService[];
+	coatOptions: Array<{ id: GroomingCoatLength; label: string; extraPrice: number }>;
+	addons: GroomingAddon[];
+	masters: GroomingMaster[];
+	autoApproval: {
+		enabled: boolean;
+		noticeText?: string;
+	};
+	paymentModel: {
+		type: 'none' | 'fixed' | 'percent' | 'full';
+		percentValue?: number;
+		fixedAmount?: number;
+	};
+	approval: {
+		channel: 'telegram' | 'dashboard';
+		responseTimeNotice?: string;
+	};
+	[key: string]: unknown;
+}
