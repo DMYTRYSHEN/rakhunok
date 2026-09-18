@@ -108,7 +108,8 @@ export const CHECKOUT_TEMPLATE_SCENARIOS = [
 	'vertical_services',
 	'vertical_delivery',
 	'vertical_print',
-	'vertical_gifts'
+	'vertical_gifts',
+	'vertical_events'
 ] as const;
 export type CheckoutTemplateScenario = (typeof CHECKOUT_TEMPLATE_SCENARIOS)[number];
 
@@ -540,6 +541,78 @@ export interface GiftsFlowData {
 		depositType: 'percent' | 'full';
 		depositValue: number; // e.g. 50
 		allowRemainingOnDelivery: boolean;
+	};
+	[key: string]: unknown;
+}
+
+// ==========================================
+// Vertical: Events / Cinema / Tickets (vertical_events)
+// ==========================================
+
+export type EventType = 'cinema' | 'concert_seated' | 'concert_open' | 'theater';
+
+export interface EventSeatCategory {
+	id: string;
+	name: string;
+	price: number;
+	color: string;
+	description?: string;
+}
+
+export interface EventSeat {
+	id: string; // e.g. "R1-S5"
+	row: number;
+	seat: number;
+	categoryId: string; // matches EventSeatCategory.id
+	status: 'available' | 'reserved' | 'sold' | 'disabled';
+}
+
+export interface EventHall {
+	id: string;
+	name: string;
+	type: 'seated' | 'open_zone';
+	screenOrStageLabel?: string; // e.g. "Екран", "Сцена"
+	rowsCount?: number;
+	seatsPerRow?: number;
+	capacity: number;
+	categories: EventSeatCategory[];
+	seats?: EventSeat[];
+}
+
+export interface EventSession {
+	id: string;
+	eventTitle: string;
+	format?: string; // 2D, 3D, IMAX, Live
+	language?: string; // "Український дубляж"
+	hallId: string; // Strictly links to hall
+	date: string; // YYYY-MM-DD
+	time: string; // HH:mm
+	durationMinutes: number;
+	ageRating?: string; // "12+", "16+", "18+"
+}
+
+export interface EventsFlowData {
+	venueName?: string;
+	address?: string;
+	description?: string;
+	contacts?: {
+		phone?: string;
+		telegram?: string;
+		email?: string;
+	};
+	sessions: EventSession[];
+	halls: EventHall[];
+	serviceFeePerTicket: number; // e.g. 20 ₴
+	reservationHoldMinutes: number; // e.g. 10 minutes
+	maxTicketsPerOrder: number; // e.g. 6
+	allowCashierMode: boolean;
+	allowRefunds: boolean;
+	refundNotice?: string;
+	approval: {
+		autoApprovalEnabled: boolean;
+		requireManualForGroupBooking: boolean;
+		groupBookingMinSeats: number;
+		telegramChat?: string;
 	};
 	[key: string]: unknown;
 }

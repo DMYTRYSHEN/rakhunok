@@ -6,6 +6,7 @@
 	import FlowerShopConfigEditor from '../business-settings/templates/FlowerShopConfigEditor.svelte';
 	import CleaningConfigEditor from '../business-settings/templates/CleaningConfigEditor.svelte';
 	import GiftsConfigEditor from '../business-settings/templates/GiftsConfigEditor.svelte';
+	import EventsConfigEditor from '../business-settings/templates/EventsConfigEditor.svelte';
 	import { Plus, Trash2 } from '@lucide/svelte';
 
 	let {
@@ -129,6 +130,21 @@
 				</p>
 			</div>
 			<GiftsConfigEditor bind:flowData={config.flow_data} />
+		</div>
+	{:else if scenario === 'vertical_events'}
+		<div class="mb-6 rounded-xl border border-sky-200 bg-white p-4 shadow-xs">
+			<div class="mb-3">
+				<p class="text-xs font-bold tracking-wider text-sky-700 uppercase">
+					Конфігуратор Концертів, Кіно та Квитків
+				</p>
+				<h4 class="text-sm font-bold text-zinc-900">
+					Сеанси, схеми залів, тарифи (250 ₴ / 350 ₴), сервісний збір (20 ₴) та таймер резерву
+				</h4>
+				<p class="mt-0.5 text-xs text-zinc-500">
+					Налаштуйте розклад сеансів, прив'язку до залів, місткість, категорії місць та правила контролю на вході.
+				</p>
+			</div>
+			<EventsConfigEditor bind:flowData={config.flow_data} />
 		</div>
 	{:else if ['vertical_auto', 'vertical_education', 'vertical_rental', 'vertical_services', 'engine_book'].includes(scenario)}
 		<div class="mb-6 rounded-xl border border-zinc-200 bg-white p-4 shadow-xs">

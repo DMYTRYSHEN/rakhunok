@@ -958,6 +958,174 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 				allowRemainingOnDelivery: true
 			}
 		}
+	},
+	vertical_events: {
+		checkout_flow: { id: 'vertical_events', version: 1, invoice_type: 'fixed' },
+		allow_promo: true,
+		allow_delivery: false,
+		allow_upsell: true,
+		cta_text: 'Купити квитки',
+		flow_data: {
+			venueName: 'Кіноконцертний комплекс «Олімп»',
+			address: 'м. Київ, вул. Велика Васильківська, 55',
+			description: 'Сучасні кінозали з лазерною проекцією та концертний хол з акустикою Meyer Sound',
+			contacts: {
+				phone: '+380 44 222 11 00',
+				telegram: '@olymp_tickets_bot',
+				email: 'tickets@olymp.kiev.ua'
+			},
+			serviceFeePerTicket: 20,
+			reservationHoldMinutes: 10,
+			maxTicketsPerOrder: 6,
+			allowCashierMode: true,
+			allowRefunds: true,
+			refundNotice: 'Повернення можливе не пізніше ніж за 2 години до початку сеансу',
+			sessions: [
+				{
+					id: 'sess_1',
+					eventTitle: 'Дюна: Частина Друга (Laser)',
+					format: '2D Laser',
+					language: 'Український дубляж',
+					hallId: 'hall_1',
+					date: '2026-09-22',
+					time: '19:30',
+					durationMinutes: 165,
+					ageRating: '16+'
+				},
+				{
+					id: 'sess_2',
+					eventTitle: 'Симфонія Всесвіту — Hans Zimmer Tribute',
+					format: 'Live Concert',
+					language: 'Живе виконання',
+					hallId: 'hall_1',
+					date: '2026-09-23',
+					time: '20:00',
+					durationMinutes: 120,
+					ageRating: '12+'
+				},
+				{
+					id: 'sess_3',
+					eventTitle: 'Indie Wave Festival 2026',
+					format: 'Open Air Festival',
+					language: 'Live Sound',
+					hallId: 'hall_2',
+					date: '2026-09-26',
+					time: '18:00',
+					durationMinutes: 240,
+					ageRating: '16+'
+				}
+			],
+			halls: [
+				{
+					id: 'hall_1',
+					name: 'Зал 1 — Premier Screen',
+					type: 'seated',
+					screenOrStageLabel: '🎬 ЕКРАН',
+					rowsCount: 5,
+					seatsPerRow: 8,
+					capacity: 40,
+					categories: [
+						{
+							id: 'cat_standard',
+							name: 'Стандартне місце',
+							price: 250,
+							color: '#3b82f6',
+							description: 'Зручні крісла, ряди 1–3'
+						},
+						{
+							id: 'cat_premium',
+							name: 'Преміальне місце',
+							price: 350,
+							color: '#eab308',
+							description: 'Шкіряні реклайнери, ряди 4–5'
+						}
+					],
+					seats: [
+						// Row 1 (Standard)
+						{ id: 'R1-S1', row: 1, seat: 1, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R1-S2', row: 1, seat: 2, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R1-S3', row: 1, seat: 3, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R1-S4', row: 1, seat: 4, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R1-S5', row: 1, seat: 5, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R1-S6', row: 1, seat: 6, categoryId: 'cat_standard', status: 'sold' },
+						{ id: 'R1-S7', row: 1, seat: 7, categoryId: 'cat_standard', status: 'sold' },
+						{ id: 'R1-S8', row: 1, seat: 8, categoryId: 'cat_standard', status: 'available' },
+						// Row 2 (Standard)
+						{ id: 'R2-S1', row: 2, seat: 1, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R2-S2', row: 2, seat: 2, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R2-S3', row: 2, seat: 3, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R2-S4', row: 2, seat: 4, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R2-S5', row: 2, seat: 5, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R2-S6', row: 2, seat: 6, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R2-S7', row: 2, seat: 7, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R2-S8', row: 2, seat: 8, categoryId: 'cat_standard', status: 'available' },
+						// Row 3 (Standard)
+						{ id: 'R3-S1', row: 3, seat: 1, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R3-S2', row: 3, seat: 2, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R3-S3', row: 3, seat: 3, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R3-S4', row: 3, seat: 4, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R3-S5', row: 3, seat: 5, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R3-S6', row: 3, seat: 6, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R3-S7', row: 3, seat: 7, categoryId: 'cat_standard', status: 'available' },
+						{ id: 'R3-S8', row: 3, seat: 8, categoryId: 'cat_standard', status: 'available' },
+						// Row 4 (Premium)
+						{ id: 'R4-S1', row: 4, seat: 1, categoryId: 'cat_premium', status: 'available' },
+						{ id: 'R4-S2', row: 4, seat: 2, categoryId: 'cat_premium', status: 'available' },
+						{ id: 'R4-S3', row: 4, seat: 3, categoryId: 'cat_premium', status: 'available' },
+						{ id: 'R4-S4', row: 4, seat: 4, categoryId: 'cat_premium', status: 'available' },
+						{ id: 'R4-S5', row: 4, seat: 5, categoryId: 'cat_premium', status: 'sold' },
+						{ id: 'R4-S6', row: 4, seat: 6, categoryId: 'cat_premium', status: 'sold' },
+						{ id: 'R4-S7', row: 4, seat: 7, categoryId: 'cat_premium', status: 'available' },
+						{ id: 'R4-S8', row: 4, seat: 8, categoryId: 'cat_premium', status: 'available' },
+						// Row 5 (Premium)
+						{ id: 'R5-S1', row: 5, seat: 1, categoryId: 'cat_premium', status: 'available' },
+						{ id: 'R5-S2', row: 5, seat: 2, categoryId: 'cat_premium', status: 'available' },
+						{ id: 'R5-S3', row: 5, seat: 3, categoryId: 'cat_premium', status: 'available' },
+						{ id: 'R5-S4', row: 5, seat: 4, categoryId: 'cat_premium', status: 'available' },
+						{ id: 'R5-S5', row: 5, seat: 5, categoryId: 'cat_premium', status: 'available' },
+						{ id: 'R5-S6', row: 5, seat: 6, categoryId: 'cat_premium', status: 'available' },
+						{ id: 'R5-S7', row: 5, seat: 7, categoryId: 'cat_premium', status: 'available' },
+						{ id: 'R5-S8', row: 5, seat: 8, categoryId: 'cat_premium', status: 'available' }
+					]
+				},
+				{
+					id: 'hall_2',
+					name: 'Концертний хол (Фан-зони)',
+					type: 'open_zone',
+					screenOrStageLabel: '🎸 ГОЛОВНА СЦЕНА',
+					capacity: 500,
+					categories: [
+						{
+							id: 'cat_fan1',
+							name: 'Фан-зона 1 (під сценою)',
+							price: 500,
+							color: '#ec4899',
+							description: 'Найближче до виконавців'
+						},
+						{
+							id: 'cat_fan2',
+							name: 'Фан-зона 2 (загальна)',
+							price: 350,
+							color: '#8b5cf6',
+							description: 'Вільний простір, хороший огляд'
+						},
+						{
+							id: 'cat_vip',
+							name: 'VIP Lounge (балкон)',
+							price: 900,
+							color: '#10b981',
+							description: 'Окремий бар, місця за столиками'
+						}
+					]
+				}
+			],
+			approval: {
+				autoApprovalEnabled: true,
+				requireManualForGroupBooking: true,
+				groupBookingMinSeats: 8,
+				telegramChat: '@olymp_tickets_manager'
+			}
+		}
 	}
 };
 

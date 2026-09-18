@@ -58,7 +58,8 @@ const SCENARIO_PRESENTATION: Record<
 	vertical_services: { merchantName: 'Майстер на годину', contextLabel: 'Сантехнічні роботи', amount: 500 },
 	vertical_delivery: { merchantName: 'Експрес Кур’єр', contextLabel: 'Доставка по місту', amount: 180 },
 	vertical_print: { merchantName: 'Print Hub', contextLabel: 'Друк поліграфії', amount: 850 },
-	vertical_gifts: { merchantName: 'Gift Box Studio', contextLabel: 'Подарунковий бокс', amount: 1250 }
+	vertical_gifts: { merchantName: 'Gift Box Studio', contextLabel: 'Подарунковий бокс', amount: 1250 },
+	vertical_events: { merchantName: 'Cinema & Concert Hall', contextLabel: 'Сеанс · Зал 1 · Квитки', amount: 910 }
 };
 
 export function buildCheckoutPreviewModel(
