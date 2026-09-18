@@ -5,16 +5,23 @@ import type {
 import type { PersistedInvoiceType } from '../types';
 
 export function templateInvoiceType(scenario: CheckoutFlowId): PersistedInvoiceType {
-	if (scenario === 'tips') return 'open_amount';
+	if (scenario === 'tips' || scenario === 'open_amount' || scenario === 'fuel_station') {
+		return 'open_amount';
+	}
+	if (scenario === 'table' || scenario === 'engine_split') {
+		return 'table';
+	}
+	if (scenario === 'delivery' || scenario === 'engine_deliver' || scenario === 'vertical_delivery' || scenario === 'vertical_food') {
+		return 'delivery';
+	}
 	if (
 		scenario === 'fixed' ||
-		scenario === 'open_amount' ||
-		scenario === 'table' ||
-		scenario === 'delivery'
+		scenario.startsWith('engine_') ||
+		scenario.startsWith('vertical_')
 	) {
-		return scenario;
+		return 'fixed';
 	}
-	throw new Error(`Checkout flow is not mapped to an invoice type: ${scenario}`);
+	return 'fixed';
 }
 
 export function buildTemplateInvoiceScenario(

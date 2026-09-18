@@ -45,6 +45,53 @@
 		</div>
 	{/if}
 
+	{#if scenario === 'vertical_auto' || scenario === 'engine_book' || scenario === 'vertical_beauty' || scenario === 'vertical_pets'}
+		<div class="mb-4 rounded-md border border-emerald-200 bg-emerald-50/80 p-3.5 text-sm text-emerald-950">
+			<div class="flex items-center gap-2">
+				<span class="text-base">📅</span>
+				<strong class="font-semibold">
+					{scenario === 'vertical_auto' ? 'Запис на СТО / Шиномонтаж' : 'Онлайн-запис та бронювання часу'}
+				</strong>
+			</div>
+			<p class="mt-1 text-xs leading-5 text-emerald-900">
+				Клієнт обирає послугу, параметри (тип авто), дату з інтерактивного календаря та вільний слот часу. 
+				Оплата фіксує бронь за клієнтом та виключає подвійні записи.
+			</p>
+
+			<div class="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 pt-2 border-t border-emerald-200/60">
+				<label class="flex flex-col gap-1">
+					<span class="text-xs font-bold text-emerald-950">Модель оплати</span>
+					<select
+						class="h-9 rounded-md border border-emerald-300 bg-white px-2.5 text-xs text-zinc-900 outline-none focus:border-emerald-600"
+						value={config.flow_data?.booking_payment_mode ?? 'deposit'}
+						onchange={(e) => {
+							const mode = e.currentTarget.value;
+							config.flow_data = { ...(config.flow_data ?? {}), booking_payment_mode: mode };
+						}}
+					>
+						<option value="deposit">Фіксований завдаток (передоплата)</option>
+						<option value="full">Повна вартість обраної послуги</option>
+					</select>
+				</label>
+
+				<label class="flex flex-col gap-1">
+					<span class="text-xs font-bold text-emerald-950">Сума завдатку (₴)</span>
+					<input
+						type="number"
+						min="50"
+						step="50"
+						value={config.flow_data?.deposit_amount ?? 200}
+						oninput={(e) => {
+							const val = Number(e.currentTarget.value);
+							config.flow_data = { ...(config.flow_data ?? {}), deposit_amount: val };
+						}}
+						class="h-9 rounded-md border border-emerald-300 bg-white px-2.5 text-xs text-zinc-900 outline-none focus:border-emerald-600"
+					/>
+				</label>
+			</div>
+		</div>
+	{/if}
+
 	<span class="mb-3 block text-xs font-bold tracking-wider text-zinc-500 uppercase"
 		>Опції екрана платника (UX)</span
 	>

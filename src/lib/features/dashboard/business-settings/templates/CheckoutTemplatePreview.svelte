@@ -17,6 +17,7 @@
 	} from '@lucide/svelte';
 	import type { CheckoutScenarioConfig } from '$lib/features/shared/checkout-scenario-config';
 	import FuelStationTemplatePreview from './FuelStationTemplatePreview.svelte';
+	import AutoServiceTemplatePreview from './AutoServiceTemplatePreview.svelte';
 	import {
 		buildCheckoutPreviewModel,
 		type CheckoutPreviewStep,
@@ -42,6 +43,7 @@
 	let selectedBank = $state(0);
 	let loyaltyApplied = $state(false);
 	let fuelStationAmount = $state(1190);
+	let autoServiceAmount = $state(200);
 
 	const previewBanks = [
 		{ name: 'Monobank', code: 'UNJS', background: 'linear-gradient(135deg, #050505, #343438)' },
@@ -55,7 +57,13 @@
 		promoApplied && model.config.allow_promo ? Number(model.config.promo_discount ?? 0) : 0
 	);
 	const total = $derived(Math.max(0, displayedAmount - discount));
-	const paymentAmount = $derived(scenario === 'fuel_station' ? fuelStationAmount : total);
+	const paymentAmount = $derived(
+		scenario === 'fuel_station'
+			? fuelStationAmount
+			: scenario === 'vertical_auto' || scenario === 'engine_book'
+				? autoServiceAmount
+				: total
+	);
 	const theme = $derived(model.config.theme === 'light' ? 'light' : 'dark');
 
 	function selectStep(next: CheckoutPreviewStep): void {
@@ -88,6 +96,11 @@
 		fuelStationAmount = amount;
 		selectStep('payment');
 	}
+
+	function openAutoServicePayment(amount: number): void {
+		autoServiceAmount = amount;
+		selectStep('payment');
+	}
 </script>
 
 <section class="preview-shell" aria-label="Попередній перегляд чекауту">
@@ -107,10 +120,12 @@
 			<div class="secure"><ShieldCheck size={13} /> Захищено</div>
 		</header>
 
-		<main class:dimmed={paymentSheetOpen} class:fuel-main={scenario === 'fuel_station'}>
+		<main class:dimmed={paymentSheetOpen} class:fuel-main={scenario === 'fuel_station' || scenario === 'vertical_auto' || scenario === 'engine_book'}>
 			{#if step === 'checkout'}
 				{#if scenario === 'fuel_station'}
 					<FuelStationTemplatePreview onPay={openFuelStationPayment} />
+				{:else if scenario === 'vertical_auto' || scenario === 'engine_book'}
+					<AutoServiceTemplatePreview onPay={openAutoServicePayment} />
 				{:else}
 					<section class="hero">
 						<span class="eyebrow">{model.contextLabel}</span>

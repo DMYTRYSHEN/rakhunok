@@ -11,6 +11,7 @@
 		getScenarioDefaults,
 		resolveCheckoutConfig
 	} from '$lib/features/shared/checkout-scenario-defaults';
+	import { templateInvoiceType } from '../../templates/template-invoice';
 	import { Eye, Settings2, X } from '@lucide/svelte';
 	import { onMount, untrack } from 'svelte';
 
@@ -94,6 +95,13 @@
 
 		try {
 			const finalConfig = resolveCheckoutConfig(scenarioType, config);
+			if (!['fixed', 'open_amount', 'table', 'delivery', 'tips'].includes(scenarioType)) {
+				finalConfig.checkout_flow = {
+					id: scenarioType,
+					version: 1,
+					invoice_type: finalConfig.checkout_flow?.invoice_type ?? templateInvoiceType(scenarioType)
+				};
+			}
 			const input: TemplateCreateInput = {
 				name: name.trim(),
 				scenario_type: scenarioType,

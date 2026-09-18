@@ -144,6 +144,7 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 
 	// --- ⚙️ ENGINES ---
 	engine_buy: {
+		checkout_flow: { id: 'engine_buy', version: 1, invoice_type: 'fixed' },
 		allow_loyalty: true,
 		allow_promo: true,
 		allow_delivery: true,
@@ -151,6 +152,7 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		cta_text: 'Оплатити замовлення'
 	},
 	engine_order: {
+		checkout_flow: { id: 'engine_order', version: 1, invoice_type: 'fixed' },
 		allow_loyalty: true,
 		allow_promo: true,
 		allow_delivery: true,
@@ -158,6 +160,7 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		cta_text: 'Замовити та оплатити'
 	},
 	engine_book: {
+		checkout_flow: { id: 'engine_book', version: 1, invoice_type: 'fixed' },
 		allow_loyalty: true,
 		allow_promo: true,
 		allow_delivery: false,
@@ -166,12 +169,14 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		cta_text: 'Забронювати (передоплата)'
 	},
 	engine_quote: {
+		checkout_flow: { id: 'engine_quote', version: 1, invoice_type: 'fixed' },
 		allow_loyalty: false,
 		allow_promo: true,
 		allow_delivery: false,
 		cta_text: 'Оплатити рахунок'
 	},
 	engine_deliver: {
+		checkout_flow: { id: 'engine_deliver', version: 1, invoice_type: 'delivery' },
 		allow_loyalty: false,
 		allow_promo: true,
 		allow_delivery: true,
@@ -179,6 +184,7 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		cta_text: 'Оплатити доставку'
 	},
 	engine_split: {
+		checkout_flow: { id: 'engine_split', version: 1, invoice_type: 'table' },
 		allow_split: true,
 		allow_tips: true,
 		allow_loyalty: true,
@@ -187,6 +193,7 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 
 	// --- 🚀 VERTICALS ---
 	vertical_food: {
+		checkout_flow: { id: 'vertical_food', version: 1, invoice_type: 'delivery' },
 		allow_loyalty: true,
 		allow_promo: true,
 		allow_delivery: true,
@@ -195,35 +202,40 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		cta_text: 'Оплатити замовлення'
 	},
 	vertical_flowers: {
+		checkout_flow: { id: 'vertical_flowers', version: 1, invoice_type: 'fixed' },
 		allow_loyalty: true,
 		allow_promo: true,
 		allow_delivery: true,
 		allow_tips: true,
-		allow_upsell: true, // Listivky, etc.
+		allow_upsell: true,
 		cta_text: 'Замовити букет'
 	},
 	vertical_auto: {
+		checkout_flow: { id: 'vertical_auto', version: 1, invoice_type: 'fixed' },
 		allow_loyalty: true,
 		allow_promo: false,
 		allow_delivery: false,
-		allow_upsell: true, // Zapasni chastyny
+		allow_upsell: true,
 		cta_text: 'Сплатити послуги'
 	},
 	vertical_beauty: {
+		checkout_flow: { id: 'vertical_beauty', version: 1, invoice_type: 'fixed' },
 		allow_loyalty: true,
 		allow_promo: true,
 		allow_tips: true,
-		allow_upsell: true, // Kosmetyka
+		allow_upsell: true,
 		cta_text: 'Підтвердити запис'
 	},
 	vertical_cleaning: {
+		checkout_flow: { id: 'vertical_cleaning', version: 1, invoice_type: 'fixed' },
 		allow_promo: true,
 		allow_delivery: false,
 		allow_tips: true,
-		allow_upsell: true, // Vikna, duhovka
+		allow_upsell: true,
 		cta_text: 'Замовити клінінг'
 	},
 	vertical_pets: {
+		checkout_flow: { id: 'vertical_pets', version: 1, invoice_type: 'fixed' },
 		allow_loyalty: true,
 		allow_promo: true,
 		allow_tips: true,
@@ -231,38 +243,44 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		cta_text: 'Сплатити прийом'
 	},
 	vertical_rental: {
+		checkout_flow: { id: 'vertical_rental', version: 1, invoice_type: 'fixed' },
 		allow_promo: true,
-		allow_delivery: true, // Delivery of equipment
+		allow_delivery: true,
 		allow_upsell: true,
 		cta_text: 'Оплатити оренду'
 	},
 	vertical_education: {
+		checkout_flow: { id: 'vertical_education', version: 1, invoice_type: 'fixed' },
 		allow_loyalty: false,
 		allow_promo: true,
-		allow_upsell: true, // Packages
+		allow_upsell: true,
 		cta_text: 'Оплатити заняття'
 	},
 	vertical_services: {
+		checkout_flow: { id: 'vertical_services', version: 1, invoice_type: 'fixed' },
 		allow_promo: true,
 		allow_tips: true,
 		allow_upsell: true,
 		cta_text: 'Сплатити послугу'
 	},
 	vertical_delivery: {
+		checkout_flow: { id: 'vertical_delivery', version: 1, invoice_type: 'delivery' },
 		allow_promo: true,
 		allow_delivery: true,
 		cta_text: 'Оплатити перевезення'
 	},
 	vertical_print: {
+		checkout_flow: { id: 'vertical_print', version: 1, invoice_type: 'fixed' },
 		allow_promo: true,
 		allow_delivery: true,
-		allow_upsell: true, // Laminaciya, etc.
+		allow_upsell: true,
 		cta_text: 'Оплатити друк'
 	},
 	vertical_gifts: {
+		checkout_flow: { id: 'vertical_gifts', version: 1, invoice_type: 'fixed' },
 		allow_promo: true,
 		allow_delivery: true,
-		allow_upsell: true, // Upakovka
+		allow_upsell: true,
 		cta_text: 'Оплатити подарунок'
 	}
 };
