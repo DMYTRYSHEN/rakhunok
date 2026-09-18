@@ -373,3 +373,75 @@ export interface FlowerShopFlowData {
 	};
 	[key: string]: unknown;
 }
+
+// ── Cleaning Scenario Contract ─────────────────────────────────
+export type CleaningObjectType = 'apartment' | 'house' | 'office' | 'commercial';
+export type CleaningCondition = 'normal' | 'heavy' | 'post_construction' | 'unsure';
+
+export interface CleaningServicePackage {
+	id: string;
+	name: string;
+	description: string;
+	pricePerSqMeter: number;
+	minPrice: number;
+	icon?: string;
+	includedFeatures: string[];
+	excludedFeatures?: string[];
+	requiresInspection?: boolean;
+}
+
+export interface CleaningAddon {
+	id: string;
+	name: string;
+	price: number;
+	unitLabel: string;
+	maxQty?: number;
+	description?: string;
+	icon?: string;
+}
+
+export interface CleaningServiceZone {
+	id: string;
+	name: string;
+	extraFee: number;
+	eta?: string;
+	description?: string;
+}
+
+export interface CleaningFlowData {
+	companyName?: string;
+	tagline?: string;
+	description?: string;
+	contacts?: {
+		phone?: string;
+		telegram?: string;
+		viber?: string;
+		address?: string;
+	};
+	modes: {
+		standardEnabled: boolean;
+		customEstimateEnabled: boolean;
+		finalPayEnabled: boolean;
+		standardButtonText?: string;
+		customButtonText?: string;
+		finalPayButtonText?: string;
+	};
+	propertyTypes: Array<{ id: CleaningObjectType; label: string; icon: string }>;
+	packages: CleaningServicePackage[];
+	addons: CleaningAddon[];
+	zones: CleaningServiceZone[];
+	approval: {
+		autoApprovalEnabled: boolean;
+		requireManualForHeavyCondition: boolean;
+		requireManualForPostConstruction: boolean;
+		telegramChat?: string;
+		responseTimeNotice?: string;
+	};
+	payment: {
+		depositType: 'percent' | 'fixed' | 'full';
+		depositValue: number;
+		allowPostPayRemaining: boolean;
+	};
+	[key: string]: unknown;
+}
+

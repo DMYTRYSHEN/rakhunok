@@ -453,27 +453,147 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		allow_delivery: false,
 		allow_tips: true,
 		allow_upsell: true,
+		cta_text: 'Замовити клінінг',
 		flow_data: {
-			categories: [
-				{ id: 'cl_1', title: '1-кімнатна квартира', subtitle: 'До 45 м²', icon: '🛋️', modifier: 1.0 },
-				{ id: 'cl_2', title: '2-3 кімнатна квартира', subtitle: 'До 85 м²', icon: '🏠', modifier: 1.35 },
-				{ id: 'cl_3', title: 'Приватний будинок', subtitle: 'Від 100 м²', icon: '🏡', modifier: 1.8 }
+			companyName: 'Чистий Дім Клінінг',
+			tagline: 'Професійний клінінг квартир, будинків та офісів',
+			description: 'Генеральне та підтримувальне прибирання, миття вікон та хімчистка меблів',
+			contacts: {
+				phone: '+380 67 555 33 22',
+				telegram: '@clean_kyiv_bot',
+				viber: '+380675553322',
+				address: 'м. Київ, вул. Васильківська, 14'
+			},
+			modes: {
+				standardEnabled: true,
+				customEstimateEnabled: true,
+				finalPayEnabled: true,
+				standardButtonText: 'Розрахувати прибирання',
+				customButtonText: 'Складне прибирання',
+				finalPayButtonText: 'Оплатити залишок'
+			},
+			propertyTypes: [
+				{ id: 'apartment', label: 'Квартира', icon: '🏢' },
+				{ id: 'house', label: 'Приватний будинок', icon: '🏡' },
+				{ id: 'office', label: 'Офіс / Комерція', icon: '💼' }
 			],
-			services: [
-				{ id: 'c_1', name: 'Базове підтримуюче прибирання', durationMinutes: 180, basePrice: 1200 },
-				{ id: 'c_2', name: 'Генеральне еко-прибирання', durationMinutes: 300, basePrice: 2400 },
-				{ id: 'c_3', name: 'Прибирання після ремонту', durationMinutes: 360, basePrice: 3800 }
+			packages: [
+				{
+					id: 'maintenance',
+					name: 'Підтримувальне прибирання',
+					description: 'Знепилення поверхонь, пилосос, вологе миття підлоги, дезінфекція санвузлів',
+					pricePerSqMeter: 35,
+					minPrice: 1200,
+					icon: '✨',
+					includedFeatures: [
+						'Сухе та вологе прибирання підлоги',
+						'Протирання відкритих поверхонь до 1.8 м',
+						'Миття та дезінфекція сантехніки'
+					],
+					excludedFeatures: ['Миття вікон', 'Очищення стійкого жиру в духовці']
+				},
+				{
+					id: 'general',
+					name: 'Генеральне прибирання',
+					description: 'Глибоке очищення від стелі до підлоги, миття кахлю на всю висоту, фасадів та дверей',
+					pricePerSqMeter: 60,
+					minPrice: 2400,
+					icon: '🧼',
+					includedFeatures: [
+						'Глибоке знежирення кухонних зон',
+						'Очищення кахлю, швів та вапняного нальоту',
+						'Миття дверей, плінтусів, розеток, вимикачів'
+					]
+				},
+				{
+					id: 'post_construction',
+					name: 'Після ремонту',
+					description: 'Видалення дрібнодисперсного будівельного пилу, слідів скотчу, ґрунтовки, фарби та затирки',
+					pricePerSqMeter: 85,
+					minPrice: 3500,
+					icon: '🏗️',
+					requiresInspection: true,
+					includedFeatures: [
+						'Робота промисловими пилососами',
+						'Спеціальні розчинники для фарби та цементу',
+						'Миття всіх поверхонь у 3 етапи'
+					]
+				}
 			],
-			schedule: {
-				startHour: '08:00',
-				endHour: '18:00',
-				slotDurationMinutes: 120,
-				workDays: 'everyday',
-				depositAmount: 300,
-				calendarSyncUrl: ''
+			addons: [
+				{
+					id: 'addon_window',
+					name: 'Стандартна віконна стулка (з обох боків)',
+					price: 150,
+					unitLabel: 'стулка',
+					maxQty: 30,
+					description: 'Склопакет, рама, підвіконня та відлив',
+					icon: '🪟'
+				},
+				{
+					id: 'addon_oven',
+					name: 'Духовка всередині (видалення нагару)',
+					price: 300,
+					unitLabel: 'шт',
+					maxQty: 3,
+					description: 'Професійна антижирова термообробка',
+					icon: '🍳'
+				},
+				{
+					id: 'addon_fridge',
+					name: 'Холодильник всередині',
+					price: 250,
+					unitLabel: 'шт',
+					maxQty: 3,
+					description: 'Миття поличок, контейнерів та дезодорація',
+					icon: '🧊'
+				},
+				{
+					id: 'addon_sofa',
+					name: 'Хімчистка прямого дивана',
+					price: 600,
+					unitLabel: 'посадкове місце',
+					maxQty: 5,
+					description: 'Екстракторне видалення плям та запахів',
+					icon: '🛋️'
+				},
+				{
+					id: 'addon_microwave',
+					name: 'Мікрохвильова піч всередині',
+					price: 150,
+					unitLabel: 'шт',
+					maxQty: 3,
+					description: 'Очищення від жиру та залишків їжі',
+					icon: '🍽️'
+				}
+			],
+			zones: [
+				{
+					id: 'zone_a',
+					name: 'Зона А (в межах Києва)',
+					extraFee: 0,
+					description: 'Виїзд бригади включено у вартість'
+				},
+				{
+					id: 'zone_b',
+					name: 'Зона Б (Передмістя до 20 км)',
+					extraFee: 200,
+					description: 'Ірпінь, Буча, Вишгород, Бровари, Бориспіль, Вишневе'
+				}
+			],
+			approval: {
+				autoApprovalEnabled: true,
+				requireManualForHeavyCondition: true,
+				requireManualForPostConstruction: true,
+				telegramChat: '@clean_kyiv_bot',
+				responseTimeNotice: 'до 10-15 хвилин'
+			},
+			payment: {
+				depositType: 'percent',
+				depositValue: 30,
+				allowPostPayRemaining: true
 			}
-		},
-		cta_text: 'Замовити клінінг'
+		}
 	},
 	vertical_pets: {
 		checkout_flow: { id: 'vertical_pets', version: 1, invoice_type: 'fixed' },

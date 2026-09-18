@@ -4,6 +4,7 @@
 	import BeautyStudioConfigEditor from '../business-settings/templates/BeautyStudioConfigEditor.svelte';
 	import GroomingStudioConfigEditor from '../business-settings/templates/GroomingStudioConfigEditor.svelte';
 	import FlowerShopConfigEditor from '../business-settings/templates/FlowerShopConfigEditor.svelte';
+	import CleaningConfigEditor from '../business-settings/templates/CleaningConfigEditor.svelte';
 	import { Plus, Trash2 } from '@lucide/svelte';
 
 	let {
@@ -98,7 +99,22 @@
 			</div>
 			<FlowerShopConfigEditor bind:flowData={config.flow_data} />
 		</div>
-	{:else if ['vertical_auto', 'vertical_education', 'vertical_cleaning', 'vertical_rental', 'vertical_services', 'engine_book'].includes(scenario)}
+	{:else if scenario === 'vertical_cleaning'}
+		<div class="mb-6 rounded-xl border border-cyan-200 bg-white p-4 shadow-xs">
+			<div class="mb-3">
+				<p class="text-xs font-bold tracking-wider text-cyan-800 uppercase">
+					Конфігуратор Клінінгового Сервісу
+				</p>
+				<h4 class="text-sm font-bold text-zinc-900">
+					Тарифи за м², мінімальні чеки, додаткові послуги, зони виїзду та аванс
+				</h4>
+				<p class="mt-0.5 text-xs text-zinc-500">
+					Налаштуйте пакети (підтримувальне, генеральне), доплати за вікна/духовку, правила для сильного забруднення та розмір авансу.
+				</p>
+			</div>
+			<CleaningConfigEditor bind:flowData={config.flow_data} />
+		</div>
+	{:else if ['vertical_auto', 'vertical_education', 'vertical_rental', 'vertical_services', 'engine_book'].includes(scenario)}
 		<div class="mb-6 rounded-xl border border-zinc-200 bg-white p-4 shadow-xs">
 			<div class="mb-3">
 				<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">

@@ -25,6 +25,7 @@
 	import FoodOrderTemplatePreview from './FoodOrderTemplatePreview.svelte';
 	import FlowerGiftTemplatePreview from './FlowerGiftTemplatePreview.svelte';
 	import CourierDeliveryTemplatePreview from './CourierDeliveryTemplatePreview.svelte';
+	import CleaningTemplatePreview from './CleaningTemplatePreview.svelte';
 	import {
 		buildCheckoutPreviewModel,
 		type CheckoutPreviewStep,
@@ -172,6 +173,8 @@
 					<BeautyStudioTemplatePreview flowData={config.flow_data} onPay={openAutoServicePayment} />
 				{:else if scenario === 'vertical_pets'}
 					<GroomingTemplatePreview flowData={config.flow_data} onPay={openAutoServicePayment} />
+				{:else if scenario === 'vertical_cleaning'}
+					<CleaningTemplatePreview flowData={config.flow_data} onPay={openAutoServicePayment} />
 				{:else if isBookingScenario(scenario)}
 					<AutoServiceTemplatePreview {scenario} onPay={openAutoServicePayment} flowData={config.flow_data} />
 				{:else if isFoodScenario(scenario)}
