@@ -26,6 +26,7 @@
 	import FlowerGiftTemplatePreview from './FlowerGiftTemplatePreview.svelte';
 	import CourierDeliveryTemplatePreview from './CourierDeliveryTemplatePreview.svelte';
 	import CleaningTemplatePreview from './CleaningTemplatePreview.svelte';
+	import GiftsTemplatePreview from './GiftsTemplatePreview.svelte';
 	import {
 		buildCheckoutPreviewModel,
 		type CheckoutPreviewStep,
@@ -181,6 +182,8 @@
 					<FoodOrderTemplatePreview {scenario} onPay={(amt) => { foodAmount = amt; selectStep('payment'); }} />
 				{:else if scenario === 'vertical_flowers'}
 					<FlowerShopTemplatePreview flowData={config.flow_data} onPay={openAutoServicePayment} />
+				{:else if scenario === 'vertical_gifts'}
+					<GiftsTemplatePreview flowData={config.flow_data} onPay={openAutoServicePayment} />
 				{:else if isFlowerScenario(scenario)}
 					<FlowerGiftTemplatePreview {scenario} onPay={(amt) => { flowerAmount = amt; selectStep('payment'); }} />
 				{:else if isCourierScenario(scenario)}

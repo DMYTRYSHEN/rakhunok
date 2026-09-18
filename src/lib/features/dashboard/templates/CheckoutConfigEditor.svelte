@@ -5,6 +5,7 @@
 	import GroomingStudioConfigEditor from '../business-settings/templates/GroomingStudioConfigEditor.svelte';
 	import FlowerShopConfigEditor from '../business-settings/templates/FlowerShopConfigEditor.svelte';
 	import CleaningConfigEditor from '../business-settings/templates/CleaningConfigEditor.svelte';
+	import GiftsConfigEditor from '../business-settings/templates/GiftsConfigEditor.svelte';
 	import { Plus, Trash2 } from '@lucide/svelte';
 
 	let {
@@ -113,6 +114,21 @@
 				</p>
 			</div>
 			<CleaningConfigEditor bind:flowData={config.flow_data} />
+		</div>
+	{:else if scenario === 'vertical_gifts'}
+		<div class="mb-6 rounded-xl border border-pink-200 bg-white p-4 shadow-xs">
+			<div class="mb-3">
+				<p class="text-xs font-bold tracking-wider text-pink-700 uppercase">
+					Конфігуратор Подарунків та Індивідуальних Замовлень
+				</p>
+				<h4 class="text-sm font-bold text-zinc-900">
+					Товари-основи, персоналізація, святкове пакування, разовий макет та погодження дизайну
+				</h4>
+				<p class="mt-0.5 text-xs text-zinc-500">
+					Налаштуйте вартість нанесення за одиницю, разову доплату за розроблення макета (300 ₴), аванс 50% та обов'язкове погодження перед виготовленням.
+				</p>
+			</div>
+			<GiftsConfigEditor bind:flowData={config.flow_data} />
 		</div>
 	{:else if ['vertical_auto', 'vertical_education', 'vertical_rental', 'vertical_services', 'engine_book'].includes(scenario)}
 		<div class="mb-6 rounded-xl border border-zinc-200 bg-white p-4 shadow-xs">

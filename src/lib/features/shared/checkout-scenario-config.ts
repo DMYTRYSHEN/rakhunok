@@ -445,3 +445,102 @@ export interface CleaningFlowData {
 	[key: string]: unknown;
 }
 
+// ==========================================
+// Vertical: Gifts / Custom Orders (vertical_gifts)
+// ==========================================
+
+export interface GiftsProductBase {
+	id: string;
+	name: string;
+	description: string;
+	basePrice: number;
+	image?: string;
+	materials?: string[];
+	colors?: Array<{ id: string; name: string; hex?: string }>;
+	sizes?: string[];
+	allowCustomText: boolean;
+	allowFileUpload: boolean;
+	inStock?: boolean;
+}
+
+export interface GiftsPersonalizationOption {
+	id: string;
+	name: string;
+	pricePerItem: number;
+	maxChars: number;
+	fonts: string[];
+	placements: string[];
+}
+
+export interface GiftsPackagingOption {
+	id: string;
+	name: string;
+	pricePerItem: number;
+	description?: string;
+	icon?: string;
+}
+
+export interface GiftsPickupPoint {
+	id: string;
+	name: string;
+	address: string;
+	workingHours: string;
+}
+
+export interface GiftsDeliveryConfig {
+	allowPickup: boolean;
+	allowDelivery: boolean;
+	pickupPoints: GiftsPickupPoint[];
+	deliveryFee: number;
+	freeDeliveryThreshold?: number;
+	deliveryTimeNotice?: string;
+}
+
+export interface GiftsMockupConfig {
+	requireMockupForPersonalized: boolean;
+	mockupFee: number; // Разова доплата за розроблення одного спільного макета
+	allowSharedMockupForIdenticalItems: boolean;
+	differentDesignsRequireManualQuote: boolean;
+	leadTimeDays: number;
+}
+
+export interface GiftsFlowData {
+	storeName?: string;
+	tagline?: string;
+	description?: string;
+	contacts?: {
+		phone?: string;
+		telegram?: string;
+		instagram?: string;
+		address?: string;
+	};
+	modes: {
+		personalizedEnabled: boolean;
+		readyGiftEnabled: boolean;
+		customIdeaEnabled: boolean;
+		directInvoiceEnabled: boolean;
+		personalizedButtonText?: string;
+		readyGiftButtonText?: string;
+		customIdeaButtonText?: string;
+		directInvoiceButtonText?: string;
+	};
+	products: GiftsProductBase[];
+	personalization: GiftsPersonalizationOption[];
+	packaging: GiftsPackagingOption[];
+	mockup: GiftsMockupConfig;
+	delivery: GiftsDeliveryConfig;
+	approval: {
+		autoApprovalEnabled: boolean;
+		requireManualForCustomFiles: boolean;
+		requireManualForTightDeadlines: boolean;
+		telegramChat?: string;
+		responseTimeNotice?: string;
+	};
+	payment: {
+		depositType: 'percent' | 'full';
+		depositValue: number; // e.g. 50
+		allowRemainingOnDelivery: boolean;
+	};
+	[key: string]: unknown;
+}
+

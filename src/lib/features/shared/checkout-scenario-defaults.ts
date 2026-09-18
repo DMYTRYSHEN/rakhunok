@@ -816,7 +816,148 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		allow_promo: true,
 		allow_delivery: true,
 		allow_upsell: true,
-		cta_text: 'Оплатити подарунок'
+		cta_text: 'Оформити замовлення',
+		flow_data: {
+			storeName: 'Майстерня Подарунків Wood & Craft',
+			tagline: 'Індивідуальні подарунки, персоналізація та брендування виробів',
+			description: 'Лазерне гравіювання, тиснення та подарункові набори ручної роботи',
+			contacts: {
+				phone: '+380 67 444 22 11',
+				telegram: '@gift_craft_bot',
+				instagram: '@wood_craft_gifts',
+				address: 'м. Київ, вул. Воздвиженська, 21'
+			},
+			modes: {
+				personalizedEnabled: true,
+				readyGiftEnabled: true,
+				customIdeaEnabled: true,
+				directInvoiceEnabled: true,
+				personalizedButtonText: 'Персоналізувати',
+				readyGiftButtonText: 'Готові подарунки',
+				customIdeaButtonText: 'Власна ідея',
+				directInvoiceButtonText: 'Оплатити рахунок'
+			},
+			products: [
+				{
+					id: 'notebook',
+					name: 'Блокнот з еко-шкіри',
+					description: 'Щільний папір у крапку 100 г/м², закладка, кишенька для дрібниць та резинка-фіксатор',
+					basePrice: 450,
+					materials: ['Італійська еко-шкіра'],
+					colors: [
+						{ id: 'black', name: 'Чорний графіт', hex: '#222222' },
+						{ id: 'emerald', name: 'Смарагдовий', hex: '#1b4d3e' },
+						{ id: 'cognac', name: 'Коньячний', hex: '#9e472a' }
+					],
+					allowCustomText: true,
+					allowFileUpload: true,
+					inStock: true
+				},
+				{
+					id: 'thermo_cup',
+					name: 'Термочашка 450 мл',
+					description: 'Подвійні вакуумні стінки, герметичний клапан, тримає тепло до 8 годин',
+					basePrice: 550,
+					materials: ['Нержавіюча харчова сталь 304'],
+					colors: [
+						{ id: 'matte_black', name: 'Матовий чорний', hex: '#1a1a1a' },
+						{ id: 'white', name: 'Перлинний білий', hex: '#f7f7f7' }
+					],
+					allowCustomText: true,
+					allowFileUpload: true,
+					inStock: true
+				},
+				{
+					id: 'hoodie',
+					name: 'Худі Oversize Unisex',
+					description: 'Преміум тринитка на флісі 320 г/м², глибокий подвійний капюшон',
+					basePrice: 1200,
+					sizes: ['S', 'M', 'L', 'XL'],
+					colors: [
+						{ id: 'charcoal', name: 'Антрацит', hex: '#333333' },
+						{ id: 'beige', name: 'Бежевий пісок', hex: '#d8c2aa' }
+					],
+					allowCustomText: true,
+					allowFileUpload: true,
+					inStock: true
+				}
+			],
+			personalization: [
+				{
+					id: 'engraving',
+					name: 'Іменне нанесення (гравіювання / тиснення)',
+					pricePerItem: 120,
+					maxChars: 60,
+					fonts: ['Класичний Serif', 'Мінімалістичний Sans', 'Каліграфічний Script', 'Сучасний Моно'],
+					placements: ['По центру обкладинки', 'Правий нижній кутик', 'По центру внизу']
+				},
+				{
+					id: 'color_print',
+					name: 'Кольоровий стійкий друк',
+					pricePerItem: 180,
+					maxChars: 100,
+					fonts: ['Bold Modern', 'Elegant Script', 'Clean Sans'],
+					placements: ['Фронтальна частина', 'Широке нанесення']
+				}
+			],
+			packaging: [
+				{
+					id: 'box',
+					name: 'Подарункова коробка зі стрічкою',
+					pricePerItem: 80,
+					description: 'Цупкий крафтовий картон, паперовий наповнювач та атласна стрічка',
+					icon: '🎁'
+				},
+				{
+					id: 'wooden_box',
+					name: 'Дерев’яний подарунковий бокс',
+					pricePerItem: 180,
+					description: 'Масив вільхи з магнітним замком та фірмовим гравіюванням',
+					icon: '🪵'
+				},
+				{
+					id: 'none',
+					name: 'Без подарункового пакування',
+					pricePerItem: 0,
+					description: 'Транспортувальне еко-пакування',
+					icon: '📦'
+				}
+			],
+			mockup: {
+				requireMockupForPersonalized: true,
+				mockupFee: 300,
+				allowSharedMockupForIdenticalItems: true,
+				differentDesignsRequireManualQuote: true,
+				leadTimeDays: 3
+			},
+			delivery: {
+				allowPickup: true,
+				allowDelivery: true,
+				pickupPoints: [
+					{
+						id: 'showroom_kyiv',
+						name: 'Шоурум & Майстерня Wood & Craft',
+						address: 'м. Київ, вул. Воздвиженська, 21',
+						workingHours: 'Пн–Сб: 10:00 – 19:00'
+					}
+				],
+				deliveryFee: 150,
+				freeDeliveryThreshold: 3000,
+				deliveryTimeNotice: '1-2 дні Новою Поштою або кур’єром'
+			},
+			approval: {
+				autoApprovalEnabled: true,
+				requireManualForCustomFiles: true,
+				requireManualForTightDeadlines: true,
+				telegramChat: '@gift_craft_manager',
+				responseTimeNotice: 'до 15 хвилин'
+			},
+			payment: {
+				depositType: 'percent',
+				depositValue: 50,
+				allowRemainingOnDelivery: true
+			}
+		}
 	}
 };
 
