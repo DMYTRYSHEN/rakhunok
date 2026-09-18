@@ -12,6 +12,7 @@
 		resolveCheckoutConfig
 	} from '$lib/features/shared/checkout-scenario-defaults';
 	import { templateInvoiceType } from '../../templates/template-invoice';
+	import FlowDataBuilder from './FlowDataBuilder.svelte';
 	import { Eye, Settings2, X } from '@lucide/svelte';
 	import { onMount, untrack } from 'svelte';
 
@@ -37,7 +38,11 @@
 	let scenarioType = $state<CheckoutTemplateScenario>(initialScenario);
 	let confirmedScenario = initialScenario;
 	let isDefault = $state(initialTemplate?.is_default ?? false);
-	let config = $state(initialTemplate?.scenario_config ?? getScenarioDefaults(initialScenario));
+	const rawInitialConfig = initialTemplate?.scenario_config ?? getScenarioDefaults(initialScenario);
+	if (!rawInitialConfig.flow_data || typeof rawInitialConfig.flow_data !== 'object') {
+		rawInitialConfig.flow_data = {};
+	}
+	let config = $state(rawInitialConfig);
 	let mobileView = $state<'settings' | 'preview'>('settings');
 
 	let saving = $state(false);
@@ -46,7 +51,7 @@
 		name: initialTemplate?.name ?? '',
 		scenarioType: initialScenario,
 		isDefault: initialTemplate?.is_default ?? false,
-		config: initialTemplate?.scenario_config ?? getScenarioDefaults(initialScenario)
+		config: rawInitialConfig
 	});
 	const dirty = $derived(
 		JSON.stringify({ name, scenarioType, isDefault, config }) !== initialSnapshot
@@ -60,13 +65,17 @@
 		if (nextScenario === confirmedScenario) return;
 		if (
 			scenarioConfigDirty &&
-			!window.confirm('Змінити тип чекауту? Несумісні налаштування сценарію буде скинуто.')
+			!window.confirm('Змінити цей сценарій? Незбережені налаштування конфігурації буде скинуто.')
 		) {
 			scenarioType = confirmedScenario;
 			return;
 		}
 		confirmedScenario = nextScenario;
-		config = getScenarioDefaults(nextScenario);
+		const defaults = getScenarioDefaults(nextScenario);
+		if (!defaults.flow_data || typeof defaults.flow_data !== 'object') {
+			defaults.flow_data = {};
+		}
+		config = defaults;
 	}
 
 	function closeEditor() {
@@ -245,13 +254,28 @@
 					</label>
 				</section>
 
-				<section aria-labelledby="template-options" class="mt-8">
-					<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">Крок 2</p>
+				{#if scenarioType === 'vertical_auto' || scenarioType === 'engine_book' || scenarioType === 'vertical_beauty' || scenarioType === 'vertical_pets' || scenarioType === 'vertical_services'}
+					<section aria-labelledby="template-flow-builder" class="mt-8 border-t border-zinc-200 pt-6">
+						<div class="mb-2">
+							<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">Конфігуратор послуг</p>
+							<h3 id="template-flow-builder" class="text-base font-bold text-zinc-900">
+								Прайс робіт, категорії та режим роботи
+							</h3>
+							<p class="mt-1 text-sm text-zinc-500">
+								Вкажіть актуальний перелік послуг вашого бізнесу. Вони миттєво з'являться на прев'ю праворуч.
+							</p>
+						</div>
+						<FlowDataBuilder scenario={scenarioType} bind:flowData={config.flow_data} />
+					</section>
+				{/if}
+
+				<section aria-labelledby="template-options" class="mt-8 border-t border-zinc-200 pt-6">
+					<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">Опції чекауту</p>
 					<h3 id="template-options" class="text-base font-bold text-zinc-900">
-						Можливості чекауту
+						Додаткові налаштування
 					</h3>
 					<p class="mt-1 text-sm text-zinc-500">
-						Показуємо лише параметри, доречні для вибраного сценарію.
+						Лояльність, чайові, промокоди та інші параметри.
 					</p>
 					<CheckoutConfigEditor bind:config scenario={scenarioType} />
 				</section>

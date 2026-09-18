@@ -126,7 +126,7 @@
 				{#if scenario === 'fuel_station'}
 					<FuelStationTemplatePreview onPay={openFuelStationPayment} />
 				{:else if scenario === 'vertical_auto' || scenario === 'engine_book'}
-					<AutoServiceTemplatePreview onPay={openAutoServicePayment} />
+					<AutoServiceTemplatePreview onPay={openAutoServicePayment} flowData={config.flow_data} />
 				{:else}
 					<section class="hero">
 						<span class="eyebrow">{model.contextLabel}</span>

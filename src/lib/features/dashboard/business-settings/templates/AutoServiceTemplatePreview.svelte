@@ -10,10 +10,16 @@
 		Wrench
 	} from '@lucide/svelte';
 
-	let { onPay }: { onPay: (amount: number) => void } = $props();
+	let {
+		onPay,
+		flowData = {}
+	}: {
+		onPay: (amount: number) => void;
+		flowData?: Record<string, unknown>;
+	} = $props();
 
 	type VehicleType = {
-		id: 'sedan' | 'suv' | 'van';
+		id: string;
 		title: string;
 		subtitle: string;
 		icon: string;
@@ -27,18 +33,49 @@
 		basePrice: number;
 	};
 
-	const vehicleTypes: VehicleType[] = [
+	const defaultVehicleTypes: VehicleType[] = [
 		{ id: 'sedan', title: 'Легкове авто', subtitle: 'Седан, хетчбек, купе', icon: '🚗', baseModifier: 1.0 },
 		{ id: 'suv', title: 'Кросовер / SUV', subtitle: 'Позашляховик, паркетник', icon: '🚙', baseModifier: 1.25 },
 		{ id: 'van', title: 'Мікроавтобус', subtitle: 'Бус, комерційний транспорт', icon: '🚐', baseModifier: 1.5 }
 	];
 
-	const services: AutoService[] = [
+	const defaultServices: AutoService[] = [
 		{ id: 'tire_full', name: 'Комплексний шиномонтаж (4 шт)', duration: '45 хв', basePrice: 800 },
 		{ id: 'tire_balance', name: 'Балансування коліс', duration: '30 хв', basePrice: 400 },
 		{ id: 'inspection', name: 'Діагностика ходової частини', duration: '30 хв', basePrice: 350 },
 		{ id: 'oil_change', name: 'Заміна мастила та фільтрів', duration: '40 хв', basePrice: 450 }
 	];
+
+	const vehicleTypes = $derived<VehicleType[]>(
+		Array.isArray(flowData?.categories) && flowData.categories.length > 0
+			? (flowData.categories as any[]).map((c) => ({
+					id: c.id || 'cat',
+					title: c.title || 'Категорія',
+					subtitle: c.subtitle || '',
+					icon: c.icon || '🚗',
+					baseModifier: Number(c.modifier || 1.0)
+				}))
+			: defaultVehicleTypes
+	);
+
+	const services = $derived<AutoService[]>(
+		Array.isArray(flowData?.services) && flowData.services.length > 0
+			? (flowData.services as any[]).map((s) => ({
+					id: s.id || 'srv',
+					name: s.name || 'Послуга',
+					duration: typeof s.duration === 'string' ? s.duration : `${s.durationMinutes || 30} хв`,
+					basePrice: Number(s.basePrice || 300)
+				}))
+			: defaultServices
+	);
+
+	const scheduleData = $derived(
+		(flowData?.schedule as Record<string, any>) || {}
+	);
+
+	const depositAmount = $derived(
+		Number(scheduleData.depositAmount || flowData?.deposit_amount || 200)
+	);
 
 	// Генерація 7 днів для календаря
 	const days = Array.from({ length: 7 }, (_, i) => {
@@ -50,30 +87,71 @@
 		return { iso, dayName, dateStr };
 	});
 
-	const timeSlots = [
-		{ time: '09:00', available: true },
-		{ time: '10:15', available: true },
-		{ time: '11:30', available: false },
-		{ time: '13:00', available: true },
-		{ time: '14:30', available: true },
-		{ time: '16:00', available: true },
-		{ time: '17:30', available: false },
-		{ time: '18:45', available: true }
-	];
+	// Генерація динамічних слотів часу за графіком мерчанта
+	const timeSlots = $derived.by(() => {
+		const start = scheduleData.startHour || '09:00';
+		const end = scheduleData.endHour || '19:00';
+		const stepMins = Number(scheduleData.slotDurationMinutes || 45);
+
+		const [startH, startM] = start.split(':').map(Number);
+		const [endH, endM] = end.split(':').map(Number);
+
+		let currentMinutes = startH * 60 + (startM || 0);
+		const stopMinutes = endH * 60 + (endM || 0);
+
+		const slots: { time: string; available: boolean }[] = [];
+		let count = 0;
+
+		while (currentMinutes + stepMins <= stopMinutes && count < 16) {
+			const h = Math.floor(currentMinutes / 60).toString().padStart(2, '0');
+			const m = (currentMinutes % 60).toString().padStart(2, '0');
+			// Симуляція пари зайнятих слотів для реалізму
+			const available = !(count === 2 || count === 6);
+			slots.push({ time: `${h}:${m}`, available });
+			currentMinutes += stepMins;
+			count++;
+		}
+
+		return slots.length > 0 ? slots : [
+			{ time: '09:00', available: true },
+			{ time: '10:30', available: true },
+			{ time: '12:00', available: false },
+			{ time: '14:00', available: true },
+			{ time: '15:30', available: true }
+		];
+	});
 
 	let step = $state<1 | 2 | 3 | 4>(1);
-	let selectedVehicleId = $state<VehicleType['id']>('suv');
-	let selectedServiceId = $state<string>('tire_full');
+	let selectedVehicleId = $state<string>('');
+	let selectedServiceId = $state<string>('');
 	let selectedDateIso = $state<string>(days[0].iso);
 	let selectedTime = $state<string>('10:15');
 	let carPlate = $state<string>('КА 7744 ВІ');
 	let clientPhone = $state<string>('+380 67 123 45 67');
 	let paymentMode = $state<'deposit' | 'full'>('deposit');
 
+	$effect(() => {
+		if (vehicleTypes.length > 0 && (!selectedVehicleId || !vehicleTypes.some((v) => v.id === selectedVehicleId))) {
+			selectedVehicleId = vehicleTypes[0].id;
+		}
+	});
+
+	$effect(() => {
+		if (services.length > 0 && (!selectedServiceId || !services.some((s) => s.id === selectedServiceId))) {
+			selectedServiceId = services[0].id;
+		}
+	});
+
+	$effect(() => {
+		if (timeSlots.length > 0 && (!selectedTime || !timeSlots.some((t) => t.time === selectedTime))) {
+			const firstAvail = timeSlots.find((t) => t.available);
+			selectedTime = firstAvail ? firstAvail.time : timeSlots[0].time;
+		}
+	});
+
 	const selectedVehicle = $derived(vehicleTypes.find((v) => v.id === selectedVehicleId) ?? vehicleTypes[0]);
 	const selectedService = $derived(services.find((s) => s.id === selectedServiceId) ?? services[0]);
-	const totalPrice = $derived(Math.round(selectedService.basePrice * selectedVehicle.baseModifier));
-	const depositAmount = 200;
+	const totalPrice = $derived(Math.round((selectedService?.basePrice ?? 500) * (selectedVehicle?.baseModifier ?? 1.0)));
 	const paymentAmount = $derived(paymentMode === 'deposit' ? depositAmount : totalPrice);
 
 	function proceedToPay() {
