@@ -194,12 +194,36 @@
 							onchange={handleScenarioChange}
 							class="w-full rounded-lg border border-zinc-200 bg-white p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
 						>
-							<option value="fixed">Фіксована сума (Товар/Послуга)</option>
-							<option value="table">HoReCa (Стіл в ресторані)</option>
-							<option value="delivery">Доставка (Товар + логістика)</option>
-							<option value="tips">Чайові / Донат</option>
-							<option value="open_amount">Відкрита сума</option>
-							<option value="fuel_station">АЗС — пальне на колонці</option>
+							<optgroup label="Rahunok Engines">
+								<option value="engine_buy">Buy (Товар &rarr; Кошик &rarr; Оплата)</option>
+								<option value="engine_order">Order (Вибір &rarr; Кастомізація &rarr; Оплата)</option>
+								<option value="engine_book">Book (Послуга &rarr; Слот &rarr; Передоплата)</option>
+								<option value="engine_quote">Quote (Калькулятор ціни &rarr; Оплата)</option>
+								<option value="engine_deliver">Deliver (Товар &rarr; Адреса &rarr; Доставка)</option>
+								<option value="engine_split">Split (Спільний рахунок &rarr; Частки)</option>
+							</optgroup>
+							<optgroup label="Готові індустрії (Вертикалі)">
+								<option value="vertical_food">🍕 Кафе / Доставка їжі</option>
+								<option value="vertical_flowers">🌸 Квіти</option>
+								<option value="vertical_auto">🚗 СТО / Шиномонтаж</option>
+								<option value="vertical_beauty">💇 Салон краси / Барбершоп</option>
+								<option value="vertical_cleaning">🧹 Клінінг</option>
+								<option value="vertical_pets">🐕 Грумінг / Ветклініка</option>
+								<option value="vertical_rental">🏕️ Оренда / Прокат</option>
+								<option value="vertical_education">📚 Репетитори / Тренери</option>
+								<option value="vertical_services">🔧 Майстри / Ремонт</option>
+								<option value="vertical_delivery">📦 Мікроперевезення / Доставка</option>
+								<option value="vertical_print">🖨️ Друкарня / Виготовлення</option>
+								<option value="vertical_gifts">🎁 Подарунки / Індивідуальне замовлення</option>
+							</optgroup>
+							<optgroup label="Базові сценарії (Legacy)">
+								<option value="fixed">Фіксована сума (Товар/Послуга)</option>
+								<option value="table">HoReCa (Стіл в закладі)</option>
+								<option value="delivery">Доставка (Товар + Логістика)</option>
+								<option value="tips">Чайові / Донат</option>
+								<option value="open_amount">Вільна сума</option>
+								<option value="fuel_station">АЗС (Відпуск з колонки)</option>
+							</optgroup>
 						</select>
 					</label>
 

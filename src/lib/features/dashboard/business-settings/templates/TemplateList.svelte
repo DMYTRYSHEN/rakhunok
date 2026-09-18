@@ -22,6 +22,36 @@
 		await load();
 	});
 
+	function getScenarioLabel(type: string): string {
+		const map: Record<string, string> = {
+			fixed: 'Фіксована сума',
+			table: 'HoReCa (Стіл)',
+			delivery: 'Доставка',
+			tips: 'Чайові',
+			open_amount: 'Вільна сума',
+			fuel_station: 'АЗС',
+			engine_buy: 'Buy (Товар)',
+			engine_order: 'Order (Кастомізація)',
+			engine_book: 'Book (Послуга/Слот)',
+			engine_quote: 'Quote (Калькулятор)',
+			engine_deliver: 'Deliver (Логістика)',
+			engine_split: 'Split (Спільний рахунок)',
+			vertical_food: '🍕 Кафе / Доставка',
+			vertical_flowers: '🌸 Квіти',
+			vertical_auto: '🚗 СТО',
+			vertical_beauty: '💇 Салон краси',
+			vertical_cleaning: '🧹 Клінінг',
+			vertical_pets: '🐕 Грумінг',
+			vertical_rental: '🏕️ Оренда',
+			vertical_education: '📚 Репетитори',
+			vertical_services: '🔧 Майстри',
+			vertical_delivery: '📦 Перевезення',
+			vertical_print: '🖨️ Друкарня',
+			vertical_gifts: '🎁 Подарунки'
+		};
+		return map[type] || type.replace(/_/g, ' ');
+	}
+
 	async function load() {
 		loading = true;
 		error = null;
@@ -45,7 +75,7 @@
 	}
 
 	async function remove(id: string) {
-		if (mutationId || !confirm('Видалити цей шаблон?')) return;
+		if (mutationId || !confirm('Точно видалити?')) return;
 		mutationId = id;
 		error = null;
 		try {
@@ -66,7 +96,7 @@
 			await setDefaultTemplate(merchantId, id, demo);
 			await load();
 		} catch (cause: unknown) {
-			error = cause instanceof Error ? cause.message : 'Не вдалося змінити основний шаблон.';
+			error = cause instanceof Error ? cause.message : 'Не вдалося змінити шаблон за замовчуванням.';
 		} finally {
 			mutationId = null;
 		}
@@ -88,14 +118,14 @@
 	<div class="flex items-center justify-between">
 		<div>
 			<h2 class="text-xl font-bold text-zinc-900">Шаблони чекауту</h2>
-			<p class="text-sm text-zinc-500">Налаштуйте візуальний вигляд та функції екрана оплати.</p>
+			<p class="text-sm text-zinc-500">Налаштуйте екрани для зручної оплати.</p>
 		</div>
 		<button
 			onclick={openCreate}
 			disabled={mutationId !== null}
 			class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
 		>
-			+ Створити шаблон
+			+ Новий шаблон
 		</button>
 	</div>
 
@@ -129,10 +159,10 @@
 			</div>
 			<h3 class="text-sm font-bold text-zinc-900">Немає шаблонів</h3>
 			<p class="mt-1 text-sm text-zinc-500">
-				Створіть свій перший шаблон, щоб пришвидшити виставлення рахунків.
+				Створіть перший шаблон, щоб налаштувати вигляд чекауту.
 			</p>
 			<button onclick={openCreate} class="mt-4 text-sm font-bold text-blue-600 hover:text-blue-800">
-				Створити зараз &rarr;
+				Створити &rarr;
 			</button>
 		</div>
 	{:else}
@@ -145,7 +175,7 @@
 						<div class="flex items-start justify-between">
 							<div>
 								<h3 class="line-clamp-1 font-bold text-zinc-900">{t.name}</h3>
-								<p class="text-xs text-zinc-500 capitalize">{t.scenario_type}</p>
+								<p class="text-xs text-zinc-500 capitalize">{getScenarioLabel(t.scenario_type)}</p>
 							</div>
 							{#if t.is_default}
 								<span
@@ -163,7 +193,7 @@
 								disabled={mutationId !== null}
 								class="mr-auto text-xs font-semibold text-zinc-500 hover:text-blue-600"
 							>
-								Зробити основним
+								Зробити за замовчуванням
 							</button>
 						{/if}
 						<button
@@ -178,7 +208,7 @@
 							disabled={mutationId !== null}
 							class="text-xs font-semibold text-blue-600 hover:text-blue-800"
 						>
-							Редагувати
+							Змінити
 						</button>
 					</div>
 				</div>

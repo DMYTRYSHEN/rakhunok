@@ -80,12 +80,35 @@ export interface CheckoutScenarioConfig {
 }
 
 export const CHECKOUT_TEMPLATE_SCENARIOS = [
+	// Legacy / Core
 	'fixed',
 	'table',
 	'delivery',
 	'tips',
 	'open_amount',
-	'fuel_station'
+	'fuel_station',
+
+	// Standard Checkout Engines
+	'engine_buy',
+	'engine_order',
+	'engine_book',
+	'engine_quote',
+	'engine_deliver',
+	'engine_split',
+
+	// Vertical Templates
+	'vertical_food',
+	'vertical_flowers',
+	'vertical_auto',
+	'vertical_beauty',
+	'vertical_cleaning',
+	'vertical_pets',
+	'vertical_rental',
+	'vertical_education',
+	'vertical_services',
+	'vertical_delivery',
+	'vertical_print',
+	'vertical_gifts'
 ] as const;
 export type CheckoutTemplateScenario = (typeof CHECKOUT_TEMPLATE_SCENARIOS)[number];
 

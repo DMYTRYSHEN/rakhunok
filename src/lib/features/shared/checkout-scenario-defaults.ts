@@ -140,6 +140,130 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 		allow_delivery: false,
 		allow_compliance_card: false,
 		cta_text: 'Оплатити запит'
+	},
+
+	// --- ⚙️ ENGINES ---
+	engine_buy: {
+		allow_loyalty: true,
+		allow_promo: true,
+		allow_delivery: true,
+		allow_upsell: true,
+		cta_text: 'Оплатити замовлення'
+	},
+	engine_order: {
+		allow_loyalty: true,
+		allow_promo: true,
+		allow_delivery: true,
+		allow_upsell: true,
+		cta_text: 'Замовити та оплатити'
+	},
+	engine_book: {
+		allow_loyalty: true,
+		allow_promo: true,
+		allow_delivery: false,
+		allow_upsell: true,
+		allow_split: false,
+		cta_text: 'Забронювати (передоплата)'
+	},
+	engine_quote: {
+		allow_loyalty: false,
+		allow_promo: true,
+		allow_delivery: false,
+		cta_text: 'Оплатити рахунок'
+	},
+	engine_deliver: {
+		allow_loyalty: false,
+		allow_promo: true,
+		allow_delivery: true,
+		allow_upsell: false,
+		cta_text: 'Оплатити доставку'
+	},
+	engine_split: {
+		allow_split: true,
+		allow_tips: true,
+		allow_loyalty: true,
+		cta_text: 'Сплатити свою частку'
+	},
+
+	// --- 🚀 VERTICALS ---
+	vertical_food: {
+		allow_loyalty: true,
+		allow_promo: true,
+		allow_delivery: true,
+		allow_tips: true,
+		allow_upsell: true,
+		cta_text: 'Оплатити замовлення'
+	},
+	vertical_flowers: {
+		allow_loyalty: true,
+		allow_promo: true,
+		allow_delivery: true,
+		allow_tips: true,
+		allow_upsell: true, // Listivky, etc.
+		cta_text: 'Замовити букет'
+	},
+	vertical_auto: {
+		allow_loyalty: true,
+		allow_promo: false,
+		allow_delivery: false,
+		allow_upsell: true, // Zapasni chastyny
+		cta_text: 'Сплатити послуги'
+	},
+	vertical_beauty: {
+		allow_loyalty: true,
+		allow_promo: true,
+		allow_tips: true,
+		allow_upsell: true, // Kosmetyka
+		cta_text: 'Підтвердити запис'
+	},
+	vertical_cleaning: {
+		allow_promo: true,
+		allow_delivery: false,
+		allow_tips: true,
+		allow_upsell: true, // Vikna, duhovka
+		cta_text: 'Замовити клінінг'
+	},
+	vertical_pets: {
+		allow_loyalty: true,
+		allow_promo: true,
+		allow_tips: true,
+		allow_upsell: true,
+		cta_text: 'Сплатити прийом'
+	},
+	vertical_rental: {
+		allow_promo: true,
+		allow_delivery: true, // Delivery of equipment
+		allow_upsell: true,
+		cta_text: 'Оплатити оренду'
+	},
+	vertical_education: {
+		allow_loyalty: false,
+		allow_promo: true,
+		allow_upsell: true, // Packages
+		cta_text: 'Оплатити заняття'
+	},
+	vertical_services: {
+		allow_promo: true,
+		allow_tips: true,
+		allow_upsell: true,
+		cta_text: 'Сплатити послугу'
+	},
+	vertical_delivery: {
+		allow_promo: true,
+		allow_delivery: true,
+		cta_text: 'Оплатити перевезення'
+	},
+	vertical_print: {
+		allow_promo: true,
+		allow_delivery: true,
+		allow_upsell: true, // Laminaciya, etc.
+		cta_text: 'Оплатити друк'
+	},
+	vertical_gifts: {
+		allow_promo: true,
+		allow_delivery: true,
+		allow_upsell: true, // Upakovka
+		cta_text: 'Оплатити подарунок'
 	}
 };
 

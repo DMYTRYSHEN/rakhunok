@@ -774,42 +774,42 @@
 				},
 				{
 					"method": "DELETE",
-					"path": "/api/v1/merchant/telegram/invoices/send",
+					"path": "/api/v1/merchant/telegram-invoice",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
 				},
 				{
 					"method": "GET",
-					"path": "/api/v1/merchant/telegram/invoices/send",
+					"path": "/api/v1/merchant/telegram-invoice",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
 				},
 				{
 					"method": "OPTIONS",
-					"path": "/api/v1/merchant/telegram/invoices/send",
+					"path": "/api/v1/merchant/telegram-invoice",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
 				},
 				{
 					"method": "PATCH",
-					"path": "/api/v1/merchant/telegram/invoices/send",
+					"path": "/api/v1/merchant/telegram-invoice",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
 				},
 				{
 					"method": "POST",
-					"path": "/api/v1/merchant/telegram/invoices/send",
+					"path": "/api/v1/merchant/telegram-invoice",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
 				},
 				{
 					"method": "PUT",
-					"path": "/api/v1/merchant/telegram/invoices/send",
+					"path": "/api/v1/merchant/telegram-invoice",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
@@ -894,6 +894,48 @@
 				{
 					"method": "PUT",
 					"path": "/api/v1/orders",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "DELETE",
+					"path": "/api/v1/orders/invoice-image/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/api/v1/orders/invoice-image/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "OPTIONS",
+					"path": "/api/v1/orders/invoice-image/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PATCH",
+					"path": "/api/v1/orders/invoice-image/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/api/v1/orders/invoice-image/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/index.ts"
+				},
+				{
+					"method": "PUT",
+					"path": "/api/v1/orders/invoice-image/",
 					"match": "prefix",
 					"status": "implemented",
 					"source": "worker/src/index.ts"
