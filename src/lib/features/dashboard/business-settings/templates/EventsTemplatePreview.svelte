@@ -8,6 +8,8 @@
 		AlertTriangle,
 		Ticket,
 		Check,
+		ChevronRight,
+		ChevronLeft,
 		QrCode,
 		User,
 		Info,
@@ -100,14 +102,14 @@
 						id: 'cat_standard',
 						name: 'Стандартне місце',
 						price: 250,
-						color: '#3b82f6',
+						color: '#007aff',
 						description: 'Зручні крісла, ряди 1–3'
 					},
 					{
 						id: 'cat_premium',
 						name: 'Преміальне місце',
 						price: 350,
-						color: '#eab308',
+						color: '#ff9500',
 						description: 'Шкіряні реклайнери, ряди 4–5'
 					}
 				],
@@ -143,9 +145,9 @@
 					{ id: 'R4-S1', row: 4, seat: 1, categoryId: 'cat_premium', status: 'available' },
 					{ id: 'R4-S2', row: 4, seat: 2, categoryId: 'cat_premium', status: 'available' },
 					{ id: 'R4-S3', row: 4, seat: 3, categoryId: 'cat_premium', status: 'available' },
-					{ id: 'R4-S4', row: 4, seat: 4, categoryId: 'cat_premium', status: 'available' },
+					{ id: 'R4-S4', row: 4, seat: 4, categoryId: 'cat_premium', status: 'sold' },
 					{ id: 'R4-S5', row: 4, seat: 5, categoryId: 'cat_premium', status: 'sold' },
-					{ id: 'R4-S6', row: 4, seat: 6, categoryId: 'cat_premium', status: 'sold' },
+					{ id: 'R4-S6', row: 4, seat: 6, categoryId: 'cat_premium', status: 'available' },
 					{ id: 'R4-S7', row: 4, seat: 7, categoryId: 'cat_premium', status: 'available' },
 					{ id: 'R4-S8', row: 4, seat: 8, categoryId: 'cat_premium', status: 'available' },
 					// Row 5 (Premium)
@@ -161,31 +163,31 @@
 			},
 			{
 				id: 'hall_2',
-				name: 'Концертний хол (Фан-зони)',
+				name: 'Фестивальний майданчик Open Space',
 				type: 'open_zone',
 				screenOrStageLabel: '🎸 ГОЛОВНА СЦЕНА',
 				capacity: 500,
 				categories: [
 					{
 						id: 'cat_fan1',
-						name: 'Фан-зона 1 (під сценою)',
+						name: 'Фан-зона 1 (біля сцени)',
 						price: 500,
-						color: '#ec4899',
-						description: 'Найближче до виконавців'
+						color: '#ef4444',
+						description: 'Максимальна близькість до артистів'
 					},
 					{
 						id: 'cat_fan2',
 						name: 'Фан-зона 2 (загальна)',
 						price: 350,
-						color: '#8b5cf6',
-						description: 'Вільний простір, хороший огляд'
+						color: '#3b82f6',
+						description: 'Вільний простір фестивалю'
 					},
 					{
 						id: 'cat_vip',
-						name: 'VIP Lounge (балкон)',
+						name: 'VIP Lounge Lounge Bar',
 						price: 900,
-						color: '#10b981',
-						description: 'Окремий бар, місця за столиками'
+						color: '#8b5cf6',
+						description: 'Окремий бар, посадочні пуфи та веранда'
 					}
 				]
 			}
@@ -193,8 +195,8 @@
 		approval: {
 			autoApprovalEnabled: true,
 			requireManualForGroupBooking: true,
-			groupBookingMinSeats: 8,
-			telegramChat: '@olymp_tickets_manager'
+			groupBookingMinSeats: 6,
+			telegramChat: '@olymp_tickets_bot'
 		}
 	};
 
@@ -206,6 +208,8 @@
 		halls: flowData?.halls && flowData.halls.length > 0 ? flowData.halls : defaultData.halls,
 		approval: { ...defaultData.approval, ...(flowData?.approval || {}) }
 	});
+
+	let step = $state<1 | 2 | 3>(1);
 
 	// Default selections: 2 standard seats + 1 premium seat = exactly 910 ₴ (850 ₴ tickets + 60 ₴ service fee)
 	let selections = $state<EventsOrderSelections>({
@@ -283,7 +287,7 @@
 	});
 
 	// Inspection simulator state (tickets used/scanned on entry)
-	let showTicketModal = $state(false);
+	let showTicketPasses = $state(false);
 	let usedTicketCodes = $state<Set<string>>(new Set());
 	let scanMessage = $state<string | null>(null);
 
@@ -300,7 +304,7 @@
 				alert(`Максимально дозволено не більше ${mergedData.maxTicketsPerOrder} квитків в одному замовленні.`);
 				return;
 			}
-			const cat = activeHall.categories.find((c) => c.id === seat.categoryId);
+			const cat = activeHall.categories?.find((c) => c.id === seat.categoryId);
 			current.push({
 				seatId: seat.id,
 				row: seat.row,
@@ -313,510 +317,702 @@
 		selections.selectedSeats = current;
 	}
 
-	function handleSessionChange(newSessionId: string) {
-		if (selections.sessionId !== newSessionId) {
-			selections.sessionId = newSessionId;
-			// Strict dependency rule: switching session cleans old hall seats
-			selections.selectedSeats = [];
-			secondsLeft = 600; // reset 10m timer
-		}
-	}
-
 	function handleOpenZoneQty(catId: string, delta: number) {
-		const zones = (selections.openZoneSelections || []).map((z) => {
-			if (z.categoryId === catId) {
-				const nextQty = Math.max(0, Math.min(10, z.quantity + delta));
-				return { ...z, quantity: nextQty };
-			}
-			return z;
-		});
-		selections.openZoneSelections = zones;
+		const current = [...(selections.openZoneSelections || [])];
+		const idx = current.findIndex((z) => z.categoryId === catId);
+		const cat = activeHall.categories?.find((c) => c.id === catId);
+		if (!cat) return;
+
+		const totalCount = current.reduce((sum, z) => sum + z.quantity, 0);
+		if (delta > 0 && totalCount >= (mergedData.maxTicketsPerOrder || 6)) {
+			alert(`Максимально дозволено не більше ${mergedData.maxTicketsPerOrder} квитків.`);
+			return;
+		}
+
+		if (idx >= 0) {
+			current[idx].quantity = Math.max(0, current[idx].quantity + delta);
+		} else if (delta > 0) {
+			current.push({
+				categoryId: cat.id,
+				categoryName: cat.name,
+				price: cat.price,
+				quantity: 1
+			});
+		}
+		selections.openZoneSelections = current;
 	}
 
-	function simulateScan(ticketCode: string) {
-		if (usedTicketCodes.has(ticketCode)) {
-			scanMessage = `❌ ПОМИЛКА: Квиток ${ticketCode} УЖЕ ВИКОРИСТАНО! Повторний прохід заборонено.`;
-		} else {
-			usedTicketCodes.add(ticketCode);
-			usedTicketCodes = new Set(usedTicketCodes);
-			scanMessage = `✅ ВХІД ДОЗВОЛЕНО: Квиток ${ticketCode} успішно погашено контролером.`;
-		}
+	function handleSessionChange(sessId: string) {
+		selections.sessionId = sessId;
+		selections.selectedSeats = [];
+		selections.openZoneSelections = [];
 	}
 
 	function handlePayClick() {
-		if (priceResult.totalAmount <= 0) return;
 		onPay(priceResult.totalAmount);
-		showTicketModal = true;
+		showTicketPasses = true;
+	}
+
+	function simulateScan(code: string) {
+		if (usedTicketCodes.has(code)) {
+			scanMessage = `❌ КВИТОК ${code} ВЖЕ БУВ ПОГАШЕНИЙ РАНІШЕ! ПОВТОРНИЙ ВХІД ЗАБОРОНЕНО.`;
+		} else {
+			const updated = new Set(usedTicketCodes);
+			updated.add(code);
+			usedTicketCodes = updated;
+			scanMessage = `✅ ВХІД ДОЗВОЛЕНО! Квиток ${code} успішно погашено на турнікеті.`;
+		}
 	}
 </script>
 
-<div class="events-preview">
-	<!-- Venue Hero Header -->
-	<header class="venue-header">
-		<div class="venue-badge">🎬 Квиткова каса онлайн</div>
-		<h3 class="venue-title">{mergedData.venueName}</h3>
-		<p class="venue-address"><MapPin size={13} /> {mergedData.address}</p>
+<div class="ios-preview-container">
+	<!-- iOS Navigation Bar -->
+	<header class="ios-nav-bar">
+		<div class="ios-nav-content">
+			<span class="ios-merchant-badge">🎬 {mergedData.venueName}</span>
+			<span class="ios-secure-tag"><ShieldCheck size={12} /> Квиткова каса</span>
+		</div>
 	</header>
 
-	<!-- Session Picker Carousel -->
-	<section class="sessions-selector">
-		<div class="selector-header">
-			<span class="sub-label">Оберіть подію та сеанс:</span>
+	<!-- Step Header & Progress Capsules -->
+	<div class="ios-step-indicator">
+		<div class="ios-capsules">
+			<div class="ios-capsule" class:filled={step >= 1}></div>
+			<div class="ios-capsule" class:filled={step >= 2}></div>
+			<div class="ios-capsule" class:filled={step >= 3}></div>
 		</div>
-		<div class="sessions-scroll">
-			{#each mergedData.sessions as sess (sess.id)}
-				<button
-					type="button"
-					class="session-pill-btn"
-					class:active={selections.sessionId === sess.id}
-					onclick={() => handleSessionChange(sess.id)}
-				>
-					<span class="sess-title">{sess.eventTitle}</span>
-					<div class="sess-meta">
-						<span class="badge-format">{sess.format}</span>
-						<span>{sess.date} о {sess.time}</span>
+		<div class="ios-step-title-wrap">
+			<span class="ios-step-sub">Крок {step} з 3</span>
+			<h4 class="ios-step-title">
+				{#if step === 1}
+					Подія, сеанс та зал
+				{:else if step === 2}
+					Схема залу та вибір місць
+				{:else if step === 3}
+					Оплата та електронні квитки
+				{/if}
+			</h4>
+		</div>
+	</div>
+
+	<div class="ios-window-body">
+		<!-- WINDOW 1: EVENT, SESSION & HALL SELECTION -->
+		{#if step === 1}
+			<!-- Sessions Inset Card -->
+			<div class="ios-card">
+				<span class="ios-card-title">Оберіть подію та сеанс:</span>
+				<div class="ios-items-stack">
+					{#each mergedData.sessions as sess (sess.id)}
+						<button
+							type="button"
+							class="ios-session-row"
+							class:selected={selections.sessionId === sess.id}
+							onclick={() => handleSessionChange(sess.id)}
+						>
+							<div class="ios-sess-main">
+								<div class="ios-sess-title">{sess.eventTitle}</div>
+								<div class="ios-sess-tags">
+									<span class="ios-badge-format">{sess.format}</span>
+									<span class="ios-badge-age">{sess.ageRating}</span>
+									<span class="ios-sess-hall">{mergedData.halls.find(h => h.id === sess.hallId)?.name}</span>
+								</div>
+							</div>
+							<div class="ios-sess-timing">
+								<strong class="ios-sess-time">{sess.time}</strong>
+								<span class="ios-sess-date">{sess.date}</span>
+							</div>
+						</button>
+					{/each}
+				</div>
+			</div>
+
+			<!-- Venue Info Card -->
+			<div class="ios-card">
+				<span class="ios-card-title">Локація та правила відвідування:</span>
+				<div class="ios-venue-info">
+					<div class="ios-info-row">
+						<MapPin size={15} class="text-blue-500 shrink-0" />
+						<span>{mergedData.address}</span>
 					</div>
-					<span class="sess-hall">{mergedData.halls.find(h => h.id === sess.hallId)?.name}</span>
-				</button>
-			{/each}
-		</div>
-	</section>
-
-	<!-- Main Hall or Zone Experience -->
-	<main class="hall-experience">
-		<!-- 10-Minute Reservation Timer Banner -->
-		<div class="reservation-timer-banner">
-			<Clock size={16} />
-			<div>
-				<strong>Місця зарезервовано на {formattedTime()} хв</strong>
-				<span class="timer-desc">Завершіть покупку до закінчення таймера, щоб зберегти місця</span>
-			</div>
-		</div>
-
-		<!-- HALL MAP (SEATED) -->
-		{#if activeHall.type === 'seated'}
-			<div class="screen-indicator">
-				<div class="screen-arc"></div>
-				<span class="screen-text">{activeHall.screenOrStageLabel || '🎬 ЕКРАН'}</span>
+					<div class="ios-info-row">
+						<Clock size={15} class="text-zinc-400 shrink-0" />
+						<span>Тривалість сеансу: {activeSession.durationMinutes} хв ({activeSession.language})</span>
+					</div>
+					<div class="ios-info-row">
+						<ShieldCheck size={15} class="text-emerald-500 shrink-0" />
+						<span>{mergedData.refundNotice}</span>
+					</div>
+				</div>
 			</div>
 
-			<!-- Hall Seat Map Matrix -->
-			<div class="seat-matrix-wrap">
-				<div class="seat-matrix">
-					{#each Array(activeHall.rowsCount || 5) as _, rIdx}
-						{@const rowNum = rIdx + 1}
-						<div class="seat-row">
-							<span class="row-num">{rowNum}</span>
-							<div class="seats-in-row">
-								{#each (activeHall.seats?.filter(s => s.row === rowNum) || []) as seat (seat.id)}
-									{@const isSelected = selections.selectedSeats.some(s => s.seatId === seat.id)}
-									{@const isStandard = seat.categoryId === 'cat_standard'}
+		<!-- WINDOW 2: SEAT MATRIX & RESERVATION TIMER -->
+		{:else if step === 2}
+			<!-- Reservation Timer Alert -->
+			<div class="ios-timer-pill">
+				<Clock size={14} />
+				<span>Місця зарезервовано на <strong>{formattedTime()} хв</strong></span>
+			</div>
+
+			<!-- Hall Seating Card -->
+			{#if activeHall.type === 'seated'}
+				<div class="ios-card ios-hall-card">
+					<!-- Curved Screen Bar -->
+					<div class="ios-screen-arc">
+						<span>{activeHall.screenOrStageLabel || '🎬 ЕКРАН'}</span>
+					</div>
+
+					<!-- Seat Matrix -->
+					<div class="ios-seat-grid">
+						{#each Array(activeHall.rowsCount || 5) as _, rIdx}
+							{@const rowNum = rIdx + 1}
+							<div class="ios-grid-row">
+								<span class="ios-row-label">{rowNum}</span>
+								<div class="ios-seats-lane">
+									{#each (activeHall.seats?.filter(s => s.row === rowNum) || []) as seat (seat.id)}
+										{@const isSelected = selections.selectedSeats.some(s => s.seatId === seat.id)}
+										{@const isStandard = seat.categoryId === 'cat_standard'}
+										<button
+											type="button"
+											class="ios-seat-dot"
+											class:selected={isSelected}
+											class:sold={seat.status === 'sold'}
+											class:standard={isStandard && !isSelected && seat.status !== 'sold'}
+											class:premium={!isStandard && !isSelected && seat.status !== 'sold'}
+											disabled={seat.status === 'sold'}
+											onclick={() => toggleSeat(seat)}
+											aria-label="Ряд {seat.row}, місце {seat.seat}"
+										>
+											{#if isSelected}
+												<Check size={10} strokeWidth={3} />
+											{:else if seat.status === 'sold'}
+												×
+											{:else}
+												{seat.seat}
+											{/if}
+										</button>
+									{/each}
+								</div>
+								<span class="ios-row-label">{rowNum}</span>
+							</div>
+						{/each}
+					</div>
+
+					<!-- Legend -->
+					<div class="ios-legend-row">
+						<div class="ios-legend-item">
+							<span class="ios-leg-dot standard"></span>
+							<span>Стандарт (250 ₴)</span>
+						</div>
+						<div class="ios-legend-item">
+							<span class="ios-leg-dot premium"></span>
+							<span>Преміум (350 ₴)</span>
+						</div>
+						<div class="ios-legend-item">
+							<span class="ios-leg-dot selected"></span>
+							<span>Обрано</span>
+						</div>
+						<div class="ios-legend-item">
+							<span class="ios-leg-dot sold"></span>
+							<span>Зайнято</span>
+						</div>
+					</div>
+				</div>
+			{:else}
+				<!-- Open Fan Zone -->
+				<div class="ios-card">
+					<span class="ios-card-title">Квитки у вільні фан-зони:</span>
+					<div class="ios-items-stack">
+						{#each activeHall.categories as cat (cat.id)}
+							{@const currentQty = selections.openZoneSelections?.find(z => z.categoryId === cat.id)?.quantity || 0}
+							<div class="ios-fan-card">
+								<div>
+									<strong class="ios-fan-name" style="border-left-color: {cat.color}">{cat.name}</strong>
+									<p class="ios-fan-desc">{cat.description}</p>
+									<span class="ios-fan-price">{cat.price} ₴</span>
+								</div>
+								<div class="ios-stepper">
 									<button
 										type="button"
-										class="seat-cell"
-										class:selected={isSelected}
-										class:sold={seat.status === 'sold'}
-										class:standard={isStandard && !isSelected && seat.status !== 'sold'}
-										class:premium={!isStandard && !isSelected && seat.status !== 'sold'}
-										disabled={seat.status === 'sold'}
-										aria-label="Ряд {seat.row}, місце {seat.seat}, {isStandard ? '250 ₴' : '350 ₴'}"
-										onclick={() => toggleSeat(seat)}
+										class="ios-stepper-btn"
+										disabled={currentQty <= 0}
+										onclick={() => handleOpenZoneQty(cat.id, -1)}
 									>
-										{#if isSelected}
-											<Check size={11} strokeWidth={3} />
-										{:else if seat.status === 'sold'}
-											×
-										{:else}
-											{seat.seat}
-										{/if}
+										-
 									</button>
-								{/each}
+									<span class="ios-stepper-val">{currentQty}</span>
+									<button
+										type="button"
+										class="ios-stepper-btn"
+										onclick={() => handleOpenZoneQty(cat.id, 1)}
+									>
+										+
+									</button>
+								</div>
 							</div>
-							<span class="row-num">{rowNum}</span>
-						</div>
-					{/each}
-				</div>
-			</div>
-
-			<!-- Category Legend -->
-			<div class="hall-legend">
-				<div class="legend-item">
-					<span class="legend-color standard"></span>
-					<span>Стандарт (250 ₴)</span>
-				</div>
-				<div class="legend-item">
-					<span class="legend-color premium"></span>
-					<span>Преміум (350 ₴)</span>
-				</div>
-				<div class="legend-item">
-					<span class="legend-color selected"></span>
-					<span>Обрано</span>
-				</div>
-				<div class="legend-item">
-					<span class="legend-color sold"></span>
-					<span>Зайнято</span>
-				</div>
-			</div>
-
-		<!-- OPEN FAN ZONE (NON-SEATED) -->
-		{:else}
-			<div class="open-zone-container">
-				<div class="stage-banner">
-					<span>🎸 ГОЛОВНА СЦЕНА ФЕСТИВАЛЮ</span>
-				</div>
-
-				<div class="open-zone-cards">
-					{#each activeHall.categories as cat (cat.id)}
-						{@const currentQty = selections.openZoneSelections?.find(z => z.categoryId === cat.id)?.quantity || 0}
-						<div class="zone-card">
-							<div class="zone-info">
-								<span class="zone-name" style="border-left-color: {cat.color}">{cat.name}</span>
-								<p class="zone-desc">{cat.description}</p>
-								<strong class="zone-price">{cat.price} ₴</strong>
-							</div>
-							<div class="zone-stepper">
-								<button
-									type="button"
-									class="btn-step"
-									disabled={currentQty <= 0}
-									onclick={() => handleOpenZoneQty(cat.id, -1)}
-								>
-									-
-								</button>
-								<span class="step-qty">{currentQty}</span>
-								<button
-									type="button"
-									class="btn-step"
-									onclick={() => handleOpenZoneQty(cat.id, 1)}
-								>
-									+
-								</button>
-							</div>
-						</div>
-					{/each}
-				</div>
-			</div>
-		{/if}
-	</main>
-
-	<!-- Price Summary & Transparent Breakdown -->
-	<footer class="checkout-footer">
-		<div class="order-summary-box">
-			<div class="summary-top">
-				<span class="event-title-tag">{activeSession.eventTitle}</span>
-				<span class="session-time-tag">{activeSession.date} · {activeSession.time}</span>
-			</div>
-
-			<!-- Breakdown rows -->
-			<div class="breakdown-lines">
-				{#each priceResult.breakdown as line}
-					<div class="line-row" class:fee-line={line.isFee}>
-						<span class="line-label">{line.label}</span>
-						<span class="line-sum">{line.amount} ₴</span>
+						{/each}
 					</div>
-				{/each}
-			</div>
+				</div>
+			{/if}
 
-			<div class="total-bar">
+			<!-- Selected Tickets Counter Card -->
+			<div class="ios-card ios-card-stepper">
 				<div>
-					<span class="total-lbl">До сплати разом:</span>
-					<span class="service-notice">Включаючи сервісний збір {priceResult.totalServiceFee} ₴</span>
+					<span class="ios-card-title mb-0">Обрано квитків:</span>
+					<span class="ios-card-sub">{priceResult.issuedTickets.length} шт (максимум {mergedData.maxTicketsPerOrder || 6})</span>
 				</div>
-				<strong class="total-num">{priceResult.totalAmount} ₴</strong>
+				<strong class="text-blue-600 font-bold text-sm">{priceResult.baseTicketsAmount} ₴</strong>
 			</div>
 
-			<button
-				type="button"
-				class="pay-btn"
-				disabled={priceResult.totalAmount <= 0}
-				onclick={handlePayClick}
-			>
-				<Ticket size={18} />
-				<span>Оплатити {priceResult.totalAmount} ₴ (Отримати квитки)</span>
-			</button>
-		</div>
-	</footer>
-
-	<!-- Electronic Tickets Modal / Access Control Simulator -->
-	{#if showTicketModal}
-		<div class="tickets-modal-backdrop">
-			<div class="tickets-modal">
-				<div class="modal-header">
-					<div>
-						<h4>🎟️ Ваші електронні квитки</h4>
-						<p class="modal-subtitle">{activeSession.eventTitle} ({priceResult.issuedTickets.length} шт)</p>
+		<!-- WINDOW 3: PAYMENT, BREAKDOWN & ELECTRONIC TICKETS -->
+		{:else if step === 3}
+			<!-- Buyer Contacts Card -->
+			<div class="ios-card">
+				<span class="ios-card-title">Отримувач електронних квитків:</span>
+				<div class="ios-form-stack">
+					<label>
+						<span class="ios-input-lbl">Ім'я та прізвище:</span>
+						<input
+							type="text"
+							class="ios-input"
+							bind:value={selections.buyerName}
+							placeholder="Олександр Коваленко"
+						/>
+					</label>
+					<div class="ios-grid-2">
+						<label>
+							<span class="ios-input-lbl">Email (для надсилання PDF):</span>
+							<input
+								type="email"
+								class="ios-input"
+								bind:value={selections.buyerEmail}
+								placeholder="example@mail.com"
+							/>
+						</label>
+						<label>
+							<span class="ios-input-lbl">Телефон (SMS / Viber):</span>
+							<input
+								type="tel"
+								class="ios-input"
+								bind:value={selections.buyerPhone}
+								placeholder="+380..."
+							/>
+						</label>
 					</div>
+				</div>
+			</div>
+
+			<!-- Apple Wallet Pass Style Ticket Receipt -->
+			<div class="ios-pass-card">
+				<div class="ios-pass-head">
+					<div>
+						<span class="ios-pass-tag">Електронні квитки</span>
+						<h5 class="ios-pass-title">{activeSession.eventTitle}</h5>
+					</div>
+					<span class="ios-pass-badge">🎬 {activeSession.format}</span>
+				</div>
+
+				<div class="ios-pass-body">
+					{#each priceResult.breakdown as line}
+						<div class="ios-pass-row">
+							<span class="ios-pass-lbl">{line.label}</span>
+							<strong class="ios-pass-val">{line.amount} ₴</strong>
+						</div>
+					{/each}
+				</div>
+
+				<div class="ios-pass-cut">
+					<div class="ios-cut-left"></div>
+					<div class="ios-cut-line"></div>
+					<div class="ios-cut-right"></div>
+				</div>
+
+				<div class="ios-pass-footer">
+					<div class="ios-pass-total-row">
+						<div>
+							<span>Разом до сплати:</span>
+							<span class="ios-fee-note">Включаючи сервісний збір {priceResult.totalServiceFee} ₴</span>
+						</div>
+						<strong class="ios-total-sum">{priceResult.totalAmount} ₴</strong>
+					</div>
+				</div>
+			</div>
+
+			<!-- E-Tickets Section with QR & Entrance Simulator -->
+			<div class="ios-card">
+				<div class="ios-card-head mb-2">
+					<span class="ios-card-title mb-0">🎟️ Ваші електронні квитки ({priceResult.issuedTickets.length} шт):</span>
 					<button
 						type="button"
-						class="btn-close"
-						onclick={() => (showTicketModal = false)}
-						aria-label="Закрити"
+						class="text-[11px] font-semibold text-blue-600"
+						onclick={() => (showTicketPasses = !showTicketPasses)}
 					>
-						×
+						{showTicketPasses ? 'Згорнути' : 'Показати QR'}
 					</button>
 				</div>
 
 				{#if scanMessage}
-					<div class="scan-alert-box" class:alert-ok={scanMessage.includes('ВХІД ДОЗВОЛЕНО')}>
+					<div class="ios-scan-alert" class:allowed={scanMessage.includes('ДОЗВОЛЕНО')}>
 						{scanMessage}
 					</div>
 				{/if}
 
-				<div class="tickets-list">
-					{#each priceResult.issuedTickets as tck}
-						{@const isUsed = usedTicketCodes.has(tck.ticketCode)}
-						<div class="ticket-card" class:used={isUsed}>
-							<div class="tck-top">
-								<span class="tck-code">{tck.ticketCode}</span>
-								<span class="tck-status" class:status-used={isUsed}>
-									{isUsed ? '❌ ПОГАШЕНО (Вхід здійснено)' : '✅ ДІЙСНИЙ'}
-								</span>
-							</div>
-
-							<div class="tck-details">
-								<div>
-									<strong>{tck.seatLabel}</strong>
-									<span class="tck-cat">{tck.categoryName}</span>
+				{#if showTicketPasses}
+					<div class="ios-tickets-list">
+						{#each priceResult.issuedTickets as tck}
+							{@const isUsed = usedTicketCodes.has(tck.ticketCode)}
+							<div class="ios-ticket-pass" class:used={isUsed}>
+								<div class="ios-tck-top">
+									<strong class="ios-tck-code">{tck.ticketCode}</strong>
+									<span class="ios-tck-status" class:status-used={isUsed}>
+										{isUsed ? '❌ ПОГАШЕНО' : '✅ ДІЙСНИЙ'}
+									</span>
 								</div>
-								<div class="tck-meta">
+								<div class="ios-tck-meta">
+									<span>{tck.seatLabel} ({tck.categoryName})</span>
 									<span>{tck.hallName}</span>
-									<span>{tck.sessionDateTime}</span>
+								</div>
+								<div class="ios-tck-qr-row">
+									<div class="ios-qr-box">
+										<QrCode size={40} />
+									</div>
+									<div class="ios-qr-action">
+										<span class="ios-qr-desc">Пред'явіть контролеру на вході</span>
+										<button
+											type="button"
+											class="ios-btn-scan"
+											onclick={() => simulateScan(tck.ticketCode)}
+										>
+											📱 Симулювати сканування
+										</button>
+									</div>
 								</div>
 							</div>
-
-							<div class="tck-qr-row">
-								<div class="qr-mock">
-									<QrCode size={48} />
-								</div>
-								<div class="qr-info">
-									<p class="qr-desc">Пред’явіть QR-код контролеру на вході</p>
-									<button
-										type="button"
-										class="btn-scanner"
-										onclick={() => simulateScan(tck.ticketCode)}
-									>
-										📱 Сканувати на вході
-									</button>
-								</div>
-							</div>
-						</div>
-					{/each}
-				</div>
+						{/each}
+					</div>
+				{/if}
 			</div>
-		</div>
-	{/if}
+		{/if}
+	</div>
+
+	<!-- Apple Style Floating Bottom Bar -->
+	<div class="ios-bottom-bar">
+		{#if step > 1}
+			<button
+				type="button"
+				class="ios-btn-secondary"
+				onclick={() => step = (step - 1) as 1 | 2 | 3}
+			>
+				<ChevronLeft size={16} /> Назад
+			</button>
+		{/if}
+
+		{#if step < 3}
+			<button
+				type="button"
+				class="ios-btn-primary flex-1"
+				onclick={() => step = (step + 1) as 1 | 2 | 3}
+			>
+				{#if step === 1}
+					Вибрати місця
+				{:else if step === 2}
+					До оплати ({priceResult.totalAmount} ₴)
+				{/if}
+				<ChevronRight size={16} />
+			</button>
+		{:else}
+			<button
+				type="button"
+				class="ios-btn-primary flex-1"
+				disabled={priceResult.totalAmount <= 0}
+				onclick={handlePayClick}
+			>
+				<Ticket size={16} />
+				<span>Оплатити {priceResult.totalAmount} ₴</span>
+			</button>
+		{/if}
+	</div>
 </div>
 
 <style>
-	.events-preview {
+	.ios-preview-container {
 		display: flex;
 		flex-direction: column;
-		background: #0f172a;
-		border-radius: 12px;
-		color: #ffffff;
+		background: #f2f2f7;
+		font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+		color: #1c1c1e;
+		min-height: 520px;
+		border-radius: 18px;
 		overflow: hidden;
-		font-family: inherit;
+		position: relative;
+		padding-bottom: 72px;
 	}
 
-	.venue-header {
-		background: linear-gradient(180deg, #1e293b, #0f172a);
-		padding: 1.1rem 1rem 0.6rem 1rem;
-		text-align: center;
+	.ios-nav-bar {
+		background: rgba(255, 255, 255, 0.85);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+		padding: 0.65rem 1rem;
+		position: sticky;
+		top: 0;
+		z-index: 10;
 	}
 
-	.venue-badge {
-		display: inline-block;
-		font-size: 0.72rem;
+	.ios-nav-content {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+
+	.ios-merchant-badge {
+		font-size: 0.85rem;
 		font-weight: 700;
-		color: #38bdf8;
-		background: rgba(56, 189, 248, 0.15);
-		padding: 0.2rem 0.6rem;
-		border-radius: 20px;
-		margin-bottom: 0.35rem;
+		color: #1c1c1e;
 	}
 
-	.venue-title {
-		font-size: 1.15rem;
-		font-weight: 800;
-		margin: 0;
-		color: #f8fafc;
-	}
-
-	.venue-address {
-		font-size: 0.75rem;
-		color: #94a3b8;
-		margin: 0.25rem 0 0 0;
+	.ios-secure-tag {
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		gap: 0.25rem;
+		gap: 3px;
+		font-size: 0.7rem;
+		font-weight: 500;
+		color: #34c759;
+		background: rgba(52, 199, 89, 0.12);
+		padding: 2px 8px;
+		border-radius: 12px;
 	}
 
-	.sessions-selector {
-		padding: 0.75rem 0.75rem 0.25rem 0.75rem;
+	.ios-step-indicator {
+		padding: 0.85rem 1rem 0.25rem 1rem;
 	}
 
-	.selector-header {
+	.ios-capsules {
+		display: flex;
+		gap: 4px;
 		margin-bottom: 0.4rem;
 	}
 
-	.sub-label {
-		font-size: 0.75rem;
+	.ios-capsule {
+		flex: 1;
+		height: 3px;
+		background: #d1d1d6;
+		border-radius: 2px;
+		transition: background 0.3s ease;
+	}
+
+	.ios-capsule.filled {
+		background: #007aff;
+	}
+
+	.ios-step-sub {
+		font-size: 0.7rem;
 		font-weight: 600;
-		color: #94a3b8;
+		color: #007aff;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
 	}
 
-	.sessions-scroll {
+	.ios-step-title {
+		font-size: 1.05rem;
+		font-weight: 700;
+		color: #1c1c1e;
+		margin: 0;
+	}
+
+	.ios-window-body {
+		padding: 0.75rem 1rem;
 		display: flex;
-		gap: 0.5rem;
-		overflow-x: auto;
-		padding-bottom: 0.35rem;
+		flex-direction: column;
+		gap: 0.75rem;
 	}
 
-	.session-pill-btn {
-		background: #1e293b;
-		border: 1.5px solid #334155;
-		border-radius: 8px;
-		padding: 0.55rem 0.75rem;
-		color: #cbd5e1;
+	.ios-card {
+		background: #ffffff;
+		border-radius: 14px;
+		padding: 0.85rem;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+		border: 0.5px solid rgba(0, 0, 0, 0.08);
+	}
+
+	.ios-card-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+
+	.ios-card-title {
+		display: block;
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: #3a3a3c;
+		margin-bottom: 0.5rem;
+	}
+
+	.ios-card-sub {
+		font-size: 0.72rem;
+		color: #8e8e93;
+		margin: 0;
+	}
+
+	.ios-card-stepper {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+
+	.ios-items-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.ios-session-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.65rem 0.75rem;
+		border-radius: 10px;
+		border: 1px solid #e5e5ea;
+		background: #ffffff;
 		cursor: pointer;
 		text-align: left;
-		white-space: nowrap;
-		display: flex;
-		flex-direction: column;
-		gap: 0.2rem;
-		transition: all 0.15s ease;
 	}
 
-	.session-pill-btn.active {
-		border-color: #38bdf8;
-		background: #0284c7;
-		color: #ffffff;
+	.ios-session-row.selected {
+		border-color: #007aff;
+		background: #f0f7ff;
 	}
 
-	.sess-title {
+	.ios-sess-title {
 		font-size: 0.82rem;
 		font-weight: 700;
+		color: #1c1c1e;
 	}
 
-	.sess-meta {
+	.ios-sess-tags {
 		display: flex;
 		align-items: center;
-		gap: 0.4rem;
-		font-size: 0.72rem;
-		color: #94a3b8;
+		gap: 4px;
+		margin-top: 3px;
 	}
 
-	.session-pill-btn.active .sess-meta {
-		color: #e0f2fe;
-	}
-
-	.badge-format {
-		background: rgba(255, 255, 255, 0.15);
-		padding: 0.1rem 0.35rem;
+	.ios-badge-format {
+		font-size: 0.65rem;
+		background: #e5e5ea;
+		color: #1c1c1e;
+		padding: 1px 5px;
 		border-radius: 4px;
 		font-weight: 600;
+	}
+
+	.ios-badge-age {
+		font-size: 0.65rem;
+		background: #fee2e2;
+		color: #b91c1c;
+		padding: 1px 5px;
+		border-radius: 4px;
+		font-weight: 600;
+	}
+
+	.ios-sess-hall {
 		font-size: 0.68rem;
+		color: #8e8e93;
 	}
 
-	.sess-hall {
-		font-size: 0.68rem;
-		color: #64748b;
+	.ios-sess-timing {
+		text-align: right;
 	}
 
-	.session-pill-btn.active .sess-hall {
-		color: #bae6fd;
-	}
-
-	.hall-experience {
-		padding: 0.75rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.85rem;
-	}
-
-	.reservation-timer-banner {
-		background: rgba(245, 158, 11, 0.15);
-		border: 1px solid rgba(245, 158, 11, 0.3);
-		border-radius: 8px;
-		padding: 0.6rem 0.75rem;
-		display: flex;
-		align-items: center;
-		gap: 0.65rem;
-		color: #fbbf24;
-	}
-
-	.reservation-timer-banner strong {
-		font-size: 0.82rem;
+	.ios-sess-time {
+		font-size: 0.92rem;
+		color: #007aff;
 		display: block;
 	}
 
-	.timer-desc {
-		font-size: 0.7rem;
-		color: #d97706;
-		display: block;
+	.ios-sess-date {
+		font-size: 0.65rem;
+		color: #8e8e93;
 	}
 
-	/* Hall Screen & Seat Map */
-	.screen-indicator {
-		text-align: center;
-		padding: 0.5rem 0;
-	}
-
-	.screen-arc {
-		height: 4px;
-		background: linear-gradient(90deg, transparent, #38bdf8, transparent);
-		border-radius: 50%;
-		margin: 0 1.5rem 0.35rem 1.5rem;
-		box-shadow: 0 0 10px #38bdf8;
-	}
-
-	.screen-text {
-		font-size: 0.72rem;
-		letter-spacing: 2px;
-		font-weight: 700;
-		color: #64748b;
-	}
-
-	.seat-matrix-wrap {
-		display: flex;
-		justify-content: center;
-		overflow-x: auto;
-		padding: 0.5rem 0;
-	}
-
-	.seat-matrix {
+	.ios-venue-info {
 		display: flex;
 		flex-direction: column;
 		gap: 0.45rem;
+		font-size: 0.75rem;
+		color: #636366;
 	}
 
-	.seat-row {
+	.ios-info-row {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 6px;
 	}
 
-	.row-num {
-		font-size: 0.72rem;
+	.ios-timer-pill {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		background: #fffbeb;
+		border: 1px solid #fef3c7;
+		padding: 0.45rem 0.75rem;
+		border-radius: 10px;
+		font-size: 0.75rem;
+		color: #b45309;
+	}
+
+	/* Seating Screen & Matrix */
+	.ios-hall-card {
+		padding: 0.85rem 0.5rem;
+		overflow-x: auto;
+	}
+
+	.ios-screen-arc {
+		background: linear-gradient(180deg, #e5e5ea 0%, rgba(229, 229, 234, 0.2) 100%);
+		border-top: 3px solid #007aff;
+		border-radius: 50% 50% 0 0 / 14px 14px 0 0;
+		padding: 0.35rem 0;
+		text-align: center;
+		font-size: 0.68rem;
 		font-weight: 700;
-		color: #64748b;
+		letter-spacing: 1px;
+		color: #8e8e93;
+		margin-bottom: 0.75rem;
+	}
+
+	.ios-seat-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		align-items: center;
+	}
+
+	.ios-grid-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.ios-row-label {
+		font-size: 0.65rem;
+		font-weight: 700;
+		color: #8e8e93;
 		width: 14px;
 		text-align: center;
 	}
 
-	.seats-in-row {
+	.ios-seats-lane {
 		display: flex;
-		gap: 0.35rem;
+		gap: 4px;
 	}
 
-	.seat-cell {
-		width: 26px;
-		height: 26px;
-		border-radius: 6px 6px 4px 4px;
-		border: 1px solid transparent;
-		font-size: 0.7rem;
-		font-weight: 700;
+	.ios-seat-dot {
+		width: 22px;
+		height: 22px;
+		border-radius: 5px;
+		font-size: 0.62rem;
+		font-weight: 600;
+		border: 1px solid #d1d1d6;
+		background: #ffffff;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -824,431 +1020,447 @@
 		transition: all 0.15s ease;
 	}
 
-	.seat-cell.standard {
-		background: #1e3a8a;
-		border-color: #3b82f6;
-		color: #bfdbfe;
+	.ios-seat-dot.standard {
+		border-color: #93c5fd;
+		color: #1d4ed8;
+		background: #eff6ff;
 	}
 
-	.seat-cell.premium {
-		background: #713f12;
-		border-color: #eab308;
-		color: #fef08a;
+	.ios-seat-dot.premium {
+		border-color: #fde68a;
+		color: #b45309;
+		background: #fffbeb;
 	}
 
-	.seat-cell.selected {
-		background: #10b981;
-		border-color: #34d399;
+	.ios-seat-dot.selected {
+		border-color: #007aff;
+		background: #007aff;
 		color: #ffffff;
-		box-shadow: 0 0 8px #10b981;
+		font-weight: 700;
 	}
 
-	.seat-cell.sold {
-		background: #334155;
-		color: #64748b;
+	.ios-seat-dot.sold {
+		border-color: #e5e5ea;
+		background: #f2f2f7;
+		color: #c7c7cc;
 		cursor: not-allowed;
-		opacity: 0.4;
 	}
 
-	.hall-legend {
+	.ios-legend-row {
 		display: flex;
 		justify-content: center;
-		gap: 0.85rem;
 		flex-wrap: wrap;
-		font-size: 0.7rem;
-		color: #94a3b8;
-		padding: 0.25rem 0;
+		gap: 0.75rem;
+		margin-top: 0.85rem;
+		padding-top: 0.6rem;
+		border-top: 1px solid #f2f2f7;
+		font-size: 0.68rem;
+		color: #636366;
 	}
 
-	.legend-item {
+	.ios-legend-item {
 		display: flex;
 		align-items: center;
-		gap: 0.35rem;
+		gap: 4px;
 	}
 
-	.legend-color {
-		width: 12px;
-		height: 12px;
+	.ios-leg-dot {
+		width: 10px;
+		height: 10px;
 		border-radius: 3px;
 	}
 
-	.legend-color.standard {
-		background: #3b82f6;
+	.ios-leg-dot.standard {
+		background: #eff6ff;
+		border: 1px solid #93c5fd;
 	}
 
-	.legend-color.premium {
-		background: #eab308;
+	.ios-leg-dot.premium {
+		background: #fffbeb;
+		border: 1px solid #fde68a;
 	}
 
-	.legend-color.selected {
-		background: #10b981;
+	.ios-leg-dot.selected {
+		background: #007aff;
 	}
 
-	.legend-color.sold {
-		background: #475569;
+	.ios-leg-dot.sold {
+		background: #e5e5ea;
 	}
 
-	/* Open Zone */
-	.open-zone-container {
+	/* Fan zone */
+	.ios-fan-card {
 		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.65rem 0.75rem;
+		border-radius: 10px;
+		border: 1px solid #e5e5ea;
+		background: #ffffff;
 	}
 
-	.stage-banner {
-		background: #be185d;
-		color: white;
-		text-align: center;
-		padding: 0.6rem;
-		font-weight: 800;
+	.ios-fan-name {
 		font-size: 0.8rem;
-		letter-spacing: 1px;
-		border-radius: 6px;
-	}
-
-	.open-zone-cards {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.zone-card {
-		background: #1e293b;
-		border: 1px solid #334155;
-		border-radius: 8px;
-		padding: 0.75rem;
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-	}
-
-	.zone-name {
-		font-weight: 700;
-		font-size: 0.85rem;
-		border-left: 3px solid #38bdf8;
-		padding-left: 0.4rem;
-	}
-
-	.zone-desc {
-		font-size: 0.72rem;
-		color: #94a3b8;
-		margin: 0.15rem 0 0.3rem 0;
-	}
-
-	.zone-price {
-		font-size: 0.92rem;
-		color: #38bdf8;
-	}
-
-	.zone-stepper {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		background: #0f172a;
-		padding: 0.2rem 0.4rem;
-		border-radius: 6px;
-	}
-
-	.btn-step {
-		width: 28px;
-		height: 28px;
-		background: #334155;
-		color: white;
-		border: none;
-		border-radius: 4px;
-		cursor: pointer;
-		font-weight: 700;
-	}
-
-	.btn-step:disabled {
-		opacity: 0.3;
-		cursor: not-allowed;
-	}
-
-	.step-qty {
-		font-size: 0.9rem;
-		font-weight: 800;
-		min-width: 20px;
-		text-align: center;
-	}
-
-	/* Footer & Pricing */
-	.checkout-footer {
-		background: #1e293b;
-		border-top: 1px solid #334155;
-		padding: 1rem;
-	}
-
-	.order-summary-box {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-
-	.summary-top {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-	}
-
-	.event-title-tag {
-		font-size: 0.85rem;
-		font-weight: 700;
-		color: #f8fafc;
-	}
-
-	.session-time-tag {
-		font-size: 0.72rem;
-		color: #38bdf8;
-	}
-
-	.breakdown-lines {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		border-top: 1px dashed #334155;
-		border-bottom: 1px dashed #334155;
-		padding: 0.5rem 0;
-	}
-
-	.line-row {
-		display: flex;
-		justify-content: space-between;
-		font-size: 0.78rem;
-		color: #cbd5e1;
-	}
-
-	.fee-line {
-		color: #fbbf24;
-	}
-
-	.total-bar {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-	}
-
-	.total-lbl {
-		font-size: 0.88rem;
-		font-weight: 700;
+		font-weight: 600;
+		color: #1c1c1e;
 		display: block;
+		padding-left: 6px;
+		border-left: 3px solid #007aff;
 	}
 
-	.service-notice {
+	.ios-fan-desc {
 		font-size: 0.68rem;
-		color: #94a3b8;
+		color: #8e8e93;
+		margin: 2px 0 0 0;
+	}
+
+	.ios-fan-price {
+		font-size: 0.82rem;
+		font-weight: 700;
+		color: #007aff;
+		margin-top: 2px;
 		display: block;
 	}
 
-	.total-num {
-		font-size: 1.3rem;
-		font-weight: 800;
-		color: #38bdf8;
+	.ios-stepper {
+		display: flex;
+		align-items: center;
+		background: #f2f2f7;
+		border-radius: 8px;
+		padding: 2px;
+		gap: 6px;
 	}
 
-	.pay-btn {
+	.ios-stepper-btn {
+		width: 26px;
+		height: 26px;
+		border-radius: 6px;
+		border: none;
+		background: #ffffff;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		gap: 0.5rem;
-		width: 100%;
-		padding: 0.8rem;
-		background: #0284c7;
-		color: #ffffff;
-		border: none;
-		border-radius: 8px;
-		font-size: 0.92rem;
-		font-weight: 700;
 		cursor: pointer;
-		box-shadow: 0 4px 10px rgba(2, 132, 199, 0.4);
-		transition: all 0.15s ease;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 	}
 
-	.pay-btn:hover:not(:disabled) {
-		background: #0369a1;
-	}
-
-	.pay-btn:disabled {
+	.ios-stepper-btn:disabled {
 		opacity: 0.4;
 		cursor: not-allowed;
 	}
 
-	/* E-tickets Modal */
-	.tickets-modal-backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.8);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 1rem;
-		z-index: 999;
+	.ios-stepper-val {
+		font-size: 0.82rem;
+		font-weight: 700;
+		color: #1c1c1e;
+		min-width: 24px;
+		text-align: center;
 	}
 
-	.tickets-modal {
-		background: #0f172a;
-		border: 1px solid #334155;
-		border-radius: 12px;
-		max-width: 420px;
-		width: 100%;
-		max-height: 85vh;
-		overflow-y: auto;
-		padding: 1.25rem;
+	/* Form Inputs */
+	.ios-form-stack {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0.4rem;
 	}
 
-	.modal-header {
+	.ios-input-lbl {
+		display: block;
+		font-size: 0.74rem;
+		font-weight: 600;
+		color: #3a3a3c;
+		margin-bottom: 0.35rem;
+	}
+
+	.ios-input {
+		width: 100%;
+		border: 1px solid #e5e5ea;
+		background: #f9f9fb;
+		border-radius: 8px;
+		padding: 0.5rem 0.65rem;
+		font-size: 0.8rem;
+		color: #1c1c1e;
+		outline: none;
+		box-sizing: border-box;
+	}
+
+	.ios-input:focus {
+		border-color: #007aff;
+		background: #ffffff;
+	}
+
+	/* Apple Pass / Wallet Card */
+	.ios-pass-card {
+		background: #ffffff;
+		border-radius: 16px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+		border: 0.5px solid rgba(0, 0, 0, 0.08);
+		overflow: hidden;
+	}
+
+	.ios-pass-head {
+		padding: 0.85rem;
 		display: flex;
 		justify-content: space-between;
 		align-items: flex-start;
+		background: linear-gradient(180deg, #fafafa 0%, #ffffff 100%);
 	}
 
-	.modal-header h4 {
-		margin: 0;
-		font-size: 1.1rem;
-		color: #ffffff;
+	.ios-pass-tag {
+		font-size: 0.68rem;
+		font-weight: 600;
+		color: #007aff;
+		text-transform: uppercase;
+		display: block;
 	}
 
-	.modal-subtitle {
-		font-size: 0.75rem;
-		color: #94a3b8;
-		margin: 0.2rem 0 0 0;
+	.ios-pass-title {
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: #1c1c1e;
+		margin: 2px 0 0 0;
 	}
 
-	.btn-close {
-		background: none;
-		border: none;
-		color: #94a3b8;
-		font-size: 1.4rem;
-		cursor: pointer;
-		line-height: 1;
+	.ios-pass-badge {
+		font-size: 0.65rem;
+		font-weight: 600;
+		color: #007aff;
+		background: #eff6ff;
+		padding: 2px 8px;
+		border-radius: 10px;
 	}
 
-	.scan-alert-box {
-		background: #7f1d1d;
-		border: 1px solid #ef4444;
-		color: #fecaca;
-		padding: 0.6rem 0.75rem;
-		border-radius: 6px;
-		font-size: 0.75rem;
+	.ios-pass-body {
+		padding: 0.5rem 0.85rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+
+	.ios-pass-row {
+		display: flex;
+		justify-content: space-between;
+		font-size: 0.78rem;
+	}
+
+	.ios-pass-lbl {
+		color: #636366;
+	}
+
+	.ios-pass-val {
+		color: #1c1c1e;
+	}
+
+	.ios-pass-cut {
+		display: flex;
+		align-items: center;
+		position: relative;
+		margin: 0.35rem 0;
+	}
+
+	.ios-cut-left, .ios-cut-right {
+		width: 14px;
+		height: 14px;
+		background: #f2f2f7;
+		border-radius: 50%;
+	}
+
+	.ios-cut-left {
+		margin-left: -7px;
+	}
+
+	.ios-cut-right {
+		margin-right: -7px;
+	}
+
+	.ios-cut-line {
+		flex: 1;
+		border-bottom: 1px dashed #d1d1d6;
+	}
+
+	.ios-pass-footer {
+		padding: 0.5rem 0.85rem 0.85rem 0.85rem;
+	}
+
+	.ios-pass-total-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		font-size: 0.88rem;
 		font-weight: 600;
 	}
 
-	.scan-alert-box.alert-ok {
-		background: #064e3b;
-		border-color: #10b981;
-		color: #a7f3d0;
+	.ios-fee-note {
+		display: block;
+		font-size: 0.65rem;
+		font-weight: normal;
+		color: #8e8e93;
 	}
 
-	.tickets-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
+	.ios-total-sum {
+		font-size: 1.25rem;
+		font-weight: 800;
+		color: #007aff;
 	}
 
-	.ticket-card {
-		background: #1e293b;
-		border: 1.5px dashed #475569;
+	/* E-Tickets Cards */
+	.ios-scan-alert {
+		font-size: 0.72rem;
+		padding: 0.45rem 0.6rem;
 		border-radius: 8px;
-		padding: 0.85rem;
+		background: #fee2e2;
+		color: #b91c1c;
+		margin-bottom: 0.5rem;
+	}
+
+	.ios-scan-alert.allowed {
+		background: #dcfce7;
+		color: #15803d;
+	}
+
+	.ios-tickets-list {
 		display: flex;
 		flex-direction: column;
-		gap: 0.65rem;
+		gap: 0.5rem;
 	}
 
-	.ticket-card.used {
+	.ios-ticket-pass {
+		border: 1px solid #e5e5ea;
+		border-radius: 10px;
+		padding: 0.6rem 0.75rem;
+		background: #fafafa;
+	}
+
+	.ios-ticket-pass.used {
 		opacity: 0.55;
-		border-color: #ef4444;
+		background: #f4f4f5;
 	}
 
-	.tck-top {
+	.ios-tck-top {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
 	}
 
-	.tck-code {
+	.ios-tck-code {
 		font-size: 0.78rem;
-		font-family: monospace;
-		font-weight: 700;
-		color: #38bdf8;
+		color: #1c1c1e;
 	}
 
-	.tck-status {
-		font-size: 0.7rem;
+	.ios-tck-status {
+		font-size: 0.68rem;
 		font-weight: 700;
-		color: #10b981;
+		color: #16a34a;
 	}
 
-	.status-used {
+	.ios-tck-status.status-used {
 		color: #ef4444;
 	}
 
-	.tck-details {
+	.ios-tck-meta {
 		display: flex;
 		justify-content: space-between;
-		align-items: flex-end;
-		border-top: 1px solid #334155;
-		padding-top: 0.5rem;
-	}
-
-	.tck-cat {
-		display: block;
 		font-size: 0.7rem;
-		color: #94a3b8;
+		color: #636366;
+		margin: 2px 0 0.4rem 0;
 	}
 
-	.tck-meta {
-		font-size: 0.7rem;
-		color: #94a3b8;
-		text-align: right;
-		display: flex;
-		flex-direction: column;
-	}
-
-	.tck-qr-row {
+	.ios-tck-qr-row {
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
-		background: #0f172a;
-		padding: 0.5rem;
+		padding-top: 0.4rem;
+		border-top: 1px dashed #e5e5ea;
+	}
+
+	.ios-qr-box {
+		background: #ffffff;
+		padding: 4px;
 		border-radius: 6px;
+		border: 1px solid #e5e5ea;
 	}
 
-	.qr-mock {
-		background: white;
-		color: black;
-		padding: 0.25rem;
-		border-radius: 4px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.qr-info {
+	.ios-qr-action {
 		flex: 1;
 	}
 
-	.qr-desc {
+	.ios-qr-desc {
 		font-size: 0.68rem;
-		color: #94a3b8;
-		margin: 0 0 0.4rem 0;
+		color: #8e8e93;
+		display: block;
+		margin-bottom: 4px;
 	}
 
-	.btn-scanner {
-		background: #334155;
+	.ios-btn-scan {
+		background: #007aff;
 		color: #ffffff;
 		border: none;
-		border-radius: 4px;
+		border-radius: 6px;
 		padding: 0.35rem 0.6rem;
 		font-size: 0.7rem;
 		font-weight: 600;
 		cursor: pointer;
 	}
 
-	.btn-scanner:hover {
-		background: #475569;
+	/* Fixed Bottom Action Bar */
+	.ios-bottom-bar {
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		padding: 0.65rem 1rem;
+		background: rgba(255, 255, 255, 0.92);
+		backdrop-filter: blur(16px);
+		-webkit-backdrop-filter: blur(16px);
+		border-top: 0.5px solid rgba(0, 0, 0, 0.1);
+		display: flex;
+		gap: 0.5rem;
+		z-index: 20;
+	}
+
+	.ios-btn-secondary {
+		background: #e5e5ea;
+		color: #1c1c1e;
+		border: none;
+		border-radius: 12px;
+		padding: 0.6rem 0.9rem;
+		font-size: 0.82rem;
+		font-weight: 600;
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		cursor: pointer;
+	}
+
+	.ios-btn-primary {
+		background: #007aff;
+		color: #ffffff;
+		border: none;
+		border-radius: 12px;
+		padding: 0.65rem 1rem;
+		font-size: 0.85rem;
+		font-weight: 600;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		cursor: pointer;
+		box-shadow: 0 2px 6px rgba(0, 122, 255, 0.3);
+		transition: background 0.15s ease;
+	}
+
+	.ios-btn-primary:active {
+		background: #0062cc;
+	}
+
+	.ios-btn-primary:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.ios-grid-2 {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.5rem;
 	}
 </style>

@@ -48,7 +48,8 @@
 			vertical_delivery: '📦 Перевезення',
 			vertical_print: '🖨️ Друкарня',
 			vertical_gifts: '🎁 Подарунки',
-			vertical_events: '🎟️ Квитки / Події'
+			vertical_events: '🎟️ Квитки / Події',
+			vertical_fitness: '🏋️‍♂️ Фітнес / Абонементи'
 		};
 		return map[type] || type.replace(/_/g, ' ');
 	}

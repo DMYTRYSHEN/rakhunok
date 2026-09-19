@@ -83,6 +83,7 @@
 
 	// Поточний екран: 'welcome' | 'booking' | 'in_salon' | 'booking_submitted'
 	let activePath = $state<'welcome' | 'booking' | 'in_salon' | 'booking_submitted'>('welcome');
+	let bookingStep = $state<1 | 2 | 3 | 4>(1);
 
 	// Вибрані клієнтом опції
 	let selectedServiceId = $state<string>('');
@@ -242,223 +243,279 @@
 	<!-- ═════════════════════════════════════════════════════════════ -->
 	{:else if activePath === 'booking'}
 		<div class="flow-content space-y-4">
-			<div class="step-title-bar">
-				<span class="step-pill">Онлайн-запис</span>
-				<span class="step-desc">Оберіть деталі вашого візиту</span>
-			</div>
-
-			<!-- Крок 1: Послуга -->
-			<div class="section-box">
-				<span class="section-label">1. Оберіть послугу:</span>
-				<div class="services-list space-y-1.5">
-					{#each effectiveData.services ?? [] as s (s.id)}
-						<button
-							type="button"
-							class="service-chip"
-							class:active={s.id === selectedServiceId}
-							onclick={() => handleServiceSelect(s.id)}
-						>
-							<div class="s-info">
-								<strong>{s.name}</strong>
-								<span class="s-time"><Clock size={11} /> {s.durationMinutes} хв</span>
-							</div>
-							<div class="s-price">
-								<strong>{s.basePrice} ₴</strong>
-								{#if s.id === selectedServiceId}
-									<span class="check-dot"><Check size={12} /></span>
-								{/if}
-							</div>
-						</button>
-					{/each}
+			<!-- Apple HIG Step Indicator -->
+			<div class="ios-step-indicator">
+				<div class="ios-capsules">
+					<div class="ios-capsule" class:filled={bookingStep >= 1}></div>
+					<div class="ios-capsule" class:filled={bookingStep >= 2}></div>
+					<div class="ios-capsule" class:filled={bookingStep >= 3}></div>
+					<div class="ios-capsule" class:filled={bookingStep >= 4}></div>
+				</div>
+				<div class="ios-step-title-wrap">
+					<span class="ios-step-sub">Крок {bookingStep} з 4</span>
+					<h4 class="ios-step-title">
+						{#if bookingStep === 1}
+							Послуга та особливості
+						{:else if bookingStep === 2}
+							Вибір майстра
+						{:else if bookingStep === 3}
+							Догляд, дата та час
+						{:else if bookingStep === 4}
+							Кошторис та аванс
+						{/if}
+					</h4>
 				</div>
 			</div>
 
-			<!-- Крок 2: Розгалужені запитання (Довжина волосся) -->
-			{#if activeQuestions.length > 0}
-				{#each activeQuestions as q (q.id)}
-					<div class="section-box highlight-box">
-						<span class="section-label text-indigo-400">
-							2. {q.title}
-							<span class="badge-branching">розгалуження</span>
-						</span>
-						<p class="section-hint">{q.hint}</p>
-
-						<div class="options-grid">
-							{#each q.options as opt (opt.id)}
-								<button
-									type="button"
-									class="opt-btn"
-									class:active={questionOptionMap[q.id] === opt.id}
-									onclick={() => (questionOptionMap = { ...questionOptionMap, [q.id]: opt.id })}
-								>
-									<span>{opt.title}</span>
-									<strong>{opt.extraPrice > 0 ? `+${opt.extraPrice} ₴` : 'Без доплати'}</strong>
-								</button>
-							{/each}
-						</div>
-					</div>
-				{/each}
-			{/if}
-
-			<!-- Крок 3: Вибір майстра -->
-			<div class="section-box">
-				<span class="section-label">3. Спеціаліст / Майстер:</span>
-				<div class="masters-grid">
-					{#each effectiveData.masters ?? [] as m (m.id)}
-						<button
-							type="button"
-							class="master-card"
-							class:active={m.id === selectedMasterId}
-							onclick={() => (selectedMasterId = m.id)}
-						>
-							<span class="m-avatar">💇</span>
-							<div class="m-info">
-								<strong>{m.name}</strong>
-								<small>{m.role}</small>
-							</div>
-							<span class="m-extra">{m.extraPrice > 0 ? `+${m.extraPrice} ₴` : '+0 ₴'}</span>
-						</button>
-					{/each}
-				</div>
-			</div>
-
-			<!-- Крок 4: Додатковий догляд -->
-			{#if (effectiveData.addons ?? []).length > 0}
+			<!-- WINDOW 1: SERVICE & BRANCHING QUESTIONS -->
+			{#if bookingStep === 1}
+				<!-- Крок 1: Послуга -->
 				<div class="section-box">
-					<span class="section-label">4. Додаткові процедури:</span>
-					<div class="space-y-1.5">
-						{#each effectiveData.addons ?? [] as addon (addon.id)}
-							{@const checked = selectedAddonIds.includes(addon.id)}
+					<span class="section-label">1. Оберіть послугу:</span>
+					<div class="services-list space-y-1.5">
+						{#each effectiveData.services ?? [] as s (s.id)}
 							<button
 								type="button"
-								class="addon-row"
-								class:active={checked}
-								onclick={() => toggleAddon(addon.id)}
+								class="service-chip"
+								class:active={s.id === selectedServiceId}
+								onclick={() => handleServiceSelect(s.id)}
 							>
-								<div class="addon-text">
-									<strong>{addon.name}</strong>
-									{#if addon.description}<small>{addon.description}</small>{/if}
+								<div class="s-info">
+									<strong>{s.name}</strong>
+									<span class="s-time"><Clock size={11} /> {s.durationMinutes} хв</span>
 								</div>
-								<div class="addon-price">
-									<strong>+{addon.price} ₴</strong>
-									<span class="box-check" class:checked>{checked ? '✓' : ''}</span>
+								<div class="s-price">
+									<strong>{s.basePrice} ₴</strong>
+									{#if s.id === selectedServiceId}
+										<span class="check-dot"><Check size={12} /></span>
+									{/if}
 								</div>
 							</button>
 						{/each}
 					</div>
 				</div>
+
+				<!-- Крок 2: Розгалужені запитання (Довжина волосся) -->
+				{#if activeQuestions.length > 0}
+					{#each activeQuestions as q (q.id)}
+						<div class="section-box highlight-box">
+							<span class="section-label text-indigo-400">
+								2. {q.title}
+								<span class="badge-branching">розгалуження</span>
+							</span>
+							<p class="section-hint">{q.hint}</p>
+
+							<div class="options-grid">
+								{#each q.options as opt (opt.id)}
+									<button
+										type="button"
+										class="opt-btn"
+										class:active={questionOptionMap[q.id] === opt.id}
+										onclick={() => (questionOptionMap = { ...questionOptionMap, [q.id]: opt.id })}
+									>
+										<span>{opt.title}</span>
+										<strong>{opt.extraPrice > 0 ? `+${opt.extraPrice} ₴` : 'Без доплати'}</strong>
+									</button>
+								{/each}
+							</div>
+						</div>
+					{/each}
+				{/if}
+
+			<!-- WINDOW 2: MASTER SELECTION -->
+			{:else if bookingStep === 2}
+				<div class="section-box">
+					<span class="section-label">Оберіть майстра салону:</span>
+					<div class="masters-grid">
+						{#each effectiveData.masters ?? [] as m (m.id)}
+							<button
+								type="button"
+								class="master-card"
+								class:active={m.id === selectedMasterId}
+								onclick={() => (selectedMasterId = m.id)}
+							>
+								<span class="m-avatar">💇</span>
+								<div class="m-info">
+									<strong>{m.name}</strong>
+									<small>{m.role}</small>
+								</div>
+								<span class="m-extra">{m.extraPrice > 0 ? `+${m.extraPrice} ₴` : '+0 ₴'}</span>
+							</button>
+						{/each}
+					</div>
+				</div>
+
+			<!-- WINDOW 3: ADDONS, DATE, TIME & CONTACTS -->
+			{:else if bookingStep === 3}
+				<!-- Крок 4: Додатковий догляд -->
+				{#if (effectiveData.addons ?? []).length > 0}
+					<div class="section-box">
+						<span class="section-label">Додаткові процедури:</span>
+						<div class="space-y-1.5">
+							{#each effectiveData.addons ?? [] as addon (addon.id)}
+								{@const checked = selectedAddonIds.includes(addon.id)}
+								<button
+									type="button"
+									class="addon-row"
+									class:active={checked}
+									onclick={() => toggleAddon(addon.id)}
+								>
+									<div class="addon-text">
+										<strong>{addon.name}</strong>
+										{#if addon.description}<small>{addon.description}</small>{/if}
+									</div>
+									<div class="addon-price">
+										<strong>+{addon.price} ₴</strong>
+										<span class="box-check" class:checked>{checked ? '✓' : ''}</span>
+									</div>
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Крок 5: Бажаний час -->
+				<div class="section-box">
+					<span class="section-label">Бажаний день та час візиту:</span>
+					<div class="flex gap-2 mb-2 overflow-x-auto pb-1">
+						{#each ['Сьогодні', 'Завтра', 'Четвер', 'П’ятниця'] as day}
+							<button
+								type="button"
+								class="day-btn"
+								class:active={selectedDate === day}
+								onclick={() => (selectedDate = day)}
+							>
+								{day}
+							</button>
+						{/each}
+					</div>
+					<div class="grid grid-cols-4 gap-1.5">
+						{#each ['10:00', '12:30', '14:00', '16:30', '18:00', '19:15'] as t}
+							<button
+								type="button"
+								class="time-btn"
+								class:active={selectedTime === t}
+								onclick={() => (selectedTime = t)}
+							>
+								{t}
+							</button>
+						{/each}
+					</div>
+					<span class="text-[10px] text-zinc-400 block mt-1.5">
+						ℹ️ Час є бажаним та узгоджується із графіком майстра
+					</span>
+				</div>
+
+				<!-- Крок 6: Контакти клієнта -->
+				<div class="section-box">
+					<span class="section-label">Ваші контактні дані:</span>
+					<div class="space-y-2">
+						<input
+							type="text"
+							bind:value={clientName}
+							placeholder="Ваше ім’я"
+							class="beauty-input"
+						/>
+						<input
+							type="tel"
+							bind:value={clientPhone}
+							placeholder="+380 67 000 00 00"
+							class="beauty-input"
+						/>
+					</div>
+				</div>
+
+			<!-- WINDOW 4: SUMMARY & DEPOSIT CHECKOUT -->
+			{:else if bookingStep === 4}
+				<!-- Підсумок та розрахунок авансу -->
+				<div class="summary-card">
+					<div class="sum-line">
+						<span>{pricing.serviceName}:</span>
+						<strong>{pricing.basePrice} ₴</strong>
+					</div>
+
+					{#each pricing.activeModifiers as mod}
+						<div class="sum-line sub">
+							<span>└ {mod.title}:</span>
+							<strong>+{mod.extraPrice} ₴</strong>
+						</div>
+					{/each}
+
+					{#if pricing.masterExtra > 0}
+						<div class="sum-line sub">
+							<span>└ Майстер ({pricing.masterName}):</span>
+							<strong>+{pricing.masterExtra} ₴</strong>
+						</div>
+					{/if}
+
+					{#each pricing.activeAddons as add}
+						<div class="sum-line sub">
+							<span>└ {add.name}:</span>
+							<strong>+{add.price} ₴</strong>
+						</div>
+					{/each}
+
+					<div class="sum-line total">
+						<span>Загальна вартість:</span>
+						<strong class="text-rose-400 text-base">{pricing.totalPrice} ₴</strong>
+					</div>
+
+					{#if pricing.paymentType === 'percent'}
+						<div class="sum-line deposit">
+							<span>Аванс для фіксації (30%):</span>
+							<strong class="text-emerald-400 font-bold">{pricing.depositAmount} ₴</strong>
+						</div>
+					{:else if pricing.paymentType === 'fixed'}
+						<div class="sum-line deposit">
+							<span>Аванс для фіксації:</span>
+							<strong class="text-emerald-400 font-bold">{pricing.depositAmount} ₴</strong>
+						</div>
+					{:else if pricing.paymentType === 'full'}
+						<div class="sum-line deposit">
+							<span>Оплата 100%:</span>
+							<strong class="text-emerald-400 font-bold">{pricing.depositAmount} ₴</strong>
+						</div>
+					{/if}
+				</div>
 			{/if}
 
-			<!-- Крок 5: Бажаний час -->
-			<div class="section-box">
-				<span class="section-label">5. Бажаний час візиту:</span>
-				<div class="flex gap-2 mb-2 overflow-x-auto pb-1">
-					{#each ['Сьогодні', 'Завтра', 'Четвер', 'П’ятниця'] as day}
-						<button
-							type="button"
-							class="day-btn"
-							class:active={selectedDate === day}
-							onclick={() => (selectedDate = day)}
-						>
-							{day}
-						</button>
-					{/each}
-				</div>
-				<div class="grid grid-cols-4 gap-1.5">
-					{#each ['10:00', '12:30', '14:00', '16:30', '18:00', '19:15'] as t}
-						<button
-							type="button"
-							class="time-btn"
-							class:active={selectedTime === t}
-							onclick={() => (selectedTime = t)}
-						>
-							{t}
-						</button>
-					{/each}
-				</div>
-				<span class="text-[10px] text-zinc-400 block mt-1.5">
-					ℹ️ Час є бажаним та узгоджується із графіком майстра
-				</span>
-			</div>
-
-			<!-- Крок 6: Контакти клієнта -->
-			<div class="section-box">
-				<span class="section-label">6. Ваші контактні дані:</span>
-				<div class="space-y-2">
-					<input
-						type="text"
-						bind:value={clientName}
-						placeholder="Ваше ім’я"
-						class="beauty-input"
-					/>
-					<input
-						type="tel"
-						bind:value={clientPhone}
-						placeholder="+380 67 000 00 00"
-						class="beauty-input"
-					/>
-				</div>
-			</div>
-
-			<!-- Підсумок та розрахунок авансу -->
-			<div class="summary-card">
-				<div class="sum-line">
-					<span>{pricing.serviceName}:</span>
-					<strong>{pricing.basePrice} ₴</strong>
-				</div>
-
-				{#each pricing.activeModifiers as mod}
-					<div class="sum-line sub">
-						<span>└ {mod.title}:</span>
-						<strong>+{mod.extraPrice} ₴</strong>
-					</div>
-				{/each}
-
-				{#if pricing.masterExtra > 0}
-					<div class="sum-line sub">
-						<span>└ Майстер ({pricing.masterName}):</span>
-						<strong>+{pricing.masterExtra} ₴</strong>
-					</div>
+			<!-- Bottom Step Navigation Bar -->
+			<div class="flex items-center gap-2 pt-2">
+				{#if bookingStep > 1}
+					<button
+						type="button"
+						class="btn-step-nav secondary"
+						onclick={() => bookingStep = (bookingStep - 1) as 1 | 2 | 3 | 4}
+					>
+						← Назад
+					</button>
 				{/if}
 
-				{#each pricing.activeAddons as add}
-					<div class="sum-line sub">
-						<span>└ {add.name}:</span>
-						<strong>+{add.price} ₴</strong>
-					</div>
-				{/each}
-
-				<div class="sum-line total">
-					<span>Загальна вартість:</span>
-					<strong class="text-rose-400 text-base">{pricing.totalPrice} ₴</strong>
-				</div>
-
-				{#if pricing.paymentType === 'percent'}
-					<div class="sum-line deposit">
-						<span>Аванс для фіксації (30%):</span>
-						<strong class="text-emerald-400 font-bold">{pricing.depositAmount} ₴</strong>
-					</div>
-				{:else if pricing.paymentType === 'fixed'}
-					<div class="sum-line deposit">
-						<span>Аванс для фіксації:</span>
-						<strong class="text-emerald-400 font-bold">{pricing.depositAmount} ₴</strong>
-					</div>
-				{:else if pricing.paymentType === 'full'}
-					<div class="sum-line deposit">
-						<span>Оплата 100%:</span>
-						<strong class="text-emerald-400 font-bold">{pricing.depositAmount} ₴</strong>
-					</div>
+				{#if bookingStep < 4}
+					<button
+						type="button"
+						class="btn-step-nav primary flex-1"
+						onclick={() => bookingStep = (bookingStep + 1) as 1 | 2 | 3 | 4}
+					>
+						{#if bookingStep === 1}
+							Обрати майстра →
+						{:else if bookingStep === 2}
+							Додаткові послуги та час →
+						{:else if bookingStep === 3}
+							Розрахувати вартість →
+						{/if}
+					</button>
+				{:else}
+					<button
+						type="button"
+						class="btn-submit-booking flex-1"
+						onclick={() => (activePath = 'booking_submitted')}
+					>
+						<Send size={16} />
+						<span>Надіслати заявку на погодження</span>
+					</button>
 				{/if}
 			</div>
-
-			<button
-				type="button"
-				class="btn-submit-booking"
-				onclick={() => (activePath = 'booking_submitted')}
-			>
-				<Send size={16} />
-				<span>Надіслати заявку на погодження</span>
-			</button>
 		</div>
 
 	<!-- ═════════════════════════════════════════════════════════════ -->
@@ -821,6 +878,78 @@
 	}
 
 	/* Common Form Flow */
+	.ios-step-indicator {
+		padding: 0.25rem 0 0.5rem 0;
+	}
+
+	.ios-capsules {
+		display: flex;
+		gap: 4px;
+		margin-bottom: 0.35rem;
+	}
+
+	.ios-capsule {
+		flex: 1;
+		height: 3px;
+		background: rgba(255, 255, 255, 0.15);
+		border-radius: 2px;
+		transition: background 0.3s ease;
+	}
+
+	.ios-capsule.filled {
+		background: #fb7185;
+	}
+
+	.ios-step-sub {
+		font-size: 0.68rem;
+		font-weight: 700;
+		color: #fb7185;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		display: block;
+	}
+
+	.ios-step-title {
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: #ffffff;
+		margin: 2px 0 0 0;
+	}
+
+	.btn-step-nav {
+		border-radius: 10px;
+		padding: 9px 14px;
+		font-size: 12px;
+		font-weight: 600;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: all 0.2s;
+	}
+
+	.btn-step-nav.secondary {
+		background: rgba(255, 255, 255, 0.08);
+		border: 1px solid rgba(255, 255, 255, 0.15);
+		color: #e4e4e7;
+	}
+
+	.btn-step-nav.secondary:hover {
+		background: rgba(255, 255, 255, 0.14);
+		color: #ffffff;
+	}
+
+	.btn-step-nav.primary {
+		background: linear-gradient(135deg, #f43f5e, #e11d48);
+		border: none;
+		color: #ffffff;
+		box-shadow: 0 2px 6px rgba(244, 63, 94, 0.35);
+	}
+
+	.btn-step-nav.primary:hover {
+		opacity: 0.95;
+	}
+
 	.step-title-bar {
 		display: flex;
 		align-items: center;

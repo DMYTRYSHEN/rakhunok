@@ -28,6 +28,7 @@
 	import CleaningTemplatePreview from './CleaningTemplatePreview.svelte';
 	import GiftsTemplatePreview from './GiftsTemplatePreview.svelte';
 	import EventsTemplatePreview from './EventsTemplatePreview.svelte';
+	import FitnessTemplatePreview from './FitnessTemplatePreview.svelte';
 	import {
 		buildCheckoutPreviewModel,
 		type CheckoutPreviewStep,
@@ -167,7 +168,7 @@
 			<div class="secure"><ShieldCheck size={13} /> Захищено</div>
 		</header>
 
-		<main class:dimmed={paymentSheetOpen} class:fuel-main={scenario === 'fuel_station' || isBookingScenario(scenario) || isFoodScenario(scenario) || isFlowerScenario(scenario) || isCourierScenario(scenario) || scenario === 'vertical_events'}>
+		<main class:dimmed={paymentSheetOpen} class:fuel-main={scenario === 'fuel_station' || isBookingScenario(scenario) || isFoodScenario(scenario) || isFlowerScenario(scenario) || isCourierScenario(scenario) || scenario === 'vertical_events' || scenario === 'vertical_fitness'}>
 			{#if step === 'checkout'}
 				{#if scenario === 'fuel_station'}
 					<FuelStationTemplatePreview onPay={openFuelStationPayment} />
@@ -187,6 +188,8 @@
 					<GiftsTemplatePreview flowData={config.flow_data} onPay={openAutoServicePayment} />
 				{:else if scenario === 'vertical_events'}
 					<EventsTemplatePreview flowData={config.flow_data} onPay={openAutoServicePayment} />
+				{:else if scenario === 'vertical_fitness'}
+					<FitnessTemplatePreview flowData={config.flow_data} onPay={openAutoServicePayment} />
 				{:else if isFlowerScenario(scenario)}
 					<FlowerGiftTemplatePreview {scenario} onPay={(amt) => { flowerAmount = amt; selectStep('payment'); }} />
 				{:else if isCourierScenario(scenario)}

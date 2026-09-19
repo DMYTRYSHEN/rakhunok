@@ -109,7 +109,8 @@ export const CHECKOUT_TEMPLATE_SCENARIOS = [
 	'vertical_delivery',
 	'vertical_print',
 	'vertical_gifts',
-	'vertical_events'
+	'vertical_events',
+	'vertical_fitness'
 ] as const;
 export type CheckoutTemplateScenario = (typeof CHECKOUT_TEMPLATE_SCENARIOS)[number];
 
@@ -616,4 +617,87 @@ export interface EventsFlowData {
 	};
 	[key: string]: unknown;
 }
+
+// ==========================================
+// Vertical: Fitness Center / Memberships (vertical_fitness)
+// ==========================================
+
+export type FitnessTariffPeriod = 'day' | 'week' | 'month';
+
+export interface FitnessTariff {
+	id: string;
+	name: string;
+	period: FitnessTariffPeriod;
+	price: number;
+	description: string;
+	includesGym: boolean;
+	includesPool: boolean;
+	includesSauna: boolean;
+	durationDays: number;
+	allowedHoursNotice: string;
+	badge?: string;
+}
+
+export interface FitnessClub {
+	id: string;
+	name: string;
+	address: string;
+	workingHours: string;
+	phone: string;
+	amenities: string[];
+	availableTariffIds: string[];
+}
+
+export interface FitnessAddon {
+	id: string;
+	name: string;
+	category: 'access' | 'resource' | 'credits' | 'usage';
+	price: number;
+	priceModel: 'match_tariff' | 'fixed_bundle' | 'per_use';
+	creditCount?: number; // e.g. 4 for 4 personal trainings
+	description?: string;
+	icon?: string;
+	totalLockers?: number;
+	availableLockers?: number;
+}
+
+export interface FitnessFlowData {
+	clubBrand?: string;
+	tagline?: string;
+	description?: string;
+	contacts?: {
+		phone?: string;
+		telegram?: string;
+		instagram?: string;
+		address?: string;
+	};
+	modes: {
+		newMembershipEnabled: boolean;
+		renewalEnabled: boolean;
+		addonOnlyEnabled: boolean;
+		receptionPayEnabled: boolean;
+		newMembershipButtonText?: string;
+		renewalButtonText?: string;
+		addonOnlyButtonText?: string;
+		receptionPayButtonText?: string;
+	};
+	clubs: FitnessClub[];
+	tariffs: FitnessTariff[];
+	addons: FitnessAddon[];
+	approval: {
+		autoApprovalEnabled: boolean;
+		requireManualForLocker: boolean;
+		requireManualForCorporate: boolean;
+		telegramChat?: string;
+		responseTimeNotice?: string;
+	};
+	rules: {
+		allowFreeze: boolean;
+		maxFreezeDays: number;
+		refundNotice: string;
+		entryMethod: 'qr_reception' | 'turnstile';
+	};
+	[key: string]: unknown;
+}
+
 

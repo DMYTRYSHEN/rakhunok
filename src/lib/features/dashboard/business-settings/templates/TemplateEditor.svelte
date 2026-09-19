@@ -233,6 +233,7 @@
 								<option value="vertical_print">🖨️ Друкарня / Виготовлення</option>
 								<option value="vertical_gifts">🎁 Подарунки / Індивідуальне замовлення</option>
 								<option value="vertical_events">🎟️ Концерти / Кіно / Квитки</option>
+								<option value="vertical_fitness">🏋️‍♂️ Фітнес-Центр / Абонементи</option>
 							</optgroup>
 							<optgroup label="Базові сценарії (Legacy)">
 								<option value="fixed">Фіксована сума (Товар/Послуга)</option>

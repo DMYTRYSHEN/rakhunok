@@ -8,12 +8,12 @@
 		Clock,
 		Check,
 		ChevronRight,
+		ChevronLeft,
 		AlertTriangle,
 		Send,
 		Store,
 		Receipt,
-		ShieldCheck,
-		ArrowLeft
+		ShieldCheck
 	} from '@lucide/svelte';
 	import type { FlowerShopFlowData } from '$lib/features/shared/checkout-scenario-config';
 	import {
@@ -44,9 +44,9 @@
 			catalogEnabled: true,
 			customOrderEnabled: true,
 			inStorePayEnabled: true,
-			catalogButtonText: 'Обрати готовий букет',
-			customOrderButtonText: 'Індивідуальний букет',
-			inStoreButtonText: 'Оплатити в магазині'
+			catalogButtonText: 'Готовий букет',
+			customOrderButtonText: 'На замовлення',
+			inStoreButtonText: 'В салоні'
 		},
 		bouquets: [
 			{
@@ -105,9 +105,9 @@
 			},
 			{
 				id: 'addon_box',
-				name: 'Преміальне пакування та стрічка',
+				name: 'Преміальне пакування та аквабокс',
 				price: 80,
-				description: 'Захисний вологостійкий аквабокс',
+				description: 'Захисний вологостійкий резервуар для свіжості',
 				icon: '🎀'
 			},
 			{
@@ -188,10 +188,10 @@
 		payment: { ...defaultData.payment, ...(flowData?.payment ?? {}) }
 	});
 
-	// Active mode
 	let currentMode = $state<'catalog' | 'custom' | 'instore'>('catalog');
+	let step = $state<1 | 2 | 3 | 4>(1);
 
-	// Catalog selections (defaulting to the prompt's 1 500 ₴ case: large bouquet + postcard + delivery Zone A)
+	// Catalog selections (defaulting to the prompt's 1 500 ₴ case: large bouquet 1300 + postcard 50 + delivery Zone A 150 = 1500)
 	let selectedBouquetId = $state<string>('bq_tenderness');
 	let selectedSizeId = $state<string>('large');
 	let selectedAddonIds = $state<string[]>(['addon_postcard']);
@@ -214,9 +214,6 @@
 	// In-store payment
 	let inStoreReceiptId = $state('FL-842');
 	let inStoreAmount = $state(850);
-
-	// Confirmation state
-	let requestSubmitted = $state(false);
 
 	// Derived current bouquet
 	const currentBouquet = $derived(
@@ -270,471 +267,1032 @@
 		}
 	}
 
-	function handleAction() {
+	function handlePayClick() {
 		if (pricing.canInstantPay) {
 			onPay(pricing.totalAmount);
 		} else {
-			requestSubmitted = true;
+			alert('Дякуємо! Ваше замовлення надіслано флористу в Telegram для перевірки наявності свіжих квітів.');
 		}
 	}
 </script>
 
-<div class="flower-phone-preview flex flex-col h-full bg-zinc-50 text-zinc-900 select-none pb-8 text-left">
-	<!-- Top Brand Banner -->
-	<div class="border-b border-pink-100 bg-linear-to-r from-pink-50 via-rose-50 to-white px-4 py-3">
-		<div class="flex items-center justify-between">
-			<div>
-				<h3 class="text-sm font-extrabold text-pink-950 flex items-center gap-1.5">
-					<span>🌸</span>
-					<span>{data.shopName}</span>
-				</h3>
-				<p class="text-[11px] text-pink-800/80 line-clamp-1">{data.tagline}</p>
-			</div>
-			<div class="flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-200">
-				<span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-				<span>Приймаємо</span>
-			</div>
+<div class="ios-preview-container">
+	<!-- iOS Navigation Bar -->
+	<header class="ios-nav-bar">
+		<div class="ios-nav-content">
+			<span class="ios-merchant-badge">🌸 {data.shopName}</span>
+			<span class="ios-secure-tag"><ShieldCheck size={12} /> Флористика</span>
 		</div>
+	</header>
 
-		<!-- Path Switcher (3 Customer Paths) -->
-		<div class="mt-2.5 flex rounded-lg bg-pink-100/70 p-0.5 text-[11px] font-semibold">
+	<!-- iOS Segmented Mode Control -->
+	<div class="ios-segmented-control">
+		{#if data.modes.catalogEnabled}
 			<button
 				type="button"
-				class="flex-1 rounded-md py-1 text-center transition-all {currentMode === 'catalog' ? 'bg-white text-pink-900 shadow-xs' : 'text-pink-900/70 hover:text-pink-950'}"
-				onclick={() => { currentMode = 'catalog'; requestSubmitted = false; }}
+				class="ios-segment-btn"
+				class:active={currentMode === 'catalog'}
+				onclick={() => { currentMode = 'catalog'; step = 1; }}
 			>
-				💐 Букети
+				{data.modes.catalogButtonText || 'Букети'}
 			</button>
+		{/if}
+		{#if data.modes.customOrderEnabled}
 			<button
 				type="button"
-				class="flex-1 rounded-md py-1 text-center transition-all {currentMode === 'custom' ? 'bg-white text-pink-900 shadow-xs' : 'text-pink-900/70 hover:text-pink-950'}"
-				onclick={() => { currentMode = 'custom'; requestSubmitted = false; }}
+				class="ios-segment-btn"
+				class:active={currentMode === 'custom'}
+				onclick={() => (currentMode = 'custom')}
 			>
-				✨ На замовлення
+				{data.modes.customOrderButtonText || 'На замовлення'}
 			</button>
+		{/if}
+		{#if data.modes.inStorePayEnabled}
 			<button
 				type="button"
-				class="flex-1 rounded-md py-1 text-center transition-all {currentMode === 'instore' ? 'bg-white text-pink-900 shadow-xs' : 'text-pink-900/70 hover:text-pink-950'}"
-				onclick={() => { currentMode = 'instore'; requestSubmitted = false; }}
+				class="ios-segment-btn"
+				class:active={currentMode === 'instore'}
+				onclick={() => (currentMode = 'instore')}
 			>
-				🏪 В салоні
+				{data.modes.inStoreButtonText || 'В салоні'}
 			</button>
-		</div>
+		{/if}
 	</div>
 
-	<!-- SUBMITTED SCREEN -->
-	{#if requestSubmitted}
-		<div class="flex-1 p-5 flex flex-col items-center justify-center text-center space-y-4">
-			<div class="size-14 rounded-full bg-pink-100 flex items-center justify-center text-pink-600 shadow-inner">
-				<Send size={26} />
+	<!-- CATALOG MODE (4 APPLE HIG STEP WINDOWS) -->
+	{#if currentMode === 'catalog'}
+		<!-- Step Header & Progress Capsules -->
+		<div class="ios-step-indicator">
+			<div class="ios-capsules">
+				<div class="ios-capsule" class:filled={step >= 1}></div>
+				<div class="ios-capsule" class:filled={step >= 2}></div>
+				<div class="ios-capsule" class:filled={step >= 3}></div>
+				<div class="ios-capsule" class:filled={step >= 4}></div>
 			</div>
-			<div>
-				<h4 class="text-base font-bold text-zinc-900">Запит успішно надіслано!</h4>
-				<p class="mt-1 text-xs text-zinc-500 leading-relaxed max-w-xs">
-					Флорист отримав параметри вашого замовлення у Telegram. Ми перевіримо свіжість квітів та надішлемо вам фото букета перед оплатою.
-				</p>
+			<div class="ios-step-title-wrap">
+				<span class="ios-step-sub">Крок {step} з 4</span>
+				<h4 class="ios-step-title">
+					{#if step === 1}
+						Букет та розмір
+					{:else if step === 2}
+						Додатки та привітання
+					{:else if step === 3}
+						Отримання та адресат
+					{:else if step === 4}
+						Кошторис та оплата
+					{/if}
+				</h4>
 			</div>
-			<div class="w-full rounded-xl border border-zinc-200 bg-white p-3.5 text-left text-xs space-y-1.5">
-				<div class="flex justify-between font-medium text-zinc-600">
-					<span>Орієнтовна сума:</span>
-					<strong class="text-zinc-900">{pricing.totalAmount.toLocaleString('uk-UA')} ₴</strong>
-				</div>
-				<div class="flex justify-between font-medium text-zinc-600">
-					<span>Спосіб:</span>
-					<span class="text-zinc-800">{pricing.fulfillmentSummary}</span>
-				</div>
-				<div class="flex justify-between font-medium text-zinc-600">
-					<span>Очікування відповіді:</span>
-					<span class="text-pink-700 font-semibold">{data.approval.responseTimeNotice || 'до 10 хв'}</span>
-				</div>
-			</div>
-			<button
-				type="button"
-				class="w-full rounded-xl bg-zinc-900 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-zinc-800"
-				onclick={() => (requestSubmitted = false)}
-			>
-				Повернутись до замовлення
-			</button>
 		</div>
-	{:else}
-		<!-- PATH 1: READY CATALOG -->
-		{#if currentMode === 'catalog'}
-			<div class="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-				<!-- Bouquet Card Selection -->
-				<section>
-					<span class="text-[10px] font-bold tracking-wider text-zinc-400 uppercase block mb-1.5">1. Оберіть букет:</span>
-					<div class="space-y-2">
+
+		<div class="ios-window-body">
+			<!-- WINDOW 1: BOUQUET & SIZE -->
+			{#if step === 1}
+				<!-- Bouquets List -->
+				<div class="ios-card">
+					<span class="ios-card-title">Оберіть букет з каталогу:</span>
+					<div class="ios-items-stack">
 						{#each data.bouquets as bouquet (bouquet.id)}
 							<button
 								type="button"
-								class="w-full text-left rounded-xl border p-2.5 transition-all flex items-start gap-2.5 {selectedBouquetId === bouquet.id ? 'border-pink-500 bg-pink-50/40 ring-1 ring-pink-500' : 'border-zinc-200 bg-white hover:border-zinc-300'}"
+								class="ios-bouquet-row"
+								class:selected={selectedBouquetId === bouquet.id}
 								onclick={() => (selectedBouquetId = bouquet.id)}
 							>
-								<span class="text-2xl mt-0.5">{bouquet.icon || '🌸'}</span>
-								<div class="flex-1 min-w-0">
-									<div class="flex items-center justify-between">
-										<strong class="text-xs font-bold text-zinc-900">{bouquet.name}</strong>
-										<span class="text-xs font-extrabold text-pink-700">від {bouquet.sizes[0]?.price ?? 900} ₴</span>
-									</div>
-									<p class="text-[11px] text-zinc-500 line-clamp-1 mt-0.5">{bouquet.description}</p>
-									{#if !bouquet.isAvailable}
-										<span class="mt-1 inline-block rounded bg-amber-100 px-1.5 py-0.2 text-[9px] font-semibold text-amber-800">
-											Під замовлення
-										</span>
-									{/if}
+								<span class="ios-bq-icon">{bouquet.icon || '🌸'}</span>
+								<div class="ios-bq-info">
+									<div class="ios-bq-name">{bouquet.name}</div>
+									<div class="ios-bq-desc">{bouquet.description}</div>
 								</div>
+								<strong class="ios-bq-price">
+									від {bouquet.sizes[0]?.price ?? 900} ₴
+								</strong>
 							</button>
 						{/each}
 					</div>
-				</section>
+				</div>
 
-				<!-- Bouquet Size Selector (Prompt requirement: large replaces standard) -->
+				<!-- Bouquet Size Chips (Replaces base price) -->
 				{#if currentBouquet}
-					<section class="rounded-xl border border-zinc-200 bg-white p-3">
-						<span class="text-[10px] font-bold tracking-wider text-zinc-400 uppercase block mb-2">2. Розмір букета:</span>
-						<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-							{#each currentBouquet.sizes as size (size.id)}
+					<div class="ios-card">
+						<span class="ios-card-title">Розмір букета:</span>
+						<div class="ios-sizes-grid">
+							{#each currentBouquet.sizes as sz (sz.id)}
 								<button
 									type="button"
-									class="rounded-lg border p-2 text-center transition-all {selectedSizeId === size.id ? 'border-pink-600 bg-pink-50 text-pink-950 font-bold ring-1 ring-pink-600' : 'border-zinc-200 bg-zinc-50/50 text-zinc-700 hover:bg-zinc-100'}"
-									onclick={() => (selectedSizeId = size.id)}
+									class="ios-size-chip"
+									class:selected={selectedSizeId === sz.id}
+									onclick={() => (selectedSizeId = sz.id)}
 								>
-									<span class="block text-xs">{size.name}</span>
-									<span class="block text-xs font-extrabold text-pink-700 mt-0.5">{size.price} ₴</span>
+									<span class="ios-size-name">{sz.name}</span>
+									<strong class="ios-size-price">{sz.price} ₴</strong>
 								</button>
 							{/each}
 						</div>
-						<div class="mt-2 rounded bg-zinc-50 p-2 text-[10px] text-zinc-500 border border-zinc-100 flex items-center gap-1.5">
-							<ShieldCheck size={13} class="text-emerald-600 shrink-0" />
-							<span>Обраний розмір замінює базову ціну, а не сумується до неї.</span>
+						<div class="ios-card-sub text-[11px] mt-2 text-zinc-500">
+							💡 Обраний розмір замінює базову ціну букета, а не додається до неї.
 						</div>
-					</section>
+					</div>
 				{/if}
 
-				<!-- Add-ons (Postcard + Vase + Box) -->
-				<section class="rounded-xl border border-zinc-200 bg-white p-3 space-y-2.5">
-					<span class="text-[10px] font-bold tracking-wider text-zinc-400 uppercase block">3. Додати до букета:</span>
-					<div class="space-y-1.5">
+			<!-- WINDOW 2: ADDONS & GREETING POSTCARD -->
+			{:else if step === 2}
+				<div class="ios-card">
+					<span class="ios-card-title">Додати до замовлення:</span>
+					<div class="ios-items-stack">
 						{#each data.addons as addon (addon.id)}
-							<label class="flex cursor-pointer items-center justify-between rounded-lg border border-zinc-100 p-2 hover:bg-zinc-50">
-								<div class="flex items-center gap-2">
-									<input
-										type="checkbox"
-										class="size-4 rounded accent-pink-600"
-										checked={selectedAddonIds.includes(addon.id)}
-										onchange={() => toggleAddon(addon.id)}
-									/>
-									<span class="text-base">{addon.icon || '🎁'}</span>
-									<div>
-										<strong class="block text-xs font-semibold text-zinc-900">{addon.name}</strong>
-										{#if addon.description}
-											<span class="block text-[10px] text-zinc-500">{addon.description}</span>
-										{/if}
-									</div>
-								</div>
-								<span class="text-xs font-bold text-zinc-800">+{addon.price} ₴</span>
-							</label>
-						{/each}
-					</div>
-
-					<!-- Postcard Text Area (Conditional) -->
-					{#if selectedAddonIds.includes('addon_postcard')}
-						<div class="pt-1.5 border-t border-dashed border-zinc-200">
-							<label class="block text-[11px] font-bold text-pink-900 mb-1">
-								<span>✉️ Текст привітання на листівці:</span>
-								<textarea
-									rows="2"
-									class="mt-1 w-full rounded-lg border border-pink-200 bg-pink-50/30 p-2 text-xs text-zinc-800 focus:border-pink-500 focus:outline-none font-normal"
-									placeholder="Напишіть теплі слова... Флорист напише каліграфічно"
-									bind:value={greetingText}
-								></textarea>
-							</label>
-						</div>
-					{/if}
-				</section>
-
-				<!-- Fulfillment Method (Pickup vs Delivery) -->
-				<section class="rounded-xl border border-zinc-200 bg-white p-3 space-y-2.5">
-					<span class="text-[10px] font-bold tracking-wider text-zinc-400 uppercase block">4. Спосіб отримання:</span>
-					<div class="grid grid-cols-2 gap-2">
-						<button
-							type="button"
-							class="flex items-center justify-center gap-1.5 rounded-lg border py-2 text-xs font-bold transition-all {fulfillmentType === 'pickup' ? 'border-pink-600 bg-pink-50 text-pink-950 ring-1 ring-pink-600' : 'border-zinc-200 bg-zinc-50 text-zinc-600'}"
-							onclick={() => (fulfillmentType = 'pickup')}
-						>
-							<Store size={14} />
-							<span>Самовивіз (0 ₴)</span>
-						</button>
-						<button
-							type="button"
-							class="flex items-center justify-center gap-1.5 rounded-lg border py-2 text-xs font-bold transition-all {fulfillmentType === 'delivery' ? 'border-pink-600 bg-pink-50 text-pink-950 ring-1 ring-pink-600' : 'border-zinc-200 bg-zinc-50 text-zinc-600'}"
-							onclick={() => (fulfillmentType = 'delivery')}
-						>
-							<Truck size={14} />
-							<span>Доставка кур'єром</span>
-						</button>
-					</div>
-
-					{#if fulfillmentType === 'pickup'}
-						<!-- Pickup point selection -->
-						<div class="space-y-1.5 pt-1">
-							<label class="block text-[11px] font-semibold text-zinc-600">
-								<span>Оберіть салон для самовивозу:</span>
-								<select
-									class="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-900 font-normal"
-									bind:value={pickupPointId}
-								>
-									{#each data.pickupPoints as point (point.id)}
-										<option value={point.id}>{point.name} — {point.address} ({point.workingHours})</option>
-									{/each}
-								</select>
-							</label>
-							<span class="block text-[10px] text-zinc-400">
-								* При самовивозі адреса одержувача не запитується. Букет буде готовий до вашого візиту.
-							</span>
-						</div>
-					{:else}
-						<!-- Delivery fields -->
-						<div class="space-y-2 pt-1">
-							<label class="block text-[11px] font-semibold text-zinc-600">
-								<span>Зона доставки:</span>
-								<select
-									class="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-900 font-normal"
-									bind:value={deliveryZoneId}
-								>
-									{#each data.deliveryZones as zone (zone.id)}
-										<option value={zone.id}>{zone.name} (+{zone.price} ₴ · {zone.eta})</option>
-									{/each}
-									<option value="out_of_zone">За межі визначених зон (ручний прорахунок флористом)</option>
-								</select>
-							</label>
-
-							<label class="block text-[11px] font-semibold text-zinc-600">
-								<span>Адреса доставки:</span>
-								<input
-									type="text"
-									class="mt-1 w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs text-zinc-900 font-normal"
-									placeholder="вул. Хрещатик, 15, кв. 10"
-									bind:value={deliveryAddress}
-								/>
-							</label>
-
-							<!-- Gift for someone else toggle -->
-							<label class="flex cursor-pointer items-center gap-2 rounded-lg border border-pink-100 bg-pink-50/50 p-2">
-								<input
-									type="checkbox"
-									class="size-3.5 rounded accent-pink-600"
-									bind:checked={isSurpriseGift}
-								/>
-								<span class="text-xs font-semibold text-pink-950">Це подарунок іншій людині 🎁</span>
-							</label>
-
-							{#if isSurpriseGift}
-								<div class="grid grid-cols-2 gap-2 rounded-lg bg-zinc-50 p-2 border border-zinc-200">
-									<label class="block text-[10px] font-medium text-zinc-500">
-										<span>Ім’я одержувача:</span>
-										<input
-											type="text"
-											class="mt-1 w-full rounded border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-900 font-normal"
-											placeholder="Марія"
-											bind:value={recipientName}
-										/>
-									</label>
-									<label class="block text-[10px] font-medium text-zinc-500">
-										<span>Телефон одержувача:</span>
-										<input
-											type="text"
-											class="mt-1 w-full rounded border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-900 font-normal"
-											placeholder="+380..."
-											bind:value={recipientPhone}
-										/>
-									</label>
-									<span class="col-span-2 text-[10px] text-zinc-400">
-										Контакти одержувача суто для кур'єра (ніяких SMS розсилок чи маркетингу).
-									</span>
-								</div>
-							{/if}
-						</div>
-					{/if}
-				</section>
-			</div>
-		{/if}
-
-		<!-- PATH 2: CUSTOM BOUQUET -->
-		{#if currentMode === 'custom'}
-			<div class="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-				<div class="rounded-xl border border-pink-200 bg-pink-50/40 p-3">
-					<div class="flex items-center gap-1.5 text-pink-900 font-bold text-xs">
-						<Sparkles size={15} class="text-pink-600" />
-						<span>Індивідуальний букет від флориста</span>
-					</div>
-					<p class="mt-1 text-[11px] text-pink-800 leading-relaxed">
-						Вкажіть ваш бюджет та побажання. Флорист підбере найкращі свіжі квіти з сьогоднішньої поставки та погодить фото букета перед оплатою.
-					</p>
-				</div>
-
-				<!-- Budget Slider / Buttons -->
-				<section class="rounded-xl border border-zinc-200 bg-white p-3 space-y-2">
-					<div class="flex items-center justify-between">
-						<span class="text-[10px] font-bold tracking-wider text-zinc-400 uppercase">Орієнтовний бюджет:</span>
-						<strong class="text-sm font-extrabold text-pink-700">{customBudget} ₴</strong>
-					</div>
-					<input
-						type="range"
-						min="800"
-						max="5000"
-						step="100"
-						class="w-full accent-pink-600 cursor-pointer"
-						bind:value={customBudget}
-					/>
-					<div class="flex justify-between gap-1 text-[10px] text-zinc-400">
-						<button type="button" class="underline" onclick={() => (customBudget = 1000)}>1 000 ₴</button>
-						<button type="button" class="underline" onclick={() => (customBudget = 1500)}>1 500 ₴</button>
-						<button type="button" class="underline" onclick={() => (customBudget = 2500)}>2 500 ₴</button>
-						<button type="button" class="underline" onclick={() => (customBudget = 4000)}>4 000 ₴</button>
-					</div>
-				</section>
-
-				<!-- Color Palette Selector -->
-				<section class="rounded-xl border border-zinc-200 bg-white p-3 space-y-2">
-					<span class="text-[10px] font-bold tracking-wider text-zinc-400 uppercase block">Колірна гама букета:</span>
-					<div class="grid grid-cols-2 gap-2">
-						{#each data.customOrder.palettes as palette (palette.id)}
+							{@const checked = selectedAddonIds.includes(addon.id)}
 							<button
 								type="button"
-								class="flex items-center gap-2 rounded-lg border p-2 text-left transition-all {customPaletteId === palette.id ? 'border-pink-600 bg-pink-50 ring-1 ring-pink-600' : 'border-zinc-200 bg-zinc-50'}"
-								onclick={() => (customPaletteId = palette.id)}
+								class="ios-addon-row"
+								class:selected={checked}
+								onclick={() => toggleAddon(addon.id)}
 							>
-								<div class="flex -space-x-1 shrink-0">
-									{#each palette.colors as color}
-										<span class="size-3.5 rounded-full border border-white shadow-xs" style="background-color: {color};"></span>
-									{/each}
+								<span class="ios-addon-icon">{addon.icon || '🎁'}</span>
+								<div class="ios-addon-info">
+									<div class="ios-addon-name">{addon.name}</div>
+									{#if addon.description}
+										<div class="ios-addon-desc">{addon.description}</div>
+									{/if}
 								</div>
-								<span class="text-xs font-semibold text-zinc-800 line-clamp-1">{palette.name}</span>
+								<div class="ios-addon-right">
+									<strong class="ios-addon-price">+{addon.price} ₴</strong>
+									<span class="ios-addon-check" class:checked>{checked ? '✓' : ''}</span>
+								</div>
 							</button>
 						{/each}
 					</div>
-				</section>
+				</div>
 
-				<!-- Wishes text -->
-				<section class="rounded-xl border border-zinc-200 bg-white p-3 space-y-1.5">
-					<label class="block text-[11px] font-bold text-zinc-700">
-						<span>Побажання по квітах та оформленню:</span>
-						<textarea
-							rows="2"
-							class="mt-1 w-full rounded-lg border border-zinc-200 p-2 text-xs text-zinc-800 focus:border-pink-500 focus:outline-none font-normal"
-							placeholder="Наприклад: побільше півоній, без гвоздик, додати евкаліпт..."
-							bind:value={customWishes}
-						></textarea>
-					</label>
-				</section>
+				{#if selectedAddonIds.includes('addon_postcard')}
+					<div class="ios-card">
+						<label>
+							<span class="ios-card-title">✉️ Текст на листівці (каліграфічний підпис):</span>
+							<textarea
+								class="ios-textarea"
+								rows="2"
+								bind:value={greetingText}
+								placeholder="Напишіть теплі слова, які флорист перенесе на фірмову листівку..."
+							></textarea>
+						</label>
+					</div>
+				{/if}
 
-				<!-- Delivery for Custom -->
-				<section class="rounded-xl border border-zinc-200 bg-white p-3 space-y-2">
-					<span class="text-[10px] font-bold tracking-wider text-zinc-400 uppercase block">Отримання:</span>
-					<div class="grid grid-cols-2 gap-2">
+			<!-- WINDOW 3: FULFILLMENT & RECIPIENT -->
+			{:else if step === 3}
+				<!-- Delivery Type Toggle -->
+				<div class="ios-card">
+					<span class="ios-card-title">Спосіб отримання:</span>
+					<div class="ios-segmented-control mb-2.5">
 						<button
 							type="button"
-							class="rounded-lg border py-1.5 text-xs font-bold {fulfillmentType === 'pickup' ? 'border-pink-600 bg-pink-50 text-pink-900' : 'border-zinc-200 text-zinc-600'}"
-							onclick={() => (fulfillmentType = 'pickup')}
-						>
-							Самовивіз (0 ₴)
-						</button>
-						<button
-							type="button"
-							class="rounded-lg border py-1.5 text-xs font-bold {fulfillmentType === 'delivery' ? 'border-pink-600 bg-pink-50 text-pink-900' : 'border-zinc-200 text-zinc-600'}"
+							class="ios-segment-btn"
+							class:active={fulfillmentType === 'delivery'}
 							onclick={() => (fulfillmentType = 'delivery')}
 						>
-							Доставка (+150 ₴)
+							<Truck size={13} class="inline mr-1" /> Доставка кур'єром
+						</button>
+						<button
+							type="button"
+							class="ios-segment-btn"
+							class:active={fulfillmentType === 'pickup'}
+							onclick={() => (fulfillmentType = 'pickup')}
+						>
+							<Store size={13} class="inline mr-1" /> Самовивіз (0 ₴)
 						</button>
 					</div>
-				</section>
-			</div>
-		{/if}
 
-		<!-- PATH 3: IN-STORE QUICK PAY -->
-		{#if currentMode === 'instore'}
-			<div class="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-				<div class="rounded-xl border border-zinc-200 bg-white p-4 text-center space-y-3">
-					<div class="size-12 rounded-full bg-pink-100 flex items-center justify-center text-pink-600 mx-auto">
-						<Receipt size={22} />
-					</div>
-					<div>
-						<h4 class="text-sm font-bold text-zinc-900">Оплата на касі в салоні</h4>
-						<p class="text-xs text-zinc-500 mt-0.5">Введіть номер чека, який назвав флорист, або суму</p>
-					</div>
+					{#if fulfillmentType === 'delivery'}
+						<!-- Delivery Zones Selection -->
+						<div class="ios-items-stack mb-2.5">
+							{#each data.deliveryZones as zone (zone.id)}
+								<button
+									type="button"
+									class="ios-zone-row"
+									class:selected={deliveryZoneId === zone.id}
+									onclick={() => (deliveryZoneId = zone.id)}
+								>
+									<div>
+										<div class="ios-zone-name">{zone.name}</div>
+										<div class="ios-zone-desc">{zone.description} · {zone.eta}</div>
+									</div>
+									<strong class="ios-zone-price">+{zone.price} ₴</strong>
+								</button>
+							{/each}
+						</div>
 
-					<div class="space-y-2 pt-2">
-						<label class="block text-[10px] font-bold text-zinc-500 text-left uppercase">
-							<span>Номер замовлення / чека:</span>
+						<label class="mb-2.5 block">
+							<span class="ios-input-lbl">Адреса доставки:</span>
 							<input
 								type="text"
-								class="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-mono font-bold text-center text-zinc-900"
-								placeholder="FL-842"
-								bind:value={inStoreReceiptId}
+								class="ios-input"
+								bind:value={deliveryAddress}
+								placeholder="м. Київ, вул. Шовковична, 14, кв. 28"
 							/>
 						</label>
-						<label class="block text-[10px] font-bold text-zinc-500 text-left uppercase">
-							<span>Сума до сплати (₴):</span>
-							<input
-								type="number"
-								min="10"
-								step="50"
-								class="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-base font-extrabold text-center text-pink-700"
-								bind:value={inStoreAmount}
-							/>
-						</label>
-					</div>
-				</div>
-			</div>
-		{/if}
 
-		<!-- BOTTOM SUMMARY & CTA -->
-		<div class="border-t border-zinc-200 bg-white p-4 shadow-lg space-y-3">
-			<!-- Breakdown rows -->
-			<div class="space-y-1 text-xs">
-				{#each pricing.breakdown as row}
-					<div class="flex items-center justify-between text-zinc-600">
-						<span class="line-clamp-1 pr-2">{row.label}</span>
-						<span class="font-medium whitespace-nowrap {row.isFree ? 'text-emerald-700 font-bold' : 'text-zinc-800'}">
-							{row.isFree ? 'Безкоштовно' : `${row.amount} ₴`}
-						</span>
-					</div>
-				{/each}
-				<div class="flex items-center justify-between border-t border-zinc-100 pt-1.5 text-sm font-extrabold text-zinc-900">
-					<span>Разом до сплати:</span>
-					<span class="text-pink-700 text-base">{pricing.totalAmount.toLocaleString('uk-UA')} ₴</span>
-				</div>
-			</div>
+						<div class="ios-grid-2 mb-2.5">
+							<label>
+								<span class="ios-input-lbl">Бажана дата:</span>
+								<input type="text" class="ios-input" bind:value={deliveryDate} />
+							</label>
+							<label>
+								<span class="ios-input-lbl">Часовий інтервал:</span>
+								<input type="text" class="ios-input" bind:value={deliverySlot} />
+							</label>
+						</div>
 
-			<!-- Notice Banner for Estimates or Approvals -->
-			{#if pricing.isEstimate}
-				<div class="rounded-lg bg-amber-50 p-2.5 text-[11px] text-amber-900 border border-amber-200 flex gap-1.5">
-					<AlertTriangle size={14} class="shrink-0 text-amber-600 mt-0.5" />
-					<span>{pricing.estimateNotice}</span>
+						<!-- Recipient Gift Toggle -->
+						<div class="ios-gift-box">
+							<label class="ios-checkbox-label">
+								<input type="checkbox" class="ios-checkbox" bind:checked={isSurpriseGift} />
+								<span>Це сюрприз / подарунок іншій людині 🎁</span>
+							</label>
+
+							{#if isSurpriseGift}
+								<div class="ios-form-stack mt-2">
+									<label>
+										<span class="ios-input-lbl">Ім'я одержувача:</span>
+										<input
+											type="text"
+											class="ios-input"
+											bind:value={recipientName}
+											placeholder="Марія Коваленко"
+										/>
+									</label>
+									<label>
+										<span class="ios-input-lbl">Телефон одержувача:</span>
+										<input
+											type="tel"
+											class="ios-input"
+											bind:value={recipientPhone}
+											placeholder="+380..."
+										/>
+									</label>
+								</div>
+							{/if}
+						</div>
+					{:else}
+						<!-- Pickup Point -->
+						<div class="ios-items-stack">
+							{#each data.pickupPoints as pt (pt.id)}
+								<button
+									type="button"
+									class="ios-zone-row"
+									class:selected={pickupPointId === pt.id}
+									onclick={() => (pickupPointId = pt.id)}
+								>
+									<div>
+										<div class="ios-zone-name">{pt.name}</div>
+										<div class="ios-zone-desc">{pt.address} ({pt.workingHours})</div>
+									</div>
+									<strong class="ios-zone-price text-emerald-600">0 ₴</strong>
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+
+			<!-- WINDOW 4: APPLE WALLET PASS RECEIPT & CONFIRMATION -->
+			{:else if step === 4}
+				<!-- Apple Pass / Wallet Card -->
+				<div class="ios-pass-card">
+					<div class="ios-pass-head">
+						<div>
+							<span class="ios-pass-tag">Замовлення квітів</span>
+							<h5 class="ios-pass-title">{currentBouquet.name}</h5>
+						</div>
+						<span class="ios-pass-badge">🌸 {pricing.fulfillmentSummary}</span>
+					</div>
+
+					<div class="ios-pass-body">
+						{#each pricing.breakdown as item}
+							<div class="ios-pass-row">
+								<span class="ios-pass-lbl">{item.label}</span>
+								<strong class="ios-pass-val">{item.amount} ₴</strong>
+							</div>
+						{/each}
+					</div>
+
+					<div class="ios-pass-cut">
+						<div class="ios-cut-left"></div>
+						<div class="ios-cut-line"></div>
+						<div class="ios-cut-right"></div>
+					</div>
+
+					<div class="ios-pass-footer">
+						<div class="ios-pass-total-row">
+							<span>Загальна сума:</span>
+							<strong class="ios-total-sum">{pricing.totalAmount} ₴</strong>
+						</div>
+
+						<div class="ios-policy-note mt-2">
+							<ShieldCheck size={13} class="text-emerald-600 shrink-0 inline" />
+							<span>Заміна квітів допускається виключно у тій самій кольоровій гамі.</span>
+						</div>
+
+						{#if pricing.estimateNotice}
+							<div class="ios-estimate-alert">
+								<AlertTriangle size={13} />
+								<span>{pricing.estimateNotice}</span>
+							</div>
+						{/if}
+					</div>
 				</div>
 			{/if}
+		</div>
 
-			<!-- Action Button -->
-			<button
-				type="button"
-				class="w-full rounded-xl py-3 text-xs font-extrabold text-white transition-all shadow-md flex items-center justify-center gap-2 {pricing.canInstantPay ? 'bg-pink-600 hover:bg-pink-700' : 'bg-zinc-900 hover:bg-zinc-800'}"
-				onclick={handleAction}
-			>
-				{#if pricing.canInstantPay}
-					<span>Оплатити {pricing.totalAmount.toLocaleString('uk-UA')} ₴</span>
-					<ChevronRight size={15} />
-				{:else}
-					<Send size={14} />
-					<span>Погодити з флористом у Telegram</span>
-				{/if}
-			</button>
+		<!-- Apple Style Floating Bottom Bar -->
+		<div class="ios-bottom-bar">
+			{#if step > 1}
+				<button
+					type="button"
+					class="ios-btn-secondary"
+					onclick={() => step = (step - 1) as 1 | 2 | 3 | 4}
+				>
+					<ChevronLeft size={16} /> Назад
+				</button>
+			{/if}
+
+			{#if step < 4}
+				<button
+					type="button"
+					class="ios-btn-primary flex-1"
+					onclick={() => step = (step + 1) as 1 | 2 | 3 | 4}
+				>
+					{#if step === 1}
+						Додатки та листівка
+					{:else if step === 2}
+						Доставка та час
+					{:else if step === 3}
+						Перейти до оплати
+					{/if}
+					<ChevronRight size={16} />
+				</button>
+			{:else}
+				<button
+					type="button"
+					class="ios-btn-primary flex-1"
+					class:estimate-btn={!pricing.canInstantPay}
+					onclick={handlePayClick}
+				>
+					{#if !pricing.canInstantPay}
+						<Send size={15} />
+						<span>Надіслати флористу ({pricing.totalAmount} ₴)</span>
+					{:else}
+						<ShieldCheck size={16} />
+						<span>Оплатити {pricing.totalAmount} ₴</span>
+					{/if}
+				</button>
+			{/if}
+		</div>
+
+	<!-- CUSTOM ORDER MODE -->
+	{:else if currentMode === 'custom'}
+		<div class="ios-window-body">
+			<div class="ios-card">
+				<span class="ios-card-title">Індивідуальний букет від флориста:</span>
+				<p class="ios-card-sub">Опишіть ваші побажання щодо складу квітів, відтінків та форми композиції.</p>
+				<textarea
+					class="ios-textarea mt-2"
+					rows="3"
+					bind:value={customWishes}
+					placeholder="Наприклад: більше півоній, ніжна еустома, багато свіжого евкаліпту..."
+				></textarea>
+			</div>
+
+			<div class="ios-card">
+				<div class="ios-grid-2">
+					<label>
+						<span class="ios-input-lbl">Бажаний бюджет (₴):</span>
+						<input
+							type="number"
+							min="800"
+							step="100"
+							class="ios-input"
+							bind:value={customBudget}
+						/>
+					</label>
+					<label>
+						<span class="ios-input-lbl">Кольорова гама:</span>
+						<select class="ios-input" bind:value={customPaletteId}>
+							{#each data.customOrder.palettes as pal}
+								<option value={pal.id}>{pal.name}</option>
+							{/each}
+						</select>
+					</label>
+				</div>
+			</div>
+
+			<div class="ios-bottom-bar">
+				<button
+					type="button"
+					class="ios-btn-primary w-full"
+					onclick={handlePayClick}
+				>
+					<Send size={15} />
+					<span>Надіслати флористу на оцінку</span>
+				</button>
+			</div>
+		</div>
+
+	<!-- IN-STORE MODE -->
+	{:else if currentMode === 'instore'}
+		<div class="ios-window-body">
+			<div class="ios-card">
+				<span class="ios-card-title">Оплата на касі в салоні:</span>
+				<div class="ios-form-stack mt-2">
+					<label>
+						<span class="ios-input-lbl">Номер чека / замовлення:</span>
+						<input
+							type="text"
+							class="ios-input"
+							bind:value={inStoreReceiptId}
+							placeholder="FL-..."
+						/>
+					</label>
+					<label>
+						<span class="ios-input-lbl">Сума до сплати (₴):</span>
+						<input
+							type="number"
+							min="1"
+							class="ios-input"
+							bind:value={inStoreAmount}
+						/>
+					</label>
+				</div>
+			</div>
+
+			<div class="ios-bottom-bar">
+				<button
+					type="button"
+					class="ios-btn-primary w-full"
+					onclick={handlePayClick}
+				>
+					<Receipt size={16} />
+					<span>Оплатити в салоні {inStoreAmount} ₴</span>
+				</button>
+			</div>
 		</div>
 	{/if}
 </div>
 
 <style>
-	.flower-phone-preview {
-		font-family: inherit;
+	.ios-preview-container {
+		display: flex;
+		flex-direction: column;
+		background: #f2f2f7;
+		font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+		color: #1c1c1e;
+		min-height: 520px;
+		border-radius: 18px;
+		overflow: hidden;
+		position: relative;
+		padding-bottom: 72px;
+	}
+
+	.ios-nav-bar {
+		background: rgba(255, 255, 255, 0.85);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+		padding: 0.65rem 1rem;
+		position: sticky;
+		top: 0;
+		z-index: 10;
+	}
+
+	.ios-nav-content {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+
+	.ios-merchant-badge {
+		font-size: 0.85rem;
+		font-weight: 700;
+		color: #1c1c1e;
+	}
+
+	.ios-secure-tag {
+		display: flex;
+		align-items: center;
+		gap: 3px;
+		font-size: 0.7rem;
+		font-weight: 500;
+		color: #34c759;
+		background: rgba(52, 199, 89, 0.12);
+		padding: 2px 8px;
+		border-radius: 12px;
+	}
+
+	.ios-segmented-control {
+		display: flex;
+		background: #e3e3e8;
+		border-radius: 9px;
+		padding: 2px;
+		margin: 0.75rem 1rem 0 1rem;
+	}
+
+	.ios-segment-btn {
+		flex: 1;
+		border: none;
+		background: transparent;
+		font-size: 0.78rem;
+		font-weight: 500;
+		color: #636366;
+		padding: 0.35rem 0.5rem;
+		border-radius: 7px;
+		cursor: pointer;
+		transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+		text-align: center;
+	}
+
+	.ios-segment-btn.active {
+		background: #ffffff;
+		color: #1c1c1e;
+		font-weight: 600;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+	}
+
+	.ios-step-indicator {
+		padding: 0.85rem 1rem 0.25rem 1rem;
+	}
+
+	.ios-capsules {
+		display: flex;
+		gap: 4px;
+		margin-bottom: 0.4rem;
+	}
+
+	.ios-capsule {
+		flex: 1;
+		height: 3px;
+		background: #d1d1d6;
+		border-radius: 2px;
+		transition: background 0.3s ease;
+	}
+
+	.ios-capsule.filled {
+		background: #007aff;
+	}
+
+	.ios-step-sub {
+		font-size: 0.7rem;
+		font-weight: 600;
+		color: #007aff;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	.ios-step-title {
+		font-size: 1.05rem;
+		font-weight: 700;
+		color: #1c1c1e;
+		margin: 0;
+	}
+
+	.ios-window-body {
+		padding: 0.75rem 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.ios-card {
+		background: #ffffff;
+		border-radius: 14px;
+		padding: 0.85rem;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+		border: 0.5px solid rgba(0, 0, 0, 0.08);
+	}
+
+	.ios-card-title {
+		display: block;
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: #3a3a3c;
+		margin-bottom: 0.5rem;
+	}
+
+	.ios-card-sub {
+		font-size: 0.72rem;
+		color: #8e8e93;
+		margin: 0;
+	}
+
+	.ios-items-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.ios-bouquet-row {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.65rem 0.75rem;
+		border-radius: 10px;
+		border: 1px solid #e5e5ea;
+		background: #ffffff;
+		cursor: pointer;
+		text-align: left;
+	}
+
+	.ios-bouquet-row.selected {
+		border-color: #007aff;
+		background: #f0f7ff;
+	}
+
+	.ios-bq-icon {
+		font-size: 1.4rem;
+	}
+
+	.ios-bq-info {
+		flex: 1;
+	}
+
+	.ios-bq-name {
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: #1c1c1e;
+	}
+
+	.ios-bq-desc {
+		font-size: 0.68rem;
+		color: #8e8e93;
+	}
+
+	.ios-bq-price {
+		font-size: 0.85rem;
+		color: #007aff;
+	}
+
+	.ios-sizes-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr 1fr;
+		gap: 0.4rem;
+	}
+
+	.ios-size-chip {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding: 0.55rem 0.35rem;
+		border-radius: 8px;
+		border: 1px solid #e5e5ea;
+		background: #ffffff;
+		cursor: pointer;
+	}
+
+	.ios-size-chip.selected {
+		border-color: #007aff;
+		background: #f0f7ff;
+	}
+
+	.ios-size-name {
+		font-size: 0.72rem;
+		color: #636366;
+	}
+
+	.ios-size-price {
+		font-size: 0.82rem;
+		color: #007aff;
+		margin-top: 2px;
+	}
+
+	.ios-addon-row {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.6rem 0.75rem;
+		border-radius: 10px;
+		border: 1px solid #e5e5ea;
+		background: #ffffff;
+		cursor: pointer;
+		text-align: left;
+	}
+
+	.ios-addon-row.selected {
+		border-color: #007aff;
+		background: #f0f7ff;
+	}
+
+	.ios-addon-icon {
+		font-size: 1.25rem;
+	}
+
+	.ios-addon-info {
+		flex: 1;
+	}
+
+	.ios-addon-name {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: #1c1c1e;
+	}
+
+	.ios-addon-desc {
+		font-size: 0.68rem;
+		color: #8e8e93;
+	}
+
+	.ios-addon-right {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.ios-addon-price {
+		font-size: 0.8rem;
+		color: #007aff;
+	}
+
+	.ios-addon-check {
+		width: 16px;
+		height: 16px;
+		border-radius: 4px;
+		border: 1px solid #c7c7cc;
+		font-size: 0.65rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #ffffff;
+	}
+
+	.ios-addon-check.checked {
+		background: #007aff;
+		border-color: #007aff;
+	}
+
+	.ios-zone-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.6rem 0.75rem;
+		border-radius: 10px;
+		border: 1px solid #e5e5ea;
+		background: #ffffff;
+		cursor: pointer;
+		text-align: left;
+	}
+
+	.ios-zone-row.selected {
+		border-color: #007aff;
+		background: #f0f7ff;
+	}
+
+	.ios-zone-name {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: #1c1c1e;
+	}
+
+	.ios-zone-desc {
+		font-size: 0.68rem;
+		color: #8e8e93;
+	}
+
+	.ios-zone-price {
+		font-size: 0.82rem;
+		color: #007aff;
+	}
+
+	.ios-input-lbl {
+		display: block;
+		font-size: 0.74rem;
+		font-weight: 600;
+		color: #3a3a3c;
+		margin-bottom: 0.35rem;
+	}
+
+	.ios-input, .ios-textarea {
+		width: 100%;
+		border: 1px solid #e5e5ea;
+		background: #f9f9fb;
+		border-radius: 8px;
+		padding: 0.5rem 0.65rem;
+		font-size: 0.8rem;
+		color: #1c1c1e;
+		outline: none;
+		box-sizing: border-box;
+	}
+
+	.ios-input:focus, .ios-textarea:focus {
+		border-color: #007aff;
+		background: #ffffff;
+	}
+
+	.ios-checkbox-label {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: #1c1c1e;
+		cursor: pointer;
+	}
+
+	.ios-checkbox {
+		width: 18px;
+		height: 18px;
+		accent-color: #007aff;
+		cursor: pointer;
+	}
+
+	.ios-form-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	/* Apple Pass / Wallet Ticket */
+	.ios-pass-card {
+		background: #ffffff;
+		border-radius: 16px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+		border: 0.5px solid rgba(0, 0, 0, 0.08);
+		overflow: hidden;
+	}
+
+	.ios-pass-head {
+		padding: 0.85rem;
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		background: linear-gradient(180deg, #fafafa 0%, #ffffff 100%);
+	}
+
+	.ios-pass-tag {
+		font-size: 0.68rem;
+		font-weight: 600;
+		color: #007aff;
+		text-transform: uppercase;
+		display: block;
+	}
+
+	.ios-pass-title {
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: #1c1c1e;
+		margin: 2px 0 0 0;
+	}
+
+	.ios-pass-badge {
+		font-size: 0.65rem;
+		font-weight: 600;
+		color: #ec4899;
+		background: #fdf2f8;
+		padding: 2px 8px;
+		border-radius: 10px;
+	}
+
+	.ios-pass-body {
+		padding: 0.5rem 0.85rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+
+	.ios-pass-row {
+		display: flex;
+		justify-content: space-between;
+		font-size: 0.78rem;
+	}
+
+	.ios-pass-lbl {
+		color: #636366;
+	}
+
+	.ios-pass-val {
+		color: #1c1c1e;
+	}
+
+	.ios-pass-cut {
+		display: flex;
+		align-items: center;
+		position: relative;
+		margin: 0.35rem 0;
+	}
+
+	.ios-cut-left, .ios-cut-right {
+		width: 14px;
+		height: 14px;
+		background: #f2f2f7;
+		border-radius: 50%;
+	}
+
+	.ios-cut-left {
+		margin-left: -7px;
+	}
+
+	.ios-cut-right {
+		margin-right: -7px;
+	}
+
+	.ios-cut-line {
+		flex: 1;
+		border-bottom: 1px dashed #d1d1d6;
+	}
+
+	.ios-pass-footer {
+		padding: 0.5rem 0.85rem 0.85rem 0.85rem;
+	}
+
+	.ios-pass-total-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		font-size: 0.88rem;
+		font-weight: 600;
+	}
+
+	.ios-total-sum {
+		font-size: 1.25rem;
+		font-weight: 800;
+		color: #007aff;
+	}
+
+	.ios-policy-note {
+		font-size: 0.7rem;
+		color: #15803d;
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.ios-estimate-alert {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		margin-top: 0.5rem;
+		background: #fffbeb;
+		border: 1px solid #fef3c7;
+		padding: 0.4rem 0.6rem;
+		border-radius: 8px;
+		font-size: 0.7rem;
+		color: #b45309;
+	}
+
+	/* Fixed Bottom Action Bar */
+	.ios-bottom-bar {
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		padding: 0.65rem 1rem;
+		background: rgba(255, 255, 255, 0.92);
+		backdrop-filter: blur(16px);
+		-webkit-backdrop-filter: blur(16px);
+		border-top: 0.5px solid rgba(0, 0, 0, 0.1);
+		display: flex;
+		gap: 0.5rem;
+		z-index: 20;
+	}
+
+	.ios-btn-secondary {
+		background: #e5e5ea;
+		color: #1c1c1e;
+		border: none;
+		border-radius: 12px;
+		padding: 0.6rem 0.9rem;
+		font-size: 0.82rem;
+		font-weight: 600;
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		cursor: pointer;
+	}
+
+	.ios-btn-primary {
+		background: #007aff;
+		color: #ffffff;
+		border: none;
+		border-radius: 12px;
+		padding: 0.65rem 1rem;
+		font-size: 0.85rem;
+		font-weight: 600;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		cursor: pointer;
+		box-shadow: 0 2px 6px rgba(0, 122, 255, 0.3);
+		transition: background 0.15s ease;
+	}
+
+	.ios-btn-primary:active {
+		background: #0062cc;
+	}
+
+	.ios-btn-primary.estimate-btn {
+		background: #f59e0b;
+		box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+	}
+
+	.ios-grid-2 {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.5rem;
 	}
 </style>

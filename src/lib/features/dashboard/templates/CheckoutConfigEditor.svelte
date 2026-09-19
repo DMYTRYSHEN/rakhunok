@@ -7,6 +7,7 @@
 	import CleaningConfigEditor from '../business-settings/templates/CleaningConfigEditor.svelte';
 	import GiftsConfigEditor from '../business-settings/templates/GiftsConfigEditor.svelte';
 	import EventsConfigEditor from '../business-settings/templates/EventsConfigEditor.svelte';
+	import FitnessConfigEditor from '../business-settings/templates/FitnessConfigEditor.svelte';
 	import { Plus, Trash2 } from '@lucide/svelte';
 
 	let {
@@ -145,6 +146,21 @@
 				</p>
 			</div>
 			<EventsConfigEditor bind:flowData={config.flow_data} />
+		</div>
+	{:else if scenario === 'vertical_fitness'}
+		<div class="mb-6 rounded-xl border border-indigo-200 bg-white p-4 shadow-xs">
+			<div class="mb-3">
+				<p class="text-xs font-bold tracking-wider text-indigo-700 uppercase">
+					Конфігуратор Фітнес-Центру та Абонементів
+				</p>
+				<h4 class="text-sm font-bold text-zinc-900">
+					Тарифи (300 / 900 / 1800 ₴), додатки (басейн, шафка, тренування), локації та Apple Wallet Pass
+				</h4>
+				<p class="mt-0.5 text-xs text-zinc-500">
+					Налаштуйте базові абонементи (день, тиждень, місяць), закріплені шафки (142), пакети тренувань (4 шт) та цифрові картки з QR-кодом.
+				</p>
+			</div>
+			<FitnessConfigEditor bind:flowData={config.flow_data} />
 		</div>
 	{:else if ['vertical_auto', 'vertical_education', 'vertical_rental', 'vertical_services', 'engine_book'].includes(scenario)}
 		<div class="mb-6 rounded-xl border border-zinc-200 bg-white p-4 shadow-xs">

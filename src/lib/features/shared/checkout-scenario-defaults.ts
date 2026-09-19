@@ -1126,6 +1126,149 @@ const SCENARIO_OVERRIDES: Record<string, Partial<CheckoutScenarioConfig>> = {
 				telegramChat: '@olymp_tickets_manager'
 			}
 		}
+	},
+
+	vertical_fitness: {
+		allow_loyalty: true,
+		allow_promo: true,
+		allow_roundup: false,
+		allow_bnpl: true,
+		allow_tips: false,
+		cta_text: 'Оформити картку',
+		flow_data: {
+			clubBrand: 'Pulse Fitness Club',
+			tagline: 'Сила, здоровʼя та енергія кожного дня',
+			description: 'Сучасний фітнес-простір з басейном, спа-зоною та персональними тренерами',
+			contacts: {
+				phone: '+380 44 233 44 55',
+				telegram: '@pulse_fitness_admin',
+				instagram: '@pulse_fit_ua',
+				address: 'вул. Спаська, 12, Київ'
+			},
+			modes: {
+				newMembershipEnabled: true,
+				renewalEnabled: true,
+				addonOnlyEnabled: true,
+				receptionPayEnabled: true,
+				newMembershipButtonText: 'Оформити новий абонемент',
+				renewalButtonText: 'Продовжити мій абонемент',
+				addonOnlyButtonText: 'Докупити послуги / тренування',
+				receptionPayButtonText: 'Швидка оплата на рецепції'
+			},
+			clubs: [
+				{
+					id: 'pulse_podil',
+					name: 'Pulse Fitness Podil',
+					address: 'вул. Спаська, 12, Київ',
+					workingHours: 'Пн-Пт: 07:00 – 22:00, Сб-Нд: 08:00 – 21:00',
+					phone: '+380 44 233 44 55',
+					amenities: ['Тренажерна зала', 'Басейн 25м', 'Фінська сауна', 'Бокс-зона'],
+					availableTariffIds: ['day', 'week', 'month']
+				},
+				{
+					id: 'pulse_pechersk',
+					name: 'Pulse Fitness Pechersk',
+					address: 'бул. Лесі Українки, 26, Київ',
+					workingHours: 'Пн-Нд: 07:00 – 23:00',
+					phone: '+380 44 599 88 77',
+					amenities: ['Тренажерна зала', 'Зона кросфіту', 'SPA-зона', 'Фіто-бар'],
+					availableTariffIds: ['day', 'week', 'month']
+				}
+			],
+			tariffs: [
+				{
+					id: 'day',
+					name: 'Денний візит (Разовий)',
+					period: 'day',
+					price: 300,
+					description: 'Тренажерна зала + душові на 1 день без обмеження часу',
+					includesGym: true,
+					includesPool: false,
+					includesSauna: false,
+					durationDays: 1,
+					allowedHoursNotice: '07:00 – 22:00 у день візиту'
+				},
+				{
+					id: 'week',
+					name: 'Тижневий інтенсив',
+					period: 'week',
+					price: 900,
+					description: '7 днів повного доступу до кардіо та силової зони',
+					includesGym: true,
+					includesPool: false,
+					includesSauna: false,
+					durationDays: 7,
+					allowedHoursNotice: '7 календарних днів поспіль'
+				},
+				{
+					id: 'month',
+					name: 'Місячний безліміт',
+					period: 'month',
+					price: 1800,
+					description: 'Необмежений доступ у будь-який час, вступний інструктаж тренера',
+					includesGym: true,
+					includesPool: false,
+					includesSauna: false,
+					durationDays: 30,
+					allowedHoursNotice: '1 календарний місяць, щоденно 07:00 – 22:00',
+					badge: 'Найпопулярніший'
+				}
+			],
+			addons: [
+				{
+					id: 'pool',
+					name: 'Доступ до басейну (на строк абонемента)',
+					category: 'access',
+					price: 600,
+					priceModel: 'match_tariff',
+					description: 'Доріжки 25м, аква-зона та гідромасаж',
+					icon: '🏊‍♂️'
+				},
+				{
+					id: 'locker',
+					name: 'Персональна закріплена шафка',
+					category: 'resource',
+					price: 300,
+					priceModel: 'match_tariff',
+					description: 'Індивідуальна шафка в роздягальні з електронним замком',
+					icon: '🔒',
+					totalLockers: 150,
+					availableLockers: 14
+				},
+				{
+					id: 'trainings_4',
+					name: 'Пакет 4 персональних тренувань',
+					category: 'credits',
+					price: 2000,
+					creditCount: 4,
+					priceModel: 'fixed_bundle',
+					description: 'Індивідуальні тренування з топ-тренером (500 ₴/сесія)',
+					icon: '🥊'
+				},
+				{
+					id: 'towel',
+					name: 'Оренда преміум-рушника (разово)',
+					category: 'usage',
+					price: 50,
+					priceModel: 'per_use',
+					description: 'Великий махровий рушник на кожне тренування',
+					icon: '🧖'
+				}
+			],
+			approval: {
+				autoApprovalEnabled: true,
+				requireManualForLocker: false,
+				requireManualForCorporate: true,
+				telegramChat: '@pulse_fitness_admin',
+				responseTimeNotice: 'Миттєве зарахування та автовидача цифрового QR-абонемента'
+			},
+			rules: {
+				allowFreeze: true,
+				maxFreezeDays: 14,
+				refundNotice: 'Заморозка до 14 днів безкоштовно. Повернення коштів за правилами клубу.',
+				entryMethod: 'qr_reception'
+			}
+		}
 	}
 };
 

@@ -135,6 +135,7 @@
 
 	// Поточний екран: 'welcome' | 'booking' | 'in_salon' | 'booking_submitted'
 	let activePath = $state<'welcome' | 'booking' | 'in_salon' | 'booking_submitted'>('welcome');
+	let bookingStep = $state<1 | 2 | 3 | 4>(1);
 
 	// Вибрані клієнтом опції
 	let petType = $state<GroomingPetType>('dog');
@@ -278,280 +279,337 @@
 	<!-- ═════════════════════════════════════════════════════════════ -->
 	{:else if activePath === 'booking'}
 		<div class="flow-content space-y-4">
-			<div class="step-title-bar">
-				<span class="step-pill">Онлайн-запис</span>
-				<span class="step-desc">Параметри тварини та розрахунок вартості</span>
-			</div>
-
-			<!-- Крок 1: Тварина -->
-			<div class="section-box">
-				<span class="section-label">1. Оберіть улюбленця:</span>
-				<div class="grid grid-cols-2 gap-2">
-					<button
-						type="button"
-						class="pet-type-btn"
-						class:active={petType === 'dog'}
-						onclick={() => (petType = 'dog')}
-					>
-						<span>🐶 Собака</span>
-					</button>
-					<button
-						type="button"
-						class="pet-type-btn"
-						class:active={petType === 'cat'}
-						onclick={() => (petType = 'cat')}
-					>
-						<span>🐱 Кіт</span>
-					</button>
+			<!-- Apple HIG Step Indicator -->
+			<div class="ios-step-indicator">
+				<div class="ios-capsules">
+					<div class="ios-capsule" class:filled={bookingStep >= 1}></div>
+					<div class="ios-capsule" class:filled={bookingStep >= 2}></div>
+					<div class="ios-capsule" class:filled={bookingStep >= 3}></div>
+					<div class="ios-capsule" class:filled={bookingStep >= 4}></div>
 				</div>
-			</div>
-
-			<!-- Крок 2: Вага тварини (тарифна сітка) -->
-			<div class="section-box">
-				<div class="flex items-center justify-between mb-1.5">
-					<span class="section-label mb-0">2. Вага тварини:</span>
-					<strong class="text-amber-400 text-xs font-bold">{weightKg} кг</strong>
-				</div>
-				<input
-					type="range"
-					min="1"
-					max="25"
-					step="0.5"
-					bind:value={weightKg}
-					class="w-full accent-amber-500 cursor-pointer"
-				/>
-				<div class="flex items-center justify-between text-[10px] text-zinc-400 mt-1">
-					<span>до 5 кг (700 ₴)</span>
-					<span>5.1–10 кг (900 ₴)</span>
-					<span>10.1–20 кг (1 200 ₴)</span>
-				</div>
-				{#if pricing.matchedTier}
-					<div class="tier-pill mt-2">
-						<span>Категорія тарифу:</span>
-						<strong>{pricing.matchedTier.label}</strong>
-					</div>
-				{/if}
-			</div>
-
-			<!-- Крок 3: Послуга -->
-			<div class="section-box">
-				<span class="section-label">3. Послуга:</span>
-				<div class="space-y-1.5">
-					{#each (effectiveData.services ?? []).filter((s) => s.petTypes.includes(petType)) as s (s.id)}
-						<button
-							type="button"
-							class="service-chip"
-							class:active={s.id === selectedServiceId}
-							onclick={() => (selectedServiceId = s.id)}
-						>
-							<div class="s-info">
-								<strong>{s.name}</strong>
-								<span class="s-time"><Clock size={11} /> {s.durationMinutes} хв</span>
-							</div>
-							<div class="s-price">
-								{#if s.requiresCoatDetails && pricing.matchedTier}
-									<strong>{s.weightTierPrices[pricing.matchedTier.id] ?? pricing.matchedTier.basePrice} ₴</strong>
-								{:else}
-									<strong>{s.fixedPrice ?? 150} ₴</strong>
-								{/if}
-								{#if s.id === selectedServiceId}
-									<span class="check-dot"><Check size={12} /></span>
-								{/if}
-							</div>
-						</button>
-					{/each}
-				</div>
-			</div>
-
-			<!-- Крок 4: Шерсть та Стан ковтунів (лише якщо послуга вимагає) -->
-			{#if activeService?.requiresCoatDetails}
-				<div class="section-box">
-					<span class="section-label">4. Довжина шерсті:</span>
-					<div class="grid grid-cols-3 gap-1.5">
-						{#each effectiveData.coatOptions ?? [] as c (c.id)}
-							<button
-								type="button"
-								class="opt-chip"
-								class:active={coatLength === c.id}
-								onclick={() => (coatLength = c.id)}
-							>
-								<span>{c.label}</span>
-								<strong>{c.extraPrice > 0 ? `+${c.extraPrice} ₴` : '+0 ₴'}</strong>
-							</button>
-						{/each}
-					</div>
-				</div>
-
-				<!-- Стан шерсті: перемикач ковтунів -->
-				<div class="section-box highlight-matting" class:matted-active={coatCondition === 'matted'}>
-					<div class="flex items-center justify-between mb-1.5">
-						<span class="section-label text-amber-300 mb-0">5. Стан шерсті (ковтуни):</span>
-						{#if coatCondition === 'matted'}
-							<span class="badge-eval">Ручна оцінка</span>
+				<div class="ios-step-title-wrap">
+					<span class="ios-step-sub">Крок {bookingStep} з 4</span>
+					<h4 class="ios-step-title">
+						{#if bookingStep === 1}
+							Улюбленець та вага
+						{:else if bookingStep === 2}
+							Послуга та стан шерсті
+						{:else if bookingStep === 3}
+							СПА, дата та час візиту
+						{:else if bookingStep === 4}
+							Кошторис та запис
 						{/if}
-					</div>
+					</h4>
+				</div>
+			</div>
+
+			<!-- WINDOW 1: PET TYPE & WEIGHT -->
+			{#if bookingStep === 1}
+				<!-- Крок 1: Тварина -->
+				<div class="section-box">
+					<span class="section-label">1. Оберіть улюбленця:</span>
 					<div class="grid grid-cols-2 gap-2">
 						<button
 							type="button"
-							class="cond-btn"
-							class:active={coatCondition === 'clean'}
-							onclick={() => (coatCondition = 'clean')}
+							class="pet-type-btn"
+							class:active={petType === 'dog'}
+							onclick={() => (petType = 'dog')}
 						>
-							<span>✨ Без ковтунів</span>
-							<small>Точна ціна</small>
+							<span>🐶 Собака</span>
 						</button>
 						<button
 							type="button"
-							class="cond-btn warning"
-							class:active={coatCondition === 'matted'}
-							onclick={() => (coatCondition = 'matted')}
+							class="pet-type-btn"
+							class:active={petType === 'cat'}
+							onclick={() => (petType = 'cat')}
 						>
-							<span>⚠️ Є ковтуни / Не впевнений</span>
-							<small>Попередня оцінка</small>
+							<span>🐱 Кіт</span>
 						</button>
 					</div>
+				</div>
 
-					{#if pricing.isEstimate}
-						<div class="estimate-banner mt-2.5">
-							<AlertTriangle size={15} class="shrink-0 text-amber-400" />
-							<span class="text-[11px] text-amber-200 leading-4">
-								{pricing.estimateNotice}
-							</span>
+				<!-- Крок 2: Вага тварини (тарифна сітка) -->
+				<div class="section-box">
+					<div class="flex items-center justify-between mb-1.5">
+						<span class="section-label mb-0">2. Вага тварини:</span>
+						<strong class="text-amber-400 text-xs font-bold">{weightKg} кг</strong>
+					</div>
+					<input
+						type="range"
+						min="1"
+						max="25"
+						step="0.5"
+						bind:value={weightKg}
+						class="w-full accent-amber-500 cursor-pointer"
+					/>
+					<div class="flex items-center justify-between text-[10px] text-zinc-400 mt-1">
+						<span>до 5 кг (700 ₴)</span>
+						<span>5.1–10 кг (900 ₴)</span>
+						<span>10.1–20 кг (1 200 ₴)</span>
+					</div>
+					{#if pricing.matchedTier}
+						<div class="tier-pill mt-2">
+							<span>Категорія тарифу:</span>
+							<strong>{pricing.matchedTier.label}</strong>
 						</div>
 					{/if}
 				</div>
-			{/if}
 
-			<!-- Крок 5: Додаткові процедури (СПА) -->
-			{#if (effectiveData.addons ?? []).length > 0}
+			<!-- WINDOW 2: SERVICE & COAT DETAILS -->
+			{:else if bookingStep === 2}
+				<!-- Крок 3: Послуга -->
 				<div class="section-box">
-					<span class="section-label">Додаткові процедури:</span>
+					<span class="section-label">Оберіть послугу:</span>
 					<div class="space-y-1.5">
-						{#each effectiveData.addons ?? [] as addon (addon.id)}
-							{@const checked = selectedAddonIds.includes(addon.id)}
+						{#each (effectiveData.services ?? []).filter((s) => s.petTypes.includes(petType)) as s (s.id)}
 							<button
 								type="button"
-								class="addon-row"
-								class:active={checked}
-								onclick={() => toggleAddon(addon.id)}
+								class="service-chip"
+								class:active={s.id === selectedServiceId}
+								onclick={() => (selectedServiceId = s.id)}
 							>
-								<div class="addon-text">
-									<strong>{addon.name}</strong>
-									{#if addon.description}<small>{addon.description}</small>{/if}
+								<div class="s-info">
+									<strong>{s.name}</strong>
+									<span class="s-time"><Clock size={11} /> {s.durationMinutes} хв</span>
 								</div>
-								<div class="addon-price">
-									<strong>+{addon.price} ₴</strong>
-									<span class="box-check" class:checked>{checked ? '✓' : ''}</span>
+								<div class="s-price">
+									{#if s.requiresCoatDetails && pricing.matchedTier}
+										<strong>{s.weightTierPrices[pricing.matchedTier.id] ?? pricing.matchedTier.basePrice} ₴</strong>
+									{:else}
+										<strong>{s.fixedPrice ?? 150} ₴</strong>
+									{/if}
+									{#if s.id === selectedServiceId}
+										<span class="check-dot"><Check size={12} /></span>
+									{/if}
 								</div>
 							</button>
 						{/each}
 					</div>
 				</div>
+
+				<!-- Крок 4: Шерсть та Стан ковтунів (лише якщо послуга вимагає) -->
+				{#if activeService?.requiresCoatDetails}
+					<div class="section-box">
+						<span class="section-label">Довжина шерсті:</span>
+						<div class="grid grid-cols-3 gap-1.5">
+							{#each effectiveData.coatOptions ?? [] as c (c.id)}
+								<button
+									type="button"
+									class="opt-chip"
+									class:active={coatLength === c.id}
+									onclick={() => (coatLength = c.id)}
+								>
+									<span>{c.label}</span>
+									<strong>{c.extraPrice > 0 ? `+${c.extraPrice} ₴` : '+0 ₴'}</strong>
+								</button>
+							{/each}
+						</div>
+					</div>
+
+					<!-- Стан шерсті: перемикач ковтунів -->
+					<div class="section-box highlight-matting" class:matted-active={coatCondition === 'matted'}>
+						<div class="flex items-center justify-between mb-1.5">
+							<span class="section-label text-amber-300 mb-0">Стан шерсті (наявність ковтунів):</span>
+							{#if coatCondition === 'matted'}
+								<span class="badge-eval">Ручна оцінка</span>
+							{/if}
+						</div>
+						<div class="grid grid-cols-2 gap-2">
+							<button
+								type="button"
+								class="cond-btn"
+								class:active={coatCondition === 'clean'}
+								onclick={() => (coatCondition = 'clean')}
+							>
+								<span>✨ Без ковтунів</span>
+								<small>Точна ціна</small>
+							</button>
+							<button
+								type="button"
+								class="cond-btn warning"
+								class:active={coatCondition === 'matted'}
+								onclick={() => (coatCondition = 'matted')}
+							>
+								<span>⚠️ Є ковтуни / Не впевнений</span>
+								<small>Попередня оцінка</small>
+							</button>
+						</div>
+
+						{#if pricing.isEstimate}
+							<div class="estimate-banner mt-2.5">
+								<AlertTriangle size={15} class="shrink-0 text-amber-400" />
+								<span class="text-[11px] text-amber-200 leading-4">
+									{pricing.estimateNotice}
+								</span>
+							</div>
+						{/if}
+					</div>
+				{/if}
+
+			<!-- WINDOW 3: ADDONS, DATE, TIME & CONTACTS -->
+			{:else if bookingStep === 3}
+				<!-- Крок 5: Додаткові процедури (СПА) -->
+				{#if (effectiveData.addons ?? []).length > 0}
+					<div class="section-box">
+						<span class="section-label">Додаткові СПА-процедури:</span>
+						<div class="space-y-1.5">
+							{#each effectiveData.addons ?? [] as addon (addon.id)}
+								{@const checked = selectedAddonIds.includes(addon.id)}
+								<button
+									type="button"
+									class="addon-row"
+									class:active={checked}
+									onclick={() => toggleAddon(addon.id)}
+								>
+									<div class="addon-text">
+										<strong>{addon.name}</strong>
+										{#if addon.description}<small>{addon.description}</small>{/if}
+									</div>
+									<div class="addon-price">
+										<strong>+{addon.price} ₴</strong>
+										<span class="box-check" class:checked>{checked ? '✓' : ''}</span>
+									</div>
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Крок 6: Бажаний час -->
+				<div class="section-box">
+					<span class="section-label">Бажаний день та час візиту:</span>
+					<div class="flex gap-2 mb-2 overflow-x-auto pb-1">
+						{#each ['Сьогодні', 'Завтра', 'Четвер', 'П’ятниця'] as day}
+							<button
+								type="button"
+								class="day-btn"
+								class:active={selectedDate === day}
+								onclick={() => (selectedDate = day)}
+							>
+								{day}
+							</button>
+						{/each}
+					</div>
+					<div class="grid grid-cols-4 gap-1.5">
+						{#each ['10:00', '11:00', '13:30', '15:00', '17:00', '18:30'] as t}
+							<button
+								type="button"
+								class="time-btn"
+								class:active={selectedTime === t}
+								onclick={() => (selectedTime = t)}
+							>
+								{t}
+							</button>
+						{/each}
+					</div>
+					<span class="text-[10px] text-zinc-400 block mt-1.5">
+						ℹ️ Бажаний час узгоджується із розкладом майстра
+					</span>
+				</div>
+
+				<!-- Крок 7: Контакти та Кличка -->
+				<div class="section-box">
+					<span class="section-label">Дані улюбленця та контакти:</span>
+					<div class="grid grid-cols-2 gap-2 mb-2">
+						<input
+							type="text"
+							bind:value={petName}
+							placeholder="Кличка (Чак)"
+							class="groom-input"
+						/>
+						<input
+							type="text"
+							bind:value={petBreed}
+							placeholder="Порода (Коргі)"
+							class="groom-input"
+						/>
+					</div>
+					<input
+						type="tel"
+						bind:value={clientPhone}
+						placeholder="Номер телефону (+380)"
+						class="groom-input"
+					/>
+				</div>
+
+			<!-- WINDOW 4: SUMMARY & CONFIRMATION -->
+			{:else if bookingStep === 4}
+				<!-- Підсумок вартості -->
+				<div class="summary-card">
+					<div class="sum-line">
+						<span>{pricing.serviceName} ({pricing.matchedTier?.label ?? `${weightKg} кг`}):</span>
+						<strong>{pricing.basePrice} ₴</strong>
+					</div>
+
+					{#if pricing.coatExtra > 0}
+						<div class="sum-line sub">
+							<span>└ Довга шерсть:</span>
+							<strong>+{pricing.coatExtra} ₴</strong>
+						</div>
+					{/if}
+
+					{#each pricing.activeAddons as add}
+						<div class="sum-line sub">
+							<span>└ {add.name}:</span>
+							<strong>+{add.price} ₴</strong>
+						</div>
+					{/each}
+
+					<div class="sum-line total">
+						<span>{pricing.isEstimate ? 'Попередня оцінка:' : 'Загальна вартість:'}</span>
+						<strong class="text-amber-400 text-base">{pricing.totalPrice} ₴</strong>
+					</div>
+
+					{#if pricing.isEstimate}
+						<span class="text-[10px] text-amber-300 block">
+							Остаточна сума визначається після огляду ковтунів
+						</span>
+					{/if}
+
+					<div class="sum-line deposit">
+						<span>Аванс для запису (30%):</span>
+						<strong class="text-emerald-400 font-bold">{pricing.depositAmount} ₴</strong>
+					</div>
+				</div>
 			{/if}
 
-			<!-- Крок 6: Бажаний час -->
-			<div class="section-box">
-				<span class="section-label">Бажаний час візиту:</span>
-				<div class="flex gap-2 mb-2 overflow-x-auto pb-1">
-					{#each ['Сьогодні', 'Завтра', 'Четвер', 'П’ятниця'] as day}
-						<button
-							type="button"
-							class="day-btn"
-							class:active={selectedDate === day}
-							onclick={() => (selectedDate = day)}
-						>
-							{day}
-						</button>
-					{/each}
-				</div>
-				<div class="grid grid-cols-4 gap-1.5">
-					{#each ['10:00', '11:00', '13:30', '15:00', '17:00', '18:30'] as t}
-						<button
-							type="button"
-							class="time-btn"
-							class:active={selectedTime === t}
-							onclick={() => (selectedTime = t)}
-						>
-							{t}
-						</button>
-					{/each}
-				</div>
-				<span class="text-[10px] text-zinc-400 block mt-1.5">
-					ℹ️ Бажаний час узгоджується із розкладом майстра
-				</span>
-			</div>
-
-			<!-- Крок 7: Контакти та Кличка -->
-			<div class="section-box">
-				<span class="section-label">Дані улюбленця та контакти:</span>
-				<div class="grid grid-cols-2 gap-2 mb-2">
-					<input
-						type="text"
-						bind:value={petName}
-						placeholder="Кличка (Чак)"
-						class="groom-input"
-					/>
-					<input
-						type="text"
-						bind:value={petBreed}
-						placeholder="Порода (Коргі)"
-						class="groom-input"
-					/>
-				</div>
-				<input
-					type="tel"
-					bind:value={clientPhone}
-					placeholder="Номер телефону (+380)"
-					class="groom-input"
-				/>
-			</div>
-
-			<!-- Підсумок вартості -->
-			<div class="summary-card">
-				<div class="sum-line">
-					<span>{pricing.serviceName} ({pricing.matchedTier?.label ?? `${weightKg} кг`}):</span>
-					<strong>{pricing.basePrice} ₴</strong>
-				</div>
-
-				{#if pricing.coatExtra > 0}
-					<div class="sum-line sub">
-						<span>└ Довга шерсть:</span>
-						<strong>+{pricing.coatExtra} ₴</strong>
-					</div>
+			<!-- Bottom Step Navigation Bar -->
+			<div class="flex items-center gap-2 pt-2">
+				{#if bookingStep > 1}
+					<button
+						type="button"
+						class="btn-step-nav secondary"
+						onclick={() => bookingStep = (bookingStep - 1) as 1 | 2 | 3 | 4}
+					>
+						← Назад
+					</button>
 				{/if}
 
-				{#each pricing.activeAddons as add}
-					<div class="sum-line sub">
-						<span>└ {add.name}:</span>
-						<strong>+{add.price} ₴</strong>
-					</div>
-				{/each}
-
-				<div class="sum-line total">
-					<span>{pricing.isEstimate ? 'Попередня оцінка:' : 'Загальна вартість:'}</span>
-					<strong class="text-amber-400 text-base">{pricing.totalPrice} ₴</strong>
-				</div>
-
-				{#if pricing.isEstimate}
-					<span class="text-[10px] text-amber-300 block">
-						Остаточна сума визначається після огляду ковтунів
-					</span>
+				{#if bookingStep < 4}
+					<button
+						type="button"
+						class="btn-step-nav primary flex-1"
+						onclick={() => bookingStep = (bookingStep + 1) as 1 | 2 | 3 | 4}
+					>
+						{#if bookingStep === 1}
+							Обрати послугу →
+						{:else if bookingStep === 2}
+							СПА та час візиту →
+						{:else if bookingStep === 3}
+							Розрахувати вартість →
+						{/if}
+					</button>
+				{:else}
+					<button
+						type="button"
+						class="btn-submit-booking flex-1"
+						onclick={() => (activePath = 'booking_submitted')}
+					>
+						<Send size={16} />
+						<span>{pricing.isEstimate ? 'Надіслати на оцінку' : 'Записати улюбленця'}</span>
+					</button>
 				{/if}
-
-				<div class="sum-line deposit">
-					<span>Аванс для запису (30%):</span>
-					<strong class="text-emerald-400 font-bold">{pricing.depositAmount} ₴</strong>
-				</div>
 			</div>
-
-			<button
-				type="button"
-				class="btn-submit-booking"
-				onclick={() => (activePath = 'booking_submitted')}
-			>
-				<Send size={16} />
-				<span>{pricing.isEstimate ? 'Надіслати заявку на оцінку майстру' : 'Записати улюбленця на візит'}</span>
-			</button>
 		</div>
 
 	<!-- ═════════════════════════════════════════════════════════════ -->
@@ -862,6 +920,78 @@
 	}
 
 	/* Form */
+	.ios-step-indicator {
+		padding: 0.25rem 0 0.5rem 0;
+	}
+
+	.ios-capsules {
+		display: flex;
+		gap: 4px;
+		margin-bottom: 0.35rem;
+	}
+
+	.ios-capsule {
+		flex: 1;
+		height: 3px;
+		background: rgba(255, 255, 255, 0.15);
+		border-radius: 2px;
+		transition: background 0.3s ease;
+	}
+
+	.ios-capsule.filled {
+		background: #fbbf24;
+	}
+
+	.ios-step-sub {
+		font-size: 0.68rem;
+		font-weight: 700;
+		color: #fbbf24;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		display: block;
+	}
+
+	.ios-step-title {
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: #ffffff;
+		margin: 2px 0 0 0;
+	}
+
+	.btn-step-nav {
+		border-radius: 10px;
+		padding: 9px 14px;
+		font-size: 12px;
+		font-weight: 600;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: all 0.2s;
+	}
+
+	.btn-step-nav.secondary {
+		background: rgba(255, 255, 255, 0.08);
+		border: 1px solid rgba(255, 255, 255, 0.15);
+		color: #e4e4e7;
+	}
+
+	.btn-step-nav.secondary:hover {
+		background: rgba(255, 255, 255, 0.14);
+		color: #ffffff;
+	}
+
+	.btn-step-nav.primary {
+		background: linear-gradient(135deg, #f59e0b, #d97706);
+		border: none;
+		color: #ffffff;
+		box-shadow: 0 2px 6px rgba(245, 158, 11, 0.35);
+	}
+
+	.btn-step-nav.primary:hover {
+		opacity: 0.95;
+	}
+
 	.step-title-bar {
 		display: flex;
 		align-items: center;

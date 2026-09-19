@@ -12,7 +12,8 @@
 		Minus,
 		Calendar,
 		FileCheck,
-		FileCode,
+		ChevronRight,
+		ChevronLeft,
 		User,
 		Phone,
 		Package
@@ -51,10 +52,10 @@
 			readyGiftEnabled: true,
 			customIdeaEnabled: true,
 			directInvoiceEnabled: true,
-			personalizedButtonText: 'Персоналізувати',
+			personalizedButtonText: 'Персоналізація',
 			readyGiftButtonText: 'Готові подарунки',
 			customIdeaButtonText: 'Власна ідея',
-			directInvoiceButtonText: 'Оплатити рахунок'
+			directInvoiceButtonText: 'Оплата'
 		},
 		products: [
 			{
@@ -194,6 +195,7 @@
 
 	// Default selections: notebook, 2 pcs, engraving (+120), box (+80), mockup (+300), delivery (+150) = 1 750 грн!
 	let currentMode = $state<GiftsOrderMode>('personalized');
+	let step = $state<1 | 2 | 3 | 4>(1);
 
 	let selections = $state<GiftsOrderSelections>({
 		mode: 'personalized',
@@ -237,6 +239,13 @@
 		mergedData.products.find((p) => p.id === prunedSelections.productId) || mergedData.products[0]
 	);
 
+	let isPackagingStep = $derived(
+		(currentMode === 'personalized' && step === 3) || (currentMode === 'ready' && step === 2)
+	);
+	let isSummaryStep = $derived(
+		(currentMode === 'personalized' && step === 4) || (currentMode === 'ready' && step === 3)
+	);
+
 	function updateQuantity(delta: number) {
 		const newQty = Math.max(1, Math.min(50, (selections.quantity || 1) + delta));
 		selections.quantity = newQty;
@@ -264,107 +273,131 @@
 	}
 </script>
 
-<div class="preview-container">
-	<!-- Store Brand Header -->
-	<header class="store-hero">
-		<div class="store-badge">🎁 Майстерня Подарунків</div>
-		<h2 class="store-title">{mergedData.storeName}</h2>
-		<p class="store-tagline">{mergedData.tagline}</p>
+<div class="ios-preview-container">
+	<!-- iOS Navigation Bar -->
+	<header class="ios-nav-bar">
+		<div class="ios-nav-content">
+			<span class="ios-merchant-badge">🎁 {mergedData.storeName}</span>
+			<span class="ios-secure-tag"><ShieldCheck size={12} /> Захищено</span>
+		</div>
 	</header>
 
-	<!-- Mode Selector Tabs -->
-	<nav class="mode-tabs">
+	<!-- iOS Segmented Mode Control -->
+	<div class="ios-segmented-control">
 		{#if mergedData.modes.personalizedEnabled}
 			<button
 				type="button"
-				class="mode-tab"
+				class="ios-segment-btn"
 				class:active={currentMode === 'personalized'}
-				onclick={() => (currentMode = 'personalized')}
+				onclick={() => { currentMode = 'personalized'; step = 1; }}
 			>
-				<Sparkles size={14} />
-				<span>{mergedData.modes.personalizedButtonText || 'Персоналізація'}</span>
+				{mergedData.modes.personalizedButtonText || 'Персоналізація'}
 			</button>
 		{/if}
 		{#if mergedData.modes.readyGiftEnabled}
 			<button
 				type="button"
-				class="mode-tab"
+				class="ios-segment-btn"
 				class:active={currentMode === 'ready'}
-				onclick={() => (currentMode = 'ready')}
+				onclick={() => { currentMode = 'ready'; step = 1; }}
 			>
-				<Package size={14} />
-				<span>{mergedData.modes.readyGiftButtonText || 'Готові подарунки'}</span>
+				{mergedData.modes.readyGiftButtonText || 'Готові'}
 			</button>
 		{/if}
 		{#if mergedData.modes.customIdeaEnabled}
 			<button
 				type="button"
-				class="mode-tab"
+				class="ios-segment-btn"
 				class:active={currentMode === 'custom_idea'}
 				onclick={() => (currentMode = 'custom_idea')}
 			>
-				<Gift size={14} />
-				<span>{mergedData.modes.customIdeaButtonText || 'Власна ідея'}</span>
+				{mergedData.modes.customIdeaButtonText || 'Власна ідея'}
 			</button>
 		{/if}
 		{#if mergedData.modes.directInvoiceEnabled}
 			<button
 				type="button"
-				class="mode-tab"
+				class="ios-segment-btn"
 				class:active={currentMode === 'direct_invoice'}
 				onclick={() => (currentMode = 'direct_invoice')}
 			>
-				<Receipt size={14} />
-				<span>{mergedData.modes.directInvoiceButtonText || 'Оплата'}</span>
+				{mergedData.modes.directInvoiceButtonText || 'Оплата'}
 			</button>
 		{/if}
-	</nav>
+	</div>
 
-	<!-- MAIN CONTENT AREA -->
-	<div class="flow-content">
-		<!-- MODE 1: PERSONALIZED OR READY -->
-		{#if currentMode === 'personalized' || currentMode === 'ready'}
-			<!-- 1. Product Selection -->
-			<section class="flow-section">
-				<div class="section-title">
-					<span class="step-num">1</span>
-					<span>Оберіть виріб-основу</span>
-				</div>
-				<div class="products-selector">
-					{#each mergedData.products as prod (prod.id)}
-						<button
-							type="button"
-							class="product-card-btn"
-							class:selected={selections.productId === prod.id}
-							onclick={() => {
-								selections.productId = prod.id;
-								if (prod.colors && prod.colors.length > 0) {
-									selections.colorId = prod.colors[0].id;
-								}
-							}}
-						>
-							<div class="prod-top">
-								<span class="prod-name">{prod.name}</span>
-								<span class="prod-price">{prod.basePrice} ₴/шт</span>
-							</div>
-							<p class="prod-desc">{prod.description}</p>
-						</button>
-					{/each}
+	<!-- MODE 1: PERSONALIZED OR READY (APPLE HIG STEP WINDOWS) -->
+	{#if currentMode === 'personalized' || currentMode === 'ready'}
+		<!-- Step Header & Progress Capsules -->
+		<div class="ios-step-indicator">
+			<div class="ios-capsules">
+				<div class="ios-capsule" class:filled={step >= 1}></div>
+				{#if currentMode === 'personalized'}
+					<div class="ios-capsule" class:filled={step >= 2}></div>
+				{/if}
+				<div class="ios-capsule" class:filled={step >= 3}></div>
+				<div class="ios-capsule" class:filled={step >= 4}></div>
+			</div>
+			<div class="ios-step-title-wrap">
+				<span class="ios-step-sub">Крок {step} з {currentMode === 'personalized' ? 4 : 3}</span>
+				<h4 class="ios-step-title">
+					{#if step === 1}
+						Виріб, колір та тираж
+					{:else if step === 2}
+						{currentMode === 'personalized' ? 'Персоналізація та нанесення' : 'Пакування та отримання'}
+					{:else if step === 3}
+						{currentMode === 'personalized' ? 'Пакування та отримання' : 'Макет, кошторис та аванс'}
+					{:else}
+						Макет, кошторис та аванс
+					{/if}
+				</h4>
+			</div>
+		</div>
+
+		<div class="ios-window-body">
+			<!-- WINDOW 1: PRODUCT, COLOR, QUANTITY -->
+			{#if step === 1}
+				<!-- Products Stack -->
+				<div class="ios-card">
+					<span class="ios-card-title">Оберіть виріб-основу:</span>
+					<div class="ios-items-stack">
+						{#each mergedData.products as prod (prod.id)}
+							<button
+								type="button"
+								class="ios-product-row"
+								class:selected={selections.productId === prod.id}
+								onclick={() => {
+									selections.productId = prod.id;
+									if (prod.colors && prod.colors.length > 0) {
+										selections.colorId = prod.colors[0].id;
+									}
+								}}
+							>
+								<div class="ios-prod-info">
+									<div class="ios-prod-name">{prod.name}</div>
+									<div class="ios-prod-desc">{prod.description}</div>
+								</div>
+								<div class="ios-prod-price">
+									{prod.basePrice} ₴/шт
+								</div>
+							</button>
+						{/each}
+					</div>
 				</div>
 
 				<!-- Color selection -->
 				{#if currentProduct && currentProduct.colors && currentProduct.colors.length > 0}
-					<div class="sub-block">
-						<span class="sub-title">Оберіть колір виробу:</span>
-						<div class="colors-row">
+					<div class="ios-card">
+						<span class="ios-card-title">Колір виробу:</span>
+						<div class="ios-colors-row">
 							{#each currentProduct.colors as color (color.id)}
 								<button
 									type="button"
-									class="color-btn"
+									class="ios-color-chip"
 									class:selected={selections.colorId === color.id}
 									onclick={() => (selections.colorId = color.id)}
 								>
-									<span class="color-swatch" style="background-color: {color.hex || '#333333'}"></span>
+									<span class="ios-color-dot" style="background-color: {color.hex || '#333333'}"></span>
 									<span>{color.name}</span>
 								</button>
 							{/each}
@@ -372,48 +405,43 @@
 					</div>
 				{/if}
 
-				<!-- Quantity stepper -->
-				<div class="sub-block flex-between qty-block">
+				<!-- Quantity Stepper -->
+				<div class="ios-card ios-card-stepper">
 					<div>
-						<span class="sub-title">Кількість виробів:</span>
-						<span class="sub-hint">Разові послуги (макет і доставка) не множаться на тираж</span>
+						<span class="ios-card-title mb-0">Кількість виробів:</span>
+						<span class="ios-card-sub">Разові послуги (макет і доставка) не множаться</span>
 					</div>
-					<div class="stepper">
+					<div class="ios-stepper">
 						<button
 							type="button"
-							class="stepper-btn"
-							aria-label="Зменшити кількість"
+							class="ios-stepper-btn"
+							aria-label="Зменшити"
 							disabled={selections.quantity <= 1}
 							onclick={() => updateQuantity(-1)}
 						>
-							<Minus size={15} />
+							<Minus size={14} />
 						</button>
-						<span class="stepper-val">{selections.quantity} шт</span>
+						<span class="ios-stepper-val">{selections.quantity} шт</span>
 						<button
 							type="button"
-							class="stepper-btn"
-							aria-label="Збільшити кількість"
+							class="ios-stepper-btn"
+							aria-label="Збільшити"
 							onclick={() => updateQuantity(1)}
 						>
-							<Plus size={15} />
+							<Plus size={14} />
 						</button>
 					</div>
 				</div>
-			</section>
 
-			<!-- 2. Personalization Block (Only in Personalized Mode) -->
-			{#if currentMode === 'personalized'}
-				<section class="flow-section">
-					<div class="section-title">
-						<span class="step-num">2</span>
-						<span>Персоналізація та нанесення</span>
-					</div>
-
-					<!-- Single name vs Multiple names -->
-					<div class="multi-name-toggle">
+			<!-- WINDOW 2: PERSONALIZATION (ONLY PERSONALIZED MODE) -->
+			{:else if step === 2 && currentMode === 'personalized'}
+				<!-- Multi-name toggle -->
+				<div class="ios-card">
+					<span class="ios-card-title">Формат персоналізації:</span>
+					<div class="ios-segmented-control mb-2">
 						<button
 							type="button"
-							class="toggle-opt"
+							class="ios-segment-btn"
 							class:active={!selections.isMultiName}
 							onclick={() => (selections.isMultiName = false)}
 						>
@@ -421,7 +449,7 @@
 						</button>
 						<button
 							type="button"
-							class="toggle-opt"
+							class="ios-segment-btn"
 							class:active={selections.isMultiName}
 							onclick={() => {
 								selections.isMultiName = true;
@@ -434,1147 +462,1192 @@
 								}
 							}}
 						>
-							Різні імена для кожного з {selections.quantity} шт
+							Різні імена для кожного ({selections.quantity})
 						</button>
 					</div>
 
 					<!-- Method selection -->
-					<div class="options-grid">
+					<div class="ios-items-stack">
 						{#each mergedData.personalization as opt (opt.id)}
 							<button
 								type="button"
-								class="opt-btn"
+								class="ios-opt-row"
 								class:selected={selections.personalizationId === opt.id}
 								onclick={() => (selections.personalizationId = opt.id)}
 							>
-								<div class="opt-name">{opt.name}</div>
-								<div class="opt-price">+{opt.pricePerItem} ₴/шт</div>
+								<span class="ios-opt-title">{opt.name}</span>
+								<strong class="ios-opt-price">+{opt.pricePerItem} ₴/шт</strong>
 							</button>
 						{/each}
 					</div>
+				</div>
 
-					<!-- Text input or multi-names list -->
+				<!-- Text input or names list -->
+				<div class="ios-card">
 					{#if !selections.isMultiName}
-						<div class="input-wrap">
-							<label>
-								<span class="sub-title">Текст для гравіювання / тиснення:</span>
-								<input
-									type="text"
-									class="control-input"
-									bind:value={selections.customText}
-									placeholder="Наприклад: Yurii Dmytryshen або ініціали"
-								/>
-							</label>
-						</div>
+						<label>
+							<span class="ios-input-lbl">Текст для нанесення / гравіювання:</span>
+							<input
+								type="text"
+								class="ios-input"
+								bind:value={selections.customText}
+								placeholder="Наприклад: Yurii Dmytryshen"
+							/>
+						</label>
 					{:else}
-						<div class="multi-names-list">
-							<span class="sub-title">Вкажіть ім'я для кожного з {selections.quantity} виробів:</span>
+						<span class="ios-input-lbl">Ім'я для кожного з {selections.quantity} виробів:</span>
+						<div class="ios-names-list">
 							{#if selections.multiNames}
 								{#each selections.multiNames as _, idx}
-									<div class="name-row">
-										<span class="name-idx">#{idx + 1}</span>
+									<div class="ios-name-row">
+										<span class="ios-name-idx">#{idx + 1}</span>
 										<input
 											type="text"
-											class="control-input"
+											class="ios-input"
 											bind:value={selections.multiNames[idx]}
-											placeholder="Ім'я для виробу #{idx + 1}"
-											aria-label="Ім'я для виробу #{idx + 1}"
+											placeholder="Ім'я виробу #{idx + 1}"
+											aria-label="Ім'я виробу #{idx + 1}"
 										/>
 									</div>
 								{/each}
 							{/if}
 						</div>
 					{/if}
-
-					<!-- Mockup Notice & Checkbox -->
-					<div class="mockup-card">
-						<div class="mockup-header">
-							<div class="mockup-icon">📐</div>
-							<div>
-								<strong>Розроблення спільного макета дизайнером</strong>
-								<p class="mockup-note">
-									+{mergedData.mockup.mockupFee} ₴ разово на замовлення (не множиться на кількість).
-								</p>
-							</div>
-							<label class="mockup-checkbox">
-								<input type="checkbox" bind:checked={selections.includeMockup} />
-								<span>Включено</span>
-							</label>
-						</div>
-					</div>
-				</section>
-			{/if}
-
-			<!-- 3. Packaging -->
-			<section class="flow-section">
-				<div class="section-title">
-					<span class="step-num">{currentMode === 'personalized' ? '3' : '2'}</span>
-					<span>Святкове пакування</span>
 				</div>
-				<div class="options-grid">
-					{#each mergedData.packaging as pack (pack.id)}
+
+				<!-- Mockup Inclusion -->
+				<div class="ios-card">
+					<label class="ios-switch-row">
+						<div>
+							<strong class="ios-switch-title">Спільний макет дизайнером</strong>
+							<p class="ios-switch-desc">+{mergedData.mockup.mockupFee} ₴ разово на все замовлення</p>
+						</div>
+						<input type="checkbox" class="ios-checkbox" bind:checked={selections.includeMockup} />
+					</label>
+				</div>
+
+			<!-- WINDOW 3: PACKAGING & DELIVERY -->
+			{:else if isPackagingStep}
+				<!-- Packaging Card -->
+				<div class="ios-card">
+					<span class="ios-card-title">Святкове пакування:</span>
+					<div class="ios-items-stack">
+						{#each mergedData.packaging as pack (pack.id)}
+							<button
+								type="button"
+								class="ios-pack-row"
+								class:selected={selections.packagingId === pack.id}
+								onclick={() => (selections.packagingId = pack.id)}
+							>
+								<span class="ios-pack-icon">{pack.icon || '🎁'}</span>
+								<div class="ios-pack-content">
+									<div class="ios-pack-name">{pack.name}</div>
+									<div class="ios-pack-desc">{pack.description}</div>
+								</div>
+								<strong class="ios-pack-price">
+									{pack.pricePerItem > 0 ? `+${pack.pricePerItem} ₴/шт` : '0 ₴'}
+								</strong>
+							</button>
+						{/each}
+					</div>
+				</div>
+
+				<!-- Delivery Type Toggle -->
+				<div class="ios-card">
+					<span class="ios-card-title">Спосіб отримання:</span>
+					<div class="ios-segmented-control mb-2.5">
 						<button
 							type="button"
-							class="opt-btn pack-btn"
-							class:selected={selections.packagingId === pack.id}
-							onclick={() => (selections.packagingId = pack.id)}
+							class="ios-segment-btn"
+							class:active={selections.deliveryType === 'delivery'}
+							onclick={() => (selections.deliveryType = 'delivery')}
 						>
-							<span class="pack-icon">{pack.icon || '🎁'}</span>
-							<div class="opt-name">{pack.name}</div>
-							<div class="opt-price">
-								{pack.pricePerItem > 0 ? `+${pack.pricePerItem} ₴/шт` : 'Включено (0 ₴)'}
-							</div>
+							<Truck size={13} class="inline mr-1" /> Доставка (+{mergedData.delivery.deliveryFee} ₴)
 						</button>
-					{/each}
-				</div>
-			</section>
+						<button
+							type="button"
+							class="ios-segment-btn"
+							class:active={selections.deliveryType === 'pickup'}
+							onclick={() => (selections.deliveryType = 'pickup')}
+						>
+							<ShieldCheck size={13} class="inline mr-1" /> Самовивіз (0 ₴)
+						</button>
+					</div>
 
-			<!-- 4. Delivery & Recipient -->
-			<section class="flow-section">
-				<div class="section-title">
-					<span class="step-num">{currentMode === 'personalized' ? '4' : '3'}</span>
-					<span>Отримання замовлення</span>
-				</div>
-
-				<div class="delivery-toggle">
-					<button
-						type="button"
-						class="toggle-btn"
-						class:active={selections.deliveryType === 'delivery'}
-						onclick={() => (selections.deliveryType = 'delivery')}
-					>
-						<Truck size={16} />
-						<span>Доставка (+{mergedData.delivery.deliveryFee} ₴)</span>
-					</button>
-					<button
-						type="button"
-						class="toggle-btn"
-						class:active={selections.deliveryType === 'pickup'}
-						onclick={() => (selections.deliveryType = 'pickup')}
-					>
-						<ShieldCheck size={16} />
-						<span>Самовивіз із майстерні (0 ₴)</span>
-					</button>
-				</div>
-
-				{#if selections.deliveryType === 'delivery'}
-					<div class="input-wrap">
+					{#if selections.deliveryType === 'delivery'}
 						<label>
-							<span class="sub-title">Адреса доставки (Нова Пошта / кур’єр):</span>
+							<span class="ios-input-lbl">Адреса доставки (Нова Пошта / кур’єр):</span>
 							<input
 								type="text"
-								class="control-input"
+								class="ios-input"
 								bind:value={selections.deliveryAddress}
 								placeholder="м. Київ, відділення НП №12 або адреса"
 							/>
 						</label>
-					</div>
 
-					<!-- Gift to another person -->
-					<div class="gift-recipient-wrap">
-						<label class="checkbox-row">
-							<input type="checkbox" bind:checked={selections.isGiftForRecipient} />
-							<span>Це подарунок іншій людині 🎁</span>
-						</label>
+						<div class="ios-gift-recipient mt-3">
+							<label class="ios-checkbox-label">
+								<input type="checkbox" class="ios-checkbox" bind:checked={selections.isGiftForRecipient} />
+								<span>Це подарунок іншій людині 🎁</span>
+							</label>
 
-						{#if selections.isGiftForRecipient}
-							<div class="recipient-fields">
-								<label>
-									<span class="sub-title">Ім'я одержувача:</span>
-									<input
-										type="text"
-										class="control-input"
-										bind:value={selections.recipientName}
-										placeholder="Ім'я та прізвище"
-									/>
-								</label>
-								<label>
-									<span class="sub-title">Телефон одержувача:</span>
-									<input
-										type="tel"
-										class="control-input"
-										bind:value={selections.recipientPhone}
-										placeholder="+380..."
-									/>
-								</label>
-								<p class="privacy-note">
-									🔒 Контакти використовуються виключно кур'єрською службою для вручення посилки
-									і не додаються до рекламних розсилок.
-								</p>
-							</div>
-						{/if}
-					</div>
-				{:else}
-					<div class="pickup-info-box">
-						<strong>Самовивіз:</strong> {mergedData.delivery.pickupPoints[0]?.name || 'Майстерня Wood & Craft'}
-						<p class="muted">{mergedData.delivery.pickupPoints[0]?.address} ({mergedData.delivery.pickupPoints[0]?.workingHours})</p>
-					</div>
-				{/if}
-			</section>
+							{#if selections.isGiftForRecipient}
+								<div class="ios-form-stack mt-2">
+									<label>
+										<span class="ios-input-lbl">Ім'я одержувача:</span>
+										<input
+											type="text"
+											class="ios-input"
+											bind:value={selections.recipientName}
+											placeholder="Марія Коваленко"
+										/>
+									</label>
+									<label>
+										<span class="ios-input-lbl">Телефон одержувача:</span>
+										<input
+											type="tel"
+											class="ios-input"
+											bind:value={selections.recipientPhone}
+											placeholder="+380..."
+										/>
+									</label>
+								</div>
+							{/if}
+						</div>
+					{:else}
+						<div class="ios-pickup-card">
+							<strong>{mergedData.delivery.pickupPoints[0]?.name || 'Майстерня Wood & Craft'}</strong>
+							<p>{mergedData.delivery.pickupPoints[0]?.address} ({mergedData.delivery.pickupPoints[0]?.workingHours})</p>
+						</div>
+					{/if}
+				</div>
 
-			<!-- 5. Mockup Approval Lifecycle Visualizer (Only in Personalized Mode) -->
-			{#if currentMode === 'personalized' && selections.includeMockup}
-				<section class="flow-section mockup-review-section">
-					<div class="section-title">
-						<span class="step-num">5</span>
-						<span>Погодження макета та виробництво</span>
-					</div>
-
-					<div class="mockup-status-box" class:approved={selections.mockupApproved}>
-						<div class="status-badge-row">
-							<span class="version-tag">Версія: {selections.mockupVersion || 'v1.0'}</span>
-							<span class="status-tag" class:ok={selections.mockupApproved}>
-								{selections.mockupApproved ? '✅ Макет затверджено клієнтом' : '⏳ Очікує вашого затвердження'}
+			<!-- WINDOW 4: MOCKUP LIFECYCLE & APPLE WALLET PASS RECEIPT -->
+			{:else if isSummaryStep}
+				{#if currentMode === 'personalized' && selections.includeMockup}
+					<!-- Mockup Lifecycle Review Card -->
+					<div class="ios-card ios-mockup-card">
+						<div class="ios-mockup-head">
+							<span class="ios-mockup-ver">Макет {selections.mockupVersion || 'v1.0'}</span>
+							<span class="ios-mockup-status" class:approved={selections.mockupApproved}>
+								{selections.mockupApproved ? '✅ Затверджено' : '⏳ Очікує затвердження'}
 							</span>
 						</div>
 
-						<div class="mockup-preview-render">
-							<div class="preview-notebook">
-								<div class="notebook-cover" style="background-color: {currentProduct.colors?.find(c => c.id === selections.colorId)?.hex || '#222222'}">
-									<div class="engraving-text">
-										{#if !selections.isMultiName}
-											{selections.customText || 'Ваш напис'}
-										{:else}
-											{selections.multiNames?.[0] || 'Ім’я на виробі'}
-										{/if}
-									</div>
-									<div class="notebook-strap"></div>
+						<div class="ios-mockup-render">
+							<div class="ios-notebook-mock" style="background-color: {currentProduct.colors?.find(c => c.id === selections.colorId)?.hex || '#222222'}">
+								<div class="ios-engraving-text">
+									{#if !selections.isMultiName}
+										{selections.customText || 'Yurii Dmytryshen'}
+									{:else}
+										{selections.multiNames?.[0] || 'Олександр'}
+									{/if}
 								</div>
+								<div class="ios-notebook-ribbon"></div>
 							</div>
-							<p class="mockup-caption">Електронне розміщення дизайну на виробі</p>
+							<span class="ios-mockup-caption">Візуалізація лазерного гравіювання</span>
 						</div>
 
-						<div class="mockup-actions">
+						<div class="ios-mockup-buttons">
 							<button
 								type="button"
-								class="btn-approve"
+								class="ios-btn-approve"
 								class:active={selections.mockupApproved}
 								onclick={() => (selections.mockupApproved = true)}
 							>
-								<Check size={16} />
-								<span>{selections.mockupApproved ? 'Макет затверджено' : 'Погодити до виготовлення'}</span>
+								<Check size={14} />
+								<span>{selections.mockupApproved ? 'Макет погоджено' : 'Погодити до виготовлення'}</span>
 							</button>
 							<button
 								type="button"
-								class="btn-reject"
+								class="ios-btn-changes"
 								onclick={() => {
 									selections.mockupApproved = false;
 									selections.mockupVersion = 'v1.1 (правки)';
-									alert('Коментар надіслано дизайнеру. Нова версія макета потребуватиме повторного погодження.');
+									alert('Коментар надіслано дизайнеру. Нова версія буде підготовлена для повторного погодження.');
 								}}
 							>
-								<span>Потрібні зміни</span>
+								Потрібні зміни
 							</button>
 						</div>
-
-						<div class="production-rule-alert">
-							<AlertTriangle size={15} />
-							<span>
-								{priceResult.productionNotice}
-							</span>
-						</div>
 					</div>
-				</section>
+				{/if}
+
+				<!-- Apple Pass / Wallet Style Card -->
+				<div class="ios-pass-card">
+					<div class="ios-pass-head">
+						<div>
+							<span class="ios-pass-tag">Індивідуальне замовлення</span>
+							<h5 class="ios-pass-title">{currentProduct.name} ({selections.quantity} шт)</h5>
+						</div>
+						<span class="ios-pass-badge">🎁 В роботі</span>
+					</div>
+
+					<div class="ios-pass-body">
+						{#each priceResult.breakdown as item}
+							<div class="ios-pass-row">
+								<span class="ios-pass-lbl">
+									{item.label}
+									{#if item.isOneTimeFee}<span class="ios-onetime-pill">разово</span>{/if}
+								</span>
+								<strong class="ios-pass-val">
+									{item.isFree ? '0 ₴' : `${item.amount} ₴`}
+								</strong>
+							</div>
+						{/each}
+					</div>
+
+					<div class="ios-pass-cut">
+						<div class="ios-cut-left"></div>
+						<div class="ios-cut-line"></div>
+						<div class="ios-cut-right"></div>
+					</div>
+
+					<div class="ios-pass-footer">
+						<div class="ios-pass-total-row">
+							<span>Загальна вартість:</span>
+							<strong class="ios-total-sum">{priceResult.totalAmount} ₴</strong>
+						</div>
+
+						{#if priceResult.depositAmount < priceResult.totalAmount && priceResult.depositAmount > 0}
+							<div class="ios-split-pills">
+								<div class="ios-split-pill deposit">
+									<span class="pill-lbl">Аванс ({priceResult.depositPercent}%):</span>
+									<strong class="pill-val">{priceResult.depositAmount} ₴</strong>
+								</div>
+								<div class="ios-split-pill remaining">
+									<span class="pill-lbl">Залишок після виготовлення:</span>
+									<strong class="pill-val">{priceResult.remainingAmount} ₴</strong>
+								</div>
+							</div>
+						{/if}
+
+						{#if priceResult.estimateNotice}
+							<div class="ios-estimate-alert">
+								<AlertTriangle size={13} />
+								<span>{priceResult.estimateNotice}</span>
+							</div>
+						{/if}
+					</div>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Apple Style Floating Bottom Bar -->
+		<div class="ios-bottom-bar">
+			{#if step > 1}
+				<button
+					type="button"
+					class="ios-btn-secondary"
+					onclick={() => step = (step - 1) as 1 | 2 | 3 | 4}
+				>
+					<ChevronLeft size={16} /> Назад
+				</button>
 			{/if}
 
-		<!-- MODE 2: CUSTOM IDEA -->
-		{:else if currentMode === 'custom_idea'}
-			<section class="flow-section">
-				<div class="section-title">
-					<span class="step-num">✨</span>
-					<span>Індивідуальне замовлення під ключ</span>
-				</div>
+			{#if step < (currentMode === 'personalized' ? 4 : 3)}
+				<button
+					type="button"
+					class="ios-btn-primary flex-1"
+					onclick={() => step = (step + 1) as 1 | 2 | 3 | 4}
+				>
+					{#if step === 1}
+						{currentMode === 'personalized' ? 'Персоналізація' : 'Пакування та доставка'}
+					{:else if step === 2}
+						Пакування та отримання
+					{:else if step === 3}
+						Підсумок замовлення
+					{/if}
+					<ChevronRight size={16} />
+				</button>
+			{:else}
+				<button
+					type="button"
+					class="ios-btn-primary flex-1"
+					class:estimate-btn={!priceResult.canInstantPay}
+					onclick={handlePayClick}
+				>
+					{#if !priceResult.canInstantPay}
+						<Send size={15} />
+						<span>Надіслати на оцінку майстру</span>
+					{:else if priceResult.depositAmount < priceResult.totalAmount && priceResult.depositAmount > 0}
+						<ShieldCheck size={16} />
+						<span>Внести аванс {priceResult.depositAmount} ₴</span>
+					{:else}
+						<ShieldCheck size={16} />
+						<span>Оплатити {priceResult.totalAmount} ₴</span>
+					{/if}
+				</button>
+			{/if}
+		</div>
 
-				<div class="callout-idea">
-					<strong>Ручна оцінка майстерні:</strong> Опишіть вашу ідею (матеріали, габарити, гравіювання).
-					Майстер прорахує точну вартість і терміни та надішле пропозицію.
-				</div>
+	<!-- MODE 2: CUSTOM IDEA -->
+	{:else if currentMode === 'custom_idea'}
+		<div class="ios-window-body">
+			<div class="ios-card">
+				<span class="ios-card-title">Індивідуальне замовлення під ключ:</span>
+				<p class="ios-card-sub">Опишіть вашу ідею. Майстер прорахує точну вартість і терміни виготовлення.</p>
+				<textarea
+					class="ios-textarea mt-2"
+					rows="3"
+					bind:value={selections.customIdeaDescription}
+					placeholder="Який виріб потрібен, матеріали, тираж, форма, побажання до пакування..."
+				></textarea>
+			</div>
 
-				<div class="input-wrap">
+			<div class="ios-card">
+				<div class="ios-grid-2">
 					<label>
-						<span class="sub-title">Опис ідеї або технічне завдання:</span>
-						<textarea
-							class="control-textarea"
-							rows="3"
-							bind:value={selections.customIdeaDescription}
-							placeholder="Який виріб потрібен, тираж, форма, побажання до пакування..."
-						></textarea>
-					</label>
-				</div>
-
-				<div class="grid-2-cols">
-					<label>
-						<span class="sub-title">Орієнтовний бюджет (₴):</span>
+						<span class="ios-input-lbl">Орієнтовний бюджет (₴):</span>
 						<input
 							type="number"
 							min="500"
 							step="100"
-							class="control-input"
+							class="ios-input"
 							bind:value={selections.customIdeaBudget}
 						/>
-						<span class="sub-hint">Бюджет є орієнтиром, а не фіксованою ціною</span>
 					</label>
 					<label>
-						<span class="sub-title">Бажана дата готовності:</span>
+						<span class="ios-input-lbl">Бажана дата:</span>
 						<input
-							type="date"
-							class="control-input"
+							type="text"
+							class="ios-input"
 							bind:value={selections.customIdeaDeadline}
+							placeholder="дд.мм.рррр"
 						/>
 					</label>
 				</div>
-			</section>
+			</div>
 
-		<!-- MODE 3: DIRECT INVOICE -->
-		{:else if currentMode === 'direct_invoice'}
-			<section class="flow-section">
-				<div class="section-title">
-					<span class="step-num">🧾</span>
-					<span>Оплата за погодженим рахунком</span>
-				</div>
+			<div class="ios-bottom-bar">
+				<button
+					type="button"
+					class="ios-btn-primary w-full"
+					onclick={handlePayClick}
+				>
+					<Send size={15} />
+					<span>Надіслати заявку на прорахунок</span>
+				</button>
+			</div>
+		</div>
 
-				<div class="grid-2-cols">
+	<!-- MODE 3: DIRECT INVOICE -->
+	{:else if currentMode === 'direct_invoice'}
+		<div class="ios-window-body">
+			<div class="ios-card">
+				<span class="ios-card-title">Оплата за погодженим рахунком:</span>
+				<div class="ios-form-stack mt-2">
 					<label>
-						<span class="sub-title">Номер рахунку / замовлення:</span>
+						<span class="ios-input-lbl">Номер рахунку / замовлення:</span>
 						<input
 							type="text"
-							class="control-input"
+							class="ios-input"
 							bind:value={selections.invoiceNumber}
 							placeholder="INV-..."
 						/>
 					</label>
 					<label>
-						<span class="sub-title">Сума до сплати (₴):</span>
+						<span class="ios-input-lbl">Сума до сплати (₴):</span>
 						<input
 							type="number"
 							min="1"
-							class="control-input"
+							class="ios-input"
 							bind:value={selections.invoiceAmount}
 						/>
 					</label>
 				</div>
-			</section>
-		{/if}
-	</div>
-
-	<!-- Sticky Summary & Checkout Footer -->
-	<footer class="pricing-summary">
-		<div class="breakdown-list">
-			{#each priceResult.breakdown as item}
-				<div class="breakdown-row" class:onetime={item.isOneTimeFee}>
-					<span class="item-label">
-						{item.label}
-						{#if item.isOneTimeFee}
-							<span class="onetime-tag">разово</span>
-						{/if}
-					</span>
-					<span class="item-val">{item.isFree ? 'Безкоштовно' : `${item.amount} ₴`}</span>
-				</div>
-			{/each}
-		</div>
-
-		<div class="totals-section">
-			<div class="total-row">
-				<span class="lbl-total">Загальна вартість:</span>
-				<strong class="total-amount">{priceResult.totalAmount} ₴</strong>
 			</div>
 
-			{#if priceResult.depositAmount < priceResult.totalAmount && priceResult.depositAmount > 0}
-				<div class="split-pay-row">
-					<div class="deposit-badge">
-						<span>Аванс ({priceResult.depositPercent}%):</span>
-						<strong>{priceResult.depositAmount} ₴</strong>
-					</div>
-					<div class="remaining-badge">
-						<span>Залишок після виготовлення:</span>
-						<strong>{priceResult.remainingAmount} ₴</strong>
-					</div>
-				</div>
-			{/if}
-
-			{#if priceResult.estimateNotice}
-				<div class="estimate-notice-bar">
-					<AlertTriangle size={14} />
-					<span>{priceResult.estimateNotice}</span>
-				</div>
-			{/if}
-
-			<button
-				type="button"
-				class="pay-btn"
-				class:blocked={!priceResult.canInstantPay}
-				onclick={handlePayClick}
-			>
-				{#if !priceResult.canInstantPay}
-					<Send size={18} />
-					<span>Надіслати на оцінку майстру</span>
-				{:else if priceResult.depositAmount < priceResult.totalAmount && priceResult.depositAmount > 0}
-					<ShieldCheck size={18} />
-					<span>Внести аванс {priceResult.depositAmount} ₴</span>
-				{:else}
-					<ShieldCheck size={18} />
-					<span>Оплатити {priceResult.totalAmount} ₴</span>
-				{/if}
-			</button>
-
-			<div class="lead-time-footer">
-				<span>🕒 {priceResult.leadTimeNotice}</span>
+			<div class="ios-bottom-bar">
+				<button
+					type="button"
+					class="ios-btn-primary w-full"
+					onclick={handlePayClick}
+				>
+					<Receipt size={16} />
+					<span>Оплатити рахунок {selections.invoiceAmount} ₴</span>
+				</button>
 			</div>
 		</div>
-	</footer>
+	{/if}
 </div>
 
 <style>
-	.preview-container {
+	.ios-preview-container {
 		display: flex;
 		flex-direction: column;
-		background: #f8fafc;
-		border-radius: 12px;
+		background: #f2f2f7;
+		font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+		color: #1c1c1e;
+		min-height: 520px;
+		border-radius: 18px;
 		overflow: hidden;
-		font-family: inherit;
-		color: #0f172a;
+		position: relative;
+		padding-bottom: 72px;
 	}
 
-	.store-hero {
-		background: linear-gradient(135deg, #1e293b, #0f172a);
-		color: #ffffff;
-		padding: 1.25rem 1rem;
-		text-align: center;
+	.ios-nav-bar {
+		background: rgba(255, 255, 255, 0.85);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+		padding: 0.65rem 1rem;
+		position: sticky;
+		top: 0;
+		z-index: 10;
 	}
 
-	.store-badge {
-		display: inline-block;
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: #f472b6;
-		background: rgba(244, 114, 182, 0.15);
-		padding: 0.2rem 0.6rem;
-		border-radius: 12px;
-		margin-bottom: 0.4rem;
-	}
-
-	.store-title {
-		font-size: 1.15rem;
-		font-weight: 700;
-		margin: 0;
-	}
-
-	.store-tagline {
-		font-size: 0.78rem;
-		color: #94a3b8;
-		margin: 0.25rem 0 0 0;
-	}
-
-	.mode-tabs {
-		display: flex;
-		background: #ffffff;
-		border-bottom: 1px solid #e2e8f0;
-		padding: 0.35rem 0.5rem;
-		gap: 0.35rem;
-		overflow-x: auto;
-	}
-
-	.mode-tab {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		padding: 0.45rem 0.75rem;
-		border: none;
-		background: transparent;
-		font-size: 0.8rem;
-		font-weight: 500;
-		color: #64748b;
-		border-radius: 6px;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-
-	.mode-tab.active {
-		background: #fdf2f8;
-		color: #db2777;
-		font-weight: 600;
-	}
-
-	.flow-content {
-		padding: 1rem;
-		display: flex;
-		flex-direction: column;
-		gap: 1.1rem;
-	}
-
-	.flow-section {
-		background: #ffffff;
-		border: 1px solid #e2e8f0;
-		border-radius: 10px;
-		padding: 0.9rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.85rem;
-	}
-
-	.section-title {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.92rem;
-		font-weight: 700;
-		color: #1e293b;
-	}
-
-	.step-num {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 22px;
-		height: 22px;
-		background: #ec4899;
-		color: #ffffff;
-		border-radius: 50%;
-		font-size: 0.75rem;
-		font-weight: 700;
-	}
-
-	.products-selector {
-		display: flex;
-		flex-direction: column;
-		gap: 0.6rem;
-	}
-
-	.product-card-btn {
-		border: 1.5px solid #e2e8f0;
-		background: #fafafa;
-		border-radius: 8px;
-		padding: 0.75rem;
-		text-align: left;
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.product-card-btn.selected {
-		border-color: #ec4899;
-		background: #fdf2f8;
-	}
-
-	.prod-top {
+	.ios-nav-content {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		margin-bottom: 0.25rem;
 	}
 
-	.prod-name {
-		font-weight: 600;
-		font-size: 0.88rem;
-		color: #0f172a;
-	}
-
-	.prod-price {
+	.ios-merchant-badge {
+		font-size: 0.85rem;
 		font-weight: 700;
-		font-size: 0.88rem;
-		color: #db2777;
+		color: #1c1c1e;
 	}
 
-	.prod-desc {
-		font-size: 0.75rem;
-		color: #64748b;
+	.ios-secure-tag {
+		display: flex;
+		align-items: center;
+		gap: 3px;
+		font-size: 0.7rem;
+		font-weight: 500;
+		color: #34c759;
+		background: rgba(52, 199, 89, 0.12);
+		padding: 2px 8px;
+		border-radius: 12px;
+	}
+
+	.ios-segmented-control {
+		display: flex;
+		background: #e3e3e8;
+		border-radius: 9px;
+		padding: 2px;
+		margin: 0.75rem 1rem 0 1rem;
+	}
+
+	.ios-segment-btn {
+		flex: 1;
+		border: none;
+		background: transparent;
+		font-size: 0.78rem;
+		font-weight: 500;
+		color: #636366;
+		padding: 0.35rem 0.5rem;
+		border-radius: 7px;
+		cursor: pointer;
+		transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+		text-align: center;
+	}
+
+	.ios-segment-btn.active {
+		background: #ffffff;
+		color: #1c1c1e;
+		font-weight: 600;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+	}
+
+	.ios-step-indicator {
+		padding: 0.85rem 1rem 0.25rem 1rem;
+	}
+
+	.ios-capsules {
+		display: flex;
+		gap: 4px;
+		margin-bottom: 0.4rem;
+	}
+
+	.ios-capsule {
+		flex: 1;
+		height: 3px;
+		background: #d1d1d6;
+		border-radius: 2px;
+		transition: background 0.3s ease;
+	}
+
+	.ios-capsule.filled {
+		background: #007aff;
+	}
+
+	.ios-step-sub {
+		font-size: 0.7rem;
+		font-weight: 600;
+		color: #007aff;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	.ios-step-title {
+		font-size: 1.05rem;
+		font-weight: 700;
+		color: #1c1c1e;
 		margin: 0;
 	}
 
-	.sub-block {
-		border-top: 1px dashed #e2e8f0;
-		padding-top: 0.75rem;
+	.ios-window-body {
+		padding: 0.75rem 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
 	}
 
-	.sub-title {
+	.ios-card {
+		background: #ffffff;
+		border-radius: 14px;
+		padding: 0.85rem;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+		border: 0.5px solid rgba(0, 0, 0, 0.08);
+	}
+
+	.ios-card-title {
 		display: block;
-		font-size: 0.78rem;
+		font-size: 0.82rem;
 		font-weight: 600;
-		color: #475569;
-		margin-bottom: 0.35rem;
+		color: #3a3a3c;
+		margin-bottom: 0.5rem;
 	}
 
-	.sub-hint {
-		display: block;
-		font-size: 0.7rem;
-		color: #94a3b8;
+	.ios-card-sub {
+		font-size: 0.72rem;
+		color: #8e8e93;
+		margin: 0;
 	}
 
-	.colors-row {
+	.ios-card-stepper {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+
+	.ios-items-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.ios-product-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.65rem 0.75rem;
+		border-radius: 10px;
+		border: 1px solid #e5e5ea;
+		background: #ffffff;
+		cursor: pointer;
+		text-align: left;
+		transition: all 0.15s ease;
+	}
+
+	.ios-product-row.selected {
+		border-color: #007aff;
+		background: #f0f7ff;
+	}
+
+	.ios-prod-name {
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: #1c1c1e;
+	}
+
+	.ios-prod-desc {
+		font-size: 0.68rem;
+		color: #8e8e93;
+		max-width: 180px;
+	}
+
+	.ios-prod-price {
+		font-size: 0.88rem;
+		font-weight: 700;
+		color: #007aff;
+	}
+
+	.ios-colors-row {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.4rem;
 	}
 
-	.color-btn {
+	.ios-color-chip {
 		display: flex;
 		align-items: center;
-		gap: 0.4rem;
+		gap: 6px;
 		padding: 0.35rem 0.65rem;
-		border: 1px solid #cbd5e1;
+		border-radius: 8px;
+		border: 1px solid #e5e5ea;
 		background: #ffffff;
-		border-radius: 20px;
-		font-size: 0.78rem;
+		font-size: 0.74rem;
 		cursor: pointer;
+		font-weight: 500;
 	}
 
-	.color-btn.selected {
-		border-color: #ec4899;
-		background: #fdf2f8;
+	.ios-color-chip.selected {
+		border-color: #007aff;
+		background: #f0f7ff;
+		color: #007aff;
 		font-weight: 600;
-		color: #db2777;
 	}
 
-	.color-swatch {
-		width: 14px;
-		height: 14px;
+	.ios-color-dot {
+		width: 12px;
+		height: 12px;
 		border-radius: 50%;
 		border: 1px solid rgba(0, 0, 0, 0.15);
 	}
 
-	.flex-between {
+	.ios-stepper {
 		display: flex;
-		justify-content: space-between;
 		align-items: center;
-	}
-
-	.stepper {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		background: #f1f5f9;
-		padding: 0.2rem;
+		background: #f2f2f7;
 		border-radius: 8px;
+		padding: 2px;
+		gap: 6px;
 	}
 
-	.stepper-btn {
+	.ios-stepper-btn {
 		width: 28px;
 		height: 28px;
+		border-radius: 6px;
+		border: none;
+		background: #ffffff;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border: 1px solid #cbd5e1;
-		background: #ffffff;
-		border-radius: 6px;
 		cursor: pointer;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 	}
 
-	.stepper-btn:disabled {
+	.ios-stepper-btn:disabled {
 		opacity: 0.4;
 		cursor: not-allowed;
 	}
 
-	.stepper-val {
-		font-size: 0.85rem;
+	.ios-stepper-val {
+		font-size: 0.82rem;
 		font-weight: 700;
-		padding: 0 0.5rem;
-	}
-
-	.multi-name-toggle {
-		display: flex;
-		background: #f1f5f9;
-		border-radius: 6px;
-		padding: 0.2rem;
-		gap: 0.2rem;
-	}
-
-	.toggle-opt {
-		flex: 1;
-		border: none;
-		background: transparent;
-		padding: 0.4rem 0.5rem;
-		font-size: 0.75rem;
-		color: #475569;
-		border-radius: 4px;
-		cursor: pointer;
+		color: #1c1c1e;
+		min-width: 44px;
 		text-align: center;
 	}
 
-	.toggle-opt.active {
-		background: #ffffff;
-		color: #0f172a;
-		font-weight: 600;
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-	}
-
-	.options-grid {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.5rem;
-	}
-
-	.opt-btn {
-		border: 1px solid #cbd5e1;
-		background: #ffffff;
-		border-radius: 8px;
-		padding: 0.6rem;
-		text-align: left;
-		cursor: pointer;
-	}
-
-	.opt-btn.selected {
-		border-color: #ec4899;
-		background: #fdf2f8;
-	}
-
-	.opt-name {
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: #1e293b;
-		margin-bottom: 0.15rem;
-	}
-
-	.opt-price {
-		font-size: 0.75rem;
-		font-weight: 700;
-		color: #db2777;
-	}
-
-	.pack-btn {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 0.2rem;
-	}
-
-	.pack-icon {
-		font-size: 1.2rem;
-	}
-
-	.control-input {
-		width: 100%;
-		padding: 0.45rem 0.65rem;
-		font-size: 0.82rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
-		box-sizing: border-box;
-		background: #ffffff;
-	}
-
-	.control-textarea {
-		width: 100%;
-		padding: 0.45rem 0.65rem;
-		font-size: 0.82rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
-		box-sizing: border-box;
-		background: #ffffff;
-		resize: vertical;
-	}
-
-	.multi-names-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-	}
-
-	.name-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.name-idx {
-		font-size: 0.78rem;
-		font-weight: 700;
-		color: #64748b;
-		width: 24px;
-	}
-
-	.mockup-card {
-		background: #fdf4ff;
-		border: 1px solid #f0abfc;
-		border-radius: 8px;
-		padding: 0.65rem 0.75rem;
-	}
-
-	.mockup-header {
-		display: flex;
-		align-items: center;
-		gap: 0.65rem;
-	}
-
-	.mockup-icon {
-		font-size: 1.4rem;
-	}
-
-	.mockup-note {
-		font-size: 0.72rem;
-		color: #86198f;
-		margin: 0.15rem 0 0 0;
-	}
-
-	.mockup-checkbox {
-		margin-left: auto;
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		font-size: 0.78rem;
-		font-weight: 600;
-		color: #86198f;
-		cursor: pointer;
-	}
-
-	.delivery-toggle {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.5rem;
-	}
-
-	.toggle-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.4rem;
-		padding: 0.5rem 0.6rem;
-		border: 1px solid #cbd5e1;
-		background: #ffffff;
-		border-radius: 6px;
-		font-size: 0.78rem;
-		font-weight: 500;
-		cursor: pointer;
-	}
-
-	.toggle-btn.active {
-		border-color: #ec4899;
-		background: #fdf2f8;
-		color: #db2777;
-		font-weight: 600;
-	}
-
-	.checkbox-row {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		font-size: 0.8rem;
-		font-weight: 500;
-		cursor: pointer;
-	}
-
-	.gift-recipient-wrap {
-		border-top: 1px dashed #e2e8f0;
-		padding-top: 0.6rem;
-	}
-
-	.recipient-fields {
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-		margin-top: 0.5rem;
-		padding: 0.5rem;
-		background: #f8fafc;
-		border-radius: 6px;
-	}
-
-	.privacy-note {
-		font-size: 0.68rem;
-		color: #64748b;
-		margin: 0;
-		line-height: 1.35;
-	}
-
-	.pickup-info-box {
-		background: #f8fafc;
-		border: 1px solid #e2e8f0;
-		border-radius: 6px;
-		padding: 0.65rem;
-		font-size: 0.8rem;
-	}
-
-	/* Mockup Review Visualizer */
-	.mockup-review-section {
-		border-color: #c084fc;
-		background: #faf5ff;
-	}
-
-	.mockup-status-box {
-		display: flex;
-		flex-direction: column;
-		gap: 0.65rem;
-	}
-
-	.status-badge-row {
+	.ios-opt-row {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
+		padding: 0.6rem 0.75rem;
+		border-radius: 10px;
+		border: 1px solid #e5e5ea;
+		background: #ffffff;
+		cursor: pointer;
+		text-align: left;
 	}
 
-	.version-tag {
+	.ios-opt-row.selected {
+		border-color: #007aff;
+		background: #f0f7ff;
+	}
+
+	.ios-opt-title {
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: #1c1c1e;
+	}
+
+	.ios-opt-price {
+		font-size: 0.8rem;
+		color: #007aff;
+	}
+
+	.ios-input-lbl {
+		display: block;
+		font-size: 0.74rem;
+		font-weight: 600;
+		color: #3a3a3c;
+		margin-bottom: 0.35rem;
+	}
+
+	.ios-input, .ios-textarea {
+		width: 100%;
+		border: 1px solid #e5e5ea;
+		background: #f9f9fb;
+		border-radius: 8px;
+		padding: 0.5rem 0.65rem;
+		font-size: 0.8rem;
+		color: #1c1c1e;
+		outline: none;
+		box-sizing: border-box;
+	}
+
+	.ios-input:focus, .ios-textarea:focus {
+		border-color: #007aff;
+		background: #ffffff;
+	}
+
+	.ios-names-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.ios-name-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.ios-name-idx {
+		font-size: 0.75rem;
+		font-weight: 700;
+		color: #8e8e93;
+		width: 22px;
+	}
+
+	.ios-switch-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		cursor: pointer;
+	}
+
+	.ios-switch-title {
+		font-size: 0.8rem;
+		color: #1c1c1e;
+		display: block;
+	}
+
+	.ios-switch-desc {
+		font-size: 0.7rem;
+		color: #8e8e93;
+		margin: 0;
+	}
+
+	.ios-checkbox {
+		width: 18px;
+		height: 18px;
+		accent-color: #007aff;
+		cursor: pointer;
+	}
+
+	.ios-pack-row {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.6rem 0.75rem;
+		border-radius: 10px;
+		border: 1px solid #e5e5ea;
+		background: #ffffff;
+		cursor: pointer;
+		text-align: left;
+	}
+
+	.ios-pack-row.selected {
+		border-color: #007aff;
+		background: #f0f7ff;
+	}
+
+	.ios-pack-icon {
+		font-size: 1.25rem;
+	}
+
+	.ios-pack-content {
+		flex: 1;
+	}
+
+	.ios-pack-name {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: #1c1c1e;
+	}
+
+	.ios-pack-desc {
+		font-size: 0.68rem;
+		color: #8e8e93;
+	}
+
+	.ios-pack-price {
+		font-size: 0.82rem;
+		color: #007aff;
+	}
+
+	.ios-checkbox-label {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: #1c1c1e;
+		cursor: pointer;
+	}
+
+	.ios-form-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.ios-pickup-card {
+		background: #f2f2f7;
+		border-radius: 8px;
+		padding: 0.6rem 0.75rem;
+		font-size: 0.75rem;
+	}
+
+	.ios-pickup-card strong {
+		display: block;
+		color: #1c1c1e;
+	}
+
+	.ios-pickup-card p {
+		color: #636366;
+		margin: 2px 0 0 0;
+	}
+
+	.ios-mockup-card {
+		border-color: #3b82f6;
+		background: #fbfdff;
+	}
+
+	.ios-mockup-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 0.6rem;
+	}
+
+	.ios-mockup-ver {
 		font-size: 0.72rem;
 		font-weight: 700;
-		background: #e9d5ff;
-		color: #6b21a8;
-		padding: 0.15rem 0.5rem;
+		color: #007aff;
+		background: #e5f1ff;
+		padding: 2px 6px;
+		border-radius: 6px;
+	}
+
+	.ios-mockup-status {
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: #d97706;
+	}
+
+	.ios-mockup-status.approved {
+		color: #16a34a;
+	}
+
+	.ios-mockup-render {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding: 0.5rem 0;
+	}
+
+	.ios-notebook-mock {
+		width: 140px;
+		height: 90px;
+		border-radius: 8px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		position: relative;
+		border: 1px solid rgba(255, 255, 255, 0.2);
+	}
+
+	.ios-engraving-text {
+		color: rgba(255, 255, 255, 0.85);
+		font-family: Georgia, serif;
+		font-size: 0.75rem;
+		font-weight: 600;
+		letter-spacing: 0.5px;
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+	}
+
+	.ios-notebook-ribbon {
+		position: absolute;
+		right: 14px;
+		top: 0;
+		bottom: 0;
+		width: 8px;
+		background: rgba(0, 0, 0, 0.25);
+	}
+
+	.ios-mockup-caption {
+		font-size: 0.65rem;
+		color: #8e8e93;
+		margin-top: 0.4rem;
+	}
+
+	.ios-mockup-buttons {
+		display: flex;
+		gap: 0.5rem;
+		margin-top: 0.6rem;
+	}
+
+	.ios-btn-approve {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 4px;
+		background: #16a34a;
+		color: #ffffff;
+		border: none;
+		border-radius: 8px;
+		padding: 0.45rem;
+		font-size: 0.75rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.ios-btn-approve.active {
+		background: #15803d;
+	}
+
+	.ios-btn-changes {
+		border: 1px solid #e5e5ea;
+		background: #ffffff;
+		color: #636366;
+		border-radius: 8px;
+		padding: 0.45rem 0.75rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		cursor: pointer;
+	}
+
+	/* Apple Pass / Wallet Ticket */
+	.ios-pass-card {
+		background: #ffffff;
+		border-radius: 16px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+		border: 0.5px solid rgba(0, 0, 0, 0.08);
+		overflow: hidden;
+	}
+
+	.ios-pass-head {
+		padding: 0.85rem;
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		background: linear-gradient(180deg, #fafafa 0%, #ffffff 100%);
+	}
+
+	.ios-pass-tag {
+		font-size: 0.68rem;
+		font-weight: 600;
+		color: #007aff;
+		text-transform: uppercase;
+		display: block;
+	}
+
+	.ios-pass-title {
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: #1c1c1e;
+		margin: 2px 0 0 0;
+	}
+
+	.ios-pass-badge {
+		font-size: 0.65rem;
+		font-weight: 600;
+		color: #ec4899;
+		background: #fdf2f8;
+		padding: 2px 8px;
+		border-radius: 10px;
+	}
+
+	.ios-pass-body {
+		padding: 0.5rem 0.85rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+
+	.ios-pass-row {
+		display: flex;
+		justify-content: space-between;
+		font-size: 0.78rem;
+	}
+
+	.ios-pass-lbl {
+		color: #636366;
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.ios-onetime-pill {
+		font-size: 0.62rem;
+		background: #e5e5ea;
+		color: #3a3a3c;
+		padding: 1px 4px;
 		border-radius: 4px;
 	}
 
-	.status-tag {
-		font-size: 0.75rem;
+	.ios-pass-val {
+		color: #1c1c1e;
+	}
+
+	.ios-pass-cut {
+		display: flex;
+		align-items: center;
+		position: relative;
+		margin: 0.35rem 0;
+	}
+
+	.ios-cut-left, .ios-cut-right {
+		width: 14px;
+		height: 14px;
+		background: #f2f2f7;
+		border-radius: 50%;
+	}
+
+	.ios-cut-left {
+		margin-left: -7px;
+	}
+
+	.ios-cut-right {
+		margin-right: -7px;
+	}
+
+	.ios-cut-line {
+		flex: 1;
+		border-bottom: 1px dashed #d1d1d6;
+	}
+
+	.ios-pass-footer {
+		padding: 0.5rem 0.85rem 0.85rem 0.85rem;
+	}
+
+	.ios-pass-total-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		font-size: 0.88rem;
 		font-weight: 600;
+	}
+
+	.ios-total-sum {
+		font-size: 1.25rem;
+		font-weight: 800;
+		color: #007aff;
+	}
+
+	.ios-split-pills {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.4rem;
+		margin-top: 0.6rem;
+	}
+
+	.ios-split-pill {
+		padding: 0.4rem 0.5rem;
+		border-radius: 8px;
+		font-size: 0.7rem;
+	}
+
+	.ios-split-pill.deposit {
+		background: #f0fdf4;
+		border: 1px solid #bbf7d0;
+	}
+
+	.ios-split-pill.deposit .pill-lbl {
+		color: #166534;
+		display: block;
+	}
+
+	.ios-split-pill.deposit .pill-val {
+		color: #15803d;
+		font-size: 0.82rem;
+	}
+
+	.ios-split-pill.remaining {
+		background: #f8fafc;
+		border: 1px solid #e2e8f0;
+	}
+
+	.ios-split-pill.remaining .pill-lbl {
+		color: #475569;
+		display: block;
+	}
+
+	.ios-split-pill.remaining .pill-val {
+		color: #334155;
+		font-size: 0.82rem;
+	}
+
+	.ios-estimate-alert {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		margin-top: 0.5rem;
+		background: #fffbeb;
+		border: 1px solid #fef3c7;
+		padding: 0.4rem 0.6rem;
+		border-radius: 8px;
+		font-size: 0.7rem;
 		color: #b45309;
 	}
 
-	.status-tag.ok {
-		color: #15803d;
-	}
-
-	.mockup-preview-render {
-		background: #ffffff;
-		border: 1px solid #e9d5ff;
-		border-radius: 8px;
-		padding: 1.25rem 0.5rem 0.75rem 0.5rem;
-		text-align: center;
-	}
-
-	.preview-notebook {
-		display: inline-block;
-		margin: 0 auto;
-	}
-
-	.notebook-cover {
-		width: 140px;
-		height: 180px;
-		border-radius: 6px 12px 12px 6px;
-		box-shadow: 2px 4px 10px rgba(0, 0, 0, 0.25);
-		position: relative;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 0.75rem;
-		color: #ffffff;
-	}
-
-	.engraving-text {
-		font-family: 'Georgia', serif;
-		font-size: 0.85rem;
-		color: #f59e0b;
-		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-		text-align: center;
-		letter-spacing: 0.5px;
-	}
-
-	.notebook-strap {
+	/* Fixed Bottom Action Bar */
+	.ios-bottom-bar {
 		position: absolute;
-		right: 15px;
-		top: 0;
 		bottom: 0;
-		width: 10px;
-		background: rgba(255, 255, 255, 0.15);
-	}
-
-	.mockup-caption {
-		font-size: 0.7rem;
-		color: #6b7280;
-		margin: 0.5rem 0 0 0;
-	}
-
-	.mockup-actions {
-		display: grid;
-		grid-template-columns: 1.3fr 1fr;
-		gap: 0.5rem;
-	}
-
-	.btn-approve {
+		left: 0;
+		right: 0;
+		padding: 0.65rem 1rem;
+		background: rgba(255, 255, 255, 0.92);
+		backdrop-filter: blur(16px);
+		-webkit-backdrop-filter: blur(16px);
+		border-top: 0.5px solid rgba(0, 0, 0, 0.1);
 		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.35rem;
-		background: #10b981;
-		color: #ffffff;
+		gap: 0.5rem;
+		z-index: 20;
+	}
+
+	.ios-btn-secondary {
+		background: #e5e5ea;
+		color: #1c1c1e;
 		border: none;
-		border-radius: 6px;
-		padding: 0.55rem;
-		font-size: 0.8rem;
-		font-weight: 700;
-		cursor: pointer;
-	}
-
-	.btn-approve.active {
-		background: #059669;
-	}
-
-	.btn-reject {
-		background: #ffffff;
-		border: 1px solid #d1d5db;
-		color: #4b5563;
-		border-radius: 6px;
-		padding: 0.55rem;
-		font-size: 0.8rem;
+		border-radius: 12px;
+		padding: 0.6rem 0.9rem;
+		font-size: 0.82rem;
 		font-weight: 600;
+		display: flex;
+		align-items: center;
+		gap: 4px;
 		cursor: pointer;
 	}
 
-	.production-rule-alert {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.4rem;
-		background: #fef3c7;
-		border: 1px solid #fde68a;
-		border-radius: 6px;
-		padding: 0.5rem 0.65rem;
-		font-size: 0.72rem;
-		color: #92400e;
-		line-height: 1.35;
-	}
-
-	.callout-idea {
-		background: #f0fdf4;
-		border: 1px solid #bbf7d0;
-		border-radius: 8px;
-		padding: 0.75rem;
-		font-size: 0.8rem;
-		color: #166534;
-		line-height: 1.4;
-	}
-
-	.grid-2-cols {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.75rem;
-	}
-
-	/* Summary & Checkout Footer */
-	.pricing-summary {
-		background: #ffffff;
-		border-top: 1px solid #e2e8f0;
-		padding: 1rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.85rem;
-	}
-
-	.breakdown-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-		border-bottom: 1px solid #f1f5f9;
-		padding-bottom: 0.65rem;
-	}
-
-	.breakdown-row {
-		display: flex;
-		justify-content: space-between;
-		font-size: 0.8rem;
-		color: #475569;
-	}
-
-	.breakdown-row.onetime {
-		color: #0f172a;
-		font-weight: 500;
-	}
-
-	.onetime-tag {
-		font-size: 0.65rem;
-		background: #f1f5f9;
-		color: #64748b;
-		padding: 0.1rem 0.35rem;
-		border-radius: 4px;
-		margin-left: 0.25rem;
-	}
-
-	.totals-section {
-		display: flex;
-		flex-direction: column;
-		gap: 0.65rem;
-	}
-
-	.total-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-	}
-
-	.lbl-total {
-		font-size: 0.92rem;
-		font-weight: 700;
-		color: #0f172a;
-	}
-
-	.total-amount {
-		font-size: 1.25rem;
-		font-weight: 800;
-		color: #0f172a;
-	}
-
-	.split-pay-row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.5rem;
-	}
-
-	.deposit-badge {
-		background: #fdf2f8;
-		border: 1px solid #fbcfe8;
-		border-radius: 6px;
-		padding: 0.45rem;
-		display: flex;
-		flex-direction: column;
-		font-size: 0.72rem;
-		color: #be185d;
-	}
-
-	.deposit-badge strong {
-		font-size: 0.95rem;
-		color: #9d174d;
-	}
-
-	.remaining-badge {
-		background: #f8fafc;
-		border: 1px solid #e2e8f0;
-		border-radius: 6px;
-		padding: 0.45rem;
-		display: flex;
-		flex-direction: column;
-		font-size: 0.72rem;
-		color: #475569;
-	}
-
-	.remaining-badge strong {
-		font-size: 0.95rem;
-		color: #1e293b;
-	}
-
-	.estimate-notice-bar {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.35rem;
-		background: #fffbeb;
-		border: 1px solid #fde68a;
-		border-radius: 6px;
-		padding: 0.45rem 0.6rem;
-		font-size: 0.72rem;
-		color: #92400e;
-	}
-
-	.pay-btn {
+	.ios-btn-primary {
+		background: #007aff;
+		color: #ffffff;
+		border: none;
+		border-radius: 12px;
+		padding: 0.65rem 1rem;
+		font-size: 0.85rem;
+		font-weight: 600;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		gap: 0.5rem;
-		width: 100%;
-		padding: 0.75rem;
-		background: #ec4899;
-		color: #ffffff;
-		border: none;
-		border-radius: 8px;
-		font-size: 0.92rem;
-		font-weight: 700;
+		gap: 6px;
 		cursor: pointer;
-		box-shadow: 0 2px 4px rgba(236, 72, 153, 0.25);
-		transition: all 0.15s ease;
+		box-shadow: 0 2px 6px rgba(0, 122, 255, 0.3);
+		transition: background 0.15s ease;
 	}
 
-	.pay-btn:hover:not(.blocked) {
-		background: #db2777;
+	.ios-btn-primary:active {
+		background: #0062cc;
 	}
 
-	.pay-btn.blocked {
-		background: #3b82f6;
-		box-shadow: 0 2px 4px rgba(59, 130, 246, 0.25);
+	.ios-btn-primary.estimate-btn {
+		background: #f59e0b;
+		box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
 	}
 
-	.lead-time-footer {
-		text-align: center;
-		font-size: 0.72rem;
-		color: #64748b;
+	.ios-grid-2 {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.5rem;
 	}
 </style>

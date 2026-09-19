@@ -59,7 +59,8 @@ const SCENARIO_PRESENTATION: Record<
 	vertical_delivery: { merchantName: 'Експрес Кур’єр', contextLabel: 'Доставка по місту', amount: 180 },
 	vertical_print: { merchantName: 'Print Hub', contextLabel: 'Друк поліграфії', amount: 850 },
 	vertical_gifts: { merchantName: 'Gift Box Studio', contextLabel: 'Подарунковий бокс', amount: 1250 },
-	vertical_events: { merchantName: 'Cinema & Concert Hall', contextLabel: 'Сеанс · Зал 1 · Квитки', amount: 910 }
+	vertical_events: { merchantName: 'Cinema & Concert Hall', contextLabel: 'Сеанс · Зал 1 · Квитки', amount: 910 },
+	vertical_fitness: { merchantName: 'Pulse Fitness Club', contextLabel: 'Абонемент · Басейн · Тренування', amount: 4700 }
 };
 
 export function buildCheckoutPreviewModel(
