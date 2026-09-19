@@ -194,6 +194,7 @@
 
 	const meta = $derived(getVerticalProfile(scenario));
 
+	// svelte-ignore state_referenced_locally
 	const initialProfile = getVerticalProfile(scenario);
 
 	let services = $state<BookingService[]>(
@@ -235,8 +236,12 @@
 	});
 
 	// При зміні сценарію оновлюємо дефолтні набори
-	let lastScenario = scenario;
+	let lastScenario = $state<string>();
 	$effect(() => {
+		if (lastScenario === undefined) {
+			lastScenario = scenario;
+			return;
+		}
 		if (scenario !== lastScenario) {
 			lastScenario = scenario;
 			const profile = getVerticalProfile(scenario);
