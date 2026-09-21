@@ -39,6 +39,10 @@
     {#await import('./TableScenario.svelte') then { default: TableScenario }}
       <TableScenario />
     {/await}
+  {:else if scenarioType.startsWith('vertical_') || screen.startsWith('vertical_')}
+    {#await import('./vertical/VerticalScenario.svelte') then { default: VerticalScenario }}
+      <VerticalScenario />
+    {/await}
   {:else}
     <OrderScenario />
   {/if}

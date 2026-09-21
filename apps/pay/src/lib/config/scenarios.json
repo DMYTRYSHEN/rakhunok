@@ -135,13 +135,85 @@
         "quickAmounts": [100, 200, 500, 1000]
       }
     },
-    "index": {
-      "id": "index",
-      "name": "Всі сценарії / Каталог",
-      "screen": "index",
-      "aliases": ["index", "all", "menu", "catalog", "demos"],
+    "vertical_fitness": {
+      "id": "vertical_fitness",
+      "name": "Фітнес-Центр / Абонементи",
+      "screen": "vertical_fitness",
+      "aliases": ["vertical_fitness", "fitness", "gym"],
       "requiresAmount": false,
-      "config": {}
+      "config": {
+        "ctaText": "Оформити картку"
+      }
+    },
+    "vertical_events": {
+      "id": "vertical_events",
+      "name": "Концерти / Кіно / Квитки",
+      "screen": "vertical_events",
+      "aliases": ["vertical_events", "events", "cinema", "tickets", "concert"],
+      "requiresAmount": false,
+      "config": {
+        "ctaText": "Оформити квитки"
+      }
+    },
+    "vertical_cleaning": {
+      "id": "vertical_cleaning",
+      "name": "Клінінг Сервіс",
+      "screen": "vertical_cleaning",
+      "aliases": ["vertical_cleaning", "cleaning"],
+      "requiresAmount": false,
+      "config": {
+        "ctaText": "Замовити прибирання"
+      }
+    },
+    "vertical_auto": {
+      "id": "vertical_auto",
+      "name": "СТО / Шиномонтаж",
+      "screen": "vertical_auto",
+      "aliases": ["vertical_auto", "auto", "car_service"],
+      "requiresAmount": false,
+      "config": {
+        "ctaText": "Записатись на СТО"
+      }
+    },
+    "vertical_beauty": {
+      "id": "vertical_beauty",
+      "name": "Салон краси / Барбершоп",
+      "screen": "vertical_beauty",
+      "aliases": ["vertical_beauty", "beauty", "salon", "barber"],
+      "requiresAmount": false,
+      "config": {
+        "ctaText": "Записатися в салон"
+      }
+    },
+    "vertical_pets": {
+      "id": "vertical_pets",
+      "name": "Грумінг Салон / Ветклініка",
+      "screen": "vertical_pets",
+      "aliases": ["vertical_pets", "pets", "grooming"],
+      "requiresAmount": false,
+      "config": {
+        "ctaText": "Записати улюбленця"
+      }
+    },
+    "vertical_flowers": {
+      "id": "vertical_flowers",
+      "name": "Магазин квітів",
+      "screen": "vertical_flowers",
+      "aliases": ["vertical_flowers", "flowers"],
+      "requiresAmount": false,
+      "config": {
+        "ctaText": "Замовити букет"
+      }
+    },
+    "vertical_gifts": {
+      "id": "vertical_gifts",
+      "name": "Подарунки / Індивідуальне замовлення",
+      "screen": "vertical_gifts",
+      "aliases": ["vertical_gifts", "gifts"],
+      "requiresAmount": false,
+      "config": {
+        "ctaText": "Оформити замовлення"
+      }
     }
   }
 }

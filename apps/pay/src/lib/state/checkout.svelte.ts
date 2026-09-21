@@ -24,6 +24,7 @@ import type {
 	UpsellItem
 } from '../types/order.js';
 import type { ResolvedScenario, ScenarioDefinition } from '../types/scenario.js';
+import { getScenarioDefaults } from '../../../../../src/lib/features/shared/checkout-scenario-defaults.ts';
 
 export function vibrate(pattern: number | number[]): void {
 	if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -983,7 +984,16 @@ class CheckoutStore {
 				'paid',
 				'paid_table',
 				'receipt',
-				'timeout'
+				'timeout',
+				'fuel_station',
+				'vertical_fitness',
+				'vertical_events',
+				'vertical_cleaning',
+				'vertical_auto',
+				'vertical_beauty',
+				'vertical_pets',
+				'vertical_flowers',
+				'vertical_gifts'
 			].includes(this.forcedScenario);
 		// Query parameters must never replace a real failed invoice with demo data.
 		if (
@@ -1234,6 +1244,37 @@ class CheckoutStore {
 					merchant: {
 						display_name: 'АЗС 7',
 						business_name: 'ТОВ «АЗС 7»',
+						tax_id: '12345678',
+						iban: 'UA673005280000026500504354077'
+					}
+				};
+				this.orderItems = [];
+				this.upsellItems = [];
+				this.showRoundUp = false;
+				this.availableBonusPoints = 0;
+				this.showComplianceCard = false;
+			} else if (this.forcedScenario.startsWith('vertical_')) {
+				const defaults = getScenarioDefaults(this.forcedScenario);
+				const flowData = (defaults.flow_data || {}) as Record<string, any>;
+				const brandName =
+					flowData.clubBrand ||
+					flowData.venueName ||
+					flowData.salonName ||
+					flowData.shopName ||
+					flowData.serviceName ||
+					'Платформа Рахунок';
+				initialOrder = {
+					id: `demo-${this.forcedScenario}`,
+					order_number: 'DEMO',
+					title: defaults.cta_text || 'Замовлення',
+					type: this.forcedScenario,
+					total_amount: 0,
+					base_amount: 0,
+					status: 'pending',
+					scenario_config: defaults,
+					merchant: {
+						display_name: brandName,
+						business_name: 'Демо індустріального сценарію',
 						tax_id: '12345678',
 						iban: 'UA673005280000026500504354077'
 					}

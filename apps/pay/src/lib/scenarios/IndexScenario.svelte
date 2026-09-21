@@ -23,6 +23,117 @@
 
   const groups: ScenarioGroup[] = [
     {
+      id: 'verticals',
+      title: 'Готові індустрії (Вертикалі)',
+      items: [
+        {
+          id: 'demo-vertical-fitness',
+          title: 'Фітнес-Центр / Абонементи',
+          sub: 'Абонемент (1 800 ₴) + Басейн + Шафка #142 + 4 Тренування = 4 700 ₴ · Apple Pass',
+          badge: 'Абонемент',
+          badgeColor: '#10b981',
+          url: './?demo=vertical_fitness',
+          iconBg: 'rgba(16, 185, 129, 0.15)',
+          iconColor: '#10b981',
+          svgPath: '<path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/>'
+        },
+        {
+          id: 'demo-vertical-events',
+          title: 'Концерти / Кіно / Квитки',
+          sub: 'Вибір сеансу, схема залу, 2 стандарт + 1 преміум + збір = 910 ₴ · Таймер 10 хв',
+          badge: 'Квитки',
+          badgeColor: '#8b5cf6',
+          url: './?demo=vertical_events',
+          iconBg: 'rgba(139, 92, 246, 0.15)',
+          iconColor: '#8b5cf6',
+          svgPath: '<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>'
+        },
+        {
+          id: 'demo-vertical-cleaning',
+          title: 'Клінінговий Сервіс',
+          sub: '50 м² + духовка + 4 вікна + Зона Б = 4 100 ₴ (Аванс 30% = 1 230 ₴)',
+          badge: 'Калькулятор',
+          badgeColor: '#06b6d4',
+          url: './?demo=vertical_cleaning',
+          iconBg: 'rgba(6, 182, 212, 0.15)',
+          iconColor: '#06b6d4',
+          svgPath: '<path d="m16 4 3 3-9 9-4 1 1-4 9-9Z"/><path d="m15 5 3 3"/><path d="M21 21H3"/>'
+        },
+        {
+          id: 'demo-vertical-auto',
+          title: 'СТО / Шиномонтаж',
+          sub: 'Легкове авто → Комплексний шиномонтаж R16 (800 ₴) → Дата та час',
+          badge: 'Запис',
+          badgeColor: '#3b82f6',
+          url: './?demo=vertical_auto',
+          iconBg: 'rgba(59, 130, 246, 0.15)',
+          iconColor: '#3b82f6',
+          svgPath: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.5 2.8C2 11 2 11.2 2 11.4V16c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>'
+        },
+        {
+          id: 'demo-vertical-beauty',
+          title: 'Салон краси / Барбершоп',
+          sub: 'Стрижка + фарбування (довге волосся) + Майстер Олена = 1 800 ₴',
+          badge: 'Послуги',
+          badgeColor: '#ec4899',
+          url: './?demo=vertical_beauty',
+          iconBg: 'rgba(236, 72, 153, 0.15)',
+          iconColor: '#ec4899',
+          svgPath: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>'
+        },
+        {
+          id: 'demo-vertical-pets',
+          title: 'Грумінг Салон / Ветклініка',
+          sub: 'Собака 10–20 кг, ковтуни (оцінка майстром + передоплата 300 ₴)',
+          badge: 'Оцінка',
+          badgeColor: '#f59e0b',
+          url: './?demo=vertical_pets',
+          iconBg: 'rgba(245, 158, 11, 0.15)',
+          iconColor: '#f59e0b',
+          svgPath: '<circle cx="12" cy="12" r="3"/><path d="M12 3a3 3 0 0 0-3 3v2a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z"/><path d="M19 13a3 3 0 0 1-3 3h-2a3 3 0 0 1-3-3v-2a3 3 0 0 1 6 0v2a3 3 0 0 0 2 0Z"/>'
+        },
+        {
+          id: 'demo-vertical-flowers',
+          title: 'Магазин квітів',
+          sub: 'Букет «Ніжність» L + листівка + кур’єр по місту = 1 450 ₴',
+          badge: 'Букети',
+          badgeColor: '#f43f5e',
+          url: './?demo=vertical_flowers',
+          iconBg: 'rgba(244, 63, 94, 0.15)',
+          iconColor: '#f43f5e',
+          svgPath: '<path d="M12 7.5a4.5 4.5 0 1 1 4.5 4.5M12 7.5A4.5 4.5 0 1 0 7.5 12M12 7.5V12m4.5 0a4.5 4.5 0 1 1-4.5 4.5M16.5 12H12m-4.5 0a4.5 4.5 0 1 0 4.5 4.5M7.5 12H12m0 4.5V21"/>'
+        },
+        {
+          id: 'demo-vertical-gifts',
+          title: 'Подарунки / Індивідуальні',
+          sub: 'Дерев’яний бокс + гравіювання + макет дизайнера (300 ₴) = 1 550 ₴',
+          badge: 'Макет',
+          badgeColor: '#d946ef',
+          url: './?demo=vertical_gifts',
+          iconBg: 'rgba(217, 70, 239, 0.15)',
+          iconColor: '#d946ef',
+          svgPath: '<polyline points="20 12 20 22 4 22 4 12"/><rect width="20" height="5" x="2" y="7"/><line x1="12" x2="12" y1="22" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>'
+        }
+      ]
+    },
+    {
+      id: 'fuel',
+      title: 'АЗС & Автозаправки',
+      items: [
+        {
+          id: 'demo-fuel-station',
+          title: 'Оплата пального на АЗС',
+          sub: 'Колонка 1, А-95 (59.50 ₴/л), 20 літрів = 1 190 ₴ · Прямий налив',
+          badge: 'АЗС 7',
+          badgeColor: '#38bdf8',
+          url: './?demo=fuel_station',
+          iconBg: 'rgba(56, 189, 248, 0.15)',
+          iconColor: '#38bdf8',
+          svgPath: '<path d="M3 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18"/><path d="M15 10h2a2 2 0 0 1 2 2v3a2 2 0 0 0 2 2v0a2 2 0 0 0 2-2V8l-3-3"/><rect x="6" y="6" width="6" height="5" rx="1"/>'
+        }
+      ]
+    },
+    {
       id: 'ecom',
       title: 'Онлайн-замовлення (E-commerce)',
       items: [
@@ -265,7 +376,9 @@
   ];
 
   const filterTabs = [
-    { id: 'all', label: 'Всі', count: 19 },
+    { id: 'all', label: 'Всі', count: 28 },
+    { id: 'verticals', label: 'Вертикалі', count: 8 },
+    { id: 'fuel', label: 'АЗС', count: 1 },
     { id: 'ecom', label: 'E-com', count: 4 },
     { id: 'horeca', label: 'HoReCa', count: 4 },
     { id: 'p2p', label: 'Каса/P2P', count: 6 },
@@ -298,7 +411,7 @@
     </div>
     <h1 class="apple-hub-title">Сценарії оплати</h1>
     <p class="apple-hub-sub">
-      19 автономних екранів для e-commerce, HoReCa, каси та логістики.
+      28 автономних екранів для індустрій, e-commerce, HoReCa, каси та логістики.
     </p>
 
     <!-- Apple Segmented Filter Bar -->

@@ -1,10 +1,16 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
+import { resolve } from 'node:path';
 
 export default defineConfig({
   base: process.env.BASE_URL || '/pay/',
   envDir: '../..',
   envPrefix: ['VITE_', 'PUBLIC_'],
+  resolve: {
+    alias: {
+      '$lib': resolve(import.meta.dirname, '../../src/lib')
+    }
+  },
   define: {
     'import.meta.env.VITE_CHECKOUT_SYNTHETIC': JSON.stringify(process.env.CHECKOUT_LOCAL_HARNESS === '1' ? '1' : '0')
   },
