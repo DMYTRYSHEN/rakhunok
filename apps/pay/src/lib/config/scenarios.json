@@ -2,6 +2,14 @@
   "version": "1.0",
   "defaultScenario": "fixed",
   "scenarios": {
+    "index": {
+      "id": "index",
+      "name": "Каталог сценаріїв",
+      "screen": "index",
+      "aliases": ["index", "all", "menu", "catalog", "demos"],
+      "requiresAmount": false,
+      "config": {}
+    },
     "fixed": {
       "id": "fixed",
       "name": "Фіксований рахунок",

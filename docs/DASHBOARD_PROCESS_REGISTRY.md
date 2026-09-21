@@ -39,6 +39,28 @@ changes do not bypass these rules.
   process.
 - **Applicable instruction:** `.github/instructions/invoice-scenario-locks.instructions.md`.
 
+#### Approved Temporary Scope — Public Scenario Catalog
+
+- On 2026-09-21, the user explicitly approved enabling the non-payment scenario catalog at
+  `/pay/?demo=all`, then separately approved opening the catalog's `fixed`, `open_amount`, `table`,
+  and `delivery` demo fixtures for display only.
+- Allow the exact 19 catalog demo URLs on the test domain `letsrealtalk.com` and local preview
+  hosts. Keep `rakhunok.com` blocked. Preserve real invoice routing, amounts, validation,
+  persistence, payment entry, and status behavior; every forced demo remains non-payable.
+- Limit implementation to the Pay scenario-selection gate, its focused regression test, and this
+  registry record. The process remains `LOCKED` outside this exact scope.
+
+#### Public Scenario Catalog Scope Closure Evidence
+
+- The Pay suite covers all 19 catalog URLs on `letsrealtalk.com`, verifies that none can initiate a
+  payment, rejects every catalog URL on `rakhunok.com`, and resolves the non-payment `index`
+  definition to the existing catalog renderer.
+- `svelte-check` diagnostics and the Svelte autofixer report no issues in the changed state slice;
+  the Pay production build succeeds and the catalog contains all 19 entries.
+- The existing `letsrealtalk-checkout` Worker routes were deployed to the test domain only. No
+  Worker route, invoice payload, payment behavior, or `rakhunok.com` environment was changed. The
+  approved scope is closed and `CROSS-APP-INVOICE-SCENARIOS-001` remains `LOCKED`.
+
 #### Approved Temporary Scope — Universal Link First
 
 - For Monobank (`MONO`/`UNJS`), return the payload-bearing Universal Link

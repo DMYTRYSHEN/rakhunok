@@ -65,7 +65,11 @@ function harness({ dev = false, url = 'https://checkout.invalid/pay/?id=order-a'
     require: name => {
       if (name.startsWith('svelte/')) return require(name);
       if (name.endsWith('/banks.js')) return { DEFAULT_BANKS: [{ code: 'LVIV', feePct: 0 }] };
-      if (name.endsWith('/profiles.js')) return { DEFAULT_PROFILES: {} };
+      if (name.endsWith('/profiles.js')) return { DEFAULT_PROFILES: {
+        krapka: { slug: 'krapka', name: 'Крапка', description: 'Кав’ярня' },
+        sofia: { slug: 'sofia_k', name: 'Софія', description: 'Профіль' },
+        bondar: { slug: 'bondar_taxi', name: 'Бондар', description: 'Таксі' }
+      } };
       if (name.endsWith('/scenarios.js')) return { resolveScenario: () => ({ config: {} }) };
       if (name.endsWith('/terminal-authority.js')) {
         const exports = {};
@@ -473,5 +477,31 @@ test('demo generation requires both DEV and local hostname and never initiates p
     assert.equal(Boolean(h.store.order), expected);
     await h.store.executePay();
     assert.equal(h.calls.initiate.length, 0);
+  }
+});
+
+test('public showcase exposes all catalog fixtures without enabling payment', async () => {
+  const catalogScenarios = [
+    '1', 'order_upsell', 'order_full', 'loyalty',
+    '3', 'table_items', 'table_full', 'waiting',
+    '2', 'tips', 'donation', 'krapka', 'sofia', 'bondar',
+    '4', 'paid', 'paid_table', 'receipt', 'timeout'
+  ];
+
+  for (const scenario of ['all', ...catalogScenarios]) {
+    const showcase = harness({ url: `https://letsrealtalk.com/pay/?demo=${scenario}` });
+    await showcase.store.init();
+    assert.equal(showcase.store.forcedScenario, scenario);
+    assert.ok(showcase.store.order, scenario);
+    await showcase.store.executePay();
+    assert.equal(showcase.calls.initiate.length, 0);
+  }
+
+  for (const scenario of ['all', ...catalogScenarios]) {
+    const url = `https://rakhunok.com/pay/?demo=${scenario}`;
+    const blocked = harness({ url });
+    await blocked.store.init();
+    assert.equal(blocked.store.forcedScenario, '');
+    assert.equal(blocked.store.order, null);
   }
 });

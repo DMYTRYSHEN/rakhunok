@@ -13,6 +13,12 @@ test('resolves the four built-in checkout scenarios', () => {
 	);
 });
 
+test('resolves the non-payment scenario catalog', () => {
+	const catalog = resolveScenario({ type: 'index' }, 'all');
+	assert.equal(catalog.type, 'index');
+	assert.equal(catalog.screen, 'index');
+});
+
 test('resolves aliases and JSON-compatible overrides', () => {
 	const aliases = {
 		fixed: ['fixed', 'invoice', '1'],

@@ -957,10 +957,38 @@ class CheckoutStore {
 		}
 		if (!id) id = this.forcedScenario ? 'demo-1' : '';
 		this.orderId = id;
+		const isPublicShowcase =
+			['letsrealtalk.com', 'localhost', '127.0.0.1'].includes(window.location.hostname) &&
+			[
+				'all',
+				'index',
+				'menu',
+				'catalog',
+				'demos',
+				'1',
+				'order_upsell',
+				'order_full',
+				'loyalty',
+				'3',
+				'table_items',
+				'table_full',
+				'waiting',
+				'2',
+				'tips',
+				'donation',
+				'krapka',
+				'sofia',
+				'bondar',
+				'4',
+				'paid',
+				'paid_table',
+				'receipt',
+				'timeout'
+			].includes(this.forcedScenario);
 		// Query parameters must never replace a real failed invoice with demo data.
 		if (
-			!import.meta.env.DEV ||
-			!['localhost', '127.0.0.1'].includes(window.location.hostname) ||
+			(!isPublicShowcase &&
+				(!import.meta.env.DEV || !['localhost', '127.0.0.1'].includes(window.location.hostname))) ||
 			(id && !id.startsWith('demo-'))
 		)
 			this.forcedScenario = '';
