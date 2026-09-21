@@ -115,97 +115,225 @@
 		flex-direction: column;
 	}
 
-	/* Ensure inner preview components adapt to dark mode seamlessly */
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-root) {
-		background: #121319;
-		border-color: rgba(255, 255, 255, 0.08);
-		color: #f5f6f8;
+	/* Map Apple HIG styles to apps/pay native OrderScenario styles (like demo=1) */
+	:global(.vertical-content-body .ios-root) {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+		color: var(--order-text) !important;
+		border-radius: 0 !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-header) {
-		background: #181a22;
-		border-bottom-color: rgba(255, 255, 255, 0.08);
+	:global(.vertical-content-body .ios-header) {
+		background: transparent !important;
+		border-bottom: none !important;
+		padding: 0 0 16px 0 !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-nav-title) {
-		color: #ffffff;
+	:global(.vertical-content-body .ios-nav-top) {
+		display: none !important; /* Hide HIG title since we have order-nav */
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-segmented) {
-		background: #232632;
+	:global(.vertical-content-body .ios-body) {
+		padding: 0 !important;
+		gap: 12px !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-segment-btn) {
-		color: #94a3b8;
+	:global(.vertical-content-body .ios-card) {
+		background: var(--order-surface) !important;
+		border: none !important;
+		border-radius: 18px !important;
+		box-shadow: none !important;
+		padding: 16px !important;
+		color: var(--order-text) !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-segment-btn.active) {
-		background: #2e3242;
-		color: #ffffff;
+	:global(.vertical-content-body .ios-card-title) {
+		color: var(--order-text) !important;
+		font-size: 14px !important;
+		font-weight: 600 !important;
+		margin-bottom: 12px !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-capsule-item) {
-		background: #1e202b;
-		color: #94a3b8;
+	:global(.vertical-content-body .ios-segmented),
+	:global(.vertical-content-body .ios-segmented-sm) {
+		background: var(--order-surface-2) !important;
+		border-radius: 12px !important;
+		padding: 4px !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-card) {
-		background: #181a22;
-		border-color: rgba(255, 255, 255, 0.06);
-		color: #f5f6f8;
+	:global(.vertical-content-body .ios-segment-btn),
+	:global(.vertical-content-body .ios-seg-sm-btn) {
+		color: var(--order-text-dim) !important;
+		font-weight: 500 !important;
+		border-radius: 8px !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-card-title) {
-		color: #ffffff;
+	:global(.vertical-content-body .ios-segment-btn.active),
+	:global(.vertical-content-body .ios-seg-sm-btn.active) {
+		background: var(--order-surface) !important;
+		color: var(--order-text) !important;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-club-row),
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-addon-item),
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-zone-row),
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-option-tile) {
-		background: #1e202b;
-		border-color: rgba(255, 255, 255, 0.06);
-		color: #f5f6f8;
+	:global(.vertical-content-body .ios-stepper-capsules) {
+		margin-top: 16px !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-club-name),
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-addon-name),
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-tariff-title) {
-		color: #ffffff;
+	:global(.vertical-content-body .ios-capsule-item) {
+		background: var(--order-surface) !important;
+		color: var(--order-text-dim) !important;
+		border-radius: 12px !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-tariff-card) {
-		background: #181a22;
-		border-color: rgba(255, 255, 255, 0.08);
+	:global(.vertical-content-body .ios-capsule-item.active) {
+		background: var(--order-text) !important;
+		color: var(--order-bg) !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-input) {
-		background: #1e202b;
-		border-color: rgba(255, 255, 255, 0.12);
-		color: #ffffff;
+	:global(.vertical-content-body .ios-capsule-item.done) {
+		background: var(--order-surface-2) !important;
+		color: var(--order-text) !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-pass-card) {
-		background: #181a22;
-		border-color: rgba(255, 255, 255, 0.08);
+	:global(.vertical-content-body .ios-club-row),
+	:global(.vertical-content-body .ios-addon-item),
+	:global(.vertical-content-body .ios-option-tile),
+	:global(.vertical-content-body .ios-zone-row) {
+		background: var(--order-surface) !important;
+		border: 1.5px solid transparent !important;
+		border-radius: 15px !important;
+		color: var(--order-text) !important;
+		padding: 13px 14px !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-pass-tariff-name),
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-total-row span) {
-		color: #ffffff;
+	:global(.vertical-content-body .ios-club-row.selected),
+	:global(.vertical-content-body .ios-addon-item.selected),
+	:global(.vertical-content-body .ios-option-tile.selected),
+	:global(.vertical-content-body .ios-zone-row.selected) {
+		border-color: var(--order-text) !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-pass-footer) {
-		background: #14151c;
+	:global(.vertical-content-body .ios-club-name),
+	:global(.vertical-content-body .ios-addon-name),
+	:global(.vertical-content-body .ios-tariff-title) {
+		color: var(--order-text) !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-pass-cut .ios-cut-left),
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-pass-cut .ios-cut-right) {
-		background: #121319;
+	:global(.vertical-content-body .ios-tariff-card) {
+		background: var(--order-surface) !important;
+		border: 1.5px solid transparent !important;
+		border-radius: 15px !important;
 	}
 
-	:global(body:not(.light-mode)) .vertical-content-body :global(.ios-bottom-bar) {
-		background: #181a22;
-		border-top-color: rgba(255, 255, 255, 0.08);
+	:global(.vertical-content-body .ios-tariff-card.selected) {
+		border-color: var(--order-text) !important;
+		box-shadow: none !important;
+	}
+
+	:global(.vertical-content-body .ios-input) {
+		background: var(--order-surface) !important;
+		border: 1px solid transparent !important;
+		border-radius: 14px !important;
+		color: var(--order-text) !important;
+		padding: 14px 15px !important;
+	}
+	
+	:global(.vertical-content-body .ios-card .ios-input) {
+		background: var(--order-surface-2) !important;
+	}
+
+	:global(.vertical-content-body .ios-input:focus) {
+		border-color: rgba(128,128,128,0.4) !important;
+	}
+
+	:global(.vertical-content-body .ios-bottom-bar) {
+		background: transparent !important;
+		border-top: none !important;
+		padding: 16px 0 0 0 !important;
+	}
+
+	:global(.vertical-content-body .ios-pay-btn),
+	:global(.vertical-content-body .ios-btn-primary) {
+		background: var(--order-cta) !important;
+		color: var(--order-cta-text) !important;
+		border-radius: 27px !important;
+		height: 54px !important;
+		font-size: 15px !important;
+		font-weight: 700 !important;
+		width: 100% !important;
+		justify-content: center !important;
+		border: none !important;
+	}
+
+	:global(.vertical-content-body .ios-next-btn),
+	:global(.vertical-content-body .ios-back-btn),
+	:global(.vertical-content-body .ios-btn-secondary),
+	:global(.vertical-content-body .ios-btn-outline),
+	:global(.vertical-content-body .ios-btn-scan) {
+		background: var(--order-surface) !important;
+		color: var(--order-text) !important;
+		border-radius: 27px !important;
+		height: 54px !important;
+		font-weight: 600 !important;
+		border: 1px solid var(--order-divider) !important;
+	}
+
+	:global(.vertical-content-body .ios-time-btn),
+	:global(.vertical-content-body .ios-date-btn) {
+		background: var(--order-surface) !important;
+		border: 1.5px solid transparent !important;
+		border-radius: 14px !important;
+		color: var(--order-text) !important;
+	}
+	:global(.vertical-content-body .ios-time-btn.selected),
+	:global(.vertical-content-body .ios-date-btn.selected) {
+		background: var(--order-surface-2) !important;
+		border-color: var(--order-text) !important;
+	}
+	
+	:global(.vertical-content-body .ios-stepper-btn) {
+		background: var(--order-surface-2) !important;
+		color: var(--order-text) !important;
+		border: none !important;
+	}
+
+	:global(.vertical-content-body .ios-pass-card) {
+		background: var(--order-surface) !important;
+		border: none !important;
+		border-radius: 18px !important;
+	}
+	
+	:global(.vertical-content-body .ios-pass-head) {
+		background: var(--order-surface-2) !important;
+		color: var(--order-text) !important;
+	}
+
+	:global(.vertical-content-body .ios-pass-tariff-name),
+	:global(.vertical-content-body .ios-total-row span) {
+		color: var(--order-text) !important;
+	}
+
+	:global(.vertical-content-body .ios-pass-footer) {
+		background: var(--order-surface) !important;
+	}
+
+	:global(.vertical-content-body .ios-pass-cut .ios-cut-left),
+	:global(.vertical-content-body .ios-pass-cut .ios-cut-right) {
+		background: var(--order-bg) !important;
+	}
+	
+	:global(.vertical-content-body .ios-digital-card) {
+		background: linear-gradient(135deg, var(--order-surface), var(--order-surface-2)) !important;
+		border: 1px solid var(--order-divider) !important;
+		box-shadow: none !important;
+	}
+	
+	:global(.vertical-content-body .ios-toggle-switch) {
+		background: var(--order-surface-2) !important;
+	}
+	
+	:global(.vertical-content-body .ios-toggle-switch.active) {
+		background: var(--accent) !important;
 	}
 </style>
