@@ -1,30 +1,17 @@
 <script lang="ts">
 	import {
 		Dumbbell,
-		Calendar,
-		Clock,
-		MapPin,
-		ShieldCheck,
-		AlertTriangle,
-		Ticket,
 		Check,
 		ChevronRight,
 		ChevronLeft,
 		QrCode,
-		User,
-		Info,
-		RotateCcw,
-		Sparkles,
-		Waves,
-		Lock,
 		CreditCard,
-		KeyRound
+		MapPin,
+		Clock,
+		Sparkles
 	} from '@lucide/svelte';
 	import type {
 		FitnessFlowData,
-		FitnessClub,
-		FitnessTariff,
-		FitnessAddon,
 		FitnessTariffPeriod
 	} from '$lib/features/shared/checkout-scenario-config';
 	import {
@@ -85,7 +72,7 @@
 		tariffs: [
 			{
 				id: 'day',
-				name: 'Денний візит (Разовий)',
+				name: 'Денний візит',
 				period: 'day',
 				price: 300,
 				description: 'Тренажерна зала + душові на 1 день без обмеження часу',
@@ -118,13 +105,13 @@
 				includesSauna: false,
 				durationDays: 30,
 				allowedHoursNotice: '1 календарний місяць, щоденно 07:00 – 22:00',
-				badge: 'Найпопулярніший'
+				badge: 'POPULAR'
 			}
 		],
 		addons: [
 			{
 				id: 'pool',
-				name: 'Доступ до басейну (на строк абонемента)',
+				name: 'Басейн (Аква-зона)',
 				category: 'access',
 				price: 600,
 				priceModel: 'match_tariff',
@@ -133,7 +120,7 @@
 			},
 			{
 				id: 'locker',
-				name: 'Персональна закріплена шафка',
+				name: 'Персональна шафка',
 				category: 'resource',
 				price: 300,
 				priceModel: 'match_tariff',
@@ -144,22 +131,13 @@
 			},
 			{
 				id: 'trainings_4',
-				name: 'Пакет 4 персональних тренувань',
+				name: '4 Персональні тренування',
 				category: 'credits',
 				price: 2000,
 				creditCount: 4,
 				priceModel: 'fixed_bundle',
 				description: 'Індивідуальні тренування з топ-тренером (500 ₴/сесія)',
 				icon: '🥊'
-			},
-			{
-				id: 'towel',
-				name: 'Оренда преміум-рушника (разово)',
-				category: 'usage',
-				price: 50,
-				priceModel: 'per_use',
-				description: 'Великий махровий рушник на кожне тренування',
-				icon: '🧖'
 			}
 		],
 		approval: {
@@ -189,11 +167,9 @@
 		rules: { ...defaultData.rules, ...(flowData?.rules ?? {}) }
 	});
 
-	// Mode & Apple HIG 4-Step Window State
 	let currentMode = $state<FitnessOrderMode>('new_membership');
 	let step = $state<1 | 2 | 3 | 4>(1);
 
-	// Default selections: Month (1 800 ₴) + Pool (600 ₴) + Locker (300 ₴) + 4 Trainings (2 000 ₴) = 4 700 ₴
 	let selectedClubId = $state('pulse_podil');
 	let selectedTariffId = $state('month');
 	let startDateType = $state<'today' | 'custom_date'>('today');
@@ -209,10 +185,8 @@
 	let receptionReceiptId = $state('REC-8291');
 	let receptionAmount = $state(4700);
 
-	// Simulator state for redeemed training credits
 	let simulatedCreditsUsed = $state(0);
 
-	// Calculation derived
 	const pricing = $derived.by(() => {
 		const rawSelections: FitnessOrderSelections = {
 			mode: currentMode,
@@ -231,7 +205,6 @@
 			receptionReceiptId,
 			receptionAmount
 		};
-
 		const pruned = pruneFitnessSelections(data, rawSelections);
 		return calculateFitnessOrderPrice(data, pruned);
 	});
@@ -244,1423 +217,837 @@
 		}
 	}
 
-	function resetSimulatedUsage() {
-		simulatedCreditsUsed = 0;
-	}
-
 	function useOneTrainingCredit() {
 		const maxCredits = pricing.issuedCard.trainingCreditsTotal;
 		if (simulatedCreditsUsed < maxCredits) {
 			simulatedCreditsUsed++;
 		}
 	}
+	
+	function resetSimulatedUsage() {
+		simulatedCreditsUsed = 0;
+	}
 </script>
 
-<div class="ios-root">
+<div class="premium-root">
 	<!-- APPLE HIG HEADER & SEGMENTED MODE SELECTOR -->
-	<header class="ios-header">
-		<div class="ios-nav-top">
-			<span class="ios-nav-sub">{data.clubBrand || 'Pulse Fitness Club'}</span>
-			<h4 class="ios-nav-title">Абонементи & Клубний Доступ</h4>
-		</div>
-
-		<!-- Segmented Control -->
-		<div class="ios-segmented">
-			<button
-				type="button"
-				class="ios-segment-btn"
-				class:active={currentMode === 'new_membership'}
-				onclick={() => {
-					currentMode = 'new_membership';
-					step = 1;
-				}}
-			>
-				Новий абонемент
-			</button>
-			<button
-				type="button"
-				class="ios-segment-btn"
-				class:active={currentMode === 'renewal'}
-				onclick={() => {
-					currentMode = 'renewal';
-					step = 1;
-				}}
-			>
-				Продовження
-			</button>
-			<button
-				type="button"
-				class="ios-segment-btn"
-				class:active={currentMode === 'addon_only'}
-				onclick={() => {
-					currentMode = 'addon_only';
-					step = 1;
-				}}
-			>
-				Додаткові послуги
-			</button>
-			<button
-				type="button"
-				class="ios-segment-btn"
-				class:active={currentMode === 'reception_pay'}
-				onclick={() => {
-					currentMode = 'reception_pay';
-					step = 1;
-				}}
-			>
-				На рецепції
-			</button>
-		</div>
-
-		<!-- Step Capsules (For New Membership) -->
-		{#if currentMode === 'new_membership'}
-			<div class="ios-stepper-capsules">
-				<div class="ios-capsule-item" class:active={step === 1} class:done={step > 1}>
-					<span class="capsule-num">1</span>
-					<span class="capsule-lbl">Клуб & Тариф</span>
-				</div>
-				<div class="ios-capsule-item" class:active={step === 2} class:done={step > 2}>
-					<span class="capsule-num">2</span>
-					<span class="capsule-lbl">Послуги & Зони</span>
-				</div>
-				<div class="ios-capsule-item" class:active={step === 3} class:done={step > 3}>
-					<span class="capsule-num">3</span>
-					<span class="capsule-lbl">Контакти</span>
-				</div>
-				<div class="ios-capsule-item" class:active={step === 4} class:done={step > 4}>
-					<span class="capsule-num">4</span>
-					<span class="capsule-lbl">Картка & Оплата</span>
-				</div>
+	<header class="premium-header">
+		<div class="header-top">
+			<div class="header-titles">
+				<span class="micro-title">{data.clubBrand}</span>
+				<h1 class="main-title">Клубний Доступ</h1>
 			</div>
+			<div class="header-icon">
+				<Dumbbell size={20} strokeWidth={2.5} />
+			</div>
+		</div>
+
+		<!-- HIG Segmented Control -->
+		<div class="ios-segmented-control">
+			<button class="ios-segment" class:active={currentMode === 'new_membership'} onclick={() => { currentMode = 'new_membership'; step = 1; }}>Новий</button>
+			<button class="ios-segment" class:active={currentMode === 'renewal'} onclick={() => { currentMode = 'renewal'; step = 1; }}>Продовження</button>
+			<button class="ios-segment" class:active={currentMode === 'addon_only'} onclick={() => { currentMode = 'addon_only'; step = 1; }}>Послуги</button>
+			<button class="ios-segment" class:active={currentMode === 'reception_pay'} onclick={() => { currentMode = 'reception_pay'; step = 1; }}>Рецепція</button>
+		</div>
+
+		<!-- Stepper (only for new_membership) -->
+		{#if currentMode === 'new_membership'}
+		<div class="stepper">
+			{#each [1, 2, 3, 4] as s}
+				<div class="stepper-dot" class:active={step >= s}></div>
+			{/each}
+		</div>
 		{/if}
 	</header>
 
-	<!-- MAIN CONTENT BODY -->
-	<main class="ios-body">
+	<main class="premium-main">
 		{#if currentMode === 'new_membership'}
-			<!-- WINDOW 1: CLUB & TARIFF SELECTION -->
 			{#if step === 1}
-				<!-- Club Selector Inset Group -->
-				<div class="ios-card">
-					<span class="ios-card-title">Оберіть філію або клуб:</span>
-					<div class="ios-club-list">
-						{#each data.clubs as club (club.id)}
-							<button
-								type="button"
-								class="ios-club-row"
-								class:selected={selectedClubId === club.id}
-								onclick={() => (selectedClubId = club.id)}
-							>
-								<div class="ios-club-info">
-									<strong class="ios-club-name">{club.name}</strong>
-									<span class="ios-club-addr">
-										<MapPin size={12} /> {club.address}
-									</span>
-									<span class="ios-club-hours">
-										<Clock size={12} /> {club.workingHours}
-									</span>
-								</div>
-								{#if selectedClubId === club.id}
-									<div class="ios-check-circle">
-										<Check size={14} />
-									</div>
-								{/if}
-							</button>
-						{/each}
-					</div>
-				</div>
-
-				<!-- Tariff Selector Inset Group -->
-				<div class="ios-card">
-					<span class="ios-card-title">Тариф абонемента:</span>
-					<div class="ios-tariff-grid">
-						{#each data.tariffs as tariff (tariff.id)}
-							<button
-								type="button"
-								class="ios-tariff-card"
-								class:selected={selectedTariffId === tariff.id}
-								onclick={() => (selectedTariffId = tariff.id)}
-							>
-								{#if tariff.badge}
-									<span class="ios-badge-pill">{tariff.badge}</span>
-								{/if}
-								<div class="ios-tariff-header">
-									<strong class="ios-tariff-title">{tariff.name}</strong>
-									<span class="ios-tariff-price">{tariff.price} ₴</span>
-								</div>
-								<p class="ios-tariff-desc">{tariff.description}</p>
-								<div class="ios-tariff-hours">
-									<Clock size={12} />
-									<span>{tariff.allowedHoursNotice}</span>
-								</div>
-								{#if selectedTariffId === tariff.id}
-									<div class="ios-check-circle corner">
-										<Check size={14} />
-									</div>
-								{/if}
-							</button>
-						{/each}
-					</div>
-				</div>
-
-				<!-- Date Selection Inset Group -->
-				<div class="ios-card">
-					<span class="ios-card-title">Дата активації абонемента:</span>
-					<div class="ios-date-selector">
-						<div class="ios-segmented-sm">
-							<button
-								type="button"
-								class="ios-seg-sm-btn"
-								class:active={startDateType === 'today'}
-								onclick={() => (startDateType = 'today')}
-							>
-								З сьогоднішнього дня
-							</button>
-							<button
-								type="button"
-								class="ios-seg-sm-btn"
-								class:active={startDateType === 'custom_date'}
-								onclick={() => (startDateType = 'custom_date')}
-							>
-								Обрати дату старту
-							</button>
-						</div>
-
-						{#if startDateType === 'custom_date'}
-							<div class="ios-date-input-wrap mt-2">
-								<input
-									type="date"
-									class="ios-input"
-									bind:value={customStartDate}
-								/>
-							</div>
-						{/if}
-
-						<div class="ios-validity-banner">
-							<Sparkles size={16} class="text-indigo-600" />
-							<div>
-								<strong>Термін дії:</strong>
-								<span>{pricing.startDateFormatted} — {pricing.endDateFormatted}</span>
-								<small class="block text-zinc-500">{pricing.validityDaysNotice}</small>
-							</div>
-						</div>
-					</div>
-				</div>
-
-			<!-- WINDOW 2: ADDONS & RESOURCES -->
-			{:else if step === 2}
-				<div class="ios-card">
-					<div class="ios-card-head-row">
-						<div>
-							<span class="ios-card-title">Додаткові послуги та розширення:</span>
-							<p class="ios-card-sub">
-								Додайте басейн, персональну шафку чи тренування до вашого абонемента
-							</p>
-						</div>
-					</div>
-
-					<div class="ios-addons-stack">
-						{#each data.addons as addon (addon.id)}
-							{@const isSelected = selectedAddonIds.includes(addon.id)}
-							<button
-								type="button"
-								class="ios-addon-item"
-								class:selected={isSelected}
-								onclick={() => toggleAddon(addon.id)}
-							>
-								<div class="ios-addon-left">
-									<span class="ios-addon-icon">{addon.icon || '🏷️'}</span>
-									<div class="text-left">
-										<div class="ios-addon-title-row">
-											<strong class="ios-addon-name">{addon.name}</strong>
-											{#if addon.category === 'resource' && addon.availableLockers !== undefined}
-												<span class="ios-pill-status">
-													{addon.availableLockers} вільно
-												</span>
-											{/if}
+				<section class="section">
+					<h2 class="section-title">Оберіть філію</h2>
+					<div class="horizontal-scroll">
+						{#each data.clubs as club}
+							<label class="radio-label">
+								<input type="radio" name="club" value={club.id} bind:group={selectedClubId} class="peer-radio" />
+								<div class="hig-card card-hover-fx card-w240">
+									<div class="card-icon-row">
+										<div class="icon-box"><MapPin size={18} strokeWidth={2.5} /></div>
+										<div class="hig-radio-ring">
+											<div class="hig-radio-dot"></div>
 										</div>
-										<p class="ios-addon-desc">{addon.description}</p>
 									</div>
+									<h3 class="card-title">{club.name}</h3>
+									<p class="card-subtitle"><Clock size={12} class="inline-icon" /> {club.workingHours}</p>
 								</div>
-								<div class="ios-addon-right">
-									<strong class="ios-addon-price">+{addon.price} ₴</strong>
-									<div class="ios-toggle-switch" class:active={isSelected}>
-										<div class="ios-switch-knob"></div>
-									</div>
-								</div>
-							</button>
+							</label>
 						{/each}
 					</div>
-				</div>
+				</section>
 
-				<div class="ios-info-note">
-					<Info size={16} class="text-blue-600 flex-shrink-0" />
-					<span>
-						Персональна закріплена шафка резервується за вами на весь термін дії абонемента з персональним електронним ключем.
-					</span>
-				</div>
+				<section class="section mt-2">
+					<h2 class="section-title">Тариф абонемента</h2>
+					<div class="vertical-stack">
+						{#each data.tariffs as tariff}
+							<label class="radio-label">
+								<input type="radio" name="tariff" value={tariff.id} bind:group={selectedTariffId} class="peer-radio" />
+								<div class="hig-card card-hover-fx flex-row-between">
+									<div class="card-col-left">
+										{#if tariff.badge}
+											<span class="hig-badge">{tariff.badge}</span>
+										{/if}
+										<h3 class="card-title">{tariff.name}</h3>
+										<span class="card-subtitle">{tariff.durationDays} днів доступу</span>
+									</div>
+									<div class="card-col-right">
+										<div class="price-wrap">
+											<span class="hig-price">{tariff.price}</span>
+											<span class="currency">₴</span>
+										</div>
+									</div>
+								</div>
+							</label>
+						{/each}
+					</div>
+				</section>
 
-			<!-- WINDOW 3: CLIENT CONTACTS -->
+			{:else if step === 2}
+				<section class="section">
+					<h2 class="section-title">Додаткові послуги</h2>
+					<div class="vertical-stack">
+						{#each data.addons as addon}
+							{@const isSelected = selectedAddonIds.includes(addon.id)}
+							<label class="radio-label">
+								<input type="checkbox" checked={isSelected} onchange={() => toggleAddon(addon.id)} class="peer-radio" />
+								<div class="hig-card card-hover-fx flex-row-center">
+									<div class="addon-emoji">{addon.icon || '✨'}</div>
+									<div class="card-col-left">
+										<h3 class="card-title-sm">{addon.name}</h3>
+										<p class="card-subtitle-sm">{addon.description}</p>
+										<div class="addon-price">+{addon.price} ₴</div>
+									</div>
+									<div class="hig-toggle">
+										<div class="hig-toggle-knob"></div>
+									</div>
+								</div>
+							</label>
+						{/each}
+					</div>
+				</section>
+
 			{:else if step === 3}
-				<div class="ios-card">
-					<span class="ios-card-title">Контактні дані власника абонемента:</span>
-					<div class="ios-form-stack">
-						<label>
-							<span class="ios-input-lbl">Прізвище та ім'я:</span>
-							<input
-								type="text"
-								class="ios-input"
-								bind:value={clientName}
-								placeholder="Олександр Коваленко"
-							/>
-						</label>
-
-						<label>
-							<span class="ios-input-lbl">Номер телефону (для входу та Telegram-сповіщень):</span>
-							<input
-								type="tel"
-								class="ios-input"
-								bind:value={clientPhone}
-								placeholder="+380..."
-							/>
-						</label>
-
-						<label>
-							<span class="ios-input-lbl">Email для квитанції та електронної картки:</span>
-							<input
-								type="email"
-								class="ios-input"
-								bind:value={clientEmail}
-								placeholder="client@example.com"
-							/>
-						</label>
+				<section class="section">
+					<h2 class="section-title">Контактні дані</h2>
+					<div class="vertical-stack">
+						<input type="text" bind:value={clientName} placeholder="Прізвище та ім'я" class="hig-input" />
+						<input type="tel" bind:value={clientPhone} placeholder="Номер телефону" class="hig-input" />
+						<input type="email" bind:value={clientEmail} placeholder="Email адреса" class="hig-input" />
 					</div>
-				</div>
+				</section>
 
-				<div class="ios-card">
-					<span class="ios-card-title">Правила клубу:</span>
-					<div class="ios-rules-box">
-						<div class="rule-bullet">
-							<ShieldCheck size={16} class="text-emerald-600 flex-shrink-0" />
-							<span>Безкоштовна заморозка абонемента до {data.rules.maxFreezeDays} днів у будь-який момент.</span>
-						</div>
-						<div class="rule-bullet">
-							<QrCode size={16} class="text-indigo-600 flex-shrink-0" />
-							<span>Вхід до клубу здійснюється за цифровим QR-кодом на рецепції або через оптичний турнікет.</span>
-						</div>
-					</div>
-				</div>
-
-			<!-- WINDOW 4: APPLE WALLET PASS TICKET & MEMBERSHIP ISSUANCE -->
 			{:else if step === 4}
-				<!-- APPLE WALLET PASS TICKET -->
-				<div class="ios-pass-card">
-					<div class="ios-pass-head">
-						<div class="ios-pass-logo-wrap">
-							<Dumbbell size={20} class="text-white" />
-							<span class="ios-pass-brand">{data.clubBrand || 'Pulse Fitness Club'}</span>
+				<section class="section pass-section">
+					<h2 class="section-title text-center">Ваша цифрова картка</h2>
+					
+					<div class="wallet-pass">
+						<!-- Pass Perforations -->
+						<div class="pass-cutout-left"></div>
+						<div class="pass-cutout-right"></div>
+						
+						<div class="pass-top">
+							<Dumbbell size={22} strokeWidth={2.5} class="pass-brand-icon" />
+							<span class="pass-badge">CLUB PASS</span>
 						</div>
-						<span class="ios-pass-type-badge">Офіційний рахунок</span>
-					</div>
+						
+						<h3 class="pass-owner">{clientName.split(' ')[0]}</h3>
+						<p class="pass-desc">{pricing.summaryLabel}</p>
 
-					<div class="ios-pass-body">
-						<h4 class="ios-pass-tariff-name">{pricing.summaryLabel}</h4>
-						<div class="ios-pass-dates">
-							<span>Діє: <strong>{pricing.startDateFormatted} — {pricing.endDateFormatted}</strong></span>
-						</div>
-
-						<div class="ios-pass-breakdown">
-							{#each pricing.breakdown as item}
-								<div class="ios-pass-row">
-									<span class="ios-pass-item-name">{item.label}</span>
-									<strong class="ios-pass-item-val">{item.amount} ₴</strong>
-								</div>
-							{/each}
-						</div>
-					</div>
-
-					<!-- Cutout line -->
-					<div class="ios-pass-cut">
-						<div class="ios-cut-left"></div>
-						<div class="ios-cut-line"></div>
-						<div class="ios-cut-right"></div>
-					</div>
-
-					<div class="ios-pass-footer">
-						<div class="ios-total-row">
-							<span>Разом до сплати:</span>
-							<strong class="ios-total-amount">{pricing.totalAmount} ₴</strong>
-						</div>
-					</div>
-				</div>
-
-				<!-- ISSUED DIGITAL MEMBERSHIP PASS PREVIEW -->
-				<div class="ios-digital-card">
-					<div class="digital-card-head">
-						<div class="flex items-center gap-2">
-							<div class="pulse-chip"></div>
-							<span class="digital-card-brand">{data.clubBrand || 'PULSE FITNESS'}</span>
-						</div>
-						<span class="digital-card-status">
-							{pricing.issuedCard.status === 'active' ? '● АКТИВНА' : '● ГОТОВА'}
-						</span>
-					</div>
-
-					<div class="digital-card-body">
-						<div class="digital-member-info">
-							<span class="digital-lbl">Власник картки</span>
-							<strong class="digital-val">{pricing.issuedCard.memberName}</strong>
-						</div>
-
-						<div class="digital-grid-2">
-							<div>
-								<span class="digital-lbl">Номер картки</span>
-								<strong class="digital-val-mono">{pricing.issuedCard.cardCode}</strong>
-							</div>
-							<div>
-								<span class="digital-lbl">Персональна шафка</span>
-								<strong class="digital-val text-amber-300">
-									{pricing.issuedCard.assignedLocker || 'Загальна'}
-								</strong>
+						<div class="qr-container">
+							<div class="qr-box">
+								<QrCode size={100} strokeWidth={1.5} />
 							</div>
 						</div>
 
-						<div class="digital-zones-row">
-							<span class="digital-lbl">Доступні зони:</span>
-							<div class="digital-tags-wrap">
-								{#each pricing.issuedCard.allowedZones as zone}
-									<span class="digital-zone-tag">{zone}</span>
-								{/each}
-							</div>
-						</div>
-
-						{#if pricing.issuedCard.trainingCreditsTotal > 0}
-							{@const remaining = Math.max(0, pricing.issuedCard.trainingCreditsTotal - simulatedCreditsUsed)}
-							<div class="digital-credits-box">
-								<div class="flex justify-between items-center">
-									<span class="digital-lbl">Персональні тренування:</span>
-									<strong class="text-emerald-300 font-bold">
-										{remaining} з {pricing.issuedCard.trainingCreditsTotal} занять
-									</strong>
-								</div>
-								<div class="reception-simulator-row">
-									<button
-										type="button"
-										class="ios-sim-btn"
-										disabled={remaining <= 0}
-										onclick={useOneTrainingCredit}
-									>
-										Списати 1 заняття на рецепції
-									</button>
-									{#if simulatedCreditsUsed > 0}
-										<button
-											type="button"
-											class="ios-sim-reset"
-											onclick={resetSimulatedUsage}
-										>
-											Скинути
-										</button>
-									{/if}
-								</div>
-							</div>
-						{/if}
-
-						<div class="digital-qr-wrap">
-							<div class="qr-mock">
-								<QrCode size={56} class="text-zinc-900" />
-							</div>
-							<div class="qr-info">
-								<span class="text-xs text-zinc-300 font-semibold">QR-код для турнікета</span>
-								<span class="text-[10px] text-zinc-400">Покажіть на вході або скануйте оптичним зчитувачем</span>
+						<div class="pass-bottom">
+							<span class="pass-total-lbl">До сплати</span>
+							<div class="pass-total">
+								<span class="pass-price">{pricing.totalAmount}</span>
+								<span class="pass-currency">₴</span>
 							</div>
 						</div>
 					</div>
-				</div>
+				</section>
 			{/if}
 
-		<!-- OTHER MODES -->
 		{:else if currentMode === 'renewal'}
-			<div class="ios-card">
-				<span class="ios-card-title">Продовження чинного абонемента:</span>
-				<div class="ios-form-stack">
-					<label>
-						<span class="ios-input-lbl">Номер діючої картки або телефон:</span>
-						<input
-							type="text"
-							class="ios-input"
-							bind:value={memberCardId}
-							placeholder="PULSE-4700-142 або +380..."
-						/>
-					</label>
-
-					<div class="ios-validity-banner">
-						<Sparkles size={16} class="text-indigo-600" />
-						<div>
-							<strong>Знайдено абонемент:</strong>
-							<span>Олександр Коваленко · Картка #{memberCardId}</span>
-							<small class="block text-zinc-500">Продовжується на 30 днів від кінцевої дати</small>
-						</div>
-					</div>
-
-					<div class="ios-pass-card mt-3">
-						<div class="ios-pass-body">
-							<div class="ios-pass-row">
-								<span>Продовження: Місячний безліміт</span>
-								<strong>1 800 ₴</strong>
-							</div>
-						</div>
-						<div class="ios-pass-cut">
-							<div class="ios-cut-left"></div>
-							<div class="ios-cut-line"></div>
-							<div class="ios-cut-right"></div>
-						</div>
-						<div class="ios-pass-footer">
-							<div class="ios-total-row">
-								<span>До сплати:</span>
-								<strong class="ios-total-amount">1 800 ₴</strong>
-							</div>
+			<section class="section">
+				<h2 class="section-title">Дані абонемента</h2>
+				<div class="vertical-stack">
+					<input type="text" bind:value={memberCardId} placeholder="PULSE-4700-142 або +380..." class="hig-input" />
+					
+					<div class="hig-banner">
+						<Sparkles size={20} class="banner-icon" />
+						<div class="banner-content">
+							<strong>Знайдено абонемент</strong>
+							<span>{clientName} · Картка #{memberCardId}</span>
+							<small>Продовжується на 30 днів від кінцевої дати</small>
 						</div>
 					</div>
 				</div>
-			</div>
+			</section>
 
 		{:else if currentMode === 'addon_only'}
-			<div class="ios-card">
-				<span class="ios-card-title">Докупівля послуг до існуючого абонемента:</span>
-				<div class="ios-addons-stack mt-2">
-					{#each data.addons as addon (addon.id)}
+			<section class="section">
+				<h2 class="section-title">Докупівля послуг</h2>
+				<div class="vertical-stack">
+					{#each data.addons as addon}
 						{@const isSelected = selectedAddonIds.includes(addon.id)}
-						<button
-							type="button"
-							class="ios-addon-item"
-							class:selected={isSelected}
-							onclick={() => toggleAddon(addon.id)}
-						>
-							<div class="ios-addon-left">
-								<span class="ios-addon-icon">{addon.icon || '🏷️'}</span>
-								<div class="text-left">
-									<strong class="ios-addon-name">{addon.name}</strong>
-									<p class="ios-addon-desc">{addon.description}</p>
+						<label class="radio-label">
+							<input type="checkbox" checked={isSelected} onchange={() => toggleAddon(addon.id)} class="peer-radio" />
+							<div class="hig-card card-hover-fx flex-row-center">
+								<div class="addon-emoji">{addon.icon || '✨'}</div>
+								<div class="card-col-left">
+									<h3 class="card-title-sm">{addon.name}</h3>
+									<p class="card-subtitle-sm">{addon.description}</p>
+									<div class="addon-price">+{addon.price} ₴</div>
+								</div>
+								<div class="hig-toggle">
+									<div class="hig-toggle-knob"></div>
 								</div>
 							</div>
-							<div class="ios-addon-right">
-								<strong class="ios-addon-price">+{addon.price} ₴</strong>
-								<div class="ios-toggle-switch" class:active={isSelected}>
-									<div class="ios-switch-knob"></div>
-								</div>
-							</div>
-						</button>
+						</label>
 					{/each}
 				</div>
-
-				<div class="ios-pass-card mt-3">
-					<div class="ios-pass-body">
-						<div class="ios-pass-row">
-							<span>Вибрано додаткових послуг:</span>
-							<strong>{pricing.totalAmount} ₴</strong>
-						</div>
-					</div>
-				</div>
-			</div>
+			</section>
 
 		{:else if currentMode === 'reception_pay'}
-			<div class="ios-card">
-				<span class="ios-card-title">Швидка оплата на рецепції клубу:</span>
-				<div class="ios-form-stack">
-					<div class="ios-grid-2">
-						<label>
-							<span class="ios-input-lbl">Номер чека / замовлення:</span>
-							<input
-								type="text"
-								class="ios-input"
-								bind:value={receptionReceiptId}
-							/>
-						</label>
-						<label>
-							<span class="ios-input-lbl">Сума до сплати:</span>
-							<input
-								type="number"
-								class="ios-input font-bold text-emerald-600"
-								bind:value={receptionAmount}
-							/>
-						</label>
-					</div>
-
-					<div class="ios-reception-box">
-						<QrCode size={36} class="text-indigo-600" />
-						<div>
-							<strong>Термінал або QR-стійка рецепції</strong>
-							<span class="text-xs text-zinc-500 block">
-								Клієнт сканує QR-код на стійці адміністратора та оплачує через Apple Pay або карткою
-							</span>
-						</div>
+			<section class="section">
+				<h2 class="section-title">Швидка оплата</h2>
+				<div class="vertical-stack">
+					<input type="text" bind:value={receptionReceiptId} placeholder="Номер чека / замовлення" class="hig-input" />
+					<div class="hig-input-wrap">
+						<span class="input-prefix">₴</span>
+						<input type="number" bind:value={receptionAmount} placeholder="Сума до сплати" class="hig-input amount-input" />
 					</div>
 				</div>
-			</div>
+			</section>
 		{/if}
 	</main>
 
-	<!-- BOTTOM HIG ACTION BAR -->
-	<footer class="ios-bottom-bar">
-		{#if currentMode === 'new_membership'}
-			<div class="ios-bar-content">
+	<!-- THUMB ZONE (Sticky Action Bar) -->
+	<div class="hig-thumb-zone">
+		<div class="thumb-container">
+			{#if currentMode === 'new_membership'}
 				{#if step > 1}
-					<button
-						type="button"
-						class="ios-back-btn"
-						onclick={() => step--}
-					>
-						<ChevronLeft size={16} />
-						<span>Назад</span>
+					<button onclick={() => step--} class="btn-hig-secondary">
+						<ChevronLeft size={24} strokeWidth={2.5} />
 					</button>
-				{:else}
-					<div></div>
 				{/if}
-
+				
 				{#if step < 4}
-					<button
-						type="button"
-						class="ios-next-btn"
-						onclick={() => step++}
-					>
-						<span>
-							{step === 1 ? 'Обрати послуги →' : step === 2 ? 'Контактні дані →' : 'До оплати →'}
-						</span>
-						<ChevronRight size={16} />
+					<button onclick={() => step++} class="btn-hig-primary">
+						<span>Продовжити</span>
+						<div class="btn-hig-right">
+							<span class="btn-hig-price">{pricing.totalAmount} ₴</span>
+							<ChevronRight size={20} strokeWidth={2.5} />
+						</div>
 					</button>
 				{:else}
-					<button
-						type="button"
-						class="ios-pay-btn"
-						onclick={() => onPay(pricing.totalAmount)}
-					>
-						<CreditCard size={17} />
+					<button onclick={() => onPay(pricing.totalAmount)} class="btn-hig-primary btn-success">
+						<CreditCard size={20} strokeWidth={2.5} />
 						<span>Оплатити {pricing.totalAmount} ₴</span>
 					</button>
 				{/if}
-			</div>
-		{:else}
-			<div class="ios-bar-content">
-				<div></div>
-				<button
-					type="button"
-					class="ios-pay-btn"
-					onclick={() => onPay(pricing.totalAmount)}
-				>
-					<CreditCard size={17} />
+			{:else}
+				<button onclick={() => onPay(pricing.totalAmount)} class="btn-hig-primary btn-success">
+					<CreditCard size={20} strokeWidth={2.5} />
 					<span>Оплатити {pricing.totalAmount} ₴</span>
 				</button>
-			</div>
-		{/if}
-	</footer>
+			{/if}
+		</div>
+	</div>
 </div>
 
 <style>
-	/* APPLE HIG CONTAINER & TYPOGRAPHY */
-	.ios-root {
-		display: flex;
-		flex-direction: column;
-		background: #f2f2f7;
-		font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
-		color: #1c1c1e;
-		border-radius: 18px;
-		overflow: hidden;
-		border: 1px solid #e5e5ea;
-		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+	/* VARIABLES: Native CSS custom properties fallback mapping to apps/pay */
+	.premium-root {
+		--bg: var(--order-bg, #f5f5f7);
+		--surface: var(--order-surface, #ffffff);
+		--surface-alt: var(--order-surface-2, #e5e5ea);
+		--surface-hover: rgba(0, 0, 0, 0.03);
+		--text: var(--order-text, #1d1d1f);
+		--text-sec: var(--order-text-dim, #86868b);
+		--divider: var(--order-divider, rgba(0,0,0,0.1));
+		--cta: var(--order-cta, #007aff);
+		--cta-text: var(--order-cta-text, #ffffff);
+		--success: #34c759;
+		
+		background: transparent;
+		color: var(--text);
+		font-family: var(--font-stack, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif);
+		width: 100%;
+		position: relative;
+		overflow-x: hidden;
+		padding-bottom: 110px; /* space for thumb zone */
+		-webkit-font-smoothing: antialiased;
 	}
 
-	.ios-header {
-		background: #ffffff;
-		padding: 1rem 1.15rem 0.75rem;
-		border-bottom: 1px solid #e5e5ea;
+	:global(body:not(.light-mode)) .premium-root {
+		--surface-hover: rgba(255, 255, 255, 0.05);
+		--divider: rgba(255, 255, 255, 0.15);
 	}
 
-	.ios-nav-top {
-		margin-bottom: 0.75rem;
+	/* Typography Polish */
+	.micro-title {
+		font-size: 11px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--text-sec);
 	}
 
-	.ios-nav-sub {
-		font-size: 0.75rem;
+	.main-title {
+		font-size: 22px;
+		font-weight: 700;
+		letter-spacing: -0.02em;
+		margin: 2px 0 0;
+	}
+
+	.section-title {
+		font-size: 13px;
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
-		color: #007aff;
+		color: var(--text-sec);
+		margin: 0 0 10px 4px;
+	}
+	
+	.text-center { text-align: center; margin-left: 0; }
+
+	.premium-header {
+		padding: 20px 20px 12px;
+		background: transparent;
 	}
 
-	.ios-nav-title {
-		font-size: 1.15rem;
-		font-weight: 700;
-		color: #000000;
-		margin: 0.15rem 0 0;
+	.header-top {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 16px;
 	}
 
-	/* Segmented Control (HIG Style) */
-	.ios-segmented {
-		display: grid;
-		grid-template-columns: repeat(4, 1fr);
-		background: #efeff4;
-		padding: 3px;
+	.header-icon {
+		height: 40px;
+		width: 40px;
+		background: var(--text);
+		color: var(--bg);
+		border-radius: 12px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+	}
+
+	/* iOS UISegmentedControl Replica */
+	.ios-segmented-control {
+		display: flex;
+		background: var(--surface-alt);
 		border-radius: 9px;
-		gap: 2px;
+		padding: 2px;
+		margin-bottom: 16px;
+		overflow-x: auto;
+		scroll-snap-type: x mandatory;
 	}
+	
+	.ios-segmented-control::-webkit-scrollbar { display: none; }
 
-	.ios-segment-btn {
+	.ios-segment {
+		flex: 1;
+		min-width: max-content;
+		padding: 6px 14px;
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--text);
 		background: transparent;
 		border: none;
-		padding: 0.4rem 0.2rem;
-		font-size: 0.74rem;
-		font-weight: 500;
-		color: #636366;
 		border-radius: 7px;
 		cursor: pointer;
-		transition: all 0.15s ease;
-		text-align: center;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+		scroll-snap-align: start;
 	}
 
-	.ios-segment-btn.active {
-		background: #ffffff;
-		color: #000000;
+	.ios-segment.active {
+		background: var(--surface);
 		font-weight: 600;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+		box-shadow: 0 3px 8px rgba(0,0,0,0.12), 0 3px 1px rgba(0,0,0,0.04);
 	}
 
-	/* Step Capsules (HIG Style) */
-	.ios-stepper-capsules {
+	.stepper {
 		display: flex;
-		gap: 0.4rem;
-		margin-top: 0.75rem;
+		gap: 6px;
 	}
 
-	.ios-capsule-item {
+	.stepper-dot {
+		height: 4px;
 		flex: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.35rem;
-		padding: 0.35rem 0.5rem;
-		border-radius: 9999px;
-		background: #f2f2f7;
-		font-size: 0.72rem;
-		color: #8e8e93;
-		font-weight: 500;
+		background: var(--surface-alt);
+		border-radius: 2px;
+		transition: background 0.3s ease;
 	}
 
-	.ios-capsule-item.active {
-		background: #007aff;
-		color: #ffffff;
-		font-weight: 600;
+	.stepper-dot.active {
+		background: var(--text);
 	}
 
-	.ios-capsule-item.done {
-		background: #e1f0ff;
-		color: #007aff;
-	}
-
-	.capsule-num {
-		font-weight: 700;
-	}
-
-	/* BODY & CARDS */
-	.ios-body {
-		padding: 1rem;
+	.premium-main {
+		padding: 0 20px 20px;
 		display: flex;
 		flex-direction: column;
-		gap: 0.85rem;
+		gap: 24px;
 	}
 
-	.ios-card {
-		background: #ffffff;
-		border-radius: 13px;
-		padding: 0.85rem 1rem;
-		border: 1px solid rgba(0, 0, 0, 0.04);
-		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
-	}
-
-	.ios-card-title {
-		display: block;
-		font-size: 0.82rem;
-		font-weight: 600;
-		color: #1c1c1e;
-		margin-bottom: 0.6rem;
-	}
-
-	.ios-card-sub {
-		font-size: 0.74rem;
-		color: #8e8e93;
-		margin: 0 0 0.5rem;
-	}
-
-	/* Clubs List */
-	.ios-club-list {
+	/* Layout primitives */
+	.horizontal-scroll {
 		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
+		overflow-x: auto;
+		scroll-snap-type: x mandatory;
+		gap: 12px;
+		padding-bottom: 16px;
+		margin: 0 -20px;
+		padding-left: 20px;
+		padding-right: 20px;
+		-webkit-overflow-scrolling: touch;
 	}
+	
+	.horizontal-scroll::-webkit-scrollbar { display: none; }
+	.vertical-stack { display: flex; flex-direction: column; gap: 12px; }
 
-	.ios-club-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 0.65rem 0.8rem;
-		border-radius: 10px;
-		border: 1px solid #f2f2f7;
-		background: #fbfbfd;
+	.radio-label {
 		cursor: pointer;
-		text-align: left;
-		transition: all 0.15s ease;
-	}
-
-	.ios-club-row.selected {
-		border-color: #007aff;
-		background: #f0f7ff;
-	}
-
-	.ios-club-name {
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: #000;
 		display: block;
-	}
-
-	.ios-club-addr,
-	.ios-club-hours {
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-		font-size: 0.73rem;
-		color: #636366;
-		margin-top: 0.15rem;
-	}
-
-	.ios-check-circle {
-		width: 22px;
-		height: 22px;
-		border-radius: 50%;
-		background: #007aff;
-		color: #fff;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.ios-check-circle.corner {
-		position: absolute;
-		top: 0.6rem;
-		right: 0.6rem;
-	}
-
-	/* Tariff Grid */
-	.ios-tariff-grid {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 0.6rem;
-	}
-
-	.ios-tariff-card {
 		position: relative;
-		border-radius: 11px;
-		border: 1.5px solid #e5e5ea;
-		background: #ffffff;
-		padding: 0.75rem 0.65rem;
-		cursor: pointer;
-		text-align: left;
-		display: flex;
-		flex-direction: column;
-		justify-content: space-between;
-		transition: all 0.15s ease;
+		-webkit-tap-highlight-color: transparent;
 	}
+	.peer-radio { position: absolute; opacity: 0; pointer-events: none; }
 
-	.ios-tariff-card.selected {
-		border-color: #007aff;
-		background: #f7fbff;
-		box-shadow: 0 2px 8px rgba(0, 122, 255, 0.15);
-	}
-
-	.ios-badge-pill {
-		position: absolute;
-		top: -8px;
-		left: 50%;
-		transform: translateX(-50%);
-		background: #ff9500;
-		color: #fff;
-		font-size: 0.65rem;
-		font-weight: 700;
-		padding: 0.15rem 0.45rem;
-		border-radius: 9999px;
-		white-space: nowrap;
-	}
-
-	.ios-tariff-title {
-		font-size: 0.82rem;
-		color: #1c1c1e;
-		display: block;
-	}
-
-	.ios-tariff-price {
-		font-size: 1.05rem;
-		font-weight: 800;
-		color: #007aff;
-		margin: 0.2rem 0;
-		display: block;
-	}
-
-	.ios-tariff-desc {
-		font-size: 0.7rem;
-		color: #8e8e93;
-		margin: 0.2rem 0;
-		line-height: 1.3;
-	}
-
-	.ios-tariff-hours {
-		display: flex;
-		align-items: center;
-		gap: 0.2rem;
-		font-size: 0.68rem;
-		color: #3c3c43;
-		margin-top: 0.4rem;
-	}
-
-	/* Date Selector */
-	.ios-segmented-sm {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		background: #efeff4;
-		padding: 2px;
-		border-radius: 8px;
-		gap: 2px;
-	}
-
-	.ios-seg-sm-btn {
-		background: transparent;
-		border: none;
-		padding: 0.35rem;
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: #636366;
-		border-radius: 6px;
-		cursor: pointer;
-	}
-
-	.ios-seg-sm-btn.active {
-		background: #ffffff;
-		color: #000;
-		font-weight: 600;
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-	}
-
-	.ios-validity-banner {
-		display: flex;
-		align-items: center;
-		gap: 0.65rem;
-		background: #f2f5fc;
-		border-radius: 9px;
-		padding: 0.6rem 0.8rem;
-		margin-top: 0.6rem;
-		font-size: 0.78rem;
-		color: #1e1b4b;
-	}
-
-	/* Addons Stack */
-	.ios-addons-stack {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.ios-addon-item {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 0.65rem 0.8rem;
-		border-radius: 10px;
-		border: 1px solid #e5e5ea;
-		background: #ffffff;
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.ios-addon-item.selected {
-		border-color: #007aff;
-		background: #f0f7ff;
-	}
-
-	.ios-addon-left {
-		display: flex;
-		align-items: center;
-		gap: 0.6rem;
-	}
-
-	.ios-addon-icon {
-		font-size: 1.3rem;
-	}
-
-	.ios-addon-title-row {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-	}
-
-	.ios-addon-name {
-		font-size: 0.82rem;
-		font-weight: 600;
-		color: #000000;
-	}
-
-	.ios-pill-status {
-		font-size: 0.68rem;
-		font-weight: 600;
-		padding: 0.1rem 0.35rem;
-		border-radius: 4px;
-		background: #dcfce7;
-		color: #166534;
-	}
-
-	.ios-addon-desc {
-		font-size: 0.7rem;
-		color: #8e8e93;
-		margin: 0.15rem 0 0;
-	}
-
-	.ios-addon-right {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-
-	.ios-addon-price {
-		font-size: 0.85rem;
-		font-weight: 700;
-		color: #34c759;
-	}
-
-	/* iOS Toggle Switch */
-	.ios-toggle-switch {
-		width: 40px;
-		height: 24px;
-		border-radius: 9999px;
-		background: #e5e5ea;
-		padding: 2px;
-		transition: background-color 0.2s ease;
-		display: flex;
-		align-items: center;
-	}
-
-	.ios-toggle-switch.active {
-		background: #34c759;
-	}
-
-	.ios-switch-knob {
-		width: 20px;
-		height: 20px;
-		border-radius: 50%;
-		background: #ffffff;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-		transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-
-	.ios-toggle-switch.active .ios-switch-knob {
-		transform: translateX(16px);
-	}
-
-	.ios-info-note {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		background: #eef2ff;
-		padding: 0.6rem 0.8rem;
-		border-radius: 10px;
-		font-size: 0.74rem;
-		color: #3730a3;
-	}
-
-	/* Form Stack */
-	.ios-form-stack {
-		display: flex;
-		flex-direction: column;
-		gap: 0.65rem;
-	}
-
-	.ios-input-lbl {
-		display: block;
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: #636366;
-		margin-bottom: 0.25rem;
-	}
-
-	.ios-input {
-		width: 100%;
-		padding: 0.55rem 0.75rem;
-		border-radius: 8px;
-		border: 1px solid #d1d1d6;
-		font-size: 0.85rem;
-		background: #ffffff;
-		color: #000000;
-		box-sizing: border-box;
-	}
-
-	.ios-rules-box {
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-	}
-
-	.rule-bullet {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.76rem;
-		color: #3c3c43;
-	}
-
-	/* APPLE WALLET PASS TICKET */
-	.ios-pass-card {
-		background: #ffffff;
-		border-radius: 14px;
-		overflow: hidden;
-		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
-		border: 1px solid rgba(0, 0, 0, 0.06);
-	}
-
-	.ios-pass-head {
-		background: linear-gradient(135deg, #1e293b, #0f172a);
-		padding: 0.8rem 1rem;
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-	}
-
-	.ios-pass-logo-wrap {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-	}
-
-	.ios-pass-brand {
-		font-size: 0.85rem;
-		font-weight: 700;
-		color: #ffffff;
-		letter-spacing: 0.02em;
-	}
-
-	.ios-pass-type-badge {
-		font-size: 0.65rem;
-		font-weight: 600;
-		color: #94a3b8;
-		background: rgba(255, 255, 255, 0.1);
-		padding: 0.15rem 0.45rem;
-		border-radius: 4px;
-	}
-
-	.ios-pass-body {
-		padding: 0.85rem 1rem;
-	}
-
-	.ios-pass-tariff-name {
-		font-size: 0.95rem;
-		font-weight: 700;
-		color: #000;
-		margin: 0 0 0.2rem;
-	}
-
-	.ios-pass-dates {
-		font-size: 0.74rem;
-		color: #636366;
-		margin-bottom: 0.65rem;
-	}
-
-	.ios-pass-breakdown {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-		border-top: 1px dashed #e5e5ea;
-		padding-top: 0.6rem;
-	}
-
-	.ios-pass-row {
-		display: flex;
-		justify-content: space-between;
-		font-size: 0.78rem;
-		color: #3c3c43;
-	}
-
-	.ios-pass-item-val {
-		font-weight: 600;
-		color: #000;
-	}
-
-	/* Pass Cutout */
-	.ios-pass-cut {
-		position: relative;
-		height: 18px;
-		display: flex;
-		align-items: center;
-		overflow: hidden;
-	}
-
-	.ios-cut-left,
-	.ios-cut-right {
-		position: absolute;
-		width: 18px;
-		height: 18px;
-		background: #f2f2f7;
-		border-radius: 50%;
-	}
-
-	.ios-cut-left {
-		left: -9px;
-	}
-
-	.ios-cut-right {
-		right: -9px;
-	}
-
-	.ios-cut-line {
-		flex: 1;
-		height: 1px;
-		border-bottom: 1.5px dashed #d1d1d6;
-		margin: 0 14px;
-	}
-
-	.ios-pass-footer {
-		padding: 0.75rem 1rem;
-		background: #fafafa;
-	}
-
-	.ios-total-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-	}
-
-	.ios-total-row span {
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: #1c1c1e;
-	}
-
-	.ios-total-amount {
-		font-size: 1.35rem;
-		font-weight: 800;
-		color: #34c759;
-	}
-
-	/* DIGITAL MEMBERSHIP CARD (APPLE WALLET STYLE) */
-	.ios-digital-card {
-		background: linear-gradient(135deg, #18181b 0%, #27272a 100%);
+	/* HIG Cards */
+	.hig-card {
+		background: var(--surface);
+		border: 1px solid var(--divider);
 		border-radius: 16px;
-		color: #ffffff;
-		padding: 1.1rem;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-		border: 1px solid rgba(255, 255, 255, 0.1);
+		padding: 16px;
+		transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+		box-shadow: 0 2px 8px rgba(0,0,0,0.02);
 	}
 
-	.digital-card-head {
+	.card-w240 {
+		width: 240px;
+		flex: none;
+		scroll-snap-align: center;
+	}
+	
+	.flex-row-between { display: flex; justify-content: space-between; }
+	.flex-row-center { display: flex; align-items: center; }
+
+	.radio-label:active .card-hover-fx {
+		transform: scale(0.97);
+		background: var(--surface-hover);
+	}
+
+	.peer-radio:checked + .hig-card {
+		border-color: var(--cta);
+		border-width: 2px;
+		padding: 15px; /* Offset border width change to avoid layout shift */
+	}
+
+	/* Card Internals */
+	.card-icon-row {
 		display: flex;
 		justify-content: space-between;
-		align-items: center;
-		padding-bottom: 0.75rem;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+		align-items: flex-start;
+		margin-bottom: 16px;
 	}
 
-	.pulse-chip {
-		width: 12px;
-		height: 12px;
-		border-radius: 50%;
-		background: #10b981;
-		box-shadow: 0 0 8px #10b981;
-	}
-
-	.digital-card-brand {
-		font-size: 0.8rem;
-		font-weight: 800;
-		letter-spacing: 0.08em;
-	}
-
-	.digital-card-status {
-		font-size: 0.68rem;
-		font-weight: 700;
-		color: #34d399;
-	}
-
-	.digital-card-body {
-		padding-top: 0.75rem;
+	.icon-box {
+		height: 36px;
+		width: 36px;
+		background: var(--surface-alt);
+		color: var(--text);
+		border-radius: 10px;
 		display: flex;
-		flex-direction: column;
-		gap: 0.7rem;
+		align-items: center;
+		justify-content: center;
 	}
 
-	.digital-lbl {
-		font-size: 0.65rem;
+	/* HIG Radio styling */
+	.hig-radio-ring {
+		height: 22px;
+		width: 22px;
+		border-radius: 50%;
+		border: 1.5px solid var(--text-sec);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: all 0.2s;
+	}
+
+	.hig-radio-dot {
+		height: 10px;
+		width: 10px;
+		border-radius: 50%;
+		background: var(--surface);
+		transform: scale(0);
+		transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+	}
+
+	.peer-radio:checked + .hig-card .hig-radio-ring {
+		border-color: var(--cta);
+		background: var(--cta);
+	}
+	
+	.peer-radio:checked + .hig-card .hig-radio-dot {
+		transform: scale(1);
+	}
+
+	.card-title {
+		font-size: 16px;
+		font-weight: 600;
+		letter-spacing: -0.01em;
+		margin: 0 0 4px;
+	}
+
+	.card-title-sm {
+		font-size: 15px;
+		font-weight: 600;
+		margin: 0 0 2px;
+	}
+
+	.card-subtitle {
+		font-size: 13px;
+		color: var(--text-sec);
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.card-subtitle-sm {
+		font-size: 13px;
+		color: var(--text-sec);
+		margin: 0;
+	}
+
+	.card-col-left { display: flex; flex-direction: column; flex: 1; padding-right: 12px; justify-content: center; }
+	.card-col-right { display: flex; align-items: center; justify-content: flex-end; }
+
+	.hig-badge {
+		font-size: 10px;
+		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
-		color: #a1a1aa;
-		display: block;
+		color: var(--cta);
+		margin-bottom: 6px;
+		display: inline-block;
 	}
 
-	.digital-val {
-		font-size: 0.95rem;
+	.price-wrap { display: flex; align-items: flex-start; }
+
+	.hig-price {
+		font-size: 24px;
 		font-weight: 700;
-		color: #ffffff;
+		letter-spacing: -0.03em;
+		line-height: 1;
 	}
 
-	.digital-val-mono {
-		font-family: monospace;
-		font-size: 0.88rem;
-		color: #38bdf8;
-	}
-
-	.digital-grid-2 {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.5rem;
-	}
-
-	.digital-zones-row {
-		border-top: 1px solid rgba(255, 255, 255, 0.08);
-		padding-top: 0.5rem;
-	}
-
-	.digital-tags-wrap {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.35rem;
-		margin-top: 0.25rem;
-	}
-
-	.digital-zone-tag {
-		background: rgba(255, 255, 255, 0.12);
-		padding: 0.15rem 0.45rem;
-		border-radius: 4px;
-		font-size: 0.68rem;
-		font-weight: 500;
-	}
-
-	.digital-credits-box {
-		background: rgba(255, 255, 255, 0.06);
-		border-radius: 8px;
-		padding: 0.55rem 0.65rem;
-		border: 1px solid rgba(255, 255, 255, 0.08);
-	}
-
-	.reception-simulator-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-top: 0.4rem;
-	}
-
-	.ios-sim-btn {
-		background: #0284c7;
-		color: #fff;
-		border: none;
-		border-radius: 5px;
-		padding: 0.3rem 0.6rem;
-		font-size: 0.72rem;
+	.currency {
+		font-size: 13px;
 		font-weight: 600;
-		cursor: pointer;
+		color: var(--text-sec);
+		margin-left: 3px;
+		margin-top: 1px;
 	}
 
-	.ios-sim-btn:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
-	}
-
-	.ios-sim-reset {
-		background: transparent;
-		color: #94a3b8;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		border-radius: 5px;
-		padding: 0.3rem 0.5rem;
-		font-size: 0.7rem;
-		cursor: pointer;
-	}
-
-	.digital-qr-wrap {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		background: rgba(255, 255, 255, 0.05);
-		padding: 0.55rem 0.75rem;
-		border-radius: 10px;
-		margin-top: 0.25rem;
-	}
-
-	.qr-mock {
-		background: #ffffff;
-		padding: 4px;
-		border-radius: 6px;
+	.addon-emoji {
+		font-size: 24px;
+		height: 48px;
+		width: 48px;
+		background: var(--surface-alt);
+		border-radius: 12px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		margin-right: 14px;
+		flex-shrink: 0;
 	}
 
-	/* BOTTOM ACTION BAR */
-	.ios-bottom-bar {
+	.addon-price {
+		font-size: 14px;
+		font-weight: 600;
+		margin-top: 4px;
+	}
+
+	/* HIG Toggle Switch */
+	.hig-toggle {
+		width: 51px;
+		height: 31px;
+		background: var(--surface-alt);
+		border-radius: 16px;
+		position: relative;
+		transition: background 0.3s;
+		flex-shrink: 0;
+	}
+
+	.peer-radio:checked + .hig-card .hig-toggle,
+	.peer-radio:checked + .hig-card .hig-toggle {
+		background: var(--success);
+	}
+
+	.hig-toggle-knob {
+		width: 27px;
+		height: 27px;
 		background: #ffffff;
-		border-top: 1px solid #e5e5ea;
-		padding: 0.75rem 1rem;
+		border-radius: 50%;
+		position: absolute;
+		top: 2px;
+		left: 2px;
+		transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+		box-shadow: 0 3px 8px rgba(0,0,0,0.15), 0 3px 1px rgba(0,0,0,0.06);
 	}
 
-	.ios-bar-content {
+	.peer-radio:checked + .hig-card .hig-toggle-knob {
+		transform: translateX(20px);
+	}
+
+	/* Inputs */
+	.hig-input {
+		width: 100%;
+		height: 52px;
+		background: var(--surface);
+		border: 1px solid var(--divider);
+		border-radius: 12px;
+		padding: 0 16px;
+		font-size: 16px;
+		font-weight: 500;
+		color: var(--text);
+		outline: none;
+		transition: all 0.2s;
+		box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
+	}
+
+	.hig-input::placeholder { color: var(--text-sec); font-weight: 400; }
+	.hig-input:focus { border-color: var(--cta); box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15); }
+
+	.hig-input-wrap { position: relative; }
+	.input-prefix {
+		position: absolute;
+		left: 16px;
+		top: 50%;
+		transform: translateY(-50%);
+		font-size: 16px;
+		font-weight: 600;
+		color: var(--text-sec);
+	}
+	.amount-input {
+		padding-left: 36px;
+		color: var(--success);
+		font-weight: 600;
+	}
+
+	/* Banners */
+	.hig-banner {
+		display: flex;
+		align-items: flex-start;
+		gap: 12px;
+		background: rgba(0, 122, 255, 0.08);
+		border-radius: 12px;
+		padding: 16px;
+		color: var(--cta);
+	}
+	
+	.banner-icon { flex-shrink: 0; margin-top: 2px; }
+	.banner-content { display: flex; flex-direction: column; font-size: 13px; }
+	.banner-content strong { font-weight: 600; margin-bottom: 2px; }
+	.banner-content small { margin-top: 4px; opacity: 0.8; font-size: 12px; }
+
+	/* Wallet Pass Ticket */
+	.wallet-pass {
+		background: linear-gradient(135deg, #18181b, #27272a);
+		color: #ffffff;
+		border-radius: 20px;
+		padding: 24px;
+		width: 100%;
+		position: relative;
+		overflow: hidden;
+		box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+	}
+
+	.pass-cutout-left, .pass-cutout-right {
+		position: absolute;
+		top: 50%;
+		width: 24px;
+		height: 24px;
+		background: var(--bg);
+		border-radius: 50%;
+		transform: translateY(-50%);
+		z-index: 10;
+	}
+
+	.pass-cutout-left { left: -12px; }
+	.pass-cutout-right { right: -12px; }
+
+	.pass-top {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
+		margin-bottom: 20px;
 	}
 
-	.ios-back-btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.25rem;
-		background: transparent;
-		border: none;
-		color: #007aff;
-		font-size: 0.85rem;
-		font-weight: 600;
-		cursor: pointer;
-	}
+	.pass-brand-icon { color: #34c759; }
 
-	.ios-next-btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.3rem;
-		background: #007aff;
-		color: #ffffff;
-		border: none;
-		border-radius: 9999px;
-		padding: 0.55rem 1.1rem;
-		font-size: 0.85rem;
-		font-weight: 600;
-		cursor: pointer;
-		box-shadow: 0 2px 6px rgba(0, 122, 255, 0.25);
-	}
-
-	.ios-pay-btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.45rem;
-		background: #34c759;
-		color: #ffffff;
-		border: none;
-		border-radius: 9999px;
-		padding: 0.65rem 1.35rem;
-		font-size: 0.9rem;
+	.pass-badge {
+		font-size: 11px;
 		font-weight: 700;
-		cursor: pointer;
-		box-shadow: 0 3px 10px rgba(52, 199, 89, 0.3);
+		letter-spacing: 0.05em;
+		opacity: 0.6;
 	}
 
-	.ios-reception-box {
+	.pass-owner {
+		font-size: 24px;
+		font-weight: 700;
+		letter-spacing: -0.01em;
+		line-height: 1;
+		margin: 0 0 6px;
+	}
+
+	.pass-desc {
+		font-size: 13px;
+		font-weight: 500;
+		opacity: 0.7;
+		margin: 0 0 24px;
+	}
+
+	.qr-container {
+		background: #ffffff;
+		border-radius: 16px;
+		padding: 20px;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		margin-bottom: 24px;
+	}
+	
+	.qr-box {
+		color: #000;
+	}
+
+	.pass-bottom {
+		border-top: 1px dashed rgba(255,255,255,0.2);
+		padding-top: 20px;
+	}
+
+	.pass-total-lbl {
+		font-size: 12px;
+		font-weight: 500;
+		opacity: 0.7;
+	}
+
+	.pass-total {
+		display: flex;
+		align-items: flex-start;
+		margin-top: 4px;
+	}
+
+	.pass-price {
+		font-size: 28px;
+		font-weight: 700;
+		letter-spacing: -0.02em;
+	}
+
+	.pass-currency {
+		font-size: 14px;
+		font-weight: 600;
+		opacity: 0.7;
+		margin-left: 4px;
+		margin-top: 2px;
+	}
+
+	/* THUMB ZONE (Sticky Action Bar) */
+	.hig-thumb-zone {
+		position: fixed;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		z-index: 50;
+		padding: 16px;
+		padding-bottom: calc(16px + env(safe-area-inset-bottom));
+		background: rgba(255, 255, 255, 0.8);
+		backdrop-filter: blur(40px) saturate(200%);
+		-webkit-backdrop-filter: blur(40px) saturate(200%);
+		border-top: 0.5px solid rgba(0,0,0,0.15);
+	}
+
+	:global(body:not(.light-mode)) .hig-thumb-zone {
+		background: rgba(28, 28, 30, 0.8);
+		border-top-color: rgba(255,255,255,0.15);
+	}
+
+	.thumb-container {
+		max-width: 480px;
+		margin: 0 auto;
+		display: flex;
+		gap: 12px;
+	}
+
+	.btn-hig-secondary {
+		height: 54px;
+		width: 54px;
+		border-radius: 16px;
+		background: var(--surface-alt);
+		color: var(--text);
+		border: none;
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
-		background: #f8fafc;
-		border: 1px solid #e2e8f0;
-		border-radius: 10px;
-		padding: 0.75rem;
-		margin-top: 0.5rem;
+		justify-content: center;
+		cursor: pointer;
+		flex-shrink: 0;
+		transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+	}
+
+	.btn-hig-primary {
+		height: 54px;
+		flex: 1;
+		border-radius: 16px;
+		background: var(--cta);
+		color: var(--cta-text);
+		border: none;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 20px;
+		font-size: 16px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+	}
+
+	.btn-success {
+		background: var(--success);
+		justify-content: center;
+		gap: 10px;
+	}
+
+	.btn-hig-primary:active, .btn-hig-secondary:active {
+		transform: scale(0.96);
+		opacity: 0.9;
+	}
+
+	.btn-hig-right {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.btn-hig-price {
+		font-size: 14px;
+		font-weight: 500;
+		opacity: 0.9;
 	}
 </style>

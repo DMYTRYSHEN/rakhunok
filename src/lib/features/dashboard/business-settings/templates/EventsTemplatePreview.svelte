@@ -737,9 +737,9 @@
 	.ios-preview-container {
 		display: flex;
 		flex-direction: column;
-		background: #f2f2f7;
+		background: var(--surface-alt);
 		font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
-		color: #1c1c1e;
+		color: var(--text);
 		min-height: 520px;
 		border-radius: 18px;
 		overflow: hidden;
@@ -751,7 +751,7 @@
 		background: rgba(255, 255, 255, 0.85);
 		backdrop-filter: blur(12px);
 		-webkit-backdrop-filter: blur(12px);
-		border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+		border-bottom: 0.5px solid var(--divider);
 		padding: 0.65rem 1rem;
 		position: sticky;
 		top: 0;
@@ -767,7 +767,7 @@
 	.ios-merchant-badge {
 		font-size: 0.85rem;
 		font-weight: 700;
-		color: #1c1c1e;
+		color: var(--text);
 	}
 
 	.ios-secure-tag {
@@ -795,19 +795,19 @@
 	.ios-capsule {
 		flex: 1;
 		height: 3px;
-		background: #d1d1d6;
+		background: var(--divider);
 		border-radius: 2px;
 		transition: background 0.3s ease;
 	}
 
 	.ios-capsule.filled {
-		background: #007aff;
+		background: var(--cta);
 	}
 
 	.ios-step-sub {
 		font-size: 0.7rem;
 		font-weight: 600;
-		color: #007aff;
+		color: var(--cta);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 	}
@@ -815,7 +815,7 @@
 	.ios-step-title {
 		font-size: 1.05rem;
 		font-weight: 700;
-		color: #1c1c1e;
+		color: var(--text);
 		margin: 0;
 	}
 
@@ -827,11 +827,11 @@
 	}
 
 	.ios-card {
-		background: #ffffff;
+		background: var(--surface);
 		border-radius: 14px;
 		padding: 0.85rem;
 		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-		border: 0.5px solid rgba(0, 0, 0, 0.08);
+		border: 0.5px solid var(--divider);
 	}
 
 	.ios-card-head {
@@ -844,13 +844,13 @@
 		display: block;
 		font-size: 0.82rem;
 		font-weight: 600;
-		color: #3a3a3c;
+		color: var(--text);
 		margin-bottom: 0.5rem;
 	}
 
 	.ios-card-sub {
 		font-size: 0.72rem;
-		color: #8e8e93;
+		color: var(--text-sec);
 		margin: 0;
 	}
 
@@ -860,6 +860,75 @@
 		align-items: center;
 	}
 
+	
+	.ios-hero-banner {
+		position: relative;
+		margin: -0.75rem -1rem 0.5rem -1rem;
+		height: 180px;
+		overflow: hidden;
+		display: flex;
+		align-items: flex-end;
+		padding: 1rem;
+	}
+	.ios-hero-img {
+		position: absolute;
+		top: 0; left: 0; right: 0; bottom: 0;
+		width: 100%; height: 100%;
+		object-fit: cover;
+		z-index: 1;
+	}
+	.ios-hero-overlay {
+		position: absolute;
+		top: 0; left: 0; right: 0; bottom: 0;
+		background: linear-gradient(0deg, var(--bg) 0%, rgba(0,0,0,0.1) 40%, rgba(0,0,0,0.6) 100%);
+		z-index: 2;
+	}
+	.ios-hero-content {
+		position: relative;
+		z-index: 3;
+		color: #ffffff;
+		text-shadow: 0 1px 4px rgba(0,0,0,0.3);
+		align-self: flex-start;
+		margin-top: 1rem;
+	}
+	.ios-hero-title {
+		font-size: 1.25rem;
+		font-weight: 800;
+		margin: 0 0 4px 0;
+		color: #ffffff;
+	}
+	.ios-hero-desc {
+		font-size: 0.8rem;
+		opacity: 0.9;
+		margin: 0;
+		line-height: 1.3;
+		color: #ffffff;
+	}
+	.ios-sessions-card {
+		margin-top: -30px;
+		position: relative;
+		z-index: 10;
+	}
+	.ios-session-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.85rem 1rem;
+		border-radius: 14px;
+		border: 1px solid var(--divider);
+		background: var(--surface);
+		cursor: pointer;
+		text-align: left;
+		transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+	}
+	.ios-session-row:active {
+		transform: scale(0.97);
+	}
+	.ios-session-row.selected {
+		border-color: var(--cta);
+		border-width: 2px;
+		padding: calc(0.85rem - 1px) calc(1rem - 1px);
+	}
 	.ios-items-stack {
 		display: flex;
 		flex-direction: column;
@@ -872,21 +941,21 @@
 		align-items: center;
 		padding: 0.65rem 0.75rem;
 		border-radius: 10px;
-		border: 1px solid #e5e5ea;
-		background: #ffffff;
+		border: 1px solid var(--divider);
+		background: var(--surface);
 		cursor: pointer;
 		text-align: left;
 	}
 
 	.ios-session-row.selected {
-		border-color: #007aff;
+		border-color: var(--cta);
 		background: #f0f7ff;
 	}
 
 	.ios-sess-title {
 		font-size: 0.82rem;
 		font-weight: 700;
-		color: #1c1c1e;
+		color: var(--text);
 	}
 
 	.ios-sess-tags {
@@ -898,8 +967,8 @@
 
 	.ios-badge-format {
 		font-size: 0.65rem;
-		background: #e5e5ea;
-		color: #1c1c1e;
+		background: var(--divider);
+		color: var(--text);
 		padding: 1px 5px;
 		border-radius: 4px;
 		font-weight: 600;
@@ -916,7 +985,7 @@
 
 	.ios-sess-hall {
 		font-size: 0.68rem;
-		color: #8e8e93;
+		color: var(--text-sec);
 	}
 
 	.ios-sess-timing {
@@ -925,13 +994,13 @@
 
 	.ios-sess-time {
 		font-size: 0.92rem;
-		color: #007aff;
+		color: var(--cta);
 		display: block;
 	}
 
 	.ios-sess-date {
 		font-size: 0.65rem;
-		color: #8e8e93;
+		color: var(--text-sec);
 	}
 
 	.ios-venue-info {
@@ -939,7 +1008,7 @@
 		flex-direction: column;
 		gap: 0.45rem;
 		font-size: 0.75rem;
-		color: #636366;
+		color: var(--text-sec);
 	}
 
 	.ios-info-row {
@@ -967,15 +1036,15 @@
 	}
 
 	.ios-screen-arc {
-		background: linear-gradient(180deg, #e5e5ea 0%, rgba(229, 229, 234, 0.2) 100%);
-		border-top: 3px solid #007aff;
+		background: linear-gradient(180deg, var(--divider) 0%, rgba(229, 229, 234, 0.2) 100%);
+		border-top: 3px solid var(--cta);
 		border-radius: 50% 50% 0 0 / 14px 14px 0 0;
 		padding: 0.35rem 0;
 		text-align: center;
 		font-size: 0.68rem;
 		font-weight: 700;
 		letter-spacing: 1px;
-		color: #8e8e93;
+		color: var(--text-sec);
 		margin-bottom: 0.75rem;
 	}
 
@@ -995,7 +1064,7 @@
 	.ios-row-label {
 		font-size: 0.65rem;
 		font-weight: 700;
-		color: #8e8e93;
+		color: var(--text-sec);
 		width: 14px;
 		text-align: center;
 	}
@@ -1011,8 +1080,8 @@
 		border-radius: 5px;
 		font-size: 0.62rem;
 		font-weight: 600;
-		border: 1px solid #d1d1d6;
-		background: #ffffff;
+		border: 1px solid var(--divider);
+		background: var(--surface);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1033,16 +1102,16 @@
 	}
 
 	.ios-seat-dot.selected {
-		border-color: #007aff;
-		background: #007aff;
-		color: #ffffff;
+		border-color: var(--cta);
+		background: var(--cta);
+		color: var(--surface);
 		font-weight: 700;
 	}
 
 	.ios-seat-dot.sold {
-		border-color: #e5e5ea;
-		background: #f2f2f7;
-		color: #c7c7cc;
+		border-color: var(--divider);
+		background: var(--surface-alt);
+		color: var(--text-sec);
 		cursor: not-allowed;
 	}
 
@@ -1053,9 +1122,9 @@
 		gap: 0.75rem;
 		margin-top: 0.85rem;
 		padding-top: 0.6rem;
-		border-top: 1px solid #f2f2f7;
+		border-top: 1px solid var(--surface-alt);
 		font-size: 0.68rem;
-		color: #636366;
+		color: var(--text-sec);
 	}
 
 	.ios-legend-item {
@@ -1081,11 +1150,11 @@
 	}
 
 	.ios-leg-dot.selected {
-		background: #007aff;
+		background: var(--cta);
 	}
 
 	.ios-leg-dot.sold {
-		background: #e5e5ea;
+		background: var(--divider);
 	}
 
 	/* Fan zone */
@@ -1095,29 +1164,29 @@
 		align-items: center;
 		padding: 0.65rem 0.75rem;
 		border-radius: 10px;
-		border: 1px solid #e5e5ea;
-		background: #ffffff;
+		border: 1px solid var(--divider);
+		background: var(--surface);
 	}
 
 	.ios-fan-name {
 		font-size: 0.8rem;
 		font-weight: 600;
-		color: #1c1c1e;
+		color: var(--text);
 		display: block;
 		padding-left: 6px;
-		border-left: 3px solid #007aff;
+		border-left: 3px solid var(--cta);
 	}
 
 	.ios-fan-desc {
 		font-size: 0.68rem;
-		color: #8e8e93;
+		color: var(--text-sec);
 		margin: 2px 0 0 0;
 	}
 
 	.ios-fan-price {
 		font-size: 0.82rem;
 		font-weight: 700;
-		color: #007aff;
+		color: var(--cta);
 		margin-top: 2px;
 		display: block;
 	}
@@ -1125,7 +1194,7 @@
 	.ios-stepper {
 		display: flex;
 		align-items: center;
-		background: #f2f2f7;
+		background: var(--surface-alt);
 		border-radius: 8px;
 		padding: 2px;
 		gap: 6px;
@@ -1136,12 +1205,12 @@
 		height: 26px;
 		border-radius: 6px;
 		border: none;
-		background: #ffffff;
+		background: var(--surface);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+		box-shadow: 0 1px 2px var(--divider);
 	}
 
 	.ios-stepper-btn:disabled {
@@ -1152,7 +1221,7 @@
 	.ios-stepper-val {
 		font-size: 0.82rem;
 		font-weight: 700;
-		color: #1c1c1e;
+		color: var(--text);
 		min-width: 24px;
 		text-align: center;
 	}
@@ -1168,33 +1237,33 @@
 		display: block;
 		font-size: 0.74rem;
 		font-weight: 600;
-		color: #3a3a3c;
+		color: var(--text);
 		margin-bottom: 0.35rem;
 	}
 
 	.ios-input {
 		width: 100%;
-		border: 1px solid #e5e5ea;
+		border: 1px solid var(--divider);
 		background: #f9f9fb;
 		border-radius: 8px;
 		padding: 0.5rem 0.65rem;
 		font-size: 0.8rem;
-		color: #1c1c1e;
+		color: var(--text);
 		outline: none;
 		box-sizing: border-box;
 	}
 
 	.ios-input:focus {
-		border-color: #007aff;
-		background: #ffffff;
+		border-color: var(--cta);
+		background: var(--surface);
 	}
 
 	/* Apple Pass / Wallet Card */
 	.ios-pass-card {
-		background: #ffffff;
+		background: var(--surface);
 		border-radius: 16px;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-		border: 0.5px solid rgba(0, 0, 0, 0.08);
+		border: 0.5px solid var(--divider);
 		overflow: hidden;
 	}
 
@@ -1203,13 +1272,13 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: flex-start;
-		background: linear-gradient(180deg, #fafafa 0%, #ffffff 100%);
+		background: linear-gradient(180deg, var(--surface) 0%, var(--surface) 100%);
 	}
 
 	.ios-pass-tag {
 		font-size: 0.68rem;
 		font-weight: 600;
-		color: #007aff;
+		color: var(--cta);
 		text-transform: uppercase;
 		display: block;
 	}
@@ -1217,14 +1286,14 @@
 	.ios-pass-title {
 		font-size: 0.95rem;
 		font-weight: 700;
-		color: #1c1c1e;
+		color: var(--text);
 		margin: 2px 0 0 0;
 	}
 
 	.ios-pass-badge {
 		font-size: 0.65rem;
 		font-weight: 600;
-		color: #007aff;
+		color: var(--cta);
 		background: #eff6ff;
 		padding: 2px 8px;
 		border-radius: 10px;
@@ -1244,11 +1313,11 @@
 	}
 
 	.ios-pass-lbl {
-		color: #636366;
+		color: var(--text-sec);
 	}
 
 	.ios-pass-val {
-		color: #1c1c1e;
+		color: var(--text);
 	}
 
 	.ios-pass-cut {
@@ -1261,7 +1330,7 @@
 	.ios-cut-left, .ios-cut-right {
 		width: 14px;
 		height: 14px;
-		background: #f2f2f7;
+		background: var(--surface-alt);
 		border-radius: 50%;
 	}
 
@@ -1275,7 +1344,7 @@
 
 	.ios-cut-line {
 		flex: 1;
-		border-bottom: 1px dashed #d1d1d6;
+		border-bottom: 1px dashed var(--divider);
 	}
 
 	.ios-pass-footer {
@@ -1294,13 +1363,13 @@
 		display: block;
 		font-size: 0.65rem;
 		font-weight: normal;
-		color: #8e8e93;
+		color: var(--text-sec);
 	}
 
 	.ios-total-sum {
 		font-size: 1.25rem;
 		font-weight: 800;
-		color: #007aff;
+		color: var(--cta);
 	}
 
 	/* E-Tickets Cards */
@@ -1325,10 +1394,10 @@
 	}
 
 	.ios-ticket-pass {
-		border: 1px solid #e5e5ea;
+		border: 1px solid var(--divider);
 		border-radius: 10px;
 		padding: 0.6rem 0.75rem;
-		background: #fafafa;
+		background: var(--surface);
 	}
 
 	.ios-ticket-pass.used {
@@ -1344,7 +1413,7 @@
 
 	.ios-tck-code {
 		font-size: 0.78rem;
-		color: #1c1c1e;
+		color: var(--text);
 	}
 
 	.ios-tck-status {
@@ -1361,7 +1430,7 @@
 		display: flex;
 		justify-content: space-between;
 		font-size: 0.7rem;
-		color: #636366;
+		color: var(--text-sec);
 		margin: 2px 0 0.4rem 0;
 	}
 
@@ -1370,14 +1439,14 @@
 		align-items: center;
 		gap: 0.75rem;
 		padding-top: 0.4rem;
-		border-top: 1px dashed #e5e5ea;
+		border-top: 1px dashed var(--divider);
 	}
 
 	.ios-qr-box {
-		background: #ffffff;
+		background: var(--surface);
 		padding: 4px;
 		border-radius: 6px;
-		border: 1px solid #e5e5ea;
+		border: 1px solid var(--divider);
 	}
 
 	.ios-qr-action {
@@ -1386,14 +1455,14 @@
 
 	.ios-qr-desc {
 		font-size: 0.68rem;
-		color: #8e8e93;
+		color: var(--text-sec);
 		display: block;
 		margin-bottom: 4px;
 	}
 
 	.ios-btn-scan {
-		background: #007aff;
-		color: #ffffff;
+		background: var(--cta);
+		color: var(--surface);
 		border: none;
 		border-radius: 6px;
 		padding: 0.35rem 0.6rem;
@@ -1412,15 +1481,15 @@
 		background: rgba(255, 255, 255, 0.92);
 		backdrop-filter: blur(16px);
 		-webkit-backdrop-filter: blur(16px);
-		border-top: 0.5px solid rgba(0, 0, 0, 0.1);
+		border-top: 0.5px solid var(--divider);
 		display: flex;
 		gap: 0.5rem;
 		z-index: 20;
 	}
 
 	.ios-btn-secondary {
-		background: #e5e5ea;
-		color: #1c1c1e;
+		background: var(--divider);
+		color: var(--text);
 		border: none;
 		border-radius: 12px;
 		padding: 0.6rem 0.9rem;
@@ -1433,8 +1502,8 @@
 	}
 
 	.ios-btn-primary {
-		background: #007aff;
-		color: #ffffff;
+		background: var(--cta);
+		color: var(--surface);
 		border: none;
 		border-radius: 12px;
 		padding: 0.65rem 1rem;
@@ -1446,11 +1515,12 @@
 		gap: 6px;
 		cursor: pointer;
 		box-shadow: 0 2px 6px rgba(0, 122, 255, 0.3);
-		transition: background 0.15s ease;
+		transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 	}
 
+	.ios-btn-primary:active, .ios-btn-secondary:active { transform: scale(0.96); opacity: 0.9; }
 	.ios-btn-primary:active {
-		background: #0062cc;
+		background: var(--cta);
 	}
 
 	.ios-btn-primary:disabled {
