@@ -170,7 +170,12 @@ body.light-mode.sheet-open .screen.active .screen-content { filter: brightness(0
     width: 34px; height: 34px; border-radius: 17px;
     background: linear-gradient(135deg, #00c853, #009624);
     display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
     color: #fff; font-weight: 700; font-size: 15px;
+}
+.merchant-avatar > img {
+    width: 18px; height: 18px;
+    display: block; object-fit: contain;
 }
 .order-merchant-name { font-size: 16px; font-weight: 700; color: var(--order-text); letter-spacing: -0.005em; }
 

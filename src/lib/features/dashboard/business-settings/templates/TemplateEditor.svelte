@@ -13,6 +13,7 @@
 		resolveCheckoutConfig
 	} from '$lib/features/shared/checkout-scenario-defaults';
 	import { templateInvoiceType } from '../../templates/template-invoice';
+	import { SCENARIO_CAPABILITIES, type ScenarioGroup } from '../../templates/scenario-capabilities';
 	import { Eye, Settings2, X } from '@lucide/svelte';
 	import { onMount, untrack } from 'svelte';
 
@@ -59,6 +60,17 @@
 	const scenarioConfigDirty = $derived(
 		JSON.stringify(config) !== JSON.stringify(getScenarioDefaults(confirmedScenario))
 	);
+	const scenarioGroups: { id: ScenarioGroup; label: string }[] = [
+		{ id: 'core', label: 'Базові сценарії' },
+		{ id: 'engine', label: 'Rahunok Engines' },
+		{ id: 'vertical', label: 'Готові індустрії' }
+	];
+
+	function readinessLabel(readiness: 'available' | 'testing' | 'preview'): string {
+		if (readiness === 'available') return 'доступний';
+		if (readiness === 'testing') return 'тестування';
+		return 'прев’ю';
+	}
 
 	function handleScenarioChange() {
 		const nextScenario = scenarioType;
@@ -211,38 +223,13 @@
 							onchange={handleScenarioChange}
 							class="w-full rounded-lg border border-zinc-200 bg-white p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
 						>
-							<optgroup label="Rahunok Engines">
-								<option value="engine_buy">Buy (Товар &rarr; Кошик &rarr; Оплата)</option>
-								<option value="engine_order">Order (Вибір &rarr; Кастомізація &rarr; Оплата)</option>
-								<option value="engine_book">Book (Послуга &rarr; Слот &rarr; Передоплата)</option>
-								<option value="engine_quote">Quote (Калькулятор ціни &rarr; Оплата)</option>
-								<option value="engine_deliver">Deliver (Товар &rarr; Адреса &rarr; Доставка)</option>
-								<option value="engine_split">Split (Спільний рахунок &rarr; Частки)</option>
-							</optgroup>
-							<optgroup label="Готові індустрії (Вертикалі)">
-								<option value="vertical_food">🍕 Кафе / Доставка їжі</option>
-								<option value="vertical_flowers">🌸 Квіти</option>
-								<option value="vertical_auto">🚗 СТО / Шиномонтаж</option>
-								<option value="vertical_beauty">💇 Салон краси / Барбершоп</option>
-								<option value="vertical_cleaning">🧹 Клінінг</option>
-								<option value="vertical_pets">🐕 Грумінг / Ветклініка</option>
-								<option value="vertical_rental">🏕️ Оренда / Прокат</option>
-								<option value="vertical_education">📚 Репетитори / Тренери</option>
-								<option value="vertical_services">🔧 Майстри / Ремонт</option>
-								<option value="vertical_delivery">📦 Мікроперевезення / Доставка</option>
-								<option value="vertical_print">🖨️ Друкарня / Виготовлення</option>
-								<option value="vertical_gifts">🎁 Подарунки / Індивідуальне замовлення</option>
-								<option value="vertical_events">🎟️ Концерти / Кіно / Квитки</option>
-								<option value="vertical_fitness">🏋️‍♂️ Фітнес-Центр / Абонементи</option>
-							</optgroup>
-							<optgroup label="Базові сценарії (Legacy)">
-								<option value="fixed">Фіксована сума (Товар/Послуга)</option>
-								<option value="table">HoReCa (Стіл в закладі)</option>
-								<option value="delivery">Доставка (Товар + Логістика)</option>
-								<option value="tips">Чайові / Донат</option>
-								<option value="open_amount">Вільна сума</option>
-								<option value="fuel_station">АЗС (Відпуск з колонки)</option>
-							</optgroup>
+							{#each scenarioGroups as group (group.id)}
+								<optgroup label={group.label}>
+									{#each SCENARIO_CAPABILITIES.filter((item) => item.group === group.id) as item (item.id)}
+										<option value={item.id}>{item.label} · {readinessLabel(item.readiness)}</option>
+									{/each}
+								</optgroup>
+							{/each}
 						</select>
 					</label>
 
@@ -258,12 +245,8 @@
 
 				<section aria-labelledby="template-options" class="mt-8 border-t border-zinc-200 pt-6">
 					<p class="text-xs font-bold tracking-wider text-blue-700 uppercase">Крок 2</p>
-					<h3 id="template-options" class="text-base font-bold text-zinc-900">
-						Опції чекауту
-					</h3>
-					<p class="mt-1 text-sm text-zinc-500">
-						Лояльність, чайові, промокоди та інші параметри.
-					</p>
+					<h3 id="template-options" class="text-base font-bold text-zinc-900">Опції чекауту</h3>
+					<p class="mt-1 text-sm text-zinc-500">Лояльність, чайові, промокоди та інші параметри.</p>
 					<CheckoutConfigEditor bind:config scenario={scenarioType} />
 				</section>
 			</div>

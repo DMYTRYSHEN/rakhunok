@@ -2099,7 +2099,7 @@
 				"letsrealtalk.com/tag/*"
 			],
 			"bindings": [
-				{ "name": "API", "type": "service", "target": "rahunok" },
+				{ "name": "API", "type": "service", "target": "letsrealtalk-web-preview" },
 				{ "name": "ASSETS", "type": "assets", "target": "../apps/pay/dist" }
 			],
 			"routes": [

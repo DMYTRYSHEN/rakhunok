@@ -25,6 +25,154 @@ Before changing Dashboard code:
 Incidental refactoring, formatting, dependency replacement, schema work, and shared-component
 changes do not bypass these rules.
 
+### CROSS-APP-INVOICE-SCENARIOS-001 — established invoice scenarios (2026-09-21)
+
+- **Status:** `LOCKED` — the user-approved Universal-Link-first correction for `fixed`,
+  `open_amount`, `table`, and `delivery` was implemented, validated, and deployed to the test domain
+  on 2026-09-21; all invariants are locked again.
+- **Owner:** Dashboard invoice creation and POS, Pay checkout, Merchant app invoice/POS entry,
+  shared scenario contracts, and Worker order APIs.
+- **Scenarios:** `fixed`, `open_amount`, `table`, and `delivery`.
+- **Approval boundary:** Any direct or indirect behavior change requires separate, explicit user
+  approval naming the affected scenario or scenarios. Approval for another process, new scenarios,
+  template work, visual cleanup, refactoring, dependency changes, or deployment does not unlock this
+  process.
+- **Applicable instruction:** `.github/instructions/invoice-scenario-locks.instructions.md`.
+
+#### Approved Temporary Scope — Universal Link First
+
+- For Monobank (`MONO`/`UNJS`), return the payload-bearing Universal Link
+  `https://mbnk.app/qr/<payload>` as both `redirect_url` and `fallback_url` on iOS, Android, and
+  desktop. The bank-owned link decides the native application handoff.
+- Use OS-specific custom schemes or package-bound intents only for banks without a configured
+  Universal Link. Existing non-Monobank routing remains unchanged.
+- Preserve the exact NBU payload, amounts, statuses, persistence, invoice-scenario resolution, and
+  checkout behavior outside bank-link selection. Limit edits to the Pay/Worker generators, focused
+  contract tests, and this registry record; validate Pay, Worker, and root checks before relocking.
+
+#### Universal-Link-First Scope Closure Evidence
+
+- Pay and Worker now return `https://mbnk.app/qr/<payload>` as both the primary redirect and fallback
+  for Monobank (`MONO`/`UNJS`) on iOS, Android, and desktop. Existing platform-specific behavior for
+  banks without a Universal Link remains unchanged.
+- The complete Pay suite passes 232/232, the Worker index suite passes 13/13, and root `npm run
+  check` reports 0 Svelte errors and 0 warnings. Root and Pay builds plus backend and checkout
+  production-environment dry-runs completed successfully.
+- The correction was deployed only to `letsrealtalk.com`: backend version
+  `08512a4b-35ff-475d-b045-0b911e3889cd` and checkout version
+  `fa198886-d06d-44a3-9583-6807c1f12c78`, with checkout bound to `letsrealtalk-web-preview`. No
+  `rakhunok.com` route or shared `rahunok` Worker was deployed.
+- Remote smoke returned HTTP 200 for `/`, `/dashboard`, `/app`, `/conf/`, `/pay`, `/pay/`, and
+  `/corex`. A live Monobank initiation returned identical payload-bearing HTTPS redirect and
+  fallback URLs whose suffix exactly matched `nbu_payload_base64`; no Android intent was returned.
+
+#### Approved Temporary Scope — Platform-Specific Monobank Launch
+
+- For iOS and desktop, use the payload-bearing Monobank universal link
+  `https://mbnk.app/qr/<payload>` as `redirect_url`.
+- For Android, use a package-bound HTTPS intent targeting `com.ftband.mono`, with the same encoded
+  Monobank universal link as its browser fallback; keep `fallback_url` equal to that universal link.
+- Preserve the exact NBU payload in every generated URL and retain strict Pay validation for the
+  approved HTTPS and Android intent shapes.
+- Do not change amounts, statuses, persistence, invoice-scenario resolution, or routing for any
+  other bank. Validate focused Pay and Worker contracts before the full test and build gates, and
+  deploy only to `letsrealtalk.com` after those checks pass.
+
+#### Approved Temporary Scope — Monobank Link Fallback
+
+- Preserve an HTTPS payment universal link carrying the NBU payload as `redirect_url` and launch it
+  first. Do not replace it with a generic bank homepage.
+- Use only the payload-bound `mono://bank.gov.ua/qr/<payload>` custom scheme as the mobile Plan B
+  `fallback_url` when the universal link does not open the installed app.
+- Extend Pay URL validation only for that exact Monobank scheme, host, path, and payload shape; do not
+  permit arbitrary `mono:` URLs or weaken validation for any other scheme.
+- Add focused Worker, Pay API, and launch-order regression coverage. No payment-status, amount,
+  persistence, invoice-scenario, or other bank-routing behavior is unlocked.
+
+#### Monobank Scope Closure Evidence
+
+- The platform-specific scope supersedes the earlier custom-scheme launch contract below: iOS and
+  desktop now use `https://mbnk.app/qr/<payload>`, while Android uses an HTTPS intent explicitly
+  bound to `com.ftband.mono` with the same encoded universal link as its browser fallback. The
+  historical custom-scheme evidence remains recorded for audit continuity.
+- `mbnk.app` serves an Apple App Site Association entry for `LK7J8D2SS7.com.ftband.mono` and an
+  Android `assetlinks.json` entry for `com.ftband.mono`; Pay rejects the ambiguous `mono://` route,
+  mismatched Monobank intent payloads, foreign fallback domains, and unapproved packages.
+- The complete Pay suite passes 232/232, the Worker index suite passes 13/13, and root `npm run
+  check` reports 0 Svelte errors and 0 warnings. Root and Pay builds plus both relevant Wrangler
+  dry-runs completed successfully.
+- The correction was deployed only to `letsrealtalk.com`: route-less backend
+  `letsrealtalk-web-preview` version `b2f62529-35dd-453f-a855-6e8adb58b4da` and checkout Worker
+  version `2512334f-cff9-4aa7-9803-f196f551f353`, bound to `letsrealtalk-web-preview`. No
+  `rakhunok.com` route or shared `rahunok` Worker was deployed.
+- Remote smoke returned HTTP 200 for `/`, `/dashboard`, `/app`, `/conf/`, `/pay`, `/pay/`, and
+  `/corex`. Live iOS and Android Monobank initiation responses retained the exact generated NBU
+  payload in every redirect and fallback URL. Native app handoff remains a physical-device check.
+
+- The Worker and Pay client mirror bind the same NBU payload to the exact mobile primary redirect
+  `mono://bank.gov.ua/qr/<payload>` and payload-bearing HTTPS deeplink/fallback
+  `https://mbnk.app/qr/<payload>`; Pay rejects other `mono:` hosts, paths, payloads, queries,
+  fragments, and credentials. Desktop opens the HTTPS URL instead of attempting the custom scheme.
+- The complete Pay suite passes 228/228, the complete Worker index suite passes 13/13, and root
+  `svelte-check` reports 0 errors and 0 warnings. Focused generator, API validation, launch-order,
+  and Worker contract checks are included in those suites.
+- The corrected test slice was deployed only to `letsrealtalk.com`: route-less backend
+  `letsrealtalk-web-preview` version `d841563c-1a5a-44c4-ad27-a4c995e29946` and checkout Worker
+  version `db6617c7-af15-4a69-a092-f77c3018f90f`. The shared `rahunok` Worker and all
+  `rakhunok.com` routes were not deployed or changed.
+- Post-deployment smoke returned HTTP 200 for `/`, `/dashboard`, `/app`, `/conf/`, `/pay`, `/pay/`,
+  `/corex`, the selected checkout order API, and the banks API. A live Monobank initiation returned
+  `mono://bank.gov.ua/qr/<payload>` as `redirect_url` and `https://mbnk.app/qr/<payload>` as
+  `fallback_url`; Chromium loaded the new `checkout.svelte-BPjyAPVr.js` bundle.
+- Local Chromium rendering with a read-only synthetic checkout response verified the checkout
+  merchant avatar at 34 x 34 px with circular clipping and its SVG image at 18 x 18 px at both
+  600 px and 390 px viewport widths.
+- No payment records, invoice state, or persistence were changed. With explicit user approval, the
+  Pay test slice was deployed only to `letsrealtalk.com`: route-less backend
+  `letsrealtalk-web-preview` version `5ac059ed-6b6b-430e-b0f4-e3cdaecc8d66` and checkout Worker
+  version `d0d4c0b9-6716-46b6-8da6-1ed2b4f54353`. The test checkout now uses that isolated backend;
+  the shared `rahunok` Worker and all `rakhunok.com` routes were not deployed or changed.
+- Post-deployment smoke returned HTTP 200 for `/`, `/dashboard`, `/app`, `/conf/`, `/pay`, `/pay/`,
+  and `/corex`, plus the checkout banks, logos, and selected-order APIs. Chromium loaded the new Pay
+  asset hashes from `letsrealtalk.com` and confirmed the 34 x 34 px clipped merchant avatar with an
+  18 x 18 px SVG image.
+
+#### Locked Invariants
+
+1. Dashboard routes `/dashboard/invoices/new?type=fixed`, `?type=open_amount`, `?type=table`, and
+   `?type=delivery` must continue to select their corresponding forms. Direct creation from these
+   routes remains independent of optional checkout-template selection and readiness gates.
+2. Dashboard POS and Merchant POS must preserve their existing invoice creation behavior. A TABLE
+   order retains immutable `terminal_id` ownership and expiry semantics; fixed and `open_amount` do
+   not inherit a stale selected terminal or entity.
+3. Persisted scenario identities remain `fixed`, `open_amount`, `table`, and `delivery`. Existing
+   orders and public `/o`, `/t`, `/tag`, `/pos`, and `/pay` links must remain backward compatible.
+4. Fixed and TABLE amounts remain server-authoritative and positive where currently required.
+   `open_amount` retains zero-total creation and customer amount-entry semantics. Delivery total
+   retains the existing separation between item amount and delivery fee.
+5. Pay scenario resolution, renderer selection, amount authority, pending/expiry behavior, payment
+   entry, and status transitions for these scenarios must not change without approval.
+6. Existing Dashboard, Pay, Merchant app, shared-contract, and Worker validation must not be weakened,
+   bypassed, or silently remapped by a fallback.
+7. `delivery` route and form behavior are locked as currently validated, but this lock does not certify
+   production persistence. The known Worker rejection of persisted `delivery` remains an explicit
+   blocker and requires a separately approved cross-app change before repair.
+
+#### Reopen Conditions
+
+Before editing a locked invariant, record a temporary `UNLOCKED` scope that names the scenarios,
+intended behavior, affected applications and files, backward-compatibility plan, data/API impact, and
+focused unit plus browser validation. Restore `LOCKED` after the approved work is validated.
+
+#### Baseline Evidence
+
+- Focused Dashboard capability, template mapping, gateway, and POS suites pass 53/53.
+- Existing Chromium acceptance for invoice scenario navigation and the read-only POS board passes 2/2.
+- Live localhost smoke selected the expected `fixed`, `open_amount`, `table`, and `delivery` forms;
+  delivery displayed its branch input. No production records were created.
+- The readiness guard applies only to an explicitly selected checkout template; direct scenario
+  selection clears that template and remains unblocked.
+
 ## Analysis Order
 
 ### DASH-TELEGRAM-INVOICE-001 — local self-test delivery (2026-09-13)
@@ -176,6 +324,17 @@ changes do not bypass these rules.
   browser mutation has not yet been repeated after the migration.
 - No Worker/application deployment or test-data mutation was performed. Existing auth and checkout
   runtime contracts remain unchanged outside the approved template-storage migration.
+- Dashboard scenario readiness is now explicit for all 26 selectable template types. The shared
+  capability registry drives editor groups, template-list status badges, and production invoice-link
+  eligibility. `fixed`, `open_amount`, `table`, and `tips` remain available; `delivery` and
+  `fuel_station` remain in testing; all `engine_*` and `vertical_*` flows remain preview-only. Demo mode
+  may exercise every configured scenario, while production invoice creation fails closed when an
+  unfinished template is selected. Direct non-template invoice creation is unchanged.
+- Readiness-gate evidence: registry coverage and demo/production eligibility tests pass 3/3; the
+  existing template-to-invoice regression suite passes 7/7. Svelte language diagnostics and the
+  official Svelte autofixer report no issue in the changed list, editor, or invoice components. No Pay,
+  Worker, schema, payment execution, or deployment change was made. The known Worker rejection of the
+  persisted `delivery` type remains the reason that scenario is not marked available.
 
 ### DASH-BUSINESS-DRAFTS-002 — authorized isolated rollout (updated 2026-09-09)
 

@@ -144,11 +144,33 @@ test('payment network failure fails closed', async () => {
 });
 
 test('unsafe secondary redirect fails closed even with a valid bank URL', async () => {
-  for (const fallback_url of ['javascript:alert(1)', 'http://bank.example/pay', '//bank.example/pay', 42]) {
+  for (const fallback_url of [
+    'javascript:alert(1)',
+    'http://bank.example/pay',
+    '//bank.example/pay',
+    'mono://evil.example/qr/cGF5bG9hZA',
+    'mono://bank.gov.ua/pay/cGF5bG9hZA',
+    'mono://bank.gov.ua/qr/',
+    'mono://bank.gov.ua/qr/cGF5bG9hZA?next=https://evil.example',
+    'mono://bank.gov.ua/qr/cGF5bG9hZA#fragment',
+    'mono://bank.gov.ua/qr/cGF5bG9hZA%2Fextra',
+    42
+  ]) {
     assertFailed(await payment(async () => jsonResponse({
       success: true, redirect_url: 'https://bank.example/pay', fallback_url
     })));
   }
+});
+
+test('payment accepts the package-bound Monobank intent with its matching HTTPS fallback', async () => {
+  const payload = 'cGF5bG9hZA_-';
+  const fallback_url = `https://mbnk.app/qr/${payload}`;
+  const data = {
+    success: true,
+    redirect_url: `intent://bank.gov.ua/qr/${payload}#Intent;scheme=https;package=com.ftband.mono;S.browser_fallback_url=${encodeURIComponent(fallback_url)};end`,
+    fallback_url
+  };
+  assert.deepEqual(await payment(async () => jsonResponse(data)), data);
 });
 
 for (const body of ['', '{', 'null', '[]', 'true', '123', '"https://bank.example/pay"']) {
@@ -179,6 +201,9 @@ for (const redirect_url of [
   'https://bank.example/\npay', 'https://bank.example/\\pay',
   ' https://bank.example/pay', 'https://bank.example/pay ',
   'ftp://bank.example/pay', 'unknown-app://pay/test',
+  'mono://bank.gov.ua/qr/test',
+  'intent://bank.gov.ua/qr/test#Intent;scheme=https;package=com.ftband.mono;S.browser_fallback_url=https%3A%2F%2Fmbnk.app%2Fqr%2Fother;end',
+  'intent://bank.gov.ua/qr/test#Intent;scheme=https;package=com.ftband.mono;S.browser_fallback_url=https%3A%2F%2Fevil.example%2Fqr%2Ftest;end',
   'intent://bank.gov.ua/qr/test#Intent;scheme=javascript;package=ua.izibank.app;end',
   'intent://bank.gov.ua/qr/test#Intent;scheme=https;package=untrusted.app;end',
   'intent://bank.gov.ua/qr/test#Intent;scheme=https;package=ua.izibank.app;S.browser_fallback_url=http://unsafe.example;end'

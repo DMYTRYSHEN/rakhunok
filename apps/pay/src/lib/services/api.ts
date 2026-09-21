@@ -115,6 +115,11 @@ function isSafeBankRedirect(value: unknown): value is string {
   if (typeof value !== 'string' || !value || /[\s\u0000-\u001f\u007f\\]/u.test(value)) return false;
   if (!/^[a-z][a-z0-9+.-]*:\/\/[^/?#]+/i.test(value)) return false;
 
+  const monobankIntent = value.match(
+    /^intent:\/\/bank\.gov\.ua\/qr\/([A-Za-z0-9_-]+)#Intent;scheme=https;package=com\.ftband\.mono;S\.browser_fallback_url=https%3A%2F%2Fmbnk\.app%2Fqr%2F([A-Za-z0-9_-]+);end$/
+  );
+  if (monobankIntent) return monobankIntent[1] === monobankIntent[2];
+
   try {
     const url = new URL(value);
     if (!url.hostname || url.username || url.password || /^[^:]+:\/\/[^/?#]*@/.test(value)) return false;

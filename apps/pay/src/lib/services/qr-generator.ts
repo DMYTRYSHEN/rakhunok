@@ -108,8 +108,8 @@ export function buildBankRedirect(bankCode: string, payload: string, os = 'deskt
   switch (code) {
     case 'MONO':
     case 'UNJS':
-      redirectUrl = `https://mbnk.app/qr/${payload}`;
-      fallbackUrl = 'https://send.monobank.ua/';
+      fallbackUrl = `https://mbnk.app/qr/${payload}`;
+      redirectUrl = fallbackUrl;
       break;
     case 'PBAN':
       redirectUrl = `https://www.privat24.ua/rd/send_qr/nbu/${payload}`;

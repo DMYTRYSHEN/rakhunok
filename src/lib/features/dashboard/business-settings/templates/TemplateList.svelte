@@ -6,6 +6,7 @@
 		deleteTemplate,
 		setDefaultTemplate
 	} from '../../templates/template-repository';
+	import { getScenarioCapability } from '../../templates/scenario-capabilities';
 	import TemplateEditor from './TemplateEditor.svelte';
 
 	let { merchantId, demo = false }: { merchantId: string; demo?: boolean } = $props();
@@ -23,35 +24,14 @@
 	});
 
 	function getScenarioLabel(type: string): string {
-		const map: Record<string, string> = {
-			fixed: 'Фіксована сума',
-			table: 'HoReCa (Стіл)',
-			delivery: 'Доставка',
-			tips: 'Чайові',
-			open_amount: 'Вільна сума',
-			fuel_station: 'АЗС',
-			engine_buy: 'Buy (Товар)',
-			engine_order: 'Order (Кастомізація)',
-			engine_book: 'Book (Послуга/Слот)',
-			engine_quote: 'Quote (Калькулятор)',
-			engine_deliver: 'Deliver (Логістика)',
-			engine_split: 'Split (Спільний рахунок)',
-			vertical_food: '🍕 Кафе / Доставка',
-			vertical_flowers: '🌸 Квіти',
-			vertical_auto: '🚗 СТО',
-			vertical_beauty: '💇 Салон краси',
-			vertical_cleaning: '🧹 Клінінг',
-			vertical_pets: '🐕 Грумінг',
-			vertical_rental: '🏕️ Оренда',
-			vertical_education: '📚 Репетитори',
-			vertical_services: '🔧 Майстри',
-			vertical_delivery: '📦 Перевезення',
-			vertical_print: '🖨️ Друкарня',
-			vertical_gifts: '🎁 Подарунки',
-			vertical_events: '🎟️ Квитки / Події',
-			vertical_fitness: '🏋️‍♂️ Фітнес / Абонементи'
-		};
-		return map[type] || type.replace(/_/g, ' ');
+		return getScenarioCapability(type)?.label ?? type.replace(/_/g, ' ');
+	}
+
+	function getReadinessLabel(type: string): string {
+		const readiness = getScenarioCapability(type)?.readiness;
+		if (readiness === 'available') return 'Доступний';
+		if (readiness === 'testing') return 'Тестування';
+		return 'Прев’ю';
 	}
 
 	async function load() {
@@ -98,7 +78,8 @@
 			await setDefaultTemplate(merchantId, id, demo);
 			await load();
 		} catch (cause: unknown) {
-			error = cause instanceof Error ? cause.message : 'Не вдалося змінити шаблон за замовчуванням.';
+			error =
+				cause instanceof Error ? cause.message : 'Не вдалося змінити шаблон за замовчуванням.';
 		} finally {
 			mutationId = null;
 		}
@@ -175,16 +156,32 @@
 				>
 					<div class="border-b border-zinc-100 p-4">
 						<div class="flex items-start justify-between">
-							<div>
+							<div class="min-w-0">
 								<h3 class="line-clamp-1 font-bold text-zinc-900">{t.name}</h3>
-								<p class="text-xs text-zinc-500 capitalize">{getScenarioLabel(t.scenario_type)}</p>
+								<p class="truncate text-xs text-zinc-500">{getScenarioLabel(t.scenario_type)}</p>
 							</div>
-							{#if t.is_default}
+							<div class="flex shrink-0 flex-col items-end gap-1">
 								<span
-									class="rounded bg-blue-50 px-2 py-1 text-[10px] font-bold tracking-wider text-blue-600 uppercase"
-									>Default</span
+									class="rounded px-2 py-1 text-[10px] font-bold"
+									class:bg-emerald-50={getScenarioCapability(t.scenario_type)?.readiness ===
+										'available'}
+									class:text-emerald-700={getScenarioCapability(t.scenario_type)?.readiness ===
+										'available'}
+									class:bg-amber-50={getScenarioCapability(t.scenario_type)?.readiness ===
+										'testing'}
+									class:text-amber-700={getScenarioCapability(t.scenario_type)?.readiness ===
+										'testing'}
+									class:bg-zinc-100={getScenarioCapability(t.scenario_type)?.readiness ===
+										'preview'}
+									class:text-zinc-600={getScenarioCapability(t.scenario_type)?.readiness ===
+										'preview'}>{getReadinessLabel(t.scenario_type)}</span
 								>
-							{/if}
+								{#if t.is_default}
+									<span class="rounded bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-600"
+										>За замовчуванням</span
+									>
+								{/if}
+							</div>
 						</div>
 					</div>
 

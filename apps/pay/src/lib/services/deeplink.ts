@@ -21,8 +21,9 @@ export function launchDeepLink(
   const os = detectOS();
 
   if (os === 'desktop') {
-    if (redirectUrl) {
-      window.open(redirectUrl, '_blank');
+    const desktopUrl = redirectUrl.startsWith('https://') ? redirectUrl : fallbackUrl;
+    if (desktopUrl) {
+      window.open(desktopUrl, '_blank');
     }
     return;
   }

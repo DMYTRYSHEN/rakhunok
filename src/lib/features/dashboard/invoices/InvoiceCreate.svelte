@@ -47,6 +47,7 @@
 
 	import { listTemplates } from '../templates/template-repository';
 	import { buildTemplateInvoiceScenario } from '../templates/template-invoice';
+	import { canCreateCheckoutLink } from '../templates/scenario-capabilities';
 	import type { CheckoutTemplate } from '../types';
 
 	type Scenario = {
@@ -197,6 +198,12 @@
 		(scenario !== 'table' || Boolean(terminalId)) &&
 			(scenario !== 'rtp' || Boolean(rtpCustomerId.trim()))
 	);
+	const selectedTemplate = $derived(
+		templates.find((template) => template.id === selectedTemplateId)
+	);
+	const canCreateFromTemplate = $derived(
+		!selectedTemplate || canCreateCheckoutLink(selectedTemplate.scenario_type, demo)
+	);
 
 	$effect(() => {
 		if (!terminalId && initialTerminals[0]) terminalId = initialTerminals[0].id;
@@ -268,6 +275,7 @@
 	}
 
 	function chooseScenario(nextScenario: InvoiceType) {
+		selectedTemplateId = '';
 		scenario = nextScenario;
 		amount = '0';
 		deliveryFee = '0';
@@ -337,6 +345,11 @@
 
 	async function createInvoice() {
 		if (!onCreate || submitting || scenario === 'recurring' || scenario === 'rtp') return;
+		if (!canCreateFromTemplate) {
+			submitError =
+				'Цей сценарій доступний для налаштування та прев’ю, але ще не створює платіжні посилання.';
+			return;
+		}
 		submitting = true;
 		submitError = null;
 		try {
@@ -972,11 +985,19 @@
 				>
 					Сценарій очікує захищений backend-контракт і поки не створює записів.
 				</div>
+			{:else if !canCreateFromTemplate}
+				<p class="mt-5 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+					Прев’ю готове. Платіжні посилання для цього сценарію ще вимкнені.
+				</p>
 			{:else if submitError}<p class="mt-5 text-sm text-red-700" role="alert">{submitError}</p>{/if}
 			<button
 				type="button"
 				onclick={createInvoice}
-				disabled={!onCreate || submitting || scenario === 'recurring' || scenario === 'rtp'}
+				disabled={!onCreate ||
+					submitting ||
+					scenario === 'recurring' ||
+					scenario === 'rtp' ||
+					!canCreateFromTemplate}
 				class="mt-4 h-12 w-full rounded-md bg-blue-600 text-sm font-extrabold text-white disabled:bg-zinc-200 disabled:text-zinc-500"
 				>{submitting ? 'Створюємо…' : 'Створити рахунок і QR'}</button
 			>

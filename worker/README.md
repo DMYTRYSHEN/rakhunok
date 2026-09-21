@@ -7,6 +7,9 @@ This directory owns an isolated Cloudflare Static Assets Worker for the `corex` 
 - The default Worker is `letsrealtalk-web-preview` and has no custom domain.
 - The production Worker is `letsrealtalk-web` and is selected only with `--env production`.
 - The only configured production route is `letsrealtalk.com/*` in the `letsrealtalk.com` zone.
+- The test-domain checkout Worker binds its public checkout API routes to the route-less
+	`letsrealtalk-web-preview` backend so Pay changes can be tested without changing the shared
+	`rahunok` production API Worker.
 - The dashboard uses the separate `letsrealtalk-dashboard` Worker configured by `wrangler.dashboard.jsonc`.
 - Its production route is `letsrealtalk.com/dashboard*`; the Worker rejects paths outside `/dashboard` and `/dashboard/` with `404`.
 - Dashboard API requests use `/dashboard/api/v1/*` and are forwarded through the `API` service binding to the existing `rahunok` Worker, which remains responsible for JWT authorization and invoice data.
