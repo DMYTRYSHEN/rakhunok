@@ -1,7 +1,8 @@
 export const financePurposeTokens = ['business_purpose', 'seller_name', 'seller_iban',
 	'seller_tax_id', 'provider_code', 'provider_seller_id', 'contract_reference', 'payment_id'] as const;
 export type FinancePurposeToken = typeof financePurposeTokens[number];
-export const defaultFinancePurposeTemplate = '{business_purpose} | Юридична назва продавця: {seller_name}; власний IBAN продавця: {seller_iban}; Код провайдера: {provider_code}; ID продавця: {provider_seller_id}; код продавця: {seller_tax_id}; договір: {contract_reference}; ID платежу: {payment_id}';
+export const defaultFinancePurposeTemplate = '{business_purpose} Продавець: {seller_name}, ЄДРПОУ {seller_tax_id}, IBAN {seller_iban}; дог. {contract_reference}; {provider_seller_id}; {provider_code}.';
+const legacyFinancePurposeTemplate = '{business_purpose} | Юридична назва продавця: {seller_name}; власний IBAN продавця: {seller_iban}; Код провайдера: {provider_code}; ID продавця: {provider_seller_id}; код продавця: {seller_tax_id}; договір: {contract_reference}; ID платежу: {payment_id}';
 
 export function validateFinancePurposeTemplate(value: unknown): string {
 	if (typeof value !== 'string' || !value.trim() || value.length > 1000 ||
@@ -18,8 +19,11 @@ export function previewFinancePurpose(template: string, values: Partial<Record<F
 	try { validateFinancePurposeTemplate(template); } catch (cause) {
 		return cause instanceof Error ? cause.message : 'Некоректний шаблон.';
 	}
-	const rendered = template.replace(/\{([a-z_]+)\}/g, (_, key: FinancePurposeToken) =>
-		key === 'payment_id' ? '[буде створено сервером — не реальний ID]' : values[key] || `[не задано: ${key}]`);
-	return rendered.length <= 4000 ? `Ілюстрація, не платіжний payload: ${rendered}`
+	const required = (key: FinancePurposeToken) => values[key] || `[не задано: ${key}]`;
+	const rendered = template === defaultFinancePurposeTemplate || template === legacyFinancePurposeTemplate
+		? `${required('business_purpose')} Продавець: ${required('seller_name')}, ЄДРПОУ ${required('seller_tax_id')}, IBAN ${required('seller_iban')}${values.contract_reference ? `; дог. ${values.contract_reference}` : ''}${values.provider_seller_id ? `; ${values.provider_seller_id}` : ''}${values.provider_code ? `; ${values.provider_code}` : ''}.`
+		: template.replace(/\{([a-z_]+)\}/g, (_, key: FinancePurposeToken) =>
+			key === 'payment_id' ? '[буде створено сервером — не реальний ID]' : required(key));
+	return rendered.length <= 4000 ? `Ілюстрація, не платіжний payload: ID: [буде створено сервером]. ${rendered}`
 		: 'Приклад перевищує 4000 символів. Скоротіть шаблон або значення; формат провайдера не перевірено.';
 }

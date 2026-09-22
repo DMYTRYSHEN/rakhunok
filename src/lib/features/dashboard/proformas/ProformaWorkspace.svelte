@@ -216,16 +216,6 @@
 
 		const result = await convertProformaToInvoice(merchantId, draft, gateway, demo);
 
-		// Increment rule nextNumber for the subsequent invoice
-		if (rules) {
-			const updatedRules: InvoiceRules = {
-				...rules,
-				nextNumber: rules.nextNumber + 1
-			};
-			rules = updatedRules;
-			saveInvoiceRules(updatedRules);
-		}
-
 		await refreshList();
 		return { invoiceId: result.invoiceId };
 	}

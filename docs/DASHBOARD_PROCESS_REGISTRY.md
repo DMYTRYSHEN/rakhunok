@@ -27,9 +27,11 @@ changes do not bypass these rules.
 
 ### CROSS-APP-INVOICE-SCENARIOS-001 — established invoice scenarios (2026-09-21)
 
-- **Status:** `LOCKED` — the user-approved Universal-Link-first correction for `fixed`,
-  `open_amount`, `table`, and `delivery` was implemented, validated, and deployed to the test domain
-  on 2026-09-21; all invariants are locked again.
+- **Status:** `UNLOCKED` — on 2026-09-22 the user explicitly approved a compatibility-preserving
+  security hardening for `fixed`, `open_amount`, `table`, and `delivery`. The temporary scope is
+  limited to server-owned invoice references, NBU field 11, concrete `open_amount` payment invoices,
+  and authenticated settlement reconciliation. Remote schema changes and deployment remain
+  separately gated and are not approved by this unlock.
 - **Owner:** Dashboard invoice creation and POS, Pay checkout, Merchant app invoice/POS entry,
   shared scenario contracts, and Worker order APIs.
 - **Scenarios:** `fixed`, `open_amount`, `table`, and `delivery`.
@@ -38,6 +40,102 @@ changes do not bypass these rules.
   template work, visual cleanup, refactoring, dependency changes, or deployment does not unlock this
   process.
 - **Applicable instruction:** `.github/instructions/invoice-scenario-locks.instructions.md`.
+
+#### Approved Temporary Scope — Authoritative Payment Reference
+
+- Preserve current routes, public links, renderer selection, amount-entry UX, bank launch behavior,
+  and existing persisted invoice interpretation for `fixed`, `open_amount`, `table`, and `delivery`.
+- Use the concrete payable invoice's server-generated `short_id` as NBU field 11. Ignore any
+  client-supplied payment reference when a persisted invoice is resolved.
+- Harden `orders.short_id` to be server-generated, immutable, `NOT NULL`, and `UNIQUE`, with
+  constraint-driven collision retry. Existing non-null references must remain unchanged.
+- Preserve reusable zero-value `open_amount` invoices; after customer amount entry, create a
+  concrete child invoice with an immutable amount and recipient snapshot before payment initiation.
+- Do not treat the existing unsigned generic callback as authoritative. Provider settlement may be
+  activated only with authenticated provider input and atomic verification of reference, amount,
+  `UAH`, recipient IBAN, invoice state, and unique provider transaction/event identity.
+- Limit implementation to the minimum Worker, Pay, migration, focused contract tests, and this
+  registry record. Restore `LOCKED` only after local compatibility validation. Do not apply a remote
+  migration or deploy either domain without separate explicit approval.
+
+#### Approved Temporary Scope — Recipient And Payment Purpose Snapshot
+
+- On 2026-09-22, the user explicitly approved activating persisted per-seller invoice rules and
+  payment-acceptance mode for `fixed`, `open_amount`, `table`, and `delivery`.
+- For direct acceptance, snapshot the selected seller as the actual recipient and finalize NBU field
+  12 from that seller's invoice rules. For finance-company acceptance, snapshot the finance company
+  as the actual recipient: its name in field 6, IBAN in field 7, and EDRPOU/RNOKPP in field 9; finalize
+  field 12 from the finance-company template with seller/provider references and a server payment ID.
+- Resolve mode, recipient, invoice number, and purpose server-side in one authoritative invoice
+  creation operation. Client input must not override the selected mode, recipient, payment ID, or
+  final purpose. Persist immutable recipient and purpose snapshots on each new concrete invoice.
+- Preserve existing invoices and their current `description`/`title` fallback interpretation. Fail
+  closed for newly activated creation when required settings are unconfigured or incomplete.
+- Keep finance-company onward settlement, `SELF_EMPLOYED`, and transfers to an individual's account
+  outside this scope. Do not apply remote migrations or deploy either domain without separate
+  explicit approval.
+- Validate direct and finance-company modes, fields 6/7/9/12, atomic numbering, client-override
+  rejection, old-invoice compatibility, and all four scenarios with focused database and Worker
+  tests plus the root check.
+
+#### Authoritative Payment Reference Checkpoint — 2026-09-22
+
+- The legacy Worker now takes persisted NBU fields 6–11 from the resolved order and merchant,
+  including the server `short_id` and server amount; request fields remain fallback-only when no
+  persisted order is resolved. A focused Worker regression rejects client overrides.
+- The forward short-ID migration preserves existing references, backfills missing values, enforces
+  format, uniqueness, `NOT NULL`, server-only generation, immutability, and constraint-driven retry.
+  The forward settlement migration additionally requires the stored order `short_id` to match the
+  immutable attempt quote and existing amount, currency, IBAN, status, revision, time, and provider
+  event checks.
+- Reusable zero-total `open_amount` parents remain non-payable in the active Pay flow. Secure child
+  creation is not activated: the stronger attempt/quote authority is deliberately local-only and is
+  not dispatched by the legacy Worker, while the legacy route has no equivalent authenticated
+  server-side child-creation boundary. Do not create children through anonymous Data API writes or
+  accept a client amount directly on the parent.
+- No remote migration or deployment has been performed. The process remains `UNLOCKED` only for the
+  remaining approved child-invoice authority integration and focused compatibility validation.
+
+#### Recipient And Purpose Snapshot Checkpoint — 2026-09-22
+
+- New concrete `fixed`, `open_amount`, `table`, and `delivery` invoices are created through the
+  authenticated `create_authoritative_invoice` RPC. The RPC verifies owner, seller, and terminal,
+  atomically reserves the seller invoice number, and persists immutable mode, recipient, payment ID,
+  settings revision, and final purpose snapshots. Client numbering, recipient, payment ID, and final
+  purpose are not RPC inputs.
+- Checkout uses a complete persisted snapshot for NBU fields 6, 7, 9, and 12, rejects partial
+  snapshots, and preserves the previous merchant plus `description`/`title` fallback only when all
+  snapshot fields are null. Field 11 remains the persisted server `short_id`.
+- Finance-company field 12 now starts with the exact six-character field 11 value as
+  `ID: <short_id>. `, followed by the seller's business purpose, legal name, EDRPOU/RNOKPP, own
+  IBAN, and any non-empty contract, provider seller ID, and provider code values. The compact
+  standard format omits labels for the last two provider values and omits empty optional segments.
+  The finance company remains the actual bank recipient in fields 6, 7, and 9; the seller details
+  in field 12 are reconciliation metadata. Direct-mode field 12 is unchanged.
+- The internal UUID `payment_id` remains server-generated, persisted, and immutable but is omitted
+  from the new standard visible purpose. Existing custom templates using `{payment_id}` retain their
+  previous behavior. The exact former standard template is normalized server-side to the compact
+  format so existing saved defaults do not keep emitting the old verbose purpose.
+- Dashboard invoice and POS creation now carry seller identity through the authenticated Worker;
+  the browser fallback calls the same authoritative RPC rather than inserting directly into
+  `orders`. TABLE terminal ownership and expiry are preserved, while the RPC discards expiry for
+  non-TABLE scenarios. Post-create local invoice-rule increments were removed because the server is
+  the numbering authority; proforma draft-copy numbering remains unchanged.
+- Focused contracts cover direct and finance-company recipients, all four scenarios, legacy rows,
+  partial-snapshot rejection, immutability, unauthorized ownership, client override rejection,
+  TABLE expiry, and the 420-character NBU purpose boundary. Finance-company content is limited to
+  408 characters before the server adds the 12-character short-ID prefix; boundary coverage asserts
+  that 408 persists as exactly 420 and 409 is rejected. A local PGlite overlapping-call
+  regression asserts distinct consecutive number reservation; it is not multi-connection PostgreSQL
+  contention proof. Editor diagnostics are clean for the changed Worker, gateway, contract,
+  migration, and test files; the Svelte autofixer reports no issue in the two changed component
+  control-flow slices.
+- Executable validation remains blocked because the VS Code task host repeatedly starts tasks
+  without creating a terminal. No focused test, root check, build, remote migration, or deployment
+  is claimed as successful. The process therefore remains `UNLOCKED` pending executable validation.
+- Ukrainian IBAN format remains enforced as `UA` plus 27 digits. Mod-97 enforcement is not added in
+  this compatibility scope because existing Dashboard settings and fixtures permit format-only
+  synthetic IBAN values; checksum rollout requires separate data cleanup and compatibility review.
 
 #### Approved Temporary Scope — Public Scenario Catalog
 

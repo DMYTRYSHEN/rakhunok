@@ -78,6 +78,16 @@ async function persistedRow(
 	return row;
 }
 
+async function persistedRpcRow(response: Response): Promise<Record<string, unknown> | Response> {
+	if (!response.ok) return persistenceError(response.status);
+	const row: unknown = await response.json();
+	if (
+		!row || typeof row !== 'object' || Array.isArray(row) ||
+		typeof row.id !== 'string' || !row.id.trim()
+	) return persistenceError();
+	return row as Record<string, unknown>;
+}
+
 export const DEFAULT_BANKS = [
 	{
 		id: 'monobank',
@@ -970,6 +980,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 						const row = rows[0];
 						orderPayload = {
 							id: row.id,
+							short_id: row.short_id,
 							merchant_id: row.merchant_id,
 							type: row.type || 'fixed',
 							order_number: row.order_number,
@@ -985,6 +996,13 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 							table_number: row.table_number,
 							terminal_id: row.terminal_id,
 							scenario_config: row.scenario_config || {},
+							payment_acceptance_mode: row.payment_acceptance_mode,
+							payment_recipient_name: row.payment_recipient_name,
+							payment_recipient_iban: row.payment_recipient_iban,
+							payment_recipient_tax_id: row.payment_recipient_tax_id,
+							payment_purpose: row.payment_purpose,
+							payment_id: row.payment_id,
+							payment_settings_revision: row.payment_settings_revision,
 							share_url: row.share_url,
 							merchant: buildMerchantInfo(row),
 							created_at: row.created_at,
@@ -1072,12 +1090,41 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 			const bankCode = (body.bank_code || 'UNJS').toUpperCase();
 			const clientOS = body.os || 'desktop';
 			const merchant = orderPayload?.merchant;
-			const recipientName = body.merchantName || merchant?.business_name || 'ФОП ДМИТРИШЕН';
-			const recipientIban = body.merchantIban || merchant?.iban || 'UA12345678987654321345562';
-			const recipientTaxId = body.merchantTaxId || merchant?.tax_id || '11212121212';
-			const purpose = body.purpose || orderPayload?.description || orderPayload?.title || `Оплата замовлення ${orderPayload?.order_number || orderId}`;
-			const orderNum = body.orderNumber || orderPayload?.order_number || orderId;
-			const amount = typeof body.amount === 'number' ? body.amount : (orderPayload?.total_amount || 0);
+			const snapshotValues = orderPayload ? [
+				orderPayload.payment_acceptance_mode,
+				orderPayload.payment_recipient_name,
+				orderPayload.payment_recipient_iban,
+				orderPayload.payment_recipient_tax_id,
+				orderPayload.payment_purpose,
+				orderPayload.payment_id,
+				orderPayload.payment_settings_revision
+			] : [];
+			const hasPaymentSnapshot = snapshotValues.some((value) => value !== null && value !== undefined);
+			const hasCompletePaymentSnapshot = hasPaymentSnapshot &&
+				['direct', 'finance-company'].includes(orderPayload?.payment_acceptance_mode) &&
+				['payment_recipient_name', 'payment_recipient_iban', 'payment_recipient_tax_id', 'payment_purpose', 'payment_id']
+					.every((key) => typeof orderPayload?.[key] === 'string' && orderPayload[key].trim()) &&
+				Number.isInteger(orderPayload?.payment_settings_revision) && orderPayload.payment_settings_revision > 0;
+			if (orderPayload && hasPaymentSnapshot && !hasCompletePaymentSnapshot) {
+				return jsonResponse({ error: 'Invoice payment snapshot unavailable' }, 409);
+			}
+			const recipientName = hasCompletePaymentSnapshot
+				? orderPayload!.payment_recipient_name
+				: merchant?.business_name || body.merchantName || 'ФОП ДМИТРИШЕН';
+			const recipientIban = hasCompletePaymentSnapshot
+				? orderPayload!.payment_recipient_iban
+				: merchant?.iban || body.merchantIban || 'UA12345678987654321345562';
+			const recipientTaxId = hasCompletePaymentSnapshot
+				? orderPayload!.payment_recipient_tax_id
+				: merchant?.tax_id || body.merchantTaxId || '11212121212';
+			const purpose = hasCompletePaymentSnapshot
+				? orderPayload!.payment_purpose
+				: orderPayload?.description || orderPayload?.title || body.purpose || `Оплата замовлення ${orderPayload?.order_number || orderId}`;
+			if (orderPayload && !orderPayload.short_id) {
+				return jsonResponse({ error: 'Invoice payment reference unavailable' }, 409);
+			}
+			const orderNum = orderPayload?.short_id || body.orderNumber || orderId;
+			const amount = orderPayload?.total_amount ?? (typeof body.amount === 'number' ? body.amount : 0);
 
 			const nbu = generateNbuQrPayload({
 				amount,
@@ -1397,7 +1444,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 				if (!merchantId) return jsonResponse({ error: 'Merchant not found' }, 404);
 
 				const type = (body.type as string) || 'fixed';
-				if (!['fixed', 'table', 'open_amount'].includes(type)) return persistenceError(422);
+				if (!['fixed', 'table', 'open_amount', 'delivery'].includes(type)) return persistenceError(422);
 				const baseAmount = Number(body.amount ?? body.base_amount ?? 0);
 				const deliveryFee = Number(body.delivery_fee ?? 0);
 				const totalAmount = baseAmount + deliveryFee;
@@ -1409,8 +1456,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 
 				const entityId = typeof body.entity_id === 'string' && body.entity_id.trim() ? body.entity_id.trim() : undefined;
 				const terminalId = typeof body.terminal_id === 'string' && body.terminal_id.trim() ? body.terminal_id.trim() : undefined;
-				if (type === 'table' && (!entityId || !terminalId)) return persistenceError(422);
-				if ((entityId && !terminalId) || (!entityId && terminalId)) return persistenceError(422);
+				if (!entityId || (type === 'table' && !terminalId) || (!entityId && terminalId)) return persistenceError(422);
 				if (terminalId && entityId) {
 					const ownerUserId = typeof merchant?.user_id === 'string' ? merchant.user_id : '';
 					if (!ownerUserId) return persistenceError();
@@ -1432,44 +1478,33 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 						return persistenceError();
 					}
 				}
-				const orderNumber = String(body.order_number || `RHK-${Date.now().toString().slice(-6)}`);
-				const title = String(body.title || `Рахунок ${orderNumber}`);
-				const newOrderId = crypto.randomUUID();
-
 				if (merchantId && authHeader) {
-					const insertPayload: Record<string, unknown> = {
-						id: newOrderId,
-						merchant_id: merchantId,
-						entity_id: entityId ?? null,
-						type,
-						order_number: orderNumber,
-						title,
-						description: body.description ? String(body.description) : null,
-						base_amount: baseAmount,
-						delivery_fee: deliveryFee,
-						total_amount: totalAmount,
-						status: type === 'table' ? 'preparing' : 'pending',
-						table_number: body.table_number ? parseInt(String(body.table_number), 10) : null,
-						terminal_id: terminalId ?? null,
-						currency: 'UAH'
+					const rpcPayload = {
+						p_merchant_id: merchantId,
+						p_entity_id: entityId,
+						p_type: type,
+						p_title: body.title ? String(body.title) : '',
+						p_description: body.description ? String(body.description) : null,
+						p_base_amount: baseAmount,
+						p_delivery_fee: deliveryFee,
+						p_table_number: body.table_number ? parseInt(String(body.table_number), 10) : null,
+						p_terminal_id: terminalId ?? null,
+						p_scenario_config: body.scenario_config ?? null,
+						p_expires_at: type === 'table' && typeof body.expires_at === 'string' ? body.expires_at : null
 					};
-					if (body.scenario_config) {
-						insertPayload.scenario_config = body.scenario_config;
-					}
 
 					try {
-						const insertRes = await fetch(`${supabaseUrl}/rest/v1/orders`, {
+						const insertRes = await fetch(`${supabaseUrl}/rest/v1/rpc/create_authoritative_invoice`, {
 							method: 'POST',
 							headers: {
 								apikey: supabaseAnonKey,
 								Authorization: authHeader,
-								'Content-Type': 'application/json',
-								Prefer: 'return=representation'
+								'Content-Type': 'application/json'
 							},
-							body: JSON.stringify(insertPayload)
+							body: JSON.stringify(rpcPayload)
 						});
 
-						const insertedOrder = await persistedRow(insertRes);
+						const insertedOrder = await persistedRpcRow(insertRes);
 						if (insertedOrder instanceof Response) return insertedOrder;
 						return Response.json(
 							{

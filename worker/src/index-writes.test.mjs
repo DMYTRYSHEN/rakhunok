@@ -148,7 +148,8 @@ for (const [label, response, status, error] of [
 
 for (const [label, body] of [
 	['zero table amount', { type: 'table', amount: 0, merchant_id: 'merchant-test', entity_id: 'entity-test', terminal_id: 'terminal-test' }],
-	['nonfinite fixed amount', { type: 'fixed', amount: 'NaN', merchant_id: 'merchant-test' }],
+	['nonfinite fixed amount', { type: 'fixed', amount: 'NaN', merchant_id: 'merchant-test', entity_id: 'entity-test' }],
+	['fixed without seller', { type: 'fixed', amount: 12, merchant_id: 'merchant-test' }],
 	['table without terminal', { type: 'table', amount: 12, merchant_id: 'merchant-test', entity_id: 'entity-test' }],
 	['terminal without entity', { type: 'fixed', amount: 12, merchant_id: 'merchant-test', terminal_id: 'terminal-test' }]
 ]) {
@@ -175,24 +176,25 @@ for (const explicitMerchant of [true, false]) {
 				assert.match(url, /is_active=eq\.true/);
 				return Response.json([{ id: 'terminal-test' }]);
 			}
-			assert.ok(url.endsWith('/rest/v1/orders'));
+			assert.ok(url.endsWith('/rest/v1/rpc/create_authoritative_invoice'));
 			assert.equal(init.method, 'POST');
-			assert.equal(init.headers.Prefer, 'return=representation');
 			const payload = JSON.parse(init.body);
 			assert.deepEqual(payload, {
-				id: payload.id, merchant_id: 'merchant-test', entity_id: 'entity-test', type: 'table',
-				order_number: 'TEST-1', title: 'Test', description: 'Description', base_amount: 12,
-				delivery_fee: 3, total_amount: 15, status: 'preparing', table_number: 4,
-				terminal_id: 'terminal-test', currency: 'UAH', scenario_config: { existing: true }
+				p_merchant_id: 'merchant-test', p_entity_id: 'entity-test', p_type: 'table',
+				p_title: 'Test', p_description: 'Description', p_base_amount: 12,
+				p_delivery_fee: 3, p_table_number: 4, p_terminal_id: 'terminal-test',
+				p_scenario_config: { existing: true }, p_expires_at: '2026-08-26T00:30:00.000Z'
 			});
-			inserted = { ...payload, created_at: 'server-time' };
-			return Response.json([inserted], { status: 201 });
+			assert.equal('order_number' in payload, false);
+			inserted = { id: 'server-order', order_number: 'INV-0007', created_at: 'server-time' };
+			return Response.json(inserted, { status: 201 });
 		};
 		const response = await routeWebRequest(request('POST', '/api/v1/orders', {
 			...(explicitMerchant ? { merchant_id: 'merchant-test' } : {}),
 			entity_id: 'entity-test', type: 'table', order_number: 'TEST-1', title: 'Test',
 			description: 'Description', amount: 12, delivery_fee: 3, table_number: '4',
-			terminal_id: 'terminal-test', scenario_config: { existing: true }
+			terminal_id: 'terminal-test', scenario_config: { existing: true },
+			expires_at: '2026-08-26T00:30:00.000Z'
 		}), env);
 		assert.equal(response.status, 200);
 		assert.deepEqual(await response.json(), {
@@ -233,12 +235,12 @@ test('POST orders: open amount preserves zero semantics', async () => {
 	respond = (url, init) => {
 		if (url.includes('/merchants?')) return Response.json([{ id: 'merchant-test', user_id: 'owner-test' }]);
 		const payload = JSON.parse(init.body);
-		assert.equal(payload.base_amount, 0);
-		assert.equal(payload.total_amount, 0);
-		return Response.json([{ ...payload, id: payload.id }]);
+		assert.equal(payload.p_base_amount, 0);
+		assert.equal(payload.p_delivery_fee, 0);
+		return Response.json({ id: 'open-order', order_number: 'INV-0009' });
 	};
 	const response = await routeWebRequest(request('POST', '/api/v1/orders', {
-		merchant_id: 'merchant-test', type: 'open_amount', amount: 0
+		merchant_id: 'merchant-test', entity_id: 'entity-test', type: 'open_amount', amount: 0
 	}), env);
 	assert.equal(response.status, 200);
 	assert.equal(calls.length, 2);

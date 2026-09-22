@@ -275,8 +275,9 @@ describe('business settings local draft boundary', () => {
 		draft.mode = 'finance-company'; draft.financeName = 'Finance'; draft.sellers[entity.id].providerSellerId = 'entered-id';
 		const finance = businessInvoicePreview(draft, entity);
 		expect(finance.finalPurpose).toContain('entered-id');
-		expect(finance.finalPurpose).toContain('[не задано: provider_code]');
-		expect(finance.finalPurpose).toContain('не реальний ID');
+		expect(finance.finalPurpose).not.toContain('[не задано: provider_code]');
+		expect(finance.finalPurpose).not.toContain('; дог. ;');
+		expect(finance.finalPurpose).toContain('ID: [буде створено сервером]');
 		expect(finance.verified).toBe(false);
 		expect(finance.payee).toBe('Finance');
 	});
@@ -285,8 +286,10 @@ describe('business settings local draft boundary', () => {
 		draft.financeName = 'Finance recipient'; draft.financeIban = `UA${'2'.repeat(27)}`;
 		const before = JSON.stringify(draft);
 		const preview = businessInvoicePreview(draft, entity);
-		expect(preview.finalPurpose).toContain(`Юридична назва продавця: ${entity.businessName}`);
-		expect(preview.finalPurpose).toContain(`власний IBAN продавця: ${entity.iban}`);
+		expect(preview.finalPurpose).toContain(`Продавець: ${entity.businessName}`);
+		expect(preview.finalPurpose).toContain(`IBAN ${entity.iban}`);
+		expect(preview.finalPurpose).not.toContain('продавець провайдера');
+		expect(preview.finalPurpose).not.toContain('провайдер:');
 		expect(preview.finalPurpose).not.toContain(draft.financeIban);
 		expect(preview.finalPurpose).toContain('не платіжний payload');
 		expect(preview).toMatchObject({ payee: draft.financeName, iban: draft.financeIban, verified: false, draftOnly: true });

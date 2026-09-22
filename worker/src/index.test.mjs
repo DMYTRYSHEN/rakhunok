@@ -175,6 +175,129 @@ test('routeWebRequest handles POST /api/v1/checkout/:id/initiate', async () => {
 	assert.ok(body.nbu_payload_base64);
 });
 
+test('resolved invoice short_id is authoritative for NBU field 11', async () => {
+	const { routeWebRequest } = await import('./index.ts');
+	globalThis.fetch = async () => Response.json([{
+		id: '4d88e808-e209-4190-a9e2-3299e5d757ee',
+		short_id: 'tinOSq',
+		order_number: 'INV-4092',
+		type: 'fixed',
+		title: 'Рахунок INV-4092',
+		description: 'Оплата рахунку INV-4092',
+		base_amount: 1240,
+		total_amount: 1240,
+		currency: 'UAH',
+		status: 'pending',
+		merchants: {
+			business_name: 'ФОП ДМИТРИШЕН',
+			iban: 'UA12345678987654321345562',
+			tax_id: '11212121212'
+		},
+		business_entities: null
+	}]);
+
+	const response = await routeWebRequest(new Request('https://letsrealtalk.com/api/v1/checkout/tinOSq/initiate', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({
+			bank_code: 'MONO',
+			amount: 1,
+			merchantName: 'CLIENT NAME',
+			merchantIban: 'UA000000000000000000000000000',
+			merchantTaxId: '0000000000',
+			purpose: 'CLIENT PURPOSE',
+			orderNumber: 'CLIENT-CONTROLLED-REFERENCE'
+		})
+	}), { ASSETS: { fetch: async () => new Response('mock') } });
+
+	assert.equal(response.status, 200);
+	const body = await response.json();
+	const fields = body.nbu_raw_string.split('\n');
+	assert.equal(fields[7], 'UAH1240.00');
+	assert.equal(fields[10], 'tinOSq');
+	assert.ok(!body.nbu_raw_string.includes('CLIENT-CONTROLLED-REFERENCE'));
+	assert.ok(!body.nbu_raw_string.includes('CLIENT NAME'));
+	assert.ok(!body.nbu_raw_string.includes('UA000000000000000000000000000'));
+	assert.ok(!body.nbu_raw_string.includes('CLIENT PURPOSE'));
+});
+
+test('payment snapshot is authoritative for NBU recipient and purpose fields', async () => {
+	const { routeWebRequest } = await import('./index.ts');
+	globalThis.fetch = async () => Response.json([{
+		id: '4d88e808-e209-4190-a9e2-3299e5d757ef',
+		short_id: 'finOSq',
+		order_number: 'FIN-0007',
+		type: 'fixed',
+		title: 'Legacy title',
+		description: 'Legacy description',
+		base_amount: 750,
+		total_amount: 750,
+		currency: 'UAH',
+		status: 'pending',
+		payment_acceptance_mode: 'finance-company',
+		payment_recipient_name: 'ТОВ Фінансова компанія',
+		payment_recipient_iban: 'UA987654321098765432109876543',
+		payment_recipient_tax_id: '87654321',
+		payment_purpose: 'Оплата продавцю ТОВ Продавець; payment=server-payment-id',
+		payment_id: '10000000-0000-4000-8000-000000000001',
+		payment_settings_revision: 2,
+		merchants: {
+			business_name: 'CLIENT-FALLBACK-NAME',
+			iban: 'UA000000000000000000000000000',
+			tax_id: '0000000000'
+		},
+		business_entities: null
+	}]);
+
+	const response = await routeWebRequest(new Request('https://letsrealtalk.com/api/v1/checkout/finOSq/initiate', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ purpose: 'CLIENT PURPOSE' })
+	}), { ASSETS: { fetch: async () => new Response('mock') } });
+
+	assert.equal(response.status, 200);
+	const fields = (await response.json()).nbu_raw_string.split('\n');
+	assert.equal(fields[5], 'ТОВ Фінансова компанія');
+	assert.equal(fields[6], 'UA987654321098765432109876543');
+	assert.equal(fields[8], '87654321');
+	assert.equal(fields[11], 'Оплата продавцю ТОВ Продавець; payment=server-payment-id');
+});
+
+test('partial payment snapshot fails closed instead of mixing payment authorities', async () => {
+	const { routeWebRequest } = await import('./index.ts');
+	globalThis.fetch = async () => Response.json([{
+		id: '4d88e808-e209-4190-a9e2-3299e5d757f0',
+		short_id: 'badOSq',
+		order_number: 'INV-0010',
+		type: 'fixed',
+		base_amount: 100,
+		total_amount: 100,
+		status: 'pending',
+		payment_acceptance_mode: 'direct',
+		payment_recipient_name: 'ТОВ Продавець',
+		payment_recipient_iban: null,
+		payment_recipient_tax_id: '12345678',
+		payment_purpose: 'Рахунок INV-0010',
+		payment_id: '10000000-0000-4000-8000-000000000001',
+		payment_settings_revision: 1,
+		merchants: {
+			business_name: 'Fallback recipient',
+			iban: 'UA123456789012345678901234567',
+			tax_id: '12345678'
+		},
+		business_entities: null
+	}]);
+
+	const response = await routeWebRequest(new Request('https://letsrealtalk.com/api/v1/checkout/badOSq/initiate', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: '{}'
+	}), { ASSETS: { fetch: async () => new Response('mock') } });
+
+	assert.equal(response.status, 409);
+	assert.deepEqual(await response.json(), { error: 'Invoice payment snapshot unavailable' });
+});
+
 test('routeWebRequest handles health check', async () => {
 	const { routeWebRequest } = await import('./index.ts');
 	const res = await routeWebRequest(

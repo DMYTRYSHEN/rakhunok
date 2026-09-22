@@ -29,6 +29,7 @@ describe('legacy POS order contract', () => {
 			ok: true,
 			payload: {
 				merchant_id: 'merchant-1',
+				entity_id: 'entity-1',
 				type: 'table',
 				order_number: 'table-1',
 				title: 'POS Стіл (table-1)',
@@ -144,6 +145,7 @@ describe('legacy POS order contract', () => {
 			status: 'ready',
 			payload: {
 				merchant_id: 'merchant-1',
+				entity_id: 'entity-1',
 				terminal_id: terminal.id,
 				total_amount: 100,
 				expires_at: '2026-08-26T10:30:00.000Z'

@@ -626,68 +626,24 @@ export function createDashboardGateway(
 				return { id: orderId };
 			}
 
-			// Fallback directly to Supabase client if Worker API is not reachable or returned 404
-			const userRes = client.auth?.getUser
-				? await client.auth.getUser().catch(() => ({ data: { user: null } }))
-				: { data: { user: null } };
-			const userId = userRes.data?.user?.id;
-			if (!userId) {
-				if (workerError) throw workerError;
-				throw new Error('Користувач не авторизований.');
-			}
-
-			const merchantRes = client.from
-				? await client
-						.from('merchants')
-						.select('id')
-						.eq('id', input.merchantId)
-						.eq('user_id', userId)
-						.maybeSingle<{ id: string }>()
-				: { data: null };
-
-			if (!merchantRes.data?.id) {
-				if (workerError) throw workerError;
-				throw new Error('Профіль мерчанта не знайдено.');
-			}
-			const totalAmount = input.amount + (input.deliveryFee ?? 0);
-			const insertPayload: Record<string, unknown> = {
-				merchant_id: input.merchantId,
-				entity_id: input.entityId ?? null,
-				order_number: input.reference,
-				title: input.title,
-				description: input.description ?? null,
-				type: input.type,
-				base_amount: input.amount,
-				delivery_fee: input.deliveryFee ?? 0,
-				total_amount: totalAmount,
-				status: input.type === 'table' ? 'preparing' : 'pending',
-				table_number: input.tableNumber ?? null,
-				terminal_id: input.terminalId ?? null,
-				currency: 'UAH'
-			};
-			if (input.scenario_config) {
-				insertPayload.scenario_config = input.scenario_config;
-			}
-
-			const { data: inserted, error: insertErr } = await client
-				.from('orders')
-				.insert(insertPayload)
-				.select('id')
-				.single<{ id: string }>();
-
-			if (insertErr || !inserted?.id) {
-				if (insertErr && insertPayload.scenario_config) {
-					delete insertPayload.scenario_config;
-					const retryRes = await client
-						.from('orders')
-						.insert(insertPayload)
-						.select('id')
-						.single<{ id: string }>();
-					if (retryRes.data?.id) {
-						return { id: retryRes.data.id };
-					}
-				}
-				throw insertErr ? new Error(insertErr.message) : (workerError ?? new Error('Не вдалося створити рахунок.'));
+			const { data, error } = await client.rpc('create_authoritative_invoice', {
+				p_merchant_id: input.merchantId,
+				p_entity_id: input.entityId ?? null,
+				p_type: input.type,
+				p_title: input.title,
+				p_description: input.description ?? null,
+				p_base_amount: input.amount,
+				p_delivery_fee: input.deliveryFee ?? 0,
+				p_table_number: input.tableNumber ?? null,
+				p_terminal_id: input.terminalId ?? null,
+				p_scenario_config: input.scenario_config ?? null,
+				p_expires_at: null
+			});
+			const inserted = (Array.isArray(data) ? data[0] : data) as { id?: string } | null;
+			if (error || !inserted?.id) {
+				throw error
+					? new Error(error.message)
+					: (workerError ?? new Error('Не вдалося створити рахунок.'));
 			}
 
 			return { id: inserted.id };
@@ -704,6 +660,8 @@ export function createDashboardGateway(
 			await workerRequest('/api/v1/orders', {
 				method: 'POST',
 				body: JSON.stringify({
+					merchant_id: payload.merchant_id,
+					entity_id: payload.entity_id,
 					type: payload.type,
 					order_number: payload.order_number,
 					title: payload.title,

@@ -6,6 +6,7 @@ export const TAG_ORDER_TTL_SECONDS = 300;
 
 export type LegacyPosOrderInsert = {
 	merchant_id: string;
+	entity_id: string;
 	type: 'table';
 	order_number: string;
 	title: string;
@@ -58,6 +59,7 @@ export function buildLegacyPosOrderInsert(
 		ok: true,
 		payload: {
 			merchant_id: merchantId,
+			entity_id: terminal.entityId,
 			type: 'table',
 			order_number: terminal.code,
 			title: `POS Стіл (${terminal.code})`,

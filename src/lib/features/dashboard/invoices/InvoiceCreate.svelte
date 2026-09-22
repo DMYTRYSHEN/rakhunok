@@ -29,7 +29,6 @@
 		formatInvoiceNumber,
 		formatPaymentPurpose,
 		loadInvoiceRules,
-		saveInvoiceRules,
 		type InvoiceRules
 	} from '../invoice-rules/invoice-rules';
 	import type { BusinessEntity, InvoiceCreateInput, InvoiceType, PosTerminal } from '../types';
@@ -374,8 +373,6 @@
 				entityId: selectedEntity?.id,
 				scenario_config: finalConfig
 			});
-			invoiceRules = { ...invoiceRules, nextNumber: invoiceRules.nextNumber + 1 };
-			saveInvoiceRules(invoiceRules);
 
 			if (linkedProforma) {
 				const mId = businessContext?.merchantId || 'default-merchant';

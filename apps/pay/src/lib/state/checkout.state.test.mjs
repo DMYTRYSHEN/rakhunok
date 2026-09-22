@@ -327,6 +327,15 @@ test('only loaded, fresh, pending, real positive invoices can initiate', async (
   }
 });
 
+test('pending zero-value open amount initiates only with the positive keypad amount', async () => {
+  const h = harness();
+  h.store.order = invoice('order-a', { type: 'open_amount', total_amount: 0, base_amount: 0 });
+  h.store.keypadValue = '12,34';
+  await h.store.executePay();
+  assert.equal(h.calls.initiate.length, 1);
+  assert.equal(h.calls.initiate[0][2], 12.34);
+});
+
 for (const stage of ['captcha', 'response']) {
   for (const change of ['id', 'amount', 'object', 'status', 'expiry', 'navigation', 'bank']) {
     test(`${stage}: reject stale ${change}`, async () => {

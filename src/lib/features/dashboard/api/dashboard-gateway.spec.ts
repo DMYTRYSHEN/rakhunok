@@ -326,34 +326,16 @@ describe('dashboard gateway', () => {
 		);
 	});
 
-	it('keeps the ready-session merchant scope in the direct invoice fallback', async () => {
-		const merchantFilters: Array<[string, unknown]> = [];
-		let insertedPayload: Record<string, unknown> | null = null;
-		const merchantQuery = {
-			select: vi.fn(() => merchantQuery),
-			eq: vi.fn((column: string, value: unknown) => {
-				merchantFilters.push([column, value]);
-				return merchantQuery;
-			}),
-			maybeSingle: vi.fn(async () => ({ data: { id: 'merchant-ready' }, error: null }))
-		};
-		const orderQuery = {
-			insert: vi.fn((payload: Record<string, unknown>) => {
-				insertedPayload = payload;
-				return orderQuery;
-			}),
-			select: vi.fn(() => orderQuery),
-			single: vi.fn(async () => ({ data: { id: 'invoice-fallback' }, error: null }))
-		};
+	it('uses the authenticated authoritative RPC when the Worker is unavailable', async () => {
+		const rpc = vi.fn(async () => ({ data: { id: 'invoice-fallback' }, error: null }));
 		const client = {
 			auth: {
 				getSession: vi.fn(async () => ({
 					data: { session: { ...session, access_token: 'access-token' } },
 					error: null
-				})),
-				getUser: vi.fn(async () => ({ data: { user: session.user }, error: null }))
+				}))
 			},
-			from: vi.fn((table: string) => (table === 'merchants' ? merchantQuery : orderQuery))
+			rpc
 		} as unknown as SupabaseClient;
 		const gateway = createDashboardGateway(client, {
 			fetcher: vi.fn<typeof fetch>().mockRejectedValue(new TypeError('network unavailable'))
@@ -375,6 +357,7 @@ describe('dashboard gateway', () => {
 		await expect(
 			gateway.createInvoice({
 				merchantId: 'merchant-ready',
+				entityId: 'entity-ready',
 				type: 'fixed',
 				reference: 'INV-TEMPLATE',
 				title: 'Template invoice',
@@ -383,15 +366,20 @@ describe('dashboard gateway', () => {
 			})
 		).resolves.toEqual({ id: 'invoice-fallback' });
 
-		expect(merchantFilters).toEqual([
-			['id', 'merchant-ready'],
-			['user_id', 'user-1']
-		]);
-		expect(insertedPayload).toMatchObject({
-			merchant_id: 'merchant-ready',
-			order_number: 'INV-TEMPLATE',
-			scenario_config: scenarioConfig
+		expect(rpc).toHaveBeenCalledWith('create_authoritative_invoice', {
+			p_merchant_id: 'merchant-ready',
+			p_entity_id: 'entity-ready',
+			p_type: 'fixed',
+			p_title: 'Template invoice',
+			p_description: null,
+			p_base_amount: 100,
+			p_delivery_fee: 0,
+			p_table_number: null,
+			p_terminal_id: null,
+			p_scenario_config: scenarioConfig,
+			p_expires_at: null
 		});
+		expect(JSON.stringify(rpc.mock.calls[0])).not.toContain('INV-TEMPLATE');
 	});
 
 	it('loads and saves merchant settings through an owner-keyed row', async () => {
@@ -499,6 +487,7 @@ describe('dashboard gateway', () => {
 		const gateway = createDashboardGateway(client, { fetcher });
 		const payload = {
 			merchant_id: 'merchant-1',
+			entity_id: 'entity-1',
 			type: 'table' as const,
 			order_number: 'table-1',
 			title: 'POS Стіл (table-1)',
@@ -519,6 +508,7 @@ describe('dashboard gateway', () => {
 		expect(fetcher).toHaveBeenCalledTimes(3);
 		expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/orders');
 		expect(fetcher.mock.calls[0]?.[1]?.body).toContain('"status":"pending"');
+		expect(fetcher.mock.calls[0]?.[1]?.body).toContain('"entity_id":"entity-1"');
 		expect(fetcher.mock.calls[0]?.[1]?.body).toContain('"terminal_id":"terminal-1"');
 		expect(fetcher.mock.calls[0]?.[1]?.body).toContain('"expires_at":"2026-08-26T00:30:00.000Z"');
 		expect(fetcher.mock.calls[1]?.[0]).toBe('/api/v1/orders/order-1');

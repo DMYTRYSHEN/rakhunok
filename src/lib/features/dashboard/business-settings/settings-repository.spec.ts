@@ -72,6 +72,7 @@ describe('finance template v2', () => {
 	});
 	it('substitutes once, marks missing fields and cannot fabricate a payment ID', () => {
 		const text = previewFinancePurpose('{seller_name} {seller_iban} {payment_id}', { seller_name: '{provider_code}', payment_id: 'fake' });
+		expect(text).toContain('ID: [буде створено сервером]');
 		expect(text).toContain('{provider_code}');
 		expect(text).toContain('[не задано: seller_iban]');
 		expect(text).toContain('не реальний ID'); expect(text).not.toContain('fake');

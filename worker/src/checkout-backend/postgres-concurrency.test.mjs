@@ -114,7 +114,8 @@ test('real PostgreSQL: attempt-bound settlement is atomic, idempotent and confli
   const snapshot=(await a.query("select checkout_read('invoice',$1,$2,0) as value",[orderId,hash])).rows[0].value.value;
   const attempt=(await a.query("select checkout_initiate('invoice',$1,$2,$1,$3,$4) as value",[orderId,hash,snapshot.order.revision,'settle-'+crypto.randomUUID()])).rows[0].value;
   const stamp=(await a.query('select clock_timestamp()::text as value')).rows[0].value;
-  const args=['synthetic','event-1',attempt.attemptId,attempt.quote.amountMinor,'UAH',attempt.quote.recipient.iban,'reference-1',stamp];
+  const reference=(await a.query('select short_id from orders where id=$1',[orderId])).rows[0].short_id;
+  const args=['synthetic','event-1',attempt.attemptId,attempt.quote.amountMinor,'UAH',attempt.quote.recipient.iban,reference,stamp];
   const sql='select checkout_record_settlement($1,$2,$3,$4,$5,$6,$7,$8) as value';
   assert.deepEqual((await a.query(sql,args)).rows[0].value,{outcome:'paid',replayed:false});
   assert.deepEqual((await a.query(sql,args)).rows[0].value,{outcome:'paid',replayed:true});
@@ -160,9 +161,10 @@ async function settlementAttempt(client,{orderId,hash}) {
 }
 async function settlementArgs(client,attempt) {
   // Keep PostgreSQL microseconds: JS Date truncation can move occurredAt before created_at.
-  const stamp=(await client.query('select clock_timestamp()::text as value')).rows[0].value;
+  const {rows:[values]}=await client.query(`select clock_timestamp()::text as stamp,short_id
+    from orders where id=$1`,[attempt.quote.orderId]);
   return ['synthetic','regression-'+crypto.randomUUID(),attempt.attemptId,attempt.quote.amountMinor,
-    attempt.quote.currency,attempt.quote.recipient.iban,'regression-'+crypto.randomUUID(),stamp];
+    attempt.quote.currency,attempt.quote.recipient.iban,values.short_id,values.stamp];
 }
 async function settlementState(client,orderId) {
   return (await client.query(`select
@@ -190,6 +192,14 @@ async function assertReview(client,orderId,attempt,args) {
   assert.deepEqual(await settlementLedger(client,attempt.attemptId),ledger,'review replay must not rewrite audit data');
   assert.deepEqual(await settlementState(client,orderId),before,'review must not mutate invoice, revisions or outbox');
 }
+
+test('real PostgreSQL: settlement with a different invoice reference enters immutable review', {skip},()=>clients(async(a,_b,_o,values)=>{
+  await a.query('begin');
+  const attempt=await settlementAttempt(a,values);
+  const args=await settlementArgs(a,attempt);
+  args[6]='Wrong1';
+  await assertReview(a,values.orderId,attempt,args);
+}));
 
 // Time fixtures are INSERT-only copies of a real quote; immutable receipts are never
 // updated and no sleeps/short deadlines are needed. All these cases roll back.
