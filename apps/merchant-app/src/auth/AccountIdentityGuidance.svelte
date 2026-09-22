@@ -2,7 +2,7 @@
 	import type { User } from '@supabase/supabase-js';
 	import { tick, untrack } from 'svelte';
 	import { ArrowLeft, ArrowRight, Check, Link2, ShieldCheck, X } from '@lucide/svelte';
-	import { hasTelegramIdentity } from './telegram-session';
+	import { TELEGRAM_PROVIDER } from './telegram-session';
 
 	let { context = 'guest', user }: {
 		context?: 'guest' | 'profile' | 'onboarding';
@@ -10,7 +10,7 @@
 	} = $props();
 	const id = $props.id();
 	const hasGoogle = $derived(user?.identities?.some((identity) => identity.provider === 'google') ?? false);
-	const hasTelegram = $derived(user ? hasTelegramIdentity(user) : false);
+	const hasTelegram = $derived(user?.identities?.some((identity) => identity.provider === TELEGRAM_PROVIDER) ?? false);
 	const linked = $derived(context !== 'guest' && hasGoogle && hasTelegram);
 	// Identity replacement matters even when the provider names remain the same.
 	const scope = $derived(JSON.stringify([context, user?.id, user?.identities?.map((identity) =>

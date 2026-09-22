@@ -68,7 +68,8 @@ BEGIN
     -- Literal membership avoids locale/range/Unicode-version classification differences.
     OR translate(v ->> 'prefix', prefix_alphabet, '') <> ''
     OR v ->> 'qrCategory' !~ '^[A-Z0-9]{4}/[A-Z0-9]{4}$'
-    OR NOT business_settings_private.valid_template(v -> 'purposeTemplate', 420, 'number|date|tax')
+    OR NOT business_settings_private.valid_template(v -> 'purposeTemplate', 420,
+      'number|date|scenario|amount|customer|contract|tax')
     THEN RETURN false; END IF;
   FOREACH k IN ARRAY ARRAY['nextNumber','padding'] LOOP
     IF jsonb_typeof(v -> k) <> 'number' THEN RETURN false; END IF;

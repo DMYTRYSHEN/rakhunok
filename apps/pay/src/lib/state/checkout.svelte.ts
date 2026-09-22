@@ -1839,7 +1839,7 @@ class CheckoutStore {
 			order.status === 'pending' &&
 			isOrderFresh(order) &&
 			Number.isFinite(order.total_amount) &&
-			order.total_amount > 0 &&
+			(order.total_amount > 0 || order.type === 'open_amount') &&
 			Number.isFinite(this.payTotalAmount) &&
 			this.payTotalAmount > 0
 		);

@@ -339,6 +339,63 @@ test('routeWebRequest handles banks catalog and logos', async () => {
 	assert.ok(logos.PBAN);
 });
 
+test('routeWebRequest reads the bank catalog from Supabase without mutating it', async () => {
+	const { routeWebRequest } = await import('./index.ts');
+	const requests = [];
+	globalThis.fetch = async (input, init = {}) => {
+		requests.push({ input: String(input), init });
+		return Response.json([
+			{ id: 'grant', code: 'GRNT', name: 'Банк Грант', active: true }
+		]);
+	};
+
+	const env = {
+		ASSETS: { fetch: async () => new Response('mock') },
+		SUPABASE_URL: 'https://catalog.supabase.co',
+		SUPABASE_ANON_KEY: 'publishable-test-key'
+	};
+	const response = await routeWebRequest(
+		new Request('https://letsrealtalk.com/api/v1/banks/grnt'),
+		env
+	);
+
+	assert.equal(response.status, 200);
+	assert.equal((await response.json()).id, 'grant');
+	assert.equal(requests.length, 1);
+	assert.equal(
+		requests[0].input,
+		'https://catalog.supabase.co/rest/v1/banklink?select=*&order=name.asc'
+	);
+	assert.equal(requests[0].init.method, 'GET');
+	assert.equal(requests[0].init.headers.apikey, 'publishable-test-key');
+	assert.equal(requests[0].init.body, undefined);
+});
+
+test('routeWebRequest preserves the fallback bank catalog when Supabase is unavailable or invalid', async () => {
+	const { routeWebRequest } = await import('./index.ts');
+	const env = {
+		ASSETS: { fetch: async () => new Response('mock') },
+		SUPABASE_URL: 'https://catalog.supabase.co',
+		SUPABASE_ANON_KEY: 'publishable-test-key'
+	};
+	const upstreamResponses = [
+		new Response('unavailable', { status: 500 }),
+		Response.json([]),
+		Response.json([{ id: 'broken', code: '', name: 'Broken Bank' }])
+	];
+
+	for (const upstreamResponse of upstreamResponses) {
+		globalThis.fetch = async () => upstreamResponse;
+		const response = await routeWebRequest(
+			new Request('https://letsrealtalk.com/api/v1/banks/pban'),
+			env
+		);
+
+		assert.equal(response.status, 200);
+		assert.equal((await response.json()).code, 'PBAN');
+	}
+});
+
 test('routeWebRequest handles auth and merchant onboarding', async () => {
 	const { routeWebRequest } = await import('./index.ts');
 	const authRes = await routeWebRequest(

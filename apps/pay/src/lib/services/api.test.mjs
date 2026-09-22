@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { after, before, mock } from 'node:test';
-import { fetchCheckoutOrder, getApiBase, initiateBankPayment } from './api.ts';
+import { fetchBanksCatalog, fetchCheckoutOrder, getApiBase, initiateBankPayment } from './api.ts';
 
 // Any accidental use of real fetch fails locally instead of accessing the network.
 before(() => mock.method(globalThis, 'fetch', () => {
@@ -47,6 +47,32 @@ test('selects the local Worker only for localhost development', () => {
   assert.equal(getApiBase({ hostname: 'localhost', port: '59692' }), 'http://localhost:8787');
   assert.equal(getApiBase({ hostname: 'localhost', port: '8787' }), '');
   assert.equal(getApiBase({ hostname: 'pay.rahunok.ua', port: '' }), '');
+});
+
+test('bank catalog overlays an incomplete API response without dropping bundled banks', async () => {
+  const bundled = [
+    { code: 'ALPHA', name: 'Bundled Alpha', active: true, color: '#111111' },
+    { code: 'BETA', name: 'Bundled Beta', active: true, color: '#222222' }
+  ];
+  const api = [
+    { code: 'alpha', name: 'API Alpha', is_active: true, color: '#abcdef' },
+    { code: 'GAMMA', name: 'API Gamma', active: true, color: '#333333' }
+  ];
+  const urls = [];
+
+  const result = await fetchBanksCatalog({
+    apiBase: '',
+    fetchImpl: async (url) => {
+      urls.push(url);
+      return jsonResponse(url === '/pay/banks.json' ? bundled : api);
+    }
+  });
+
+  assert.deepEqual(urls, ['/pay/banks.json', '/api/v1/banks', '/api/v1/logos']);
+  assert.deepEqual(result.map((bank) => bank.code), ['alpha', 'BETA', 'GAMMA']);
+  assert.deepEqual(result[0], { ...bundled[0], ...api[0] });
+  assert.deepEqual(result[1], bundled[1]);
+  assert.deepEqual(result[2], api[1]);
 });
 
 test('returns checkout order JSON from the Worker API', async () => {

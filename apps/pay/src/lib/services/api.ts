@@ -90,7 +90,19 @@ export async function fetchBanksCatalog(
     if (listRes && listRes.ok) {
       const list = await listRes.json();
       if (Array.isArray(list) && list.length > 0) {
-        banks = list.filter((b: Bank) => b.active !== false && b.is_active !== false);
+        const apiBanks = list.filter((b: Bank) => b.active !== false && b.is_active !== false);
+        const apiBanksByCode = new Map(
+          apiBanks.map((bank: Bank) => [bank.code.toUpperCase(), bank])
+        );
+        const bundledCodes = new Set(banks.map((bank) => bank.code.toUpperCase()));
+
+        banks = banks.map((bank) => {
+          const apiBank = apiBanksByCode.get(bank.code.toUpperCase());
+          return apiBank ? { ...bank, ...apiBank } : bank;
+        });
+        banks.push(
+          ...apiBanks.filter((bank: Bank) => !bundledCodes.has(bank.code.toUpperCase()))
+        );
       }
     }
 

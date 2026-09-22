@@ -71,6 +71,7 @@ function harness({ dev = false, url = 'https://checkout.invalid/pay/?id=order-a'
         bondar: { slug: 'bondar_taxi', name: 'Бондар', description: 'Таксі' }
       } };
       if (name.endsWith('/scenarios.js')) return { resolveScenario: () => ({ config: {} }) };
+      if (name.endsWith('/checkout-scenario-defaults.ts')) return { getScenarioDefaults: () => ({}) };
       if (name.endsWith('/terminal-authority.js')) {
         const exports = {};
         vm.runInNewContext(terminalAuthority, {

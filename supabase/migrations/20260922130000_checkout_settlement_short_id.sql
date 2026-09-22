@@ -1,5 +1,18 @@
 begin;
 
+set local lock_timeout = '2s';
+set local statement_timeout = '30s';
+
+do $migration$
+begin
+  if to_regclass('checkout_private.attempts') is null
+    or to_regclass('checkout_private.settlements') is null
+    or to_regprocedure('checkout_private.gate()') is null
+    or to_regprocedure('public.checkout_record_settlement(text,text,uuid,bigint,text,text,text,timestamptz)') is null then
+    return;
+  end if;
+
+  execute $function$
 create or replace function public.checkout_record_settlement(p_provider text,p_event_id text,p_attempt uuid,
   p_amount_minor bigint,p_currency text,p_iban text,p_reference text,p_occurred_at timestamptz)
 returns jsonb language plpgsql security definer set search_path='' as $$
@@ -35,9 +48,12 @@ begin
   insert into checkout_private.settlements(provider,event_id,attempt_id,event,outcome)
     values(p_provider,p_event_id,p_attempt,event,outcome);
   return jsonb_build_object('outcome',outcome,'replayed',false);
-end $$;
+end $$
+$function$;
 
-revoke all on function public.checkout_record_settlement(text,text,uuid,bigint,text,text,text,timestamptz) from public,anon,authenticated;
-grant execute on function public.checkout_record_settlement(text,text,uuid,bigint,text,text,text,timestamptz) to service_role;
+  execute 'revoke all on function public.checkout_record_settlement(text,text,uuid,bigint,text,text,text,timestamptz) from public,anon,authenticated';
+  execute 'grant execute on function public.checkout_record_settlement(text,text,uuid,bigint,text,text,text,timestamptz) to service_role';
+end
+$migration$;
 
 commit;

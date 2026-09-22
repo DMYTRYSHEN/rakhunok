@@ -199,6 +199,43 @@ export const DEFAULT_BANKS = [
 	}
 ];
 
+type BankCatalogEntry = (typeof DEFAULT_BANKS)[number] | Record<string, unknown>;
+
+function isBankCatalogEntry(value: unknown): value is BankCatalogEntry {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+	const bank = value as Record<string, unknown>;
+	return (
+		typeof bank.id === 'string' && bank.id.trim().length > 0 &&
+		typeof bank.code === 'string' && bank.code.trim().length > 0 &&
+		typeof bank.name === 'string' && bank.name.trim().length > 0
+	);
+}
+
+async function resolveBankCatalog(env: Env): Promise<BankCatalogEntry[]> {
+	const supabaseUrl = env.SUPABASE_URL?.trim().replace(/\/$/, '');
+	const supabaseAnonKey = env.SUPABASE_ANON_KEY?.trim();
+	if (!supabaseUrl || !supabaseAnonKey) return DEFAULT_BANKS;
+
+	try {
+		const response = await fetch(`${supabaseUrl}/rest/v1/banklink?select=*&order=name.asc`, {
+			method: 'GET',
+			headers: {
+				apikey: supabaseAnonKey,
+				Authorization: `Bearer ${supabaseAnonKey}`
+			}
+		});
+		if (!response.ok) return DEFAULT_BANKS;
+
+		const banks: unknown = await response.json();
+		if (!Array.isArray(banks) || banks.length === 0 || !banks.every(isBankCatalogEntry)) {
+			return DEFAULT_BANKS;
+		}
+		return banks;
+	} catch {
+		return DEFAULT_BANKS;
+	}
+}
+
 export const DEFAULT_LOGOS: Record<string, { color: string; logo: string; name: string }> = {
 	MONO: {
 		color: '#000000',
@@ -775,18 +812,19 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 		url.pathname.startsWith('/banks/')
 	) {
 		if (request.method === 'GET') {
+			const banks = await resolveBankCatalog(env);
 			const bankCodeMatch = url.pathname.match(/^\/(?:api\/v1\/)?banks\/([a-zA-Z0-9_-]+)$/i);
 			if (bankCodeMatch) {
 				const idOrCode = bankCodeMatch[1].toLowerCase();
-				const bank = DEFAULT_BANKS.find(
-					(b) => b.code.toLowerCase() === idOrCode || b.id.toLowerCase() === idOrCode
+				const bank = banks.find(
+					(b) => String(b.code).toLowerCase() === idOrCode || String(b.id).toLowerCase() === idOrCode
 				);
 				if (bank) {
 					return jsonResponse(bank);
 				}
 				return jsonResponse({ error: `Bank ${idOrCode} not found` }, 404);
 			}
-			return jsonResponse(DEFAULT_BANKS);
+			return jsonResponse(banks);
 		}
 	}
 

@@ -791,7 +791,7 @@
 			{/await}
 		{:else if view === 'developer-api'}
 			{#await loadDeveloperApi() then module}
-				<module.default gateway={gateway!} merchantId={sessionState.merchant.id} />
+				<module.default {gateway} merchantId={sessionState.merchant.id} />
 			{/await}
 		{:else if view === 'sandbox'}
 			{#await loadPaymentSandbox() then module}<module.default />{/await}

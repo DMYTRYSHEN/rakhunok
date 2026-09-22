@@ -25,6 +25,28 @@ Before changing Dashboard code:
 Incidental refactoring, formatting, dependency replacement, schema work, and shared-component
 changes do not bypass these rules.
 
+### BANK-CATALOG-READ-001 — public BankLink catalog (2026-09-22)
+
+- **Status:** `LOCKED` — the user approved and the implementation completed read-only catalog
+  resolution only. Payment initiation, invoice scenarios, Conf management, database writes,
+  migrations, and deployment were not unlocked.
+- Worker bank list and detail GET routes read `public.banklink` through a single PostgREST `GET`
+  using the configured publishable/anon key. The request has no body and cannot mutate source rows.
+- The existing hardcoded `DEFAULT_BANKS` remains unchanged and is returned when Supabase
+  configuration is absent, the request throws, the response is non-2xx, JSON is invalid, or the
+  result is empty or contains an invalid `id`, `code`, or `name`.
+- Detail lookup remains case-insensitive by bank `id` or `code`. A focused regression confirms an
+  API-only bank resolves from Supabase; failure regressions confirm `500`, empty, and malformed
+  responses preserve the fallback catalog.
+- Pay keeps its active bundled catalog when a successful Worker response is incomplete, overlays
+  matching active API records by case-insensitive `code`, and appends API-only records. This changes
+  catalog composition only; payment initiation, invoice data, scenarios, statuses, and redirects
+  remain unchanged.
+- Evidence: all 18 tests in `worker/src/index.test.mjs` pass and editor diagnostics are clean for
+  the changed Worker source and test. Pay validation passes all 236 tests and `svelte-check` with
+  zero errors; the local target invoice renders 46 bank rows, including bundled-only `ALLI` and
+  API-only `UNJS`. No remote query, migration, or deployment was performed.
+
 ### CROSS-APP-INVOICE-SCENARIOS-001 — established invoice scenarios (2026-09-21)
 
 - **Status:** `UNLOCKED` — on 2026-09-22 the user explicitly approved a compatibility-preserving
@@ -136,6 +158,23 @@ changes do not bypass these rules.
 - Ukrainian IBAN format remains enforced as `UA` plus 27 digits. Mod-97 enforcement is not added in
   this compatibility scope because existing Dashboard settings and fixtures permit format-only
   synthetic IBAN values; checksum rollout requires separate data cleanup and compatibility review.
+
+#### Amount And Purpose Verification — 2026-09-22
+
+- Read-only inspection classified order `4125d75a-4f5d-48a4-b326-04ebb729d761` as a legacy
+  `fixed` invoice created before the snapshot migration: its persisted `base_amount` and
+  `total_amount` are both `117.00`, while its title is `Рахунок APP-49520512` and description is
+  null. The connected remote database does not yet contain the payment snapshot columns or the
+  `20260922140000_invoice_payment_snapshots` migration, so this existing invoice cannot use the
+  agreed seller or finance-company purpose formatter and correctly remains on legacy fallback.
+- The local candidate now accepts and renders the same seller purpose tokens as Dashboard:
+  `{number}`, `{date}`, `{scenario}`, `{amount}`, `{customer}`, `{contract}`, and `{tax}`. Rendering
+  uses the concrete invoice total (`base_amount + delivery_fee`), the scenario label, seller contract,
+  and Dashboard-compatible whitespace normalization. A focused PGlite regression verifies all
+  supported tokens are consumed for a delivery invoice.
+- No remote migration, data mutation, or deployment was performed. Existing legacy invoices were
+  not reinterpreted or backfilled; new immutable purpose snapshots require separately approved
+  application of the pending migration and compatible application deployment.
 
 #### Approved Temporary Scope — Public Scenario Catalog
 
@@ -461,6 +500,16 @@ focused unit plus browser validation. Restore `LOCKED` after the approved work i
 - **Status:** `ANALYZING` — authorized migration and isolated Dashboard deployment completed;
   production smoke remains ongoing in the main session. Earlier `LOCAL VALIDATED — REMOTE BLOCKED`
   status describes the pre-approval checkpoint, not the current rollout state.
+- On 2026-09-22 the user approved correcting problems limited to `?demo=1`. The scope covers stale
+  demo browser assertions, independent viewport test budgets, and fail-closed Developer API demo
+  credentials when no gateway exists. It does not unlock production auth, persistence, invoice or
+  payment behavior, schema changes, or deployment.
+- Demo-only repair is locally validated: the focused demo slice passed 6/6, the checkout-template
+  flow passed 1/1 in isolation, and the complete Dashboard browser suite passed 24/24. Developer API
+  now accepts an absent gateway and fails closed before credential reads or mutations; its focused
+  browser test passed 1/1 after the final guards. Root `npm run check` passed with 0 errors and 9
+  pre-existing unused-CSS warnings in template previews. No production auth, persistence, invoice or
+  payment behavior, schema, API, RLS, deployment, or `rakhunok.com` resource changed.
 - User approved persistence, scoped pre-deploy safety remediation, then the separate migration and
   Dashboard-only rollout below. This does not unlock any other registered process.
 - Scope: isolated candidate SQL, transactional owner-scoped settings RPC, existing SDK adapter,

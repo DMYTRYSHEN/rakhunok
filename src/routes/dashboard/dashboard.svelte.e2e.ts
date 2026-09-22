@@ -25,6 +25,7 @@ test('renders the dashboard overview with the financial baseline', async ({ page
 
 test('manages checkout templates locally in demo mode', async ({ page }) => {
 	const supabaseRequests: string[] = [];
+	page.on('dialog', (dialog) => dialog.accept());
 	page.on('request', (request) => {
 		if (/\.supabase\.co\/|\/rest\/v1\/(?:checkout_templates|rpc\/)/i.test(request.url())) {
 			supabaseRequests.push(request.url());
@@ -40,7 +41,7 @@ test('manages checkout templates locally in demo mode', async ({ page }) => {
 	await expect(page.getByText('Немає шаблонів')).toBeVisible();
 	await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll');
 
-	await page.getByRole('button', { name: '+ Створити шаблон' }).click();
+	await page.getByRole('button', { name: '+ Новий шаблон' }).click();
 	const editor = page.getByRole('dialog', { name: 'Новий шаблон' });
 	await editor.getByRole('textbox', { name: 'Назва шаблону' }).fill('Основний чайові');
 	await editor.getByRole('button', { name: 'Прев’ю' }).click();
@@ -59,7 +60,8 @@ test('manages checkout templates locally in demo mode', async ({ page }) => {
 	await expect(editor.getByText('Є незбережені зміни')).toBeVisible();
 	await editor.getByRole('button', { name: 'Прев’ю' }).click();
 	await expect(editor.getByRole('heading', { name: 'Перевірка вигляду' })).toBeVisible();
-	await editor.getByRole('button', { name: 'Подякувати 10 ₴' }).click();
+	await editor.getByRole('button', { name: '+20 ₴' }).click();
+	await editor.getByRole('button', { name: 'Подякувати 20 ₴' }).click();
 	const paymentSheet = editor.getByRole('dialog', { name: 'Вибір способу оплати' });
 	await expect(paymentSheet).toBeVisible();
 	await expect(editor.getByText('Очікує на оплату')).toBeVisible();
@@ -74,8 +76,8 @@ test('manages checkout templates locally in demo mode', async ({ page }) => {
 	await editor.getByRole('button', { name: 'Створити шаблон' }).click();
 
 	await expect(page.getByText('Основний чайові')).toBeVisible();
-	await expect(page.getByText('Default')).toHaveCount(1);
-	await page.getByRole('button', { name: '+ Створити шаблон' }).click();
+	await expect(page.getByText('За замовчуванням', { exact: true })).toHaveCount(1);
+	await page.getByRole('button', { name: '+ Новий шаблон' }).click();
 	const secondEditor = page.getByRole('dialog', { name: 'Новий шаблон' });
 	await secondEditor.getByRole('textbox', { name: 'Назва шаблону' }).fill('АЗС майбутній');
 	await secondEditor.getByRole('combobox', { name: 'Тип чекауту' }).selectOption('fuel_station');
@@ -99,16 +101,16 @@ test('manages checkout templates locally in demo mode', async ({ page }) => {
 	const secondCard = page.locator('div.flex.flex-col.overflow-hidden').filter({
 		has: page.getByRole('heading', { name: 'АЗС майбутній', level: 3 })
 	});
-	await secondCard.getByRole('button', { name: 'Зробити основним' }).click();
-	await expect(page.getByText('Default')).toHaveCount(1);
+	await secondCard.getByRole('button', { name: 'Зробити за замовчуванням' }).click();
+	await expect(page.getByText('За замовчуванням', { exact: true })).toHaveCount(1);
 	await page.reload();
 	await expect(page.getByText('Основний чайові')).toBeVisible();
 	await expect(page.getByText('АЗС майбутній')).toBeVisible();
-	await expect(page.getByText('Default')).toHaveCount(1);
+	await expect(page.getByText('За замовчуванням', { exact: true })).toHaveCount(1);
 	await page
 		.locator('div.flex.flex-col.overflow-hidden')
 		.filter({ has: page.getByRole('heading', { name: 'АЗС майбутній', level: 3 }) })
-		.getByRole('button', { name: 'Редагувати' })
+		.getByRole('button', { name: 'Змінити' })
 		.click();
 	const persistedPresetEditor = page.getByRole('dialog', { name: 'Редагування шаблону' });
 	await expect(
@@ -119,13 +121,12 @@ test('manages checkout templates locally in demo mode', async ({ page }) => {
 	const firstCard = page.locator('div.flex.flex-col.overflow-hidden').filter({
 		has: page.getByRole('heading', { name: 'Основний чайові', level: 3 })
 	});
-	await firstCard.getByRole('button', { name: 'Редагувати' }).click();
+	await firstCard.getByRole('button', { name: 'Змінити' }).click();
 	const editDialog = page.getByRole('dialog', { name: 'Редагування шаблону' });
 	await editDialog.getByRole('textbox', { name: 'Назва шаблону' }).fill('Чайові тераса');
 	await editDialog.getByRole('button', { name: 'Зберегти зміни' }).click();
 	await expect(page.getByText('Чайові тераса')).toBeVisible();
 
-	page.once('dialog', (dialog) => dialog.accept());
 	await page
 		.locator('div.flex.flex-col.overflow-hidden')
 		.filter({ has: page.getByRole('heading', { name: 'Чайові тераса', level: 3 }) })
@@ -161,7 +162,7 @@ test('documents the current merchant OpenAPI contract', async ({ page, context }
 test('keeps dark theme icons and controls distinguishable', async ({ page }) => {
 	await page.addInitScript(() => localStorage.setItem('rahunok_theme', 'dark'));
 	await page.goto('/dashboard/team?demo=1');
-	await expect(page.getByRole('heading', { name: 'Команда й касири' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Команда, касири та КСО' })).toBeVisible();
 	await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
 	const contrastRatio = async (selector: string) =>

@@ -59,9 +59,9 @@ const hundreds: Record<string, number> = {
 
 const intentPatterns = [
 	/(створи|створити|зроби|зробити|вистав|виставити|сформуй|сформувати)\s+(?:\S+\s+)?рахунок/,
-	/(создай|создать|сделай|сделать|выставь|выставить|сформируй|сформировать)\s+(?:\S+\s+)?счет/,
+	/(создай|создать|сделай|сделать|выставь|выставить|сформируй|сформировать)\s+(?:\S+\s+)?сч[её]т/,
 	/(потрібен|потрібно|треба)\s+(?:\S+\s+)?рахунок/,
-	/(нужен|нужно)\s+(?:\S+\s+)?счет/,
+	/(нужен|нужно)\s+(?:\S+\s+)?сч[её]т/,
 	/(?:^|\s)до\s+сплати(?=\s|$)/,
 	/(?:^|\s)к\s+оплате(?=\s|$)/,
 	/(?:^|\s)с\s+вас(?=\s|$)/
@@ -187,7 +187,7 @@ function parseNumberTokens(tokens: string[]): number | null {
 function parseCustomer(text: string): VoiceCommand['entities']['customer'] {
 	const withoutFillers = text.replace(/(?:^|\s)(будь ласка|пожалуйста|мені потрібно|мені треба|мне нужно)(?=\s|$)/g, ' ');
 	const explicit = withoutFillers.match(/(?:^|\s)для\s+([а-яіїєґ'-]+)(?=\s|$)/i)?.[1];
-	const beforeInvoice = withoutFillers.match(/(?:^|\s)(?:створи|створити|зроби|вистав|виставити|сформуй|создай|создать|сделай|выставь|выставить|сформируй)\s+([а-яіїєґ'-]+)\s+(?:рахунок|счет)(?=\s|$)/i)?.[1];
+	const beforeInvoice = withoutFillers.match(/(?:^|\s)(?:створи|створити|зроби|вистав|виставити|сформуй|создай|создать|сделай|выставь|выставить|сформируй)\s+([а-яіїєґ'-]+)\s+(?:рахунок|сч[её]т)(?=\s|$)/i)?.[1];
 	const rawName = explicit || beforeInvoice;
 	if (!rawName || isNumberToken(rawName) || currencyWords[rawName]) return null;
 	return { name: normalizeName(rawName), confidence: explicit ? 0.96 : 0.92 };

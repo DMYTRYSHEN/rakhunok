@@ -9,11 +9,24 @@ const settingsSql = await readFile(
 	'utf8'
 );
 const snapshotSql = await readFile(
-	new URL('../../../supabase/migrations/20260922140000_invoice_payment_snapshots.sql', import.meta.url),
+	new URL(
+		'../../../supabase/migrations/20260922140000_invoice_payment_snapshots.sql',
+		import.meta.url
+	),
 	'utf8'
 );
 const shortIdSql = await readFile(
-	new URL('../../../supabase/migrations/20260922120000_order_short_id_authority.sql', import.meta.url),
+	new URL(
+		'../../../supabase/migrations/20260922120000_order_short_id_authority.sql',
+		import.meta.url
+	),
+	'utf8'
+);
+const purposeTokensSql = await readFile(
+	new URL(
+		'../../../supabase/migrations/20260922135000_business_settings_purpose_tokens.sql',
+		import.meta.url
+	),
 	'utf8'
 );
 const ids = {
@@ -52,21 +65,28 @@ async function save(document, revision = 0) {
 }
 
 async function createInvoice() {
-	return (await db.query(
-		`select (public.create_authoritative_invoice(
+	return (
+		await db.query(
+			`select result.* from public.create_authoritative_invoice(
 			$1, $2, 'fixed', 'Client title', 'Delivery note', 100, 20, null, null, '{"allow_tips":false}'
-		)).*`,
-		[ids.merchant, ids.entity]
-	)).rows[0];
+		) as result`,
+			[ids.merchant, ids.entity]
+		)
+	).rows[0];
 }
 
-async function createScenarioInvoice(type, { baseAmount, deliveryFee = 0, tableNumber = null, terminalId = null, expiresAt = null }) {
-	return (await db.query(
-		`select (public.create_authoritative_invoice(
+async function createScenarioInvoice(
+	type,
+	{ baseAmount, deliveryFee = 0, tableNumber = null, terminalId = null, expiresAt = null }
+) {
+	return (
+		await db.query(
+			`select result.* from public.create_authoritative_invoice(
 			$1, $2, $3, 'Scenario invoice', null, $4, $5, $6, $7, null, $8
-		)).*`,
-		[ids.merchant, ids.entity, type, baseAmount, deliveryFee, tableNumber, terminalId, expiresAt]
-	)).rows[0];
+		) as result`,
+			[ids.merchant, ids.entity, type, baseAmount, deliveryFee, tableNumber, terminalId, expiresAt]
+		)
+	).rows[0];
 }
 
 before(async () => {
@@ -111,6 +131,7 @@ before(async () => {
 	`);
 	await db.exec(settingsSql);
 	await db.exec(shortIdSql);
+	await db.exec(purposeTokensSql);
 	await db.exec(snapshotSql);
 	await save({
 		version: 2,
@@ -144,18 +165,24 @@ test('direct mode snapshots seller recipient and atomically reserves numbers', a
 test('concurrent creation reserves distinct invoice numbers', async () => {
 	await identity();
 	const orders = await Promise.all(Array.from({ length: 8 }, () => createInvoice()));
-	const numbers = orders.map((order) => Number(order.order_number.replace('INV-', ''))).sort((a, b) => a - b);
+	const numbers = orders
+		.map((order) => Number(order.order_number.replace('INV-', '')))
+		.sort((a, b) => a - b);
 	assert.equal(new Set(numbers).size, numbers.length);
-	assert.deepEqual(numbers, Array.from({ length: 8 }, (_, index) => numbers[0] + index));
+	assert.deepEqual(
+		numbers,
+		Array.from({ length: 8 }, (_, index) => numbers[0] + index)
+	);
 });
 
 test('all approved invoice scenarios receive authoritative payment snapshots', async () => {
-	await identity();
+	await db.exec('reset role');
 	await db.query(
 		`insert into public.terminals (id, entity_id, user_id, is_active)
 		 values ($1, $2, $3, true) on conflict (id) do nothing`,
 		['40000000-0000-0000-0000-000000000001', ids.entity, ids.user]
 	);
+	await identity();
 	const expiresAt = '2026-09-22T12:30:00.000Z';
 	const rows = [
 		await createScenarioInvoice('fixed', { baseAmount: 10, expiresAt }),
@@ -181,40 +208,51 @@ test('all approved invoice scenarios receive authoritative payment snapshots', a
 });
 
 test('finance-company mode snapshots the actual recipient and real payment ID', async () => {
-	await save({
-		version: 2,
-		mode: 'finance-company',
-		financeName: 'ТОВ Фінансова компанія',
-		financeIban: 'UA987654321098765432109876543',
-		financeTaxId: '87654321',
-		financePurposeTemplate: '{business_purpose} | Юридична назва продавця: {seller_name}; власний IBAN продавця: {seller_iban}; Код провайдера: {provider_code}; ID продавця: {provider_seller_id}; код продавця: {seller_tax_id}; договір: {contract_reference}; ID платежу: {payment_id}',
-		sellers: { [ids.entity]: { ...seller, nextNumber: 9 } }
-	}, 1);
+	await save(
+		{
+			version: 2,
+			mode: 'finance-company',
+			financeName: 'ТОВ Фінансова компанія',
+			financeIban: 'UA987654321098765432109876543',
+			financeTaxId: '87654321',
+			financePurposeTemplate:
+				'{business_purpose} | Юридична назва продавця: {seller_name}; власний IBAN продавця: {seller_iban}; Код провайдера: {provider_code}; ID продавця: {provider_seller_id}; код продавця: {seller_tax_id}; договір: {contract_reference}; ID платежу: {payment_id}',
+			sellers: { [ids.entity]: { ...seller, nextNumber: 9 } }
+		},
+		1
+	);
 	await identity();
 	const order = await createInvoice();
 	assert.equal(order.payment_recipient_name, 'ТОВ Фінансова компанія');
 	assert.equal(order.payment_recipient_iban, 'UA987654321098765432109876543');
 	assert.equal(order.payment_recipient_tax_id, '87654321');
 	assert.match(order.payment_id, /^[0-9a-f-]{36}$/);
-	assert.equal(order.payment_purpose,
-		`ID: ${order.short_id}. Рахунок INV-0009 від ${new Intl.DateTimeFormat('uk-UA').format(new Date())}, у т.ч. ПДВ Продавець: ТОВ Продавець, ЄДРПОУ 12345678, IBAN UA123456789012345678901234567; дог. contract-9; seller-42; provider-1.`);
+	assert.equal(
+		order.payment_purpose,
+		`ID: ${order.short_id}. Рахунок INV-0009 від ${new Intl.DateTimeFormat('uk-UA').format(new Date())}, у т.ч. ПДВ Продавець: ТОВ Продавець, ЄДРПОУ 12345678, IBAN UA123456789012345678901234567; дог. contract-9; seller-42; provider-1.`
+	);
 	assert.doesNotMatch(order.payment_purpose, new RegExp(order.payment_id));
 });
 
 test('payment snapshots are immutable while legacy rows remain valid', async () => {
 	await identity();
 	const order = await createInvoice();
+	await db.exec('reset role');
 	await assert.rejects(
 		db.query("update public.orders set payment_purpose = 'forged' where id = $1", [order.id]),
 		/order_payment_snapshot_immutable/
 	);
-	await db.exec('reset role');
-	await assert.doesNotReject(db.query(`
+	await assert.doesNotReject(
+		db.query(
+			`
 		insert into public.orders (
 			merchant_id, type, order_number, title, base_amount, delivery_fee,
 			total_amount, currency, status
 		) values ($1, 'fixed', 'LEGACY-1', 'Legacy', 10, 0, 10, 'UAH', 'pending')
-	`, [ids.merchant]));
+	`,
+			[ids.merchant]
+		)
+	);
 });
 
 test('unauthorized owners cannot create an invoice', async () => {
@@ -223,17 +261,21 @@ test('unauthorized owners cannot create an invoice', async () => {
 });
 
 test('purpose that cannot be represented unchanged in NBU field 12 is rejected', async () => {
-	await save({
-		version: 2,
-		mode: 'direct',
-		financeName: '',
-		financeIban: '',
-		financeTaxId: '',
-		financePurposeTemplate: '{business_purpose}',
-		sellers: { [ids.entity]: { ...seller, purposeTemplate: 'x'.repeat(421) } }
-	}, 2);
-	await identity();
-	await assert.rejects(createInvoice(), /Invoice payment settings are incomplete/);
+	await assert.rejects(
+		save(
+			{
+				version: 2,
+				mode: 'direct',
+				financeName: '',
+				financeIban: '',
+				financeTaxId: '',
+				financePurposeTemplate: '{business_purpose}',
+				sellers: { [ids.entity]: { ...seller, purposeTemplate: 'x'.repeat(421) } }
+			},
+			2
+		),
+		/Invalid business settings document or revision/
+	);
 });
 
 test('finance-company purpose reserves exactly 12 characters for the field 11 short ID', async () => {
@@ -246,13 +288,51 @@ test('finance-company purpose reserves exactly 12 characters for the field 11 sh
 		financePurposeTemplate: 'x'.repeat(408),
 		sellers: { [ids.entity]: seller }
 	};
-	await save(document, 3);
+	await save(document, 2);
 	await identity();
 	const order = await createInvoice();
 	assert.equal(order.payment_purpose, `ID: ${order.short_id}. ${'x'.repeat(408)}`);
 	assert.equal(order.payment_purpose.length, 420);
 
-	await save({ ...document, financePurposeTemplate: 'x'.repeat(409) }, 4);
+	await save({ ...document, financePurposeTemplate: 'x'.repeat(409) }, 3);
 	await identity();
 	await assert.rejects(createInvoice(), /Invoice payment settings are incomplete/);
+});
+
+test('authoritative purpose renders every supported seller template token', async () => {
+	await db.exec('reset role');
+	const revision = Number(
+		(
+			await db.query('select revision from public.business_settings where merchant_id = $1', [
+				ids.merchant
+			])
+		).rows[0].revision
+	);
+	await save(
+		{
+			version: 2,
+			mode: 'direct',
+			financeName: '',
+			financeIban: '',
+			financeTaxId: '',
+			financePurposeTemplate: '{business_purpose}',
+			sellers: {
+				[ids.entity]: {
+					...seller,
+					nextNumber: 42,
+					purposeTemplate: '{scenario}; {amount}; {customer}; {contract}; {number}; {date}; {tax}'
+				}
+			}
+		},
+		revision
+	);
+	await identity();
+	const order = await createScenarioInvoice('delivery', { baseAmount: 100, deliveryFee: 20 });
+	assert.match(
+		order.payment_purpose,
+		new RegExp(
+			`^товари та доставку; 120\\.00; ; contract-9; INV-\\d+; ${new Intl.DateTimeFormat('uk-UA').format(new Date()).replaceAll('.', '\\.')};;? у т\\.ч\\. ПДВ$`
+		)
+	);
+	assert.doesNotMatch(order.payment_purpose, /\{[a-z_]+\}/);
 });

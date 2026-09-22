@@ -11,16 +11,16 @@ test.beforeEach(async ({ context }) => {
 	});
 });
 
-test('groups business settings in an initially expanded desktop and mobile menu', async ({ page }) => {
-	for (const width of [1280, 390]) {
+for (const width of [1280, 390]) {
+	test(`groups business settings in an initially expanded ${width < 1024 ? 'mobile' : 'desktop'} menu`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 844 });
 		await page.goto('/dashboard/structure?demo=1');
-		await expect(page.getByRole('combobox', { name: 'Продавець', exact: true })).toBeEnabled();
 		if (width < 1024) await page.getByRole('button', { name: 'Відкрити навігацію' }).click();
 		const nav = page.getByRole('navigation', { name: 'Основна навігація' });
+		await expect(nav).toBeVisible();
 		const group = nav.locator('details').filter({ has: page.locator('summary', { hasText: 'Налаштування бізнесу' }) });
 		await expect(group).toHaveAttribute('open', '');
-		await expect(group.getByRole('link')).toHaveCount(3);
+		await expect(group.getByRole('link')).toHaveCount(4);
 		await expect(group.getByRole('link', { name: 'Структура бізнесу', exact: true })).toHaveAttribute('aria-current', 'page');
 		await expect(group.getByRole('link', { name: 'Правила рахунків', exact: true })).toHaveAttribute('href', '/dashboard/invoice-rules?demo=1');
 		await group.locator('summary').click();
@@ -34,8 +34,8 @@ test('groups business settings in an initially expanded desktop and mobile menu'
 			await page.getByRole('button', { name: 'Відкрити навігацію' }).click();
 		}
 		await expect(group.getByRole('link', { name: 'Приймання платежів', exact: true })).toHaveAttribute('aria-current', 'page');
-	}
-});
+	});
+}
 
 test('keeps seller VAT, rules and provider identifiers independent across routes and reloads', async ({ page }) => {
 	await page.goto('/dashboard/structure?demo=1');
@@ -150,7 +150,7 @@ test('saves demo finance-purpose edits and substitutes each seller after reload 
 	const preview = page.getByRole('complementary', { name: 'Чернетка налаштувань продавця' });
 	await expect(preview).toContainText('Вони ще не застосовуються до полів цього рахунку, отримувача або платежу');
 	await preview.locator('summary').click();
-	await expect(preview).toContainText('Ілюстрація, не платіжний payload: Тест:');
+	await expect(preview).toContainText('Ілюстрація, не платіжний payload: ID: [буде створено сервером]. Тест:');
 	await expect(preview).toContainText('FOP-ID | FOP-CODE | FOP-CONTRACT');
 	await expect(preview).toContainText('Чернетка не дозволяє приймати оплату через фінкомпанію');
 });

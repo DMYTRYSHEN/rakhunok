@@ -1,5 +1,8 @@
 begin;
 
+set local lock_timeout = '2s';
+set local statement_timeout = '30s';
+
 lock table public.orders in share row exclusive mode;
 
 alter table public.orders

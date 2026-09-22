@@ -1,5 +1,8 @@
 begin;
 
+set local lock_timeout = '2s';
+set local statement_timeout = '30s';
+
 alter table public.orders
 	add column if not exists payment_acceptance_mode text,
 	add column if not exists payment_recipient_name text,
@@ -108,6 +111,7 @@ declare
 	entity public.business_entities%rowtype;
 	mode text;
 	invoice_number text;
+	scenario_label text;
 	business_purpose text;
 	final_purpose text;
 	server_payment_id text := gen_random_uuid()::text;
@@ -181,11 +185,23 @@ begin
 		lpad(seller.config ->> 'nextNumber', (seller.config ->> 'padding')::integer, '0')
 	);
 	tax_text := case seller.config ->> 'vatStatus' when 'vat' then 'у т.ч. ПДВ' else 'без ПДВ' end;
-	business_purpose := replace(replace(replace(
-		seller.config ->> 'purposeTemplate',
-		'{number}', invoice_number),
-		'{date}', to_char(current_date, 'DD.MM.YYYY')),
-		'{tax}', tax_text);
+	scenario_label := case p_type
+		when 'table' then 'послуги закладу'
+		when 'delivery' then 'товари та доставку'
+		else 'товари/послуги'
+	end;
+	business_purpose := btrim(regexp_replace(
+		replace(replace(replace(replace(replace(replace(replace(
+			seller.config ->> 'purposeTemplate',
+			'{number}', invoice_number),
+			'{date}', to_char(current_date, 'DD.MM.YYYY')),
+			'{scenario}', scenario_label),
+			'{amount}', case when p_base_amount + p_delivery_fee = 0 then ''
+				else to_char(p_base_amount + p_delivery_fee, 'FM999999999999990.00') end),
+			'{customer}', ''),
+			'{contract}', seller.config ->> 'contractReference'),
+			'{tax}', tax_text),
+		'\s+', ' ', 'g'));
 
 	if mode = 'direct' then
 		recipient_name := entity.business_name;
@@ -228,7 +244,7 @@ begin
 		or recipient_iban !~ '^UA[0-9]{27}$'
 		or recipient_tax_id !~ '^([0-9]{8}|[0-9]{10})$'
 		or final_purpose is null or btrim(final_purpose) = ''
-		or char_length(final_purpose) > case when mode = 'finance-company' then 408 else 420 end then
+		or char_length(final_purpose) > (case when mode = 'finance-company' then 408 else 420 end) then
 		raise exception 'Invoice payment settings are incomplete' using errcode = '22023';
 	end if;
 

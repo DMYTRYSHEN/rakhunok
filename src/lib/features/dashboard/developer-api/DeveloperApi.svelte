@@ -21,7 +21,7 @@
 		MerchantApiKey
 	} from '../api/dashboard-gateway';
 
-	let { gateway, merchantId }: { gateway: DashboardGateway; merchantId: string } = $props();
+	let { gateway, merchantId }: { gateway: DashboardGateway | null; merchantId: string } = $props();
 
 	type Endpoint = {
 		id: 'list' | 'create' | 'get' | 'update' | 'stats';
@@ -134,6 +134,12 @@
 	);
 
 	onMount(async () => {
+		if (!gateway) {
+			credentialsError = 'Доступи недоступні в ознайомчому режимі.';
+			loadingCredentials = false;
+			return;
+		}
+
 		const [sessionResult, apiKeysResult] = await Promise.allSettled([
 			gateway.getDeveloperSession(),
 			gateway.listMerchantApiKeys(merchantId)
@@ -178,6 +184,10 @@
 
 	async function createApiKey() {
 		if (!keyName.trim()) return;
+		if (!gateway) {
+			credentialsError = 'Доступи недоступні в ознайомчому режимі.';
+			return;
+		}
 		creatingKey = true;
 		credentialsError = '';
 		try {
@@ -200,6 +210,10 @@
 	}
 
 	async function revokeApiKey(apiKey: MerchantApiKey) {
+		if (!gateway) {
+			credentialsError = 'Доступи недоступні в ознайомчому режимі.';
+			return;
+		}
 		if (!confirm(`Відкликати ключ “${apiKey.name}”? Цю дію не можна скасувати.`)) return;
 		revokingKeyId = apiKey.id;
 		credentialsError = '';
