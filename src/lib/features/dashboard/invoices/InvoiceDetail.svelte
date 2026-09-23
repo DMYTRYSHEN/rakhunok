@@ -23,6 +23,7 @@
 	import { getInvoiceShareLinks } from './invoice-links';
 	import { buildLegacyInvoiceCancellation } from './invoice-cancellation-contract';
 	import InvoiceTimeline from './InvoiceTimeline.svelte';
+	import { generateA2DataUri } from './qr-a2';
 
 	let {
 		invoice,
@@ -50,9 +51,7 @@
 		shareLinks.find((l) => l.path.startsWith('/pay/'))?.path || shareLinks[0].path
 	);
 	let checkoutUrl = $derived(`${browser ? window.location.origin : ''}${checkoutPath}`);
-	let qrUrl = $derived(
-		`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(checkoutUrl)}`
-	);
+	let qrUrl = $derived(generateA2DataUri(checkoutUrl, { size: 240, ecc: 'M' }));
 
 	let isCheckingWebhook = $state(false);
 	let webhookCheckMessage = $state<string | null>(null);
@@ -206,9 +205,9 @@
 					<img
 						src={qrUrl}
 						alt="QR-код для оплати рахунку"
-						class="size-44"
-						width="176"
-						height="176"
+						class="size-[254px] max-w-full"
+						width="254"
+						height="254"
 					/>
 				</div>
 			</div>

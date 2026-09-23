@@ -106,6 +106,46 @@ function harness({ dev = false, url = 'https://checkout.invalid/pay/?id=order-a'
 }
 
 const terminalA = '11111111-1111-4111-8111-111111111111';
+test('URL amount is validated and applies only to reusable pending open amount invoices', async () => {
+  for (const [value, expected] of [
+    ['12.34', '12,34'], ['0.01', '0,01'], ['9999999', '9999999'],
+    ['0', ''], ['-1', ''], ['Infinity', ''], ['1e2', ''], ['1.234', ''],
+    ['10000000', ''], ['999999.99', ''], [' 12 ', ''], ['abc', '']
+  ]) {
+    const { store, mocks } = harness({ url: `https://checkout.invalid/pay/?id=order-a&amount=${encodeURIComponent(value)}` });
+    mocks.load = async () => ({ order: invoice('order-a', { type: 'open_amount', total_amount: 0, base_amount: 0 }), reason: null });
+    await store.init();
+    assert.equal(store.keypadValue, expected, value);
+  }
+  for (const extra of [
+    { type: 'fixed' }, { type: 'table' }, { type: 'delivery' }, { type: 'open_amount' },
+    { type: 'open_amount', total_amount: 0, base_amount: 0, status: 'paid' },
+    { type: 'open_amount', total_amount: 0, base_amount: 0, expires_at: '2000-01-01' }
+  ]) {
+    const { store, mocks } = harness({ url: 'https://checkout.invalid/pay/?id=order-a&amount=12.34' });
+    mocks.load = async () => ({ order: invoice('order-a', extra), reason: null });
+    await store.init();
+    assert.equal(store.keypadValue, '', JSON.stringify(extra));
+    if (extra.type === 'open_amount' && extra.total_amount !== 0) assert.equal(store.baseAmount, 100);
+  }
+});
+test('desktop observation waits for a loaded invoice and cleans up without initiating payment', async () => {
+  const harnessState = harness();
+  harnessState.store.isLoaded = false;
+  assert.equal(harnessState.store.startStatusPolling(true), undefined);
+  harnessState.store.isLoaded = true;
+  harnessState.store.order = invoice('order-a', { type: 'open_amount', total_amount: 0, base_amount: 0 });
+  const stop = harnessState.store.startStatusPolling(true);
+  assert.equal(typeof stop, 'function');
+  await [...harnessState.intervals.values()][0]();
+  assert.equal(harnessState.calls.fetch.length, 1);
+  assert.equal(harnessState.calls.initiate.length, 0);
+  const previousStatus = harnessState.store.statusState;
+  [...harnessState.timeouts.values()][0]();
+  assert.equal(harnessState.store.statusState, previousStatus);
+  stop();
+  assert.equal(harnessState.intervals.size, 0);
+});
 const terminalB = '22222222-2222-4222-8222-222222222222';
 const terminalOrder = (extra = {}) => invoice(terminalA, {
   currency: 'UAH', type: 'table', expires_at: '2099-01-01T00:00:00Z',

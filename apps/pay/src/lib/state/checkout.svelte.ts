@@ -168,6 +168,9 @@ class CheckoutStore {
 	});
 
 	baseAmount = $derived.by(() => {
+		if (this.order?.type === 'open_amount' && this.order.total_amount > 0) {
+			return this.order.total_amount;
+		}
 		if (
 			this.order?.type === 'open_amount' ||
 			this.forcedScenario === 'amount' ||
@@ -1815,6 +1818,11 @@ class CheckoutStore {
 		}
 
 		this.order = initialOrder;
+		if (isReusableAmountOrder(initialOrder) && initialOrder.status === 'pending' &&
+			isOrderFresh(initialOrder) && !this.forcedScenario &&
+			params.getAll('amount').length === 1) {
+			this.keypadValue = normalizeAmountInput(params.get('amount')) ?? '';
+		}
 		if (this.order.status === 'paid') {
 			this.statusState = 'success';
 			this.isStatusScreenOpen = true;
@@ -1923,10 +1931,14 @@ class CheckoutStore {
 		}
 	}
 
-	startStatusPolling(): void {
+	startStatusPolling(observeOnly = false): (() => void) | undefined {
 		if (this.terminalMode) return;
 		this.stopPolling?.();
-		if (!this.isPayable()) return;
+		if (observeOnly) {
+			if (!this.isLoaded || !this.order || this.order.id !== this.orderId ||
+				this.forcedScenario || /^(demo-|term-|profile-)/i.test(this.orderId) ||
+				this.order.status !== 'pending' || !isOrderFresh(this.order)) return;
+		} else if (!this.isPayable()) return;
 		const order = this.order!;
 		const orderId = this.orderId;
 		const session = this.session;
@@ -2000,13 +2012,27 @@ class CheckoutStore {
 			() => {
 				const wasCurrent = current();
 				stop();
-				if (wasCurrent) this.statusState = 'timeout';
+				if (wasCurrent && !observeOnly) this.statusState = 'timeout';
 			},
 			8 * 60 * 1000
 		);
 		this.statusPollingInterval = interval;
 		this.stopPolling = stop;
+		return stop;
 	}
+}
+
+export function isReusableAmountOrder(order: Order | null | undefined): boolean {
+	return order?.type === 'open_amount' && order.total_amount === 0 &&
+		(order.base_amount == null || order.base_amount === 0);
+}
+
+export function normalizeAmountInput(value: unknown): string | null {
+	if (typeof value !== 'string' || !/^\d+(?:[.,]\d{1,2})?$/.test(value)) return null;
+	const normalized = value.replace('.', ',');
+	if (normalized.replace(',', '').length > 7) return null;
+	const amount = Number(normalized.replace(',', '.'));
+	return Number.isFinite(amount) && amount > 0 ? normalized : null;
 }
 
 export const checkout = new CheckoutStore();

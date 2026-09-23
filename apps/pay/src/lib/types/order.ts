@@ -123,6 +123,8 @@ export interface Order {
   currency?: string;
   table_number?: string | number;
   merchant?: Merchant;
+  payment_recipient_name?: string | null;
+  payment_recipient_iban?: string | null;
   _terminal?: Terminal;
   created_at?: string;
   createdAt?: string;

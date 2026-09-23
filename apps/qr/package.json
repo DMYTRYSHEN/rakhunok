@@ -1,0 +1,25 @@
+{
+  "name": "qr",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix ../../worker exec wrangler -- dev --port 8789",
+    "build": "npm --prefix ../../worker exec wrangler -- deploy --dry-run --outdir .wrangler-dist",
+    "check": "tsc --noEmit && npm --prefix ../../worker exec wrangler -- deploy --dry-run --outdir .wrangler-dist",
+    "test": "node --experimental-strip-types --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@resvg/resvg-wasm": "^2.6.2",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250224.0",
+    "@types/node": "^24.13.3",
+    "@types/qrcode": "^1.5.6",
+    "jsqr": "^1.4.0",
+    "pngjs": "^7.0.0",
+    "typescript": "~6.0.2",
+    "wrangler": "^4.129.0"
+  }
+}

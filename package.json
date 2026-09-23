@@ -7,7 +7,8 @@
 		"apps/merchant-app",
 		"apps/checkout",
 		"apps/pay",
-		"apps/conf"
+		"apps/conf",
+		"apps/qr"
 	],
 	"engines": {
 		"node": ">=22.13 <23 || >=24"
@@ -18,19 +19,23 @@
 		"dev:app": "npm --prefix apps/merchant-app run dev",
 		"dev:pay": "npm --prefix apps/pay run dev",
 		"dev:conf": "npm --prefix apps/conf run dev",
+		"dev:qr": "npm --prefix apps/qr run dev",
 		"dev:api": "npm --prefix worker run dev",
 		"build:app": "npm --prefix apps/merchant-app run build",
 		"build:checkout": "npm --prefix apps/pay run build",
 		"build:pay": "npm --prefix apps/pay run build",
 		"build:conf": "npm --prefix apps/conf run build",
+		"build:qr": "npm --prefix apps/qr run build",
 		"check:app": "npm --prefix apps/merchant-app run check",
 		"check:checkout": "npm --prefix apps/pay run check",
 		"check:pay": "npm --prefix apps/pay run check",
 		"check:conf": "npm --prefix apps/conf run check",
+		"check:qr": "npm --prefix apps/qr run check",
 		"test:app": "npm --prefix apps/merchant-app run test",
 		"test:checkout": "npm --prefix apps/checkout run test",
 		"test:pay": "npm --prefix apps/pay run test",
 		"test:conf": "npm --prefix apps/conf run test",
+		"test:qr": "npm --prefix apps/qr run test",
 		"generate:processes": "node --experimental-strip-types scripts/generate-process-manifest.ts",
 		"build": "npm run generate:processes && vite build && npm run build:docs",
 		"build:dashboard:isolated": "npm run generate:processes && vite build --mode dashboard-isolated && node scripts/assert-dashboard-isolated-build.mjs",
