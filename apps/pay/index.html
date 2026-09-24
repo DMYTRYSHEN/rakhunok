@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0d0e13" media="(prefers-color-scheme: dark)">
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
     <title>Rahunok — App Clip Checkout</title>
-    <link rel="icon" type="image/svg+xml" href="./logo.svg">
+    <link rel="icon" type="image/svg+xml" href="/pay/logo.svg">
     <link rel="preload" href="./src/assets/fonts/manrope-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="./src/assets/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
     <style>
@@ -40,9 +40,31 @@
             min-height: 100vh;
             min-height: 100dvh;
         }
+        #boot-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            display: grid;
+            place-content: center;
+            justify-items: center;
+            gap: 16px;
+            background: var(--sk-bg);
+            color: #f5f6f8;
+        }
+        #boot-screen p { margin: 0; font-size: 16px; }
+        #boot-screen .boot-brand { font-size: 24px; font-weight: 700; }
+        #boot-screen a { color: inherit; }
+        @media (prefers-color-scheme: light) {
+            #boot-screen { color: #17181c; }
+        }
     </style>
 </head>
 <body>
+    <div id="boot-screen" role="status" aria-label="Завантаження Rahunok">
+        <p class="boot-brand">Rahunok</p>
+        <a href="">Оновити сторінку</a>
+        <noscript><p>Для оплати увімкніть JavaScript.</p></noscript>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
 </body>

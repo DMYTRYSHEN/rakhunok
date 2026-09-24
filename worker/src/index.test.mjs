@@ -56,6 +56,48 @@ test('serves only the canonical OpenAPI file below /docs', async () => {
 	assert.equal(missing.status, 404);
 });
 
+test('anonymous order listing and detail require authentication without querying persistence', async () => {
+	let queries = 0;
+	globalThis.fetch = async () => {
+		queries += 1;
+		return Response.json([{ id: 'private-order' }]);
+	};
+	for (const path of ['/api/v1/orders', '/api/v1/orders/private-order']) {
+		const response = await routeWebRequest(new Request(`https://example.com${path}`), createEnv().env);
+		assert.equal(response.status, 401);
+	}
+	assert.equal(queries, 0);
+});
+
+test('authenticated order listing forwards the bearer token to persistence', async () => {
+	const requests = [];
+	globalThis.fetch = async (url, options) => {
+		requests.push({ url: String(url), authorization: options.headers.Authorization });
+		return Response.json([]);
+	};
+	const response = await routeWebRequest(new Request('https://example.com/api/v1/orders', {
+		headers: { Authorization: 'Bearer merchant-token' }
+	}), createEnv().env);
+	assert.equal(response.status, 200);
+	assert.equal(requests.length, 1);
+	assert.match(requests[0].url, /\/rest\/v1\/orders\?/);
+	assert.equal(requests[0].authorization, 'Bearer merchant-token');
+});
+
+test('public checkout reads only the requested invoice without listing orders', async () => {
+	const requests = [];
+	globalThis.fetch = async (url) => {
+		requests.push(String(url));
+		return Response.json([{ id: 'invoice-123', short_id: 'ABC123', base_amount: 12, total_amount: 12 }]);
+	};
+	const response = await routeWebRequest(new Request('https://example.com/api/v1/checkout/invoice-123'), createEnv().env);
+	assert.equal(response.status, 200);
+	assert.equal((await response.json()).id, 'invoice-123');
+	assert.equal(requests.length, 1);
+	assert.match(requests[0], /or=\(short_id\.eq\.invoice-123,order_number\.eq\.invoice-123\)/);
+	assert.match(requests[0], /limit=1/);
+});
+
 test('buildMerchantInfo prioritizes business_entities over merchants', async () => {
 	const { buildMerchantInfo } = await import('./index.ts');
 

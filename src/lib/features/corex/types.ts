@@ -120,6 +120,7 @@ export type FlowEdge = {
 export type FlowScenario = {
 	id: string;
 	category:
+		| 'Demo journeys'
 		| 'Access'
 		| 'PWA'
 		| 'Invoices'

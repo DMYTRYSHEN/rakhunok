@@ -108,5 +108,8 @@
 		"mermaid": "^11.17.2",
 		"qrcode": "^1.5.4",
 		"webgl-fluid": "^0.4.0"
+	},
+	"optionalDependencies": {
+		"@cloudflare/workerd-windows-64": "^1.20260921.1"
 	}
 }

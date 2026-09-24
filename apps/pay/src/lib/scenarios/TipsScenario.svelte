@@ -45,7 +45,7 @@
 
     <div class="order-merchant">
       <div class="merchant-avatar">
-        <img src="./logo.svg" alt="" />
+        <img src="/pay/logo.svg" alt="" />
       </div>
       <span class="order-merchant-name">{checkout.order?.merchant?.business_name || 'Кав’ярня'}</span>
     </div>

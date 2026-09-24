@@ -72,16 +72,16 @@
         error = '';
 
         if (!passcode.trim()) {
-            error = 'Введіть код доступу (777)';
+            error = 'Введіть код доступу';
             return;
         }
 
         isSubmitting = true;
 
-        if (passcode.trim() === '777' || passcode.trim() === 'admin777' || passcode.trim() === 'banklink') {
+        if (passcode.trim() === '777') {
             onPasswordAuthenticated();
         } else {
-            error = 'Невірний пароль доступу. Використовуйте 777.';
+            error = 'Невірний пароль доступу.';
             isSubmitting = false;
         }
     }
@@ -120,7 +120,7 @@
                     <input
                         type="password"
                         bind:value={passcode}
-                        placeholder="Введіть код доступу (777)"
+                        placeholder="Введіть код доступу"
                         autocomplete="current-password"
                         class="w-full bg-stone-950/60 border border-stone-700/80 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-mono tracking-wider"
                     />
@@ -174,7 +174,7 @@
                     <input
                         type="password"
                         bind:value={passcode}
-                        placeholder="Введіть службовий пароль (777)"
+                        placeholder="Введіть службовий пароль"
                         autocomplete="current-password"
                         class="w-full bg-stone-950/60 border border-stone-700/80 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-mono tracking-wider"
                     />

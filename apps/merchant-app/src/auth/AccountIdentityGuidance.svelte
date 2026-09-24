@@ -1,7 +1,12 @@
 <script lang="ts">
 	import type { User } from '@supabase/supabase-js';
 	import { tick, untrack } from 'svelte';
-	import { ArrowLeft, ArrowRight, Check, Link2, ShieldCheck, X } from '@lucide/svelte';
+	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+	import ArrowRight from '@lucide/svelte/icons/arrow-right';
+	import Check from '@lucide/svelte/icons/check';
+	import Link2 from '@lucide/svelte/icons/link-2';
+	import ShieldCheck from '@lucide/svelte/icons/shield-check';
+	import X from '@lucide/svelte/icons/x';
 	import { TELEGRAM_PROVIDER } from './telegram-session';
 
 	let { context = 'guest', user }: {

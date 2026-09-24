@@ -2,7 +2,6 @@
   import { onMount, untrack } from 'svelte';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
   import { checkout, formatNumber, isReusableAmountOrder, normalizeAmountInput } from '../state/checkout.svelte.js';
-  import { generateA2DataUri } from '../utils/qr-a2.js';
   import { isOrderFresh } from '../services/expiry.js';
   import StateScreen from './StateScreen.svelte';
 
@@ -46,10 +45,21 @@
   const recipientName = $derived(hasPaymentSnapshot ? order?.payment_recipient_name : order?.merchant?.business_name || order?.merchant?.display_name);
   const recipientIban = $derived(hasPaymentSnapshot ? order?.payment_recipient_iban : order?.merchant?.iban);
 
-  // Generate A2 QR Code Image (Data URI)
-  const a2QrImage = $derived.by(() => {
-    if (!qrUrl || !isActive || needsInput) return '';
-    return generateA2DataUri(qrUrl, { size: 240, ecc: 'M' });
+  let a2QrImage = $state('');
+  let qrError = $state(false);
+  let qrAttempt = $state(0);
+  $effect(() => {
+    const currentUrl = qrUrl;
+    const canGenerate = isActive && !needsInput;
+    void qrAttempt;
+    a2QrImage = '';
+    qrError = false;
+    if (!currentUrl || !canGenerate) return;
+    let active = true;
+    void import('../utils/qr-a2.js').then(({ generateA2DataUri }) => {
+      if (active) a2QrImage = generateA2DataUri(currentUrl, { size: 240, ecc: 'M' });
+    }).catch(() => { if (active) qrError = true; });
+    return () => { active = false; };
   });
 
   onMount(() => {
@@ -111,7 +121,7 @@
 
         <div class="logo-wrapper" ondblclick={toggleTheme} role="button" tabindex="0">
           <div class="logo-icon">
-            <img src="./logo.svg" alt="Logo" class="real-logo" />
+            <img src="/pay/logo.svg" alt="Logo" class="real-logo" />
           </div>
           <span class="brand-name">Rakhunok</span>
         </div>
@@ -196,9 +206,13 @@
             <p>Відкрийте камеру або застосунок вашого банку та наведіть на QR-код</p>
           </div>
 
-          <div class="qr-canvas-wrapper">
+          <div class="qr-canvas-wrapper" aria-busy={!a2QrImage && !qrError}>
             {#if a2QrImage}
               <img src={a2QrImage} alt="QR-код для оплати" class="qr-img" width="256" height="256" />
+            {:else if qrError}
+              <button type="button" onclick={() => qrAttempt++}>Повторити завантаження QR</button>
+            {:else}
+              <span role="status">Завантаження QR...</span>
             {/if}
           </div>
 

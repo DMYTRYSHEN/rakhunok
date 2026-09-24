@@ -1,4 +1,4 @@
-import { mount } from 'svelte';
+import { mount, tick } from 'svelte';
 import './app.css';
 const harnessBuild = import.meta.env.DEV && import.meta.env.VITE_CHECKOUT_SYNTHETIC === '1';
 const requestedLocal = harnessBuild || location.hash.startsWith('#local=') || (location.hostname === '127.0.0.1' && location.port === '8792');
@@ -13,5 +13,7 @@ const { default: App } = harnessBuild
 const app = mount(App, {
   target: document.getElementById('app')!
 });
+await tick();
+document.getElementById('boot-screen')?.remove();
 
 export default app;

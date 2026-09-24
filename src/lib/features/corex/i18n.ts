@@ -128,6 +128,7 @@ export const statusText = {
 } as const;
 
 const categoryUk: Record<FlowScenario['category'], string> = {
+	'Demo journeys': 'Шлях мерчанта · Demo',
 	Access: 'Доступ',
 	PWA: 'PWA',
 	Invoices: 'Рахунки',
@@ -142,6 +143,18 @@ const categoryUk: Record<FlowScenario['category'], string> = {
 };
 
 const scenarioUk: Record<string, { label: string; title: string; description: string }> = {
+	'merchant-payment-demo': {
+		label: 'Шлях мерчанта · Demo',
+		title: 'Від онбордингу мерчанта до оплати й повідомлень',
+		description:
+			'Demo-макет, не live-інтеграція: реквізити, checkout, рахунок, підтвердження А-Банку та незалежні повідомлення Telegram / webhook мерчанта.'
+	},
+	'terminal-cash-order-demo': {
+		label: 'Термінал & каса · Нове замовлення (чернетка)',
+		title: 'Від чернетки замовлення до webhook банку й повідомлення мерчанта',
+		description:
+			'Demo-макет: каса створює замовлення й посилання на оплату; webhook банку проходить перевірку, а вихідний webhook мерчанта є необов’язковим.'
+	},
 	login: {
 		label: 'Вхід Google',
 		title: 'Google OAuth і відновлення сесії',

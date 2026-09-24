@@ -354,7 +354,7 @@
 						<div class="pass-cutout-right"></div>
 						
 						<div class="pass-top">
-							<Dumbbell size={22} strokeWidth={2.5} class="pass-brand-icon" />
+							<Dumbbell size={22} strokeWidth={2.5} style="color: #34c759;" />
 							<span class="pass-badge">CLUB PASS</span>
 						</div>
 						
@@ -385,7 +385,7 @@
 					<input type="text" bind:value={memberCardId} placeholder="PULSE-4700-142 або +380..." class="hig-input" />
 					
 					<div class="hig-banner">
-						<Sparkles size={20} class="banner-icon" />
+						<Sparkles size={20} style="flex-shrink: 0; margin-top: 2px;" />
 						<div class="banner-content">
 							<strong>Знайдено абонемент</strong>
 							<span>{clientName} · Картка #{memberCardId}</span>
@@ -862,7 +862,6 @@
 		color: var(--cta);
 	}
 	
-	.banner-icon { flex-shrink: 0; margin-top: 2px; }
 	.banner-content { display: flex; flex-direction: column; font-size: 13px; }
 	.banner-content strong { font-weight: 600; margin-bottom: 2px; }
 	.banner-content small { margin-top: 4px; opacity: 0.8; font-size: 12px; }
@@ -899,8 +898,6 @@
 		align-items: center;
 		margin-bottom: 20px;
 	}
-
-	.pass-brand-icon { color: #34c759; }
 
 	.pass-badge {
 		font-size: 11px;

@@ -131,6 +131,9 @@ export default defineConfig(({ mode }) => ({
 			allow: ['.']
 		},
 		proxy: {
+			'/_app/immutable': {
+				target: 'http://127.0.0.1:8787'
+			},
 			'/app': {
 				target: 'http://127.0.0.1:5174',
 				changeOrigin: true,

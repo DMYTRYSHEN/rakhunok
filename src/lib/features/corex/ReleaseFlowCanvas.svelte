@@ -58,7 +58,7 @@
 		type Viewport
 	} from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
-	import { flowScenarios } from './flow-scenarios';
+	import { demoFlowScenarios, flowScenarios } from './flow-scenarios';
 	import { canvasText, localizedCategory, localizedScenario, type CorexLocale } from './i18n';
 	import { statusText } from './i18n';
 	import {
@@ -2675,6 +2675,11 @@
 							: activeScenario.id}
 						onchange={(event) => selectJourney(event.currentTarget.value)}
 					>
+						<optgroup label={localizedCategory('Demo journeys', locale)}>
+							{#each demoFlowScenarios as scenario (scenario.id)}
+								<option value={scenario.id}>{localizedScenario(scenario, locale).label}</option>
+							{/each}
+						</optgroup>
 						{#if persistedProcesses.length > 0}
 							<optgroup label={locale === 'uk' ? 'Збережені процеси' : 'Saved Processes'}>
 								{#each persistedProcesses as process (process.id)}
@@ -2688,7 +2693,7 @@
 							>
 						</optgroup>
 						<optgroup label={locale === 'uk' ? 'Еталонні процеси' : 'Standard Scenarios'}>
-							{#each flowScenarios as scenario (scenario.id)}
+							{#each flowScenarios.filter((scenario) => scenario.category !== 'Demo journeys') as scenario (scenario.id)}
 								<option value={scenario.id}>{localizedScenario(scenario, locale).label}</option>
 							{/each}
 						</optgroup>

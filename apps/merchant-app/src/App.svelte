@@ -27,18 +27,9 @@
 	import type { TelegramStatus } from './auth/telegram-login';
 	import { MerchantApiError, type BusinessEntity, type MerchantDataGateway, type OrderSummary, type Terminal } from './data/merchant-data-gateway';
 	import { evaluateAmount, formatAmount } from './lib/calculator';
-	import PaymentQr from './lib/PaymentQr.svelte';
-	import LiquidPaymentButton from './lib/LiquidPaymentButton.svelte';
-	import { parseVoiceCommand, type VoiceCommand } from './lib/voice-command-parser';
+	import type { VoiceCommand } from './lib/voice-command-parser';
 	import { applyPwaUpdate, isStandalone, promptInstall } from './platform/pwa';
-	import {
-		createSpeechRecognition,
-		getMicrophonePermission,
-		isSpeechRecognitionSupported,
-		requestMicrophonePermission,
-		type MicrophonePermission,
-		type SpeechLocale
-	} from './platform/speech';
+	import type { createSpeechRecognition, MicrophonePermission, SpeechLocale } from './platform/speech';
 	import { bindTelegramBackButton, haptic } from './platform/telegram';
 
 	type Scenario = 'fixed' | 'table' | 'open';
@@ -51,6 +42,7 @@
 	let wheelRevision = $state(0);
 	let scenario = $state<Scenario>('fixed');
 	let previewOpen = $state(false);
+	let paymentLoadAttempt = $state(0);
 	let orderCreating = $state(false);
 	let orderCreateError = $state('');
 	let activeView = $state<'kasa' | 'history' | 'profile'>('kasa');
@@ -69,6 +61,7 @@
 	let structureError = $state('');
 	let entities = $state<BusinessEntity[]>([]);
 	let terminals = $state<Terminal[]>([]);
+	let selectedEntityId = $state('');
 	let selectedTerminalId = $state('');
 	let qrSwipeStartX = $state<number | null>(null);
 	let orders = $state<OrderSummary[]>([]);
@@ -86,6 +79,7 @@
 	let standalone = $state(false);
 	let microphonePermission = $state<MicrophonePermission>('prompt');
 	let microphoneBusy = $state(false);
+	let microphoneError = $state('');
 	let voiceOpen = $state(false);
 	let voiceLocale = $state<SpeechLocale>('uk-UA');
 	let voicePhase = $state<'idle' | 'listening' | 'processing' | 'result' | 'error'>('idle');
@@ -111,6 +105,7 @@
 	const amountCharacters = $derived(formattedDisplay.split(''));
 	const previousCharacters = $derived(previousDisplay.padStart(formattedDisplay.length, ' ').slice(-formattedDisplay.length).split(''));
 	const selectedTerminal = $derived(terminals.find((terminal) => terminal.id === selectedTerminalId));
+	const selectedEntity = $derived(entities.find((entity) => entity.id === selectedEntityId));
 	const selectedTerminalIndex = $derived(terminals.findIndex((terminal) => terminal.id === selectedTerminalId));
 	const scenarioIndex = $derived(scenario === 'fixed' ? 0 : scenario === 'table' ? 1 : 2);
 	const pendingTerminalOrder = $derived(
@@ -119,7 +114,7 @@
 			: undefined
 	);
 	const canPreview = $derived(
-		!pendingTerminalOrder && (scenario === 'open' || (amount > 0 && (scenario !== 'table' || Boolean(selectedTerminal))))
+		!pendingTerminalOrder && (scenario === 'table' ? Boolean(selectedTerminal) && amount > 0 : Boolean(selectedEntity) && (scenario === 'open' || amount > 0))
 	);
 	const merchantName = $derived(authState.status === 'ready' ? authState.merchant.name : 'Моя каса');
 	const filteredOrders = $derived(orders.filter((order) => isOrderInPeriod(order, historyPeriod)));
@@ -186,7 +181,6 @@
 	onMount(() => {
 		online = navigator.onLine;
 		standalone = isStandalone();
-		void refreshMicrophonePermission();
 		const handleOnline = () => (online = true);
 		const handleOffline = () => (online = false);
 		const handleInstall = () => (installAvailable = true);
@@ -220,18 +214,30 @@
 		if (await promptInstall()) installAvailable = false;
 	}
 
-	async function refreshMicrophonePermission() {
-		const permission = await getMicrophonePermission();
-		if (!disposed) microphonePermission = permission;
-	}
+	$effect(() => {
+		if (authState.status !== 'ready' || activeView !== 'profile') return;
+		let active = true;
+		microphoneError = '';
+		void import('./platform/speech').then((speech) => speech.getMicrophonePermission())
+			.then((permission) => { if (active && !disposed) microphonePermission = permission; })
+			.catch(() => { if (active && !disposed) microphoneError = 'Не вдалося перевірити мікрофон. Спробуйте надати доступ ще раз.'; });
+		return () => { active = false; };
+	});
 
-	async function requestMicrophone() {
+	async function requestMicrophone(isCurrent = () => true) {
 		const generation = sessionFence.capture();
 		microphoneBusy = true;
-		const permission = await requestMicrophonePermission();
-		if (!sessionFence.isCurrent(generation)) return;
-		microphonePermission = permission;
-		microphoneBusy = false;
+		microphoneError = '';
+		try {
+			const { requestMicrophonePermission } = await import('./platform/speech');
+			if (!sessionFence.isCurrent(generation) || !isCurrent()) return;
+			const permission = await requestMicrophonePermission();
+			if (sessionFence.isCurrent(generation)) microphonePermission = permission;
+		} catch {
+			if (sessionFence.isCurrent(generation)) microphoneError = 'Не вдалося завантажити голосовий ввід. Спробуйте ще раз.';
+		} finally {
+			if (sessionFence.isCurrent(generation)) microphoneBusy = false;
+		}
 	}
 
 	async function openVoice() {
@@ -249,18 +255,32 @@
 		const generation = sessionFence.capture();
 		const attempt = voiceFence.advance();
 		const current = () => sessionFence.isCurrent(generation) && voiceFence.isCurrent(attempt) && voiceOpen;
+		let speech: typeof import('./platform/speech');
+		let parser: typeof import('./lib/voice-command-parser');
+		try {
+			[speech, parser] = await Promise.all([import('./platform/speech'), import('./lib/voice-command-parser')]);
+		} catch {
+			if (current()) {
+				voicePhase = 'error';
+				voiceError = 'Не вдалося завантажити голосовий ввід. Спробуйте ще раз.';
+			}
+			return;
+		}
+		if (!current()) return;
+		const { isSpeechRecognitionSupported, createSpeechRecognition } = speech;
+		const { parseVoiceCommand } = parser;
 		if (!isSpeechRecognitionSupported()) {
 			voicePhase = 'error';
 			voiceError = 'Цей браузер не підтримує голосове розпізнавання. Спробуйте Chrome або Safari.';
 			return;
 		}
-		if (microphonePermission !== 'granted') await requestMicrophone();
+		if (microphonePermission !== 'granted') await requestMicrophone(current);
 		if (!current()) return;
 		if (microphonePermission !== 'granted') {
 			voicePhase = 'error';
-			voiceError = microphonePermission === 'denied'
+			voiceError = microphoneError || (microphonePermission === 'denied'
 				? 'Дозвольте доступ до мікрофона в налаштуваннях браузера.'
-				: 'Мікрофон недоступний на цьому пристрої.';
+				: 'Мікрофон недоступний на цьому пристрої.');
 			return;
 		}
 		speechRecognition?.abort();
@@ -351,6 +371,7 @@
 		voiceError = '';
 		voiceLocale = 'uk-UA';
 		microphoneBusy = false;
+		microphoneError = '';
 		closeOrder();
 		previewOpen = false;
 		orderCreating = false;
@@ -364,6 +385,7 @@
 		qrSwipeStartX = null;
 		entities = [];
 		terminals = [];
+		selectedEntityId = '';
 		selectedTerminalId = '';
 		orders = [];
 		historyPeriod = 'today';
@@ -448,6 +470,9 @@
 			if (!current()) return;
 			entities = structure.entities;
 			terminals = structure.terminals;
+			if (!entities.some((entity) => entity.id === selectedEntityId)) {
+				selectedEntityId = entities[0]?.id ?? '';
+			}
 			if (!terminals.some((terminal) => terminal.id === selectedTerminalId)) {
 				selectedTerminalId = terminals[0]?.id ?? '';
 			}
@@ -740,6 +765,11 @@
 		const expectedUserId = authState.user.id;
 		const merchantId = authState.merchant.id;
 		const terminal = scenario === 'table' ? selectedTerminal : undefined;
+		const entityId = scenario === 'table' ? terminal?.entityId : selectedEntity?.id;
+		if (!entityId) {
+			orderCreateError = 'Оберіть компанію для рахунку.';
+			return false;
+		}
 		const generation = sessionFence.capture();
 		const isCurrentSession = () => sessionFence.isCurrent(generation);
 		orderCreating = true;
@@ -752,7 +782,7 @@
 				orderNumber,
 				title: title || (scenario === 'table' && terminal ? terminal.name : `Рахунок ${orderNumber}`),
 				merchantId,
-				entityId: terminal?.entityId,
+				entityId,
 				terminalId: terminal?.id,
 				description: scenario === 'table' && terminal ? `Оплата через ${terminal.name}` : undefined,
 				tableNumber: scenario === 'table' && terminal && /^\d+$/.test(terminal.code)
@@ -854,6 +884,18 @@
 				</h1>
 			</div>
 
+			{#if scenario !== 'table'}
+				<label class="table-select" class:ready={Boolean(selectedEntity)}>
+					<span class="terminal-label">Компанія</span>
+					<strong class="terminal-value">{selectedEntity?.name ?? (structureLoading ? 'Завантаження...' : 'Немає компаній')}</strong>
+					<select bind:value={selectedEntityId} disabled={structureLoading || entities.length === 0}>
+						{#if entities.length === 0}<option value="">{structureLoading ? 'Завантаження...' : 'Немає компаній'}</option>{/if}
+						{#each entities as entity (entity.id)}<option value={entity.id}>{entity.name}</option>{/each}
+					</select>
+					<ChevronDown class="select-chevron" size={17} strokeWidth={2.2} aria-hidden="true" />
+				</label>
+				{#if structureError}<button class="structure-error" type="button" onclick={retryStructure}>{structureError} Повторити</button>{/if}
+			{/if}
 			{#if scenario === 'table'}
 				<label class="table-select" class:ready={Boolean(selectedTerminal)}>
 					<span class="terminal-icon"><MapPin size={17} strokeWidth={2.1} /></span>
@@ -947,8 +989,9 @@
 			</div>
 			<div class="pwa-settings permission-settings">
 				<div><strong>Мікрофон</strong><p>{microphonePermission === 'granted' ? 'Доступ дозволено' : microphonePermission === 'denied' ? 'Заблоковано в браузері' : microphonePermission === 'unsupported' ? 'Не підтримується пристроєм' : 'Потрібен для голосових команд'}</p></div>
-				{#if microphonePermission === 'prompt'}<button type="button" onclick={requestMicrophone} disabled={microphoneBusy}>{microphoneBusy ? 'Запит...' : 'Надати доступ'}</button>{/if}
+				{#if microphonePermission === 'prompt' || microphoneError}<button type="button" onclick={() => requestMicrophone()} disabled={microphoneBusy}>{microphoneBusy ? 'Запит...' : 'Надати доступ'}</button>{/if}
 			</div>
+			{#if microphoneError}<p role="alert">{microphoneError}</p>{/if}
 			<div class="business-setup">
 				<div class="business-setup-heading">
 					<span><Landmark size={20} /></span>
@@ -983,6 +1026,10 @@
 	<div class="dock-container">
 		<nav class="dock" aria-label="Навігація застосунку">
 			<button class:active={activeView !== 'profile'} type="button" onclick={() => (activeView = activeView === 'kasa' ? 'history' : 'kasa')} aria-label={activeView === 'kasa' ? 'Історія' : 'Каса'}>{#if activeView === 'kasa'}<History size={22} />{:else}<Store size={22} />{/if}</button>
+			{#key paymentLoadAttempt}
+			{#await import('./lib/LiquidPaymentButton.svelte')}
+				<button type="button" disabled aria-busy="true" aria-label="Завантаження оплати">Оплата</button>
+			{:then { default: LiquidPaymentButton }}
 			<LiquidPaymentButton
 				{amount}
 				formattedAmount={formatAmount(String(amount))}
@@ -1007,6 +1054,10 @@
 				onCancelOrder={cancelOrder}
 				onClose={closeOrder}
 			/>
+			{:catch}
+				<button type="button" onclick={() => paymentLoadAttempt++}>Повторити завантаження оплати</button>
+			{/await}
+			{/key}
 			<button class:active={activeView === 'profile'} type="button" onclick={() => (activeView = 'profile')} aria-label="Профіль"><UserRound size={22} /></button>
 		</nav>
 		<button class="voice-button" class:listening={voiceOpen && voicePhase === 'listening'} type="button" aria-label="Створити рахунок голосом" onclick={openVoice}><Mic size={23} strokeWidth={2.1} /></button>

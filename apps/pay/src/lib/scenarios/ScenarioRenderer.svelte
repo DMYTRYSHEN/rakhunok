@@ -1,6 +1,6 @@
 <script lang="ts">
   import { checkout } from '../state/checkout.svelte.js';
-  import OrderScenario from './OrderScenario.svelte';
+  let loadAttempt = $state(0);
 
   const screen = $derived.by(() => checkout.resolvedScenario.activeScreen);
   const scenarioType = $derived.by(() => checkout.resolvedScenario.type);
@@ -44,6 +44,14 @@
       <VerticalScenario />
     {/await}
   {:else}
-    <OrderScenario />
+    {#key loadAttempt}
+      {#await import('./OrderScenario.svelte')}
+        <p role="status">Завантаження...</p>
+      {:then { default: OrderScenario }}
+        <OrderScenario />
+      {:catch}
+        <button type="button" onclick={() => loadAttempt++}>Повторити завантаження рахунку</button>
+      {/await}
+    {/key}
   {/if}
 </div>

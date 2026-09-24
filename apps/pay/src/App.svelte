@@ -1,14 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import BankSheet from './lib/components/BankSheet.svelte';
   import StateScreen from './lib/components/StateScreen.svelte';
   import ThemeToggle from './lib/components/ThemeToggle.svelte';
   import Toast from './lib/components/Toast.svelte';
-  import ScenarioRenderer from './lib/scenarios/ScenarioRenderer.svelte';
   import { checkout } from './lib/state/checkout.svelte.js';
-  import DesktopCheckout from './lib/components/DesktopCheckout.svelte';
 
-  let isDesktop = $state(false);
+  let isDesktop = $state<boolean | null>(null);
+  let bankSheetRequested = $state(false);
+  let loadAttempt = $state(0);
+  let bankLoadAttempt = $state(0);
+
+  $effect(() => {
+    if (checkout.isSheetOpen) bankSheetRequested = true;
+  });
 
   onMount(() => {
     // Detect desktop/tablet via CSS media query (> phone width)
@@ -25,8 +29,25 @@
   });
 </script>
 
-{#if isDesktop}
-  <DesktopCheckout />
+{#snippet loadError()}
+  <div role="alert">
+    <p>Не вдалося завантажити екран.</p>
+    <button type="button" onclick={() => loadAttempt++}>Повторити</button>
+  </div>
+{/snippet}
+
+{#if isDesktop === null}
+  <p role="status">Завантаження...</p>
+{:else if isDesktop}
+  {#key loadAttempt}
+    {#await import('./lib/components/DesktopCheckout.svelte')}
+      <p role="status">Завантаження...</p>
+    {:then { default: DesktopCheckout }}
+      <DesktopCheckout />
+    {:catch}
+      {@render loadError()}
+    {/await}
+  {/key}
 {:else}
   <ThemeToggle />
 
@@ -36,7 +57,15 @@
     </div>
   {:else}
     <div class="clip-root">
-      <ScenarioRenderer />
+      {#key loadAttempt}
+        {#await import('./lib/scenarios/ScenarioRenderer.svelte')}
+          <p role="status">Завантаження...</p>
+        {:then { default: ScenarioRenderer }}
+          <ScenarioRenderer />
+        {:catch}
+          {@render loadError()}
+        {/await}
+      {/key}
     </div>
 
     <div
@@ -46,7 +75,23 @@
       role="presentation"
     ></div>
 
-    <BankSheet />
+    {#if bankSheetRequested}
+      {#key bankLoadAttempt}
+        {#await import('./lib/components/BankSheet.svelte')}
+          {#if checkout.isSheetOpen}<div class="sheet-loading" role="status">Завантаження...</div>{/if}
+        {:then { default: BankSheet }}
+          <BankSheet />
+        {:catch}
+          {#if checkout.isSheetOpen}
+            <div class="sheet-loading" role="alert">
+              <p>Не вдалося завантажити способи оплати.</p>
+              <button type="button" onclick={() => bankLoadAttempt++}>Повторити</button>
+              <button type="button" onclick={() => checkout.closePaymentSheet()}>Закрити</button>
+            </div>
+          {/if}
+        {/await}
+      {/key}
+    {/if}
 
     {#if checkout.isStatusScreenOpen || checkout.isFiscalReceiptOpen}
       {#await import('./lib/components/StatusScreen.svelte') then { default: StatusScreen }}
@@ -81,3 +126,14 @@
     <Toast />
   {/if}
 {/if}
+
+<style>
+  .sheet-loading {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 1000;
+    padding: 24px;
+    background: var(--sk-bg);
+    text-align: center;
+  }
+</style>

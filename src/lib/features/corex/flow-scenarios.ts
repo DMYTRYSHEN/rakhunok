@@ -4,6 +4,8 @@ import { ksoSandboxScenario, ksoTargetScenario } from './kso-flow-scenarios';
 import { bankFlowScenarios } from './bank-flow-scenarios';
 import { dac7PlatformFlowScenario } from './dac7-flow-scenario';
 import { generatedFlowScenarios } from './process-manifest';
+import { merchantPaymentCanvasScenario } from './merchant-payment-flow';
+import { terminalCashOrderCanvasScenario } from './terminal-cash-order-flow';
 import type { FlowEdge, FlowNode, FlowNodeLayer, FlowScenario } from './types';
 
 type NodeInput = Omit<FlowNode, 'kind' | 'position'> & {
@@ -576,4 +578,13 @@ export const rahunokFlowScenarios: FlowScenario[] = [
 	deploy
 ];
 
-export const flowScenarios: FlowScenario[] = [...rahunokFlowScenarios, ...generatedFlowScenarios];
+export const demoFlowScenarios: FlowScenario[] = [
+	merchantPaymentCanvasScenario,
+	terminalCashOrderCanvasScenario
+];
+
+export const flowScenarios: FlowScenario[] = [
+	...demoFlowScenarios,
+	...rahunokFlowScenarios,
+	...generatedFlowScenarios
+];

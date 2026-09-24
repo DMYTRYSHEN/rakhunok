@@ -63,6 +63,56 @@ changes do not bypass these rules.
   process.
 - **Applicable instruction:** `.github/instructions/invoice-scenario-locks.instructions.md`.
 
+#### Loading-Only Scope Checkpoint - 2026-09-24
+
+- The user separately approved `fixed`, `open_amount`, `table` and `delivery` for Merchant App
+  lazy payment/voice/QR modules and Pay lazy UI/QR plus a lightweight initial HTML screen.
+  Compatibility boundaries: retain API payloads, amounts, status rules, public links,
+  authentication and renderer identity. No deployment or database changes were authorized.
+- Touched loading surfaces: Merchant `App.svelte`, `AccountIdentityGuidance.svelte`, `PaymentQr.svelte`;
+  Pay `App.svelte`, `ScenarioRenderer.svelte`, `DesktopCheckout.svelte`, `index.html`, `main.ts`.
+  Per-icon login imports remove the barrel; QR rendering has stale-result guards; payment and
+  voice modules defer to existing UI/auth boundaries; first-open BankSheet stays mounted on close.
+- Evidence: Merchant check has zero diagnostics and 215 unit tests pass; Pay check has zero errors
+  with nine existing CSS warnings and 238 unit tests pass. Identity guidance passes 24 browser tests.
+  Both production builds pass. The focused lazy-loading browser suite passes 11/11, including all
+  four mobile renderer identities, retained BankSheet instances, desktop amount-gated QR and
+  merchant latest-value QR decoding. Details: `docs/LOCAL_LOADING_AUDIT_20260924.md`.
+- Residual risks: browser scenarios use isolated synthetic data, not remote persistence or completed
+  payments. Real OAuth, physical microphone behavior and production latency/chunk-failure recovery
+  are unverified. The recorded delivery persistence blocker remains; no production-readiness claim.
+- **Final loading-only scope status: `LOCKED` (closed).** Previously approved security and seller
+  scopes and their existing process-level status are unchanged. This checkpoint grants no further
+  changes to scenario semantics, authentication, shared Workers or deployment.
+
+#### Merchant App Seller Selection Checkpoint — 2026-09-24
+
+- The user approved a bounded correction for `fixed` and `open_amount` merchant-app invoice
+  creation, preservation of `table` terminal ownership, guest single-invoice checkout reading,
+  and deployment to the `letsrealtalk.com` test domain only. No database migration, unrelated
+  Worker change, or `rakhunok.com` deployment was approved.
+- The merchant app now selects an owner-scoped active seller for non-table invoices and sends its
+  `entity_id`; `table` continues to use the selected terminal's seller. Focused merchant payload
+  tests passed 43/43, `check:app` passed without diagnostics, `check:pay` passed with nine existing
+  template CSS warnings, and checkout routing tests passed 11/11. The isolated merchant build,
+  root build, and app production-environment Wrangler dry-run succeeded locally.
+- Anonymous test-domain `GET /api/v1/checkout/not-a-real-invoice` returned 404 as expected, but
+  anonymous `GET /api/v1/orders` returned 200 with 49 invoice rows and payment-related fields.
+  The current API Worker list branch uses a publishable key when Authorization is absent. This
+  violates the intended private-list boundary and requires a separately scoped API security fix.
+  No test-domain deployment, remote migration, or authenticated creation smoke test was performed;
+  remote RPC readiness and guest reading of an existing invoice remain unverified. The process
+  remains `UNLOCKED` only within previously approved scopes; this checkpoint does not authorize
+  changing the shared Worker or expanding any scenario behavior.
+- Follow-up clarification: the existing public `/api/v1/checkout/{id}` already fetches one
+  invoice by UUID, short ID, or order number with `limit=1`. A local Worker patch now requires a
+  Bearer token before private `GET /api/v1/orders` and `GET /api/v1/orders/{id}` access. Focused
+  tests confirm anonymous private reads return 401 without a database query, authenticated list
+  requests forward the token, and public checkout still fetches one invoice; the full Worker route
+  suite passes 21/21. The shared Worker has unrelated in-progress API-key changes, so neither the
+  patch nor those changes have been deployed; the remote exposure remains until a separately
+  isolated and validated API Worker deployment is approved and performed.
+
 #### Approved Temporary Scope — Authoritative Payment Reference
 
 - Preserve current routes, public links, renderer selection, amount-entry UX, bank launch behavior,
@@ -374,6 +424,12 @@ focused unit plus browser validation. Restore `LOCKED` after the approved work i
 
 ### DASH-CHECKOUT-TEMPLATES-001 — checkout template management (2026-09-16)
 
+- CSS-only checkpoint (2026-09-24): the user explicitly approved removing seven unused Events
+  preview selectors and correcting two Fitness icon styles. Removed the unused Events blocks;
+  passed the existing color/spacing properties directly to the Lucide components via `style`.
+  No warning suppression, invoice semantics, template data, authentication or deployment changes.
+  Pay `check` now reports zero errors and zero warnings; the changed icon markup passes the Svelte
+  autofixer without issues. This cleanup is complete; the broader process status below is unchanged.
 - **Status:** `ANALYZING — REMOTE TEMPLATE STORAGE MIGRATED` — the user separately approved the
   checkout-template migration after the production repository reported its RPC boundary was absent.
   Application deployment remains unapproved.
@@ -562,6 +618,13 @@ contract or behavior.
 ### DASH-SHELL-001 - Dynamic Module Load Recovery (2026-09-16)
 
 - **Status:** `ANALYZING - LOCAL RECOVERY VALIDATED`.
+- **Local loading audit, 2026-09-24:** Stabilized localhost guest Dashboard LCP was 2.216 s
+  with cold browser cache and 0.476 s warm. Initial dev starts also triggered dependency
+  optimization/reloads, so loading-screen samples are not evidence of workspace readiness.
+  The guest dependency graph included 17,053 KiB of decoded Hugeicons and 6,876 KiB of Lucide
+  dev modules. Per-icon imports and deferred shell loading are proposals only; production
+  sizes and authenticated navigation remain unmeasured. See [local audit](LOCAL_LOADING_AUDIT_20260924.md).
+  No shell behavior or process status was changed.
 - Browser reproduction traced the failed `PublicPageSettings.svelte` import to its transitive
   `qrcode` dependency returning `504 Outdated Optimize Dep`. Vitest and the live dev server shared
   `node_modules/.vite`, allowing focused test runs to replace dependency metadata while the server
@@ -581,6 +644,12 @@ contract or behavior.
 ### DASH-AUTH-001 - Authentication And Session Lifecycle
 
 - **Status:** `LOCKED` — local context candidate validated; runtime invariants unchanged.
+- **Local loading audit, 2026-09-24:** Guest login rendered after hydration; fresh-browser Google
+  Identity button requests returned 403, with an origin-not-allowed diagnostic in the integrated
+  browser. No sign-in action, authenticated readiness test, auth mutation or invariant change was
+  performed. Deferred authenticated UI is proposed only and must preserve revalidation and ownership
+  checks. This process remains `LOCKED`; evidence and limitations are in the
+  [local audit](LOCAL_LOADING_AUDIT_20260924.md).
 - **Reviewed:** 2026-09-04
 - **Owner:** Dashboard root and gateway auth boundary
 - **Files:**
@@ -591,6 +660,20 @@ contract or behavior.
   - `src/lib/features/dashboard/auth/DashboardLogin.svelte`
   - `src/lib/features/dashboard/auth/DashboardStateScreen.svelte`
   - `src/lib/features/dashboard/auth/MerchantOnboarding.svelte`
+
+#### Test-Domain Build Configuration Checkpoint — 2026-09-24
+
+- The isolated `letsrealtalk.com/dashboard` build was published without public Supabase URL,
+  publishable/anon key, or Google client ID; its `dashboard/_app/env.js` contained none of these
+  names, so the existing configuration-required login screen was shown before authentication.
+- Rebuilt the isolated Dashboard in a deployment worktree using only the existing public build
+  variables, without changing Dashboard source or auth lifecycle. The isolated artifact guard,
+  Dashboard Worker dry-run, root build, and `npm run check` passed (nine existing CSS warnings).
+- Redeployed only `letsrealtalk-dashboard`. The served public env module matches the corrected
+  artifact byte-for-byte; an unauthenticated browser visit shows the Google sign-in button, and
+  `/`, `/dashboard`, `/app`, `/conf/`, `/pay`, `/pay/`, and `/corex` return HTTP 200.
+- **Status:** `LOCKED`. Signed-in session restore and merchant access were not retested; future
+  isolated deployments must supply the public build variables before publishing assets.
 
 #### Conclusions
 
@@ -808,6 +891,192 @@ Separate approval is required to change terminal-specific TTL values, restore br
 reinterpret explicit null expiry, or derive TABLE identity without `terminal_id`.
 
 ## Active Analyses
+
+### Browser And Deployment Compatibility Audit - 2026-09-24
+
+- **Status:** `ANALYZING`; partial browser verification, not full production certification.
+  Processes: `DASH-AUTH-001`, `DASH-POS-001`, `DASH-INVOICE-001`,
+  `DASH-DEVELOPER-001`, and `CROSS-APP-INVOICE-SCENARIOS-001`. Existing locks remain unchanged.
+- **Boundary:** no runtime edits, deployment, remote migration, login submission, invoice creation,
+  or payment initiation. Remote browser checks blocked methods other than GET/HEAD/OPTIONS;
+  blocked analytics POST errors are audit artifacts, not application failures.
+- **Local browser evidence:** Dashboard business UI suite passed 24/24; isolated account identity
+  guidance browser suite passed 24/24; Pay fuel quote/payment-sheet UI test passed 1/1.
+  Pay logged ECONNREFUSED for bank/logo API proxy requests because local port 8787 was unavailable;
+  this pass does not establish live API integration. No full repository validation gate was run.
+- **Deployed entry points:** `/dashboard`, `/dashboard/`, `/app`, `/app/`, `/pay`, and `/pay/`
+  returned HTTP 200 on both letsrealtalk.com and rakhunok.com. Guest desktop checks found no
+  page exceptions or horizontal overflow. Bare Pay correctly displayed the missing-invoice state.
+  Production App renders a Google login iframe; its initially sparse body text is not a blank UI.
+  Test App additionally exposes Telegram login and account identity guidance.
+- **Pay smoke:** mobile demo 1/2/3/4 remained on their expected checkout URLs without horizontal
+  overflow on both domains. TABLE reload preserved the displayed 386.00 UAH order and controls.
+  Demo rendering is not evidence for persisted invoices, delivery persistence, or bank settlement.
+- **Responsive findings:** repeated 28-page matrix (Dashboard overview/POS/invoices and four Pay
+  demos, two domains, 390/1440 px) had no page exceptions, horizontal overflow, or lingering
+  Dashboard loading state. However, test-domain desktop Pay rendered all four demos as expired
+  with no usable QR; mobile rendered checkout actions. Production uses a different desktop view.
+  TABLE was reproduced separately: `DesktopCheckout.svelte` applies `!isOrderFresh(order, now)`,
+  while its demo fixture lacks creation/expiry timestamps; `expiry.ts` treats missing timestamps
+  as not fresh. This explains a demo compatibility failure, not proven failure of real invoices.
+  Production POS also retains the older draft label, unlike the test deployment.
+- **Artifact comparison:** test App entry JS `index-BllVO330.js` and CSS `index-DOIfg4iw.css`
+  match the existing local dist bytes. Production App uses different assets. Dashboard entry
+  assets differ between both domains and the existing root build; Pay entry assets likewise
+  differ between test, production, and local dist. Some shared chunks match exactly. These are
+  comparisons with existing artifacts, not fresh builds or proof of deployed commit identity.
+- **Coverage gaps:** `scripts/liquid-payment.browser.test.mjs`,
+  `scripts/liquid-payment.harness.mjs`, and `worker/src/terminal-functional-browser.test.mjs`
+  are zero-byte files. They were not restored or counted as passing coverage.
+- **Still required:** authenticated Dashboard/App JWT refresh and navigation, live Realtime,
+  a valid test invoice across the four scenarios, cash/payment write lifecycle, and actual mobile
+  Safari/Telegram WebView behavior. No passwords or tokens should be provided to the assistant;
+  authenticated verification requires a user-established browser session. Earlier navigation-style
+  test instability and delivery persistence findings below remain unresolved.
+- **Auth audit correction:** the initial blanket POST guard also blocked the user's Google
+  Supabase `auth/v1/token?grant_type=id_token` exchange. Those login failures were introduced
+  by the audit, not evidence of an application regression. The shared page now allows only
+  token POST exchanges with id_token/refresh_token/pkce grants on the configured Supabase host;
+  the business-write guard remains. Reload still showed login; automated Google button clicks
+  timed out on visibility, so successful authentication remains unverified pending user interaction.
+- **Authenticated read-only follow-up (2026-09-24):** the user completed Google sign-in in a
+  standard browser; popup failure was not reproduced there. A newly shared authenticated tab
+  displayed the Dashboard financial overview, invoices, POS workplaces, structure, settings,
+  and Developer API after load, with no visible alerts or persistent restore screen. The App
+  opened its online cashier without another login; history and profile loaded. No token or key
+  values were read or recorded. One existing TABLE invoice detail loaded, but its checkout
+  rendered "payment unavailable / invalid invoice"; expiry at the observation time was not
+  established. App history displayed "preparing", while Dashboard displayed "waiting".
+  Current Pay tests explicitly block preparing invoices, including positive amounts. The
+  persisted status at observation time was not captured, so the exact cause remains unverified.
+  This does not establish active checkout or payment compatibility. The earlier audit tab was not used
+  for this follow-up; its request guard must not be assumed to cover the new tab. No business
+  writes were initiated. Token-refresh timing, live Realtime delivery, valid checkout across
+  four scenarios, and payment/write lifecycle remain unverified.
+- **Fresh-build follow-up (2026-09-24):** a cold local Vite run timed out once at
+  `page.goto` and then at the five-second overview heading assertion; the same isolated test
+  passed after the route warmed, followed by 24/24 Dashboard business UI E2E passing. This
+  supports a cold-start timing issue, not a proven Dashboard navigation regression. Fresh local
+  and test App entry JS/CSS names match. Dashboard start/app entry bytes differ despite equal
+  lengths; bundle identity is not established. Pay has 18/22 identical referenced chunk names;
+  the four differing chunks are Amount, Delivery, Table, and Tips scenarios. The Pay entry JS
+  differs because it imports the changed App chunk; its other entry imports and CSS match.
+  Read-only Pay demo checks at 390/1440 px matched local and test behavior for all four
+  scenarios without horizontal overflow: mobile showed checkout actions, desktop marked every
+  demo invalid/expired. Local preview bank/logo API proxy requests returned 502; no live payment
+  or persisted invoice was verified. Test Dashboard demo overview, POS, invoices, and Developer
+  API routes loaded with expected headings. Asset differences and demo parity do not certify
+  authenticated API, Realtime, invoice settlement, or scenario write compatibility.
+
+### Merchant API Key Orders Authentication
+
+- **Remote promotion attempt (2026-09-24):** the user explicitly retained merchant PATCH
+  `paid` for cash or alternative payment, not bank-confirmed settlement, and authorized the two
+  migrations and test-only deployment conditional on compatibility. SELECT checks confirmed the
+  required columns, service-role table privileges, invoice function signature and existing grants.
+  The user-installed `SUPABASE_SERVICE_ROLE_KEY` is present on `letsrealtalk-web`; its value has
+  not been functionally verified. Fresh focused tests passed 29/29; full root build and matching
+  test Worker dry-run passed. Earlier root unit run passed 759 tests and check had zero errors.
+- **Deployment blocker:** applying `merchant_api_key_orders` failed with SQLSTATE `42501`,
+  `permission denied to set parameter "request.jwt.claim.sub"`. Remote SELECT confirmed that
+  neither `postgres` nor `service_role` can SET either JWT claims parameter. PGlite does not
+  reproduce this hosted permission restriction. Follow-up SELECT confirmed full rollback:
+  both new RPCs and the private schema are absent, neither migration is recorded, and the original
+  revocation trigger function is unchanged. The second migration and Worker deployment were not
+  attempted. No existing orders were modified. The database is shared with `rakhunok.com`.
+- **Required approval boundary:** redesigning the shared authoritative invoice creation path to
+  accept a verified merchant owner without impersonating JWT claims affects
+  `CROSS-APP-INVOICE-SCENARIOS-001` across `fixed`, `open_amount`, `table`, and `delivery`.
+  This requires separate approval before changing that locked path; do not grant broad JWT-setting
+  privileges or remove auth checks as a deployment workaround. Existing browser JWT behavior,
+  snapshots, numbering, and merchant isolation must remain covered by regression tests.
+- **Local integration follow-up (2026-09-24):** after the entrypoint was restored, the Merchant
+  API key handler was reconnected before the legacy JWT routes and public order cache. Successful
+  key PATCH clears matching cached order aliases; JWT requests continue through the existing route.
+  Focused Worker routing tests passed 16/16, local PGlite invoice/API tests passed 13/13, and the
+  main Worker Wrangler dry-run bundled successfully. No remote migrations, secrets or deployment
+  were applied; deployed key authentication and live JWT compatibility remain unverified.
+- **Status:** locally implemented and tested, remote promotion blocked by hosted JWT-parameter
+  permissions; `DASH-DEVELOPER-001` remains `ANALYZING` for deployment/readiness.
+  `CROSS-APP-INVOICE-SCENARIOS-001` remains `LOCKED` for the required shared creation-path redesign.
+- **Explicit approval:** user selected "Погоджую цей обсяг для всіх чотирьох сценаріїв" for
+  `fixed`, `open_amount`, `table`, `delivery`. Temporary unlock covered only API key read/write
+  authentication, local Worker/migration/tests/specification. No deployment or remote migration.
+- **Earlier local implementation (superseded):** `worker/src/merchant-api-key.ts` intercepts Merchant keys before legacy
+  routes/cache; SHA-256 only is sent to service-role-only invoker RPC `merchant_api_key_orders`.
+  Key validity, scopes, merchant isolation and operation share one transaction. Key row locking
+  serializes operations with revocation. Usage timestamps are server-updated; owner revocation
+  remains supported. Authoritative invoice creation is reused; temporary auth claims are derived
+  exclusively from the verified merchant and restored at function exit, never returned as JWTs.
+- **Preserved:** existing JWT path, invoice numbering/payment snapshots, four scenario identities,
+  amount/status semantics, terminal authority and public links. Successful key PATCH invalidates
+  matching local cache aliases. No Dashboard authentication lifecycle or UI changes.
+- **Earlier local evidence:** HTTP/SQL/JWT regression suite passed (172/172); focused JWT/key cache
+  variants and standalone Worker-to-PGlite test also passed independently (3/3).
+  Covers all four creates, reads/writes, foreign merchant/order denial, scope denial, expiry,
+  revocation, client RPC permission denial, hash-only forwarding and restored auth context.
+- **Deployment prerequisites:** apply `20260923225403_merchant_api_key_orders.sql` after existing
+  migrations; configure server-only `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL` on main Worker.
+  No remote schema, secret, Worker or production route was changed. Real PostgREST authentication,
+  full local Supabase stack/advisors and deployed behavior remain unverified.
+- **Local operations follow-up:** the unapplied `20260923235713_merchant_api_operations.sql`
+  adds `stats:read`, merchant-wide read/write rate limits and 24-hour create idempotency through
+  `merchant_api_operations`, which delegates order work to `merchant_api_key_orders`.
+- **Approved local redesign (2026-09-24):** the user selected a separate API creation path while
+  leaving browser creation unchanged, then explicitly approved local changes for `fixed`,
+  `open_amount`, `table`, and `delivery`. This temporarily unlocked only the Merchant API invoice
+  creation path and its tests, not remote migration or deployment. The earlier JWT-claim approach
+  above remains a failed, rolled-back attempt, not the current implementation: the unapplied
+  `20260923225403_merchant_api_key_orders.sql` now defines service-role-only, security-invoker
+  `create_merchant_api_invoice(owner, merchant, ...)`. Key verification derives both IDs before
+  the call; the function checks ownership and seller/terminal authority without SET on JWT claims.
+  `create_authoritative_invoice` and browser JWT creation are unchanged. Local PGlite tests cover
+  four API scenarios in direct and finance-company recipient modes, numbering, purpose snapshots,
+  key isolation and revocation, plus idempotency/stats (14/14 focused tests). This supersedes the
+  old implementation claim about temporary JWT claims; no hosted permission or PostgREST execution
+  was established. `PATCH paid` remains a merchant cash/alternative-payment action, not bank proof.
+  Remote rollout of both migrations and either Worker requires separate explicit authorization;
+  `delivery` retains its recorded persistence blocker. Temporary unlock closed:
+  `CROSS-APP-INVOICE-SCENARIOS-001` is `LOCKED`, `DASH-DEVELOPER-001` remains `ANALYZING`.
+- **Residual risks:** hosted PostgREST execution, live JWT compatibility and actual merchant
+  payment writes remain unverified. Existing public/JWT cache access and status-transition
+  gaps remain. `delivery` is not production-ready while the earlier persistence blocker remains.
+  Earlier read-only audit findings below remain historical evidence, not an implementation claim.
+  Updated integration contract: `docs/openapi2.yaml`; original `docs/openapi.yaml` unchanged.
+
+### Main OpenAPI And Worker Contract Audit
+
+- **Status:** `ANALYZING`; read-only runtime review. Existing process lock/unlock states and
+  previously approved scopes are unchanged. This audit grants no implementation or deployment approval.
+- **Scope:** `docs/openapi.yaml` (30 operations), main Worker router, checkout proxy and domain
+  service bindings; related processes `DASH-AUTH-001`, `DASH-INVOICE-001`, `DASH-POS-001`,
+  `DASH-DEVELOPER-001`, and `CROSS-APP-INVOICE-SCENARIOS-001`.
+- `worker/src/index.ts` accepts unsigned KSO requests and bank webhooks without the documented
+  HMAC, timestamp, replay/idempotency, or persistence behavior. KSO returns stub fields instead
+  of the required checkout/payment identifiers; the bank webhook only echoes its input.
+- The documented `/api/v1/merchant/telegram/invoices/send` POST returns 404 in the main router;
+  the handler is mounted at `/api/v1/merchant/telegram-invoice`. Direct handler tests and the
+  hardcoded coverage inventory do not prove the documented URL is reachable.
+- Merchant credentials are forwarded to Supabase; no merchant API-key resolution was found in
+  this router. Several protected reads return demo/static data or empty success on auth failure.
+  Team deletion and invitation creation report success even when mocked persistence returns 403.
+- Order creation requires `entity_id` (and `terminal_id` for table), unlike the documented optional
+  fields, returns 200 rather than 201, and does not forward items/order_number/discount_amount.
+  Public cold order lookup filters UUID `id` only, despite the documented code lookup.
+- Main Worker checkout initiation ignores required `bank` in favor of `bank_code`, accepts GET,
+  and generates a payment payload for a missing order. Promo/delivery changes are memory-only;
+  events are echoed without persistence. These findings are not production checkout certification.
+- `worker/src/checkout.js` forwards public API requests unchanged through `API`: the test-domain
+  configuration targets `letsrealtalk-web-preview`, while production targets `rahunok`. The latter
+  service implementation/deployed revision was not established by this audit.
+- Error payloads use string `error` rather than the contract's required boolean `error` and
+  `message`. YAML parsing found nine Response Objects without required `description`.
+- **Evidence:** 11 offline assertions against `routeWebRequest` reproduced the source behavior;
+  all external fetches were mocked. YAML inventory parsed 30 operations. These are discrepancy
+  reproductions, not passing conformance tests. The demo-session response matches its inline schema.
+- **Residual risks:** deployed service revisions, production checkout behavior, real JWT/key flows,
+  database policies and settlement behavior remain unverified. No remote requests, database changes,
+  API/specification edits, or deployments were performed for this audit.
 
 ### DASH-POS-001 - POS First Navigation And Update Recovery
 

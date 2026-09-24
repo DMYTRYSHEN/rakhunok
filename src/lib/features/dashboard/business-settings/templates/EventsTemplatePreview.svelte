@@ -861,54 +861,6 @@
 	}
 
 	
-	.ios-hero-banner {
-		position: relative;
-		margin: -0.75rem -1rem 0.5rem -1rem;
-		height: 180px;
-		overflow: hidden;
-		display: flex;
-		align-items: flex-end;
-		padding: 1rem;
-	}
-	.ios-hero-img {
-		position: absolute;
-		top: 0; left: 0; right: 0; bottom: 0;
-		width: 100%; height: 100%;
-		object-fit: cover;
-		z-index: 1;
-	}
-	.ios-hero-overlay {
-		position: absolute;
-		top: 0; left: 0; right: 0; bottom: 0;
-		background: linear-gradient(0deg, var(--bg) 0%, rgba(0,0,0,0.1) 40%, rgba(0,0,0,0.6) 100%);
-		z-index: 2;
-	}
-	.ios-hero-content {
-		position: relative;
-		z-index: 3;
-		color: #ffffff;
-		text-shadow: 0 1px 4px rgba(0,0,0,0.3);
-		align-self: flex-start;
-		margin-top: 1rem;
-	}
-	.ios-hero-title {
-		font-size: 1.25rem;
-		font-weight: 800;
-		margin: 0 0 4px 0;
-		color: #ffffff;
-	}
-	.ios-hero-desc {
-		font-size: 0.8rem;
-		opacity: 0.9;
-		margin: 0;
-		line-height: 1.3;
-		color: #ffffff;
-	}
-	.ios-sessions-card {
-		margin-top: -30px;
-		position: relative;
-		z-index: 10;
-	}
 	.ios-session-row {
 		display: flex;
 		justify-content: space-between;

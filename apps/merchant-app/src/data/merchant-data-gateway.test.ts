@@ -160,6 +160,23 @@ function query(data: unknown[] | null, error: Error | null = null) {
 }
 
 describe('merchant data gateway', () => {
+	it.each(['fixed', 'open_amount'] as const)('sends a seller without a terminal for %s', async (type) => {
+		const getSession = vi.fn().mockResolvedValue(sessionResult('user-1', 'token-1'));
+		const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+			order: { ...orderRow, type, total_amount: type === 'open_amount' ? 0 : 125.5, terminal_id: null }
+		}), { status: 201 }));
+		const client = { auth: { getSession } } as unknown as SupabaseClient;
+
+		await createMerchantDataGateway(client, fetcher).createOrder({
+			type, amount: type === 'open_amount' ? 0 : 125.5, orderNumber: 'APP-1',
+			title: 'Рахунок APP-1', merchantId: 'merchant-1', entityId: 'entity-1'
+		}, 'user-1', () => true);
+
+		const body = JSON.parse((fetcher.mock.calls[0]?.[1] as RequestInit).body as string);
+		expect(body).toMatchObject({ type, entity_id: 'entity-1', merchant_id: 'merchant-1' });
+		expect(body).not.toHaveProperty('terminal_id');
+	});
+
 	it('creates an order through the scoped authenticated Worker API', async () => {
 		const getSession = vi.fn().mockResolvedValue({ data: { session: { access_token: 'token-1', user: { id: 'user-1' } } }, error: null });
 		const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
