@@ -30,6 +30,23 @@ describe('LiquidPaymentButton SSR and component contract', () => {
 		expect(output).toContain('dock-pay-btn');
 	});
 
+	it('uses the current origin for a stored invoice link from another domain', () => {
+		const output = render(LiquidPaymentButton, {
+			props: {
+				amount: 500,
+				formattedAmount: '500',
+				scenario: 'fixed',
+				open: true,
+				selectedOrder: { ...waitingOrder, shareUrl: 'https://letsrealtalk.com/pay/order-123' },
+				origin: 'https://rhnk.pp.ua',
+				onSubmitOrder: vi.fn()
+			}
+		}).body;
+
+		expect(output).toContain('https://rhnk.pp.ua/pay/order-123');
+		expect(output).not.toContain('https://letsrealtalk.com/pay/order-123');
+	});
+
 	it('renders free amount scenario text', () => {
 		const output = render(LiquidPaymentButton, {
 			props: {

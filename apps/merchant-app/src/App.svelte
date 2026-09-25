@@ -567,7 +567,7 @@
 		const current = () => sessionFence.isCurrent(generation) && selectedOrder?.id === order.id;
 		orderAction = 'copy';
 		try {
-			await navigator.clipboard.writeText(order.shareUrl || `${window.location.origin}/pay/${order.id}`);
+			await navigator.clipboard.writeText(`${window.location.origin}/pay/${encodeURIComponent(order.id)}`);
 			if (!current()) return;
 			haptic('light');
 			setTimeout(() => {
@@ -581,7 +581,7 @@
 	async function shareOrder(order: OrderSummary) {
 		if (authState.status !== 'ready') return;
 		const generation = sessionFence.capture();
-		const url = order.shareUrl || `${window.location.origin}/pay/${order.id}`;
+		const url = `${window.location.origin}/pay/${encodeURIComponent(order.id)}`;
 		if (!navigator.share) return copyOrderLink(order);
 		try {
 			await navigator.share({

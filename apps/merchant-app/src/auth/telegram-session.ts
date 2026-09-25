@@ -16,7 +16,7 @@ export function telegramCallbackError(href: string): string {
 }
 
 export function telegramSessionAvailable(origin: string, enabled: string | undefined): boolean {
-	return enabled === 'true' && origin === 'https://letsrealtalk.com';
+	return enabled === 'true' && (origin === 'https://letsrealtalk.com' || origin === 'https://rhnk.pp.ua');
 }
 
 /** Supabase owns OAuth state, identity verification, callback and session persistence. */
@@ -41,7 +41,7 @@ export async function startTelegramSession(
 	if (mode === 'signin' && session) throw new Error('Use account linking while signed in.');
 	const credentials = {
 		provider: TELEGRAM_PROVIDER,
-		options: { redirectTo: 'https://letsrealtalk.com/app/', scopes: 'openid profile' }
+		options: { redirectTo: `${origin}/app/`, scopes: 'openid profile' }
 	};
 	const { error } = mode === 'link'
 		? await client.auth.linkIdentity(credentials)

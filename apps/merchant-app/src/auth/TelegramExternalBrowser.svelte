@@ -1,7 +1,7 @@
 <script lang="ts">
 	let copied = $state(false);
 	let copyFailed = $state(false);
-	const url = 'https://letsrealtalk.com/app/';
+	const url = `${window.location.origin}/app/`;
 	async function copyLink() {
 		try {
 			await navigator.clipboard.writeText(url);

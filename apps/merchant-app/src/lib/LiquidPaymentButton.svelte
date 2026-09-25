@@ -171,7 +171,7 @@
 	let shareOrigin = $derived(origin || (typeof window !== 'undefined' ? window.location.origin : ''));
 	let paymentComplete = $derived(cachedOrder?.status === 'paid' || cachedOrder?.status === 'completed');
 	let paymentClosed = $derived(cachedOrder?.status === 'cancelled' || cachedOrder?.status === 'expired');
-	let paymentUrl = $derived(cachedOrder?.shareUrl || (cachedOrder ? `${shareOrigin}/pay/${cachedOrder.id}` : ''));
+	let paymentUrl = $derived(cachedOrder ? `${shareOrigin}/pay/${encodeURIComponent(cachedOrder.id)}` : '');
 	let orderTerminal = $derived(terminals.find((terminal) => terminal.id === cachedOrder?.terminalId));
 	let qrEntries = $derived(
 		cachedOrder

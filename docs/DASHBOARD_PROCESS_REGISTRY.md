@@ -63,6 +63,31 @@ changes do not bypass these rules.
   process.
 - **Applicable instruction:** `.github/instructions/invoice-scenario-locks.instructions.md`.
 
+#### New-Domain Merchant Link Scope - 2026-09-25
+
+- The user approved publishing the Merchant App link correction on `rhnk.pp.ua` for
+  `fixed`, `open_amount`, `table`, and `delivery`. The temporary scope is limited to
+  deriving copied/shared invoice and liquid-payment URLs from the current App origin
+  and existing order ID, even when a persisted `shareUrl` names the old domain.
+  Stored invoices, amounts, payment rules, checkout routing, and other Workers remain unchanged.
+- The App bundle also enables the new-domain Telegram callback. The user confirmed
+  `https://rhnk.pp.ua/app/` is present in the Supabase Auth redirect allowlist;
+  remote OAuth completion is not yet exercised. No Supabase settings are changed.
+- Focused link and Telegram tests pass (30/30); the full Merchant App unit suite
+  passes (219/219), and `check:app` reports zero errors and warnings. The App
+  build, root build, and matching `rhnk-app` Wrangler dry-run passed. Only
+  `rhnk-app` was deployed to `rhnk.pp.ua/app` and `/app/*` (Worker version
+  `0669d2f8-5193-4cd1-9dc3-d075707d239c`). Live `/`, `/dashboard`, `/app`,
+  `/app/`, `/conf/`, `/pay`, `/pay/`, and `/corex` returned 200; the App's
+  referenced JS and CSS returned 200 with the expected content types. Live JS
+  contains current-origin invoice copying and the `/app/` OAuth callback.
+- Residual risks: a completed remote OAuth flow and an authenticated click-to-copy
+  or share interaction were not verified. The old domain remains in the Telegram
+  compatibility allowlist, not in the invoice clipboard call. No Supabase settings,
+  other Workers, or other domains were changed. **Final new-domain link scope:
+  `LOCKED` (closed).** This checkpoint grants no further scenario changes or
+  deployment to another domain.
+
 #### Loading-Only Scope Checkpoint - 2026-09-24
 
 - The user separately approved `fixed`, `open_amount`, `table` and `delivery` for Merchant App
