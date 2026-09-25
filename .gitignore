@@ -5,8 +5,12 @@ node_modules
 .vercel
 .netlify
 .wrangler
+/.wrangler-dist-demo/
 /worker/.wrangler-dist*
 /worker-rakhunok/.wrangler-dist*
+/worker-rhnk/.demo-assets/
+/worker-rhnk/.wrangler-dist*
+/worker-rhnk/**/.wrangler-dist*/
 /apps/qr/.wrangler-dist*
 /.svelte-kit
 /.svelte-kit-dashboard
