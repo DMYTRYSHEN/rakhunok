@@ -94,6 +94,7 @@ export default defineConfig(({ mode }) => ({
 		apiDocsDevServer(),
 		tailwindcss(),
 		sveltekit({
+			prerender: { crawl: false },
 			...(mode === 'dashboard-isolated'
 				? {
 						appDir: 'dashboard/_app',

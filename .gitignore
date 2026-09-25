@@ -9,6 +9,7 @@ node_modules
 /worker/.wrangler-dist*
 /worker-rakhunok/.wrangler-dist*
 /worker-rhnk/.demo-assets/
+/worker-rhnk/.landing-assets/
 /worker-rhnk/.wrangler-dist*
 /worker-rhnk/**/.wrangler-dist*/
 /apps/qr/.wrangler-dist*
