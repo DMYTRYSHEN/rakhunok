@@ -63,6 +63,205 @@ changes do not bypass these rules.
   process.
 - **Applicable instruction:** `.github/instructions/invoice-scenario-locks.instructions.md`.
 
+#### Merchant App Invoice Dialog Refinement - 2026-09-25
+
+- Separate release approval: the user requested a Git commit and deployment to
+  `https://rhnk.pp.ua/app`. Release scope is the approved Merchant App UI and its
+  existing `rhnk-app` routes only. API Workers, database changes and other products
+  are excluded. Invoice creation and recipient-validation issues remain unresolved;
+  this UI release does not claim to fix them. Scenario locks remain unchanged.
+- **Status:** `LOCKED` (implementation closed, visual acceptance pending) after separate explicit user approval for `fixed`, `table`
+  and `open_amount`: unified creation preview and existing-invoice presentation,
+  compact mobile bottom panel, centered desktop dialog, stable heading/close action,
+  accessible content and restrained motion matching the Merchant App theme.
+  Follow-up approval pins existing-invoice share, Telegram, copy and cancel actions
+  below independently scrollable details.
+- Scope: LiquidPaymentButton.svelte, existing isolated browser regression and this
+  registry. Preserve amounts, statuses, QR routes, API calls and payment handlers.
+  Delivery, auth, backend code, database, deployment and commits are excluded.
+- Validation passed: isolated browser regression including four dialog viewports
+  and both themes, footer visibility at both scroll extremes, QR switching,
+  keyboard focus and reduced motion; Svelte/TypeScript check (zero errors/warnings),
+  Svelte autofixer of the footer slice (no issues/suggestions), and Merchant App build.
+- User-requested local API restart: Wrangler runs locally on 127.0.0.1:8787;
+  health directly and through Vite and authenticated invoice reads returned HTTP 200.
+  No real invoice creation/payment was performed. The separate security-hardening
+  unlock is unchanged; no deployment or commit was performed.
+
+#### Merchant App Navigation Icon Refinement - 2026-09-25
+
+- **Status:** `LOCKED` (implementation closed, visual acceptance pending) after separate explicit user confirmation for `fixed`,
+  `table`, and `open_amount`: shopping-bag Kasa, hryvnia invoice History and
+  unified avatar Profile icons with restrained monochrome animation. Preserve
+  the bare left-aligned logo and its 44px target.
+- Files: LiquidNavIcon.svelte, existing Merchant App UI browser test, this registry;
+  App.svelte/app.css only if logo positioning requires repair.
+- No payment, routing, auth, backend, database, delivery, deployment or commit changes.
+- Validation: Svelte autofixer/check, browser geometry on mobile/desktop, icon
+  semantics, motion/reduced motion, themes and App build.
+- Evidence: isolated browser regression passes, including left-logo geometry at
+  seven viewport sizes from 320x568 to 1440x900, consistent icon strokes, hryvnia
+  glyph, animation sampling, reduced motion and themes. Svelte autofixer reports
+  no issues or suggestions; Svelte/TypeScript check reports zero errors/warnings;
+  changed component/test editor diagnostics are clean; App production build passes.
+- Logo was already left-aligned locally; this refinement adds geometry coverage
+  without changing App.svelte/app.css. Browser fixtures do not exercise live payments.
+  Physical-device rendering and final visual acceptance remain unverified.
+  No deployment or commit was performed; the separate security unlock is unchanged.
+
+#### Merchant App Compact UI Scope - 2026-09-25
+
+- **Status:** `LOCKED` (implementation closed, visual acceptance pending) after explicit user confirmation for Merchant App UI in
+  `fixed`, `table`, and `open_amount` only. Scope: compact height-aware layout,
+  container-aware typography, a left-aligned bare Rahunok logo with a 44px target,
+  monochrome action-specific navigation animations, and persistent demo-cart access.
+- Files: Merchant App App.svelte, app.css, AmountKeypad.svelte, LiquidNavIcon.svelte,
+  WaiterMenu.svelte, and the existing isolated UI browser regression.
+- Preserve amount validation, terminal-owned recipients, API payloads, auth, payment
+  behavior, and demo isolation. Delivery, backend, database, deployment and commits
+  are excluded. The separate security-hardening unlock is unchanged.
+- Validation plan: inspect actual ancestor clipping at 375x667 and 320x568, including
+  table and expanded calculator; enlarged text remains reachable; check desktop,
+  themes, monochrome motion/reduced motion, demo totals and manual-amount isolation.
+  Run Svelte checks/autofixer, App unit tests, isolated browser tests and App build.
+- Evidence: isolated browser regression passes seven viewport sizes from 320x568
+  to 1440x900, compact fixed/table calculator controls, monochrome animations and
+  reduced motion, mobile cart access/focus, demo totals, manual-amount isolation,
+  themes and payment preview. At 375x667 with 200% root text, amount intrinsic
+  height and scenario-label wrapping keep calculator controls reachable by scrolling.
+- Current App validation: 219 unit tests in 17 files pass; Svelte/TypeScript check
+  reports zero errors/warnings; production build passes. Svelte autofixer reports
+  no issues in the keypad, navigation icons or waiter menu; optional attachment
+  suggestions were not adopted for the explicit cart focus references.
+- Existing App.svelte editor lint findings outside this UI scope remain unchanged.
+  Browser checks use isolated fixtures, not live payments. Physical-device safe
+  areas, system font scaling and final visual acceptance remain unverified.
+  No deployment or commit was performed; the separate security unlock is unchanged.
+
+#### Merchant App Decimal Input Scope - 2026-09-25
+
+- **Status:** `LOCKED` after separate explicit approval for `fixed` and `table`:
+  ignore further digit presses after two decimal digits in the current operand.
+  Deletion and subsequent operands remain editable. Evaluation, rounding, recipients,
+  API payloads and payment rules are unchanged; `open_amount` and `delivery` excluded.
+- Evidence: isolated browser regression passed for both scenarios, deletion, second
+  operand, arithmetic result and five responsive viewports. App Svelte/TypeScript
+  checks passed with zero errors and warnings. Existing unrelated editor lint findings
+  remain. No API, database or deployment changes.
+- Local frontend responds on the Wi-Fi address and renders the login page. Physical
+  phone access remains unverified; Google login requires HTTPS and Telegram login is
+  not configured. LAN HTTP alone does not provide an authenticated mobile preview.
+
+#### Merchant App Waiter Demo Scope - 2026-09-25
+
+- **Status:** `LOCKED` (implementation closed, visual acceptance pending) after separate explicit approval for Merchant App rendering in
+  `fixed`, `open_amount`, and `table`: right-aligned existing logo, navigation icons,
+  amount/products switch, and an isolated demo catalog and order composer.
+- Demo quantities and totals must never alter the manual amount, call payment APIs,
+  or persist a real order. Confirmed orders remain local demo state. Recipient and
+  terminal ownership remain unchanged. No backend, database, deployment or delivery scope.
+- Validation: responsive browser regression, demo cart totals and isolation, Svelte
+  checks and local build. Existing security-hardening unlock is unaffected.
+- Evidence: 219 Merchant App unit tests passed; browser regression passed across five
+  viewport sizes, including distinct icon animations and reduced-motion fallback,
+  local menu images, demo totals, confirmation gating and unchanged manual amounts.
+  App check/build and isolated `rhnk-app` dry-run passed. Root build, domain asset
+  preparation, Pay/Conf builds and root/Pay/App/Conf checks also passed.
+- Separate release approval: the user explicitly requested deployment to `rhnk.pp.ua`
+  for testing this UI revision. Only `rhnk-app` and its existing `/app` and `/app/*`
+  routes are authorized; no API Worker, database, other product or domain deployment.
+  Published `rhnk-app` version `ff0e0856-0e88-45c7-9ddd-e933deb9c93a`.
+  Post-deployment smoke checks returned HTTP 200 for `/`, `/dashboard`, `/app`,
+  `/conf/`, `/pay`, `/pay/` and `/corex`, with their referenced JS/CSS assets.
+  The new app bundle and all six menu images are available. Unauthenticated
+  `/app/api/v1/orders` returns 401. The app runs in a secure browser context and
+  Google/Telegram login controls load; provider sign-in was not performed.
+- Residual risks: physical-phone and visual acceptance remain pending. Demo orders
+  are local only; other invoice modes still use the shared real backend.
+
+#### Merchant App Header Recipient Scope - 2026-09-25
+
+- **Status:** `LOCKED` (implementation closed, visual acceptance pending) after
+  separately approved header placement in `fixed`,
+  `open_amount`, and `table`. Move the existing entity selector into the header;
+  table mode displays the selected terminal's entity without changing selection rules.
+  Replace the visible online label with an accessible online/offline indicator.
+  Payment rules, payloads, recipients, and persisted data are unchanged.
+- **Evidence:** Isolated browser regression passed at five viewport sizes, including
+  company selection persistence across table mode, terminal-owned company display,
+  online/offline browser events, themes, responsive geometry, and payment preview.
+  App Svelte/TypeScript check passed with zero errors and warnings; reconstructed
+  header markup passed Svelte autofixer. No deployment or database changes.
+- **Residual risks:** Network status reflects browser connectivity, not payment service
+  health. Full visual acceptance, physical-device testing, and real payments remain
+  outside this isolated check.
+
+#### Merchant App Workflow Design Scope - 2026-09-25
+
+- **Status:** `LOCKED` (implementation closed, visual acceptance pending) after the separately approved Merchant App visual and ergonomic
+  redesign of `fixed`, `open_amount`, and `table`. The user explicitly accepted these
+  scenarios and the preservation of amounts, API payloads, recipients, statuses, and
+  payment rules. Scope: App layout, keypad component, theme styles, preview presentation,
+  and isolated browser regressions. Delivery, Dashboard, Pay, database changes, and
+  deployment are excluded. Validation: App checks, unit tests, build, and isolated
+  responsive browser checks with business mutations blocked.
+- Implemented context-first layout, a three-column numeric keypad extracted to
+  `AmountKeypad.svelte`, optional arithmetic controls, accessible clear/delete actions,
+  a dedicated open-amount state, and desktop payment-action alignment. Existing
+  calculation and payment handlers remain unchanged; no preview logic was changed.
+- Evidence: Svelte/TypeScript check reports zero errors and warnings; 219 unit tests
+  pass; the production bundle builds. The isolated browser regression passes at
+  320x568, 390x844, 768x1024, 900x900, and 1440x900, including arithmetic, deletion,
+  theme persistence, long amounts, open-amount state, and payment preview. Standard
+  phone/tablet entry fits without scrolling with the synthetic long company name;
+  smaller screens retain scrolling. Screenshot rendering in the review tool remains
+  unreliable. Physical-device, full-motion, real payment, and remote OAuth flows were
+  not validated. No deployment or database change was made. Other unlocks are unchanged.
+
+#### Merchant App Visual Scope - 2026-09-25
+
+- The user separately approved the visual layer of the established invoice scenarios
+  and requested a responsive Merchant App redesign with dark, light, and system themes
+  and local services. This scope covers `apps/merchant-app/src/App.svelte`,
+  `src/app.css`, `src/lib/LiquidPaymentButton.svelte`, the local Vite proxy, and
+  `scripts/merchant-app-ui.browser.test.mjs`.
+- The changes separate navigation from payment actions, establish amount and recipient
+  hierarchy, adapt the keypad and workspace to mobile and desktop, and apply themes to
+  portaled payment surfaces. Theme preference is stored locally. API payloads, amount
+  authority, persisted orders, recipients, statuses, authentication, and public links
+  are unchanged. `delivery` behavior and its existing readiness limitation are unchanged.
+- Evidence: Merchant App check reports zero errors and warnings; all 219 unit tests
+  across 17 files pass; the App production build succeeds. The isolated browser test
+  passes at 320x568, 390x844, 768x1024, and 1440x900, exercising fixed, open-amount,
+  and table selection, long amounts, navigation, theme persistence, and payment preview.
+  Synthetic screenshots are stored under `test-results/merchant-design/`.
+- Residual risks: screenshot display in the review tool was unreliable, so complete
+  visual acceptance is pending user review. The browser test blocks business mutations;
+  real invoice creation, bank payment, remote OAuth, installed-device PWA behavior,
+  and full-motion interaction on physical devices were not verified. Local UI and
+  Worker development servers do not make Supabase or external integrations local.
+  No database changes or deployment were performed for this scope.
+  **Final visual implementation scope: `LOCKED` (closed); visual acceptance pending.**
+  This does not close or expand the separate security-hardening unlock above.
+
+#### Recipient-Details Error Scope - 2026-09-25
+
+- The user separately approved replacing `Service unavailable` for the known incomplete
+  recipient-payment-settings error during invoice creation in `fixed`, `open_amount`,
+  `table`, and `delivery`. The temporary unlock covers only the error response in
+  `worker/src/index.ts` and focused route tests in `worker/src/index-writes.test.mjs`.
+- The Worker maps only HTTP 400 RPC responses with code `22023` and exact message
+  `Invoice payment settings are incomplete` to HTTP 422 with a Ukrainian prompt to
+  check recipient name, IBAN, tax ID, and payment purpose. Other RPC errors keep the
+  existing sanitized response; invoice amounts, persistence, and payment rules do not change.
+- Focused tests for the exact match and unrelated RPC failures pass (3/3). The full
+  write-route file has 125 passes and one separate pre-existing `PATCH` cache assertion
+  failure; it is not claimed as passing. No database changes, Axiom integration, or
+  deployment were authorized or performed. Residual risk: the database does not
+  identify which payment-setting field failed, and the live Merchant flow remains
+  unverified until a separately approved deployment.
+  **Final recipient-details error scope: `LOCKED` (closed).**
+
 #### New-Domain Merchant Link Scope - 2026-09-25
 
 - The user approved publishing the Merchant App link correction on `rhnk.pp.ua` for

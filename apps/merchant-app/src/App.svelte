@@ -1,21 +1,24 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import AmountKeypad from './lib/AmountKeypad.svelte';
+	import ScanLine from '@lucide/svelte/icons/scan-line';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Check from '@lucide/svelte/icons/check';
 	import Copy from '@lucide/svelte/icons/copy';
 	import Building2 from '@lucide/svelte/icons/building-2';
-	import History from '@lucide/svelte/icons/history';
+	import LiquidNavIcon from './lib/LiquidNavIcon.svelte';
+	import WaiterMenu from './lib/WaiterMenu.svelte';
+	import Calculator from '@lucide/svelte/icons/calculator';
+	import UtensilsCrossed from '@lucide/svelte/icons/utensils-crossed';
 	import Landmark from '@lucide/svelte/icons/landmark';
 	import LockKeyhole from '@lucide/svelte/icons/lock-keyhole';
 	import MapPin from '@lucide/svelte/icons/map-pin';
 	import Mic from '@lucide/svelte/icons/mic';
 	import MonitorSmartphone from '@lucide/svelte/icons/monitor-smartphone';
 	import Share2 from '@lucide/svelte/icons/share-2';
-	import Store from '@lucide/svelte/icons/store';
 	import X from '@lucide/svelte/icons/x';
-	import UserRound from '@lucide/svelte/icons/user-round';
 	import type { AuthGateway, AuthState } from './auth/auth-gateway';
 	import { createSessionFence } from './auth/session-fence';
 	import { createGoogleNonce, loadGoogleIdentityServices } from './auth/google-identity';
@@ -35,7 +38,6 @@
 	type Scenario = 'fixed' | 'table' | 'open';
 	type HistoryPeriod = 'today' | 'week' | 'month';
 
-	const keys = ['C', '÷', '×', '⌫', '1', '2', '3', '−', '4', '5', '6', '+', '7', '8', '9', '=', '0', ','];
 	let expression = $state('');
 	let previousDisplay = $state('0');
 	let wheelDirection = $state<1 | -1>(1);
@@ -46,7 +48,11 @@
 	let orderCreating = $state(false);
 	let orderCreateError = $state('');
 	let activeView = $state<'kasa' | 'history' | 'profile'>('kasa');
+	let entryMode = $state<'amount' | 'products'>('amount');
 	let lightTheme = $state(false);
+	let themePreference = $state<'system' | 'light' | 'dark'>('system');
+	let systemLightTheme = $state(false);
+	let themeReady = $state(false);
 	let authState = $state<AuthState>({ status: 'loading' });
 	let authGateway: AuthGateway | null = null;
 	let merchantDataGateway: MerchantDataGateway | null = null;
@@ -122,6 +128,13 @@
 	const fullDateFormatter = new Intl.DateTimeFormat('uk-UA', { dateStyle: 'long', timeStyle: 'short' });
 
 	$effect(() => {
+		if (!themeReady) return;
+		lightTheme = themePreference === 'light' || (themePreference === 'system' && systemLightTheme);
+		document.documentElement.dataset.theme = lightTheme ? 'light' : 'dark';
+		try { localStorage.setItem('rahunok:theme', themePreference); } catch { return; }
+	});
+
+	$effect(() => {
 		if (authState.status !== 'ready' || !merchantDataGateway) return;
 		const merchantId = authState.merchant.id;
 		const period = historyPeriod;
@@ -179,6 +192,15 @@
 	}
 
 	onMount(() => {
+		const themeQuery = window.matchMedia('(prefers-color-scheme: light)');
+		systemLightTheme = themeQuery.matches;
+		try {
+			const savedTheme = localStorage.getItem('rahunok:theme');
+			if (savedTheme === 'light' || savedTheme === 'dark') themePreference = savedTheme;
+		} catch { themePreference = 'system'; }
+		themeReady = true;
+		const handleThemeChange = (event: MediaQueryListEvent) => { systemLightTheme = event.matches; };
+		themeQuery.addEventListener('change', handleThemeChange);
 		online = navigator.onLine;
 		standalone = isStandalone();
 		const handleOnline = () => (online = true);
@@ -195,6 +217,7 @@
 		void restoreSession();
 
 		return () => {
+			themeQuery.removeEventListener('change', handleThemeChange);
 			disposed = true;
 			restoreFence.advance();
 			sessionFence.advance();
@@ -734,7 +757,7 @@
 		else if (key === '×') appendOperator('×');
 		else if (key === '÷') appendOperator('÷');
 		else if (key === ',') appendDecimal();
-		else if (expression.length < 18) setExpression(`${expression}${key}`, 1);
+		else if (/^\d$/.test(key) && expression.length < 18 && !/\.\d{2}$/.test(expression)) setExpression(`${expression}${key}`, 1);
 
 		if (/[+\-×÷]/.test(expression) && /\d$/.test(expression)) {
 			evaluationTimer = setTimeout(calculate, 900);
@@ -855,45 +878,48 @@
 		</section>
 	{:else}
 	<header class="topbar">
-		<button class="brand" type="button" onclick={() => (lightTheme = !lightTheme)} aria-label="Змінити тему">
+		<button class="header-logo" type="button" onclick={() => (activeView = 'kasa')} aria-label="Rahunok — каса" title="Rahunok">
 			<svg viewBox="0 0 208 221" aria-hidden="true"><path d="M108.9 29.2c31.7 0 52.6 20.2 52.6 47.8 0 21.2-12.1 38.8-33.1 46.3l40.9 68.1c-25.3 0-48.6-13.3-61-34.7l-13.7-23.7c-12.1 0-21.9 9.6-21.9 21.3v37.1c-19.4 0-35.2-15.3-35.2-34.3v-20c0-18.9 15.8-34.3 35.2-34.3h28.8c15.8 0 24.7-8.3 24.7-22.4 0-13.1-7.5-19.7-22.4-19.7H72.7c-19.4 0-35.2-14.1-35.2-31.5h71.4Z" /></svg>
-			Rahunok
 		</button>
-		<button class="entity-button" type="button" aria-label="Обрати бізнес">
-			<strong>{merchantName} <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" /></strong>
-			<small><span class="status-dot"></span> Онлайн</small>
-		</button>
+		{#if scenario === 'table'}
+			<div class="header-company">
+				<Building2 size={20} aria-hidden="true" />
+				<div><span>Компанія точки</span><strong>{entities.find((entity) => entity.id === selectedTerminal?.entityId)?.name ?? (structureLoading ? 'Завантаження...' : 'Точку не вибрано')}</strong></div>
+			</div>
+		{:else}
+			<label class="header-company">
+				<Building2 size={20} aria-hidden="true" />
+				<div><span>Компанія</span><strong>{selectedEntity?.name ?? (structureLoading ? 'Завантаження...' : 'Немає компаній')}</strong></div>
+				<select aria-label="Компанія" bind:value={selectedEntityId} disabled={structureLoading || entities.length === 0}>
+					{#if entities.length === 0}<option value="">{structureLoading ? 'Завантаження...' : 'Немає компаній'}</option>{/if}
+					{#each entities as entity (entity.id)}<option value={entity.id}>{entity.name}</option>{/each}
+				</select>
+				<ChevronDown size={17} aria-hidden="true" />
+			</label>
+		{/if}
+		<span class="connection-status" role="status" aria-label={online ? 'Онлайн' : 'Офлайн'} title={online ? 'Онлайн' : 'Офлайн'}><span class="status-dot" class:offline={!online}></span></span>
+		<div class="entry-mode" role="group" aria-label="Режим каси">
+			<button type="button" aria-label="Сума" title="Сума" aria-pressed={entryMode === 'amount'} onclick={() => { entryMode = 'amount'; activeView = 'kasa'; }}><Calculator size={19} aria-hidden="true" /></button>
+			<button type="button" aria-label="Товари" title="Товари" aria-pressed={entryMode === 'products'} onclick={() => { entryMode = 'products'; activeView = 'kasa'; }}><UtensilsCrossed size={19} aria-hidden="true" /></button>
+		</div>
 	</header>
 
-	{#if activeView === 'kasa'}
+	<div class="products-workspace" hidden={activeView !== 'kasa' || ! (entryMode === 'products')}>
+		{#key scenario === 'table' ? selectedTerminal?.entityId : selectedEntityId}
+			<WaiterMenu />
+		{/key}
+	</div>
+	{#if activeView === 'kasa' && entryMode === 'amount'}
 		<section class="kasa" aria-labelledby="kasa-title">
-			<div class="amount-block">
-				<h1 id="kasa-title" aria-live="polite">
-					<span class="amount-window" aria-label={formattedDisplay}>
-						{#key wheelRevision}
-							<span class:reverse={wheelDirection < 0} class="amount-reel" aria-hidden="true">
-								{#each amountCharacters as character, index}
-									<span class="amount-character" class:changed={previousCharacters[index] !== character}>
-										<span class="previous-character">{previousCharacters[index]}</span>
-										<span class="current-character">{character}</span>
-									</span>
-								{/each}
-							</span>
-						{/key}
-					</span><small>₴</small>
-				</h1>
-			</div>
-
+			<div class="kasa-controls">
+				<div class="workspace-heading"><p>Каса</p><h2>Новий рахунок</h2></div>
+				<div class="scenario-control" style:--scenario-index={scenarioIndex} role="radiogroup" aria-label="Тип рахунку">
+					<span class="scenario-indicator" aria-hidden="true"></span>
+					<button class:active={scenario === 'fixed'} type="button" role="radio" aria-checked={scenario === 'fixed'} onclick={() => selectScenario('fixed')}>Фіксована</button>
+					<button class:active={scenario === 'table'} type="button" role="radio" aria-checked={scenario === 'table'} onclick={() => selectScenario('table')}>Стіл</button>
+					<button class:active={scenario === 'open'} type="button" role="radio" aria-checked={scenario === 'open'} onclick={() => selectScenario('open')}>Вільна сума</button>
+				</div>
 			{#if scenario !== 'table'}
-				<label class="table-select" class:ready={Boolean(selectedEntity)}>
-					<span class="terminal-label">Компанія</span>
-					<strong class="terminal-value">{selectedEntity?.name ?? (structureLoading ? 'Завантаження...' : 'Немає компаній')}</strong>
-					<select bind:value={selectedEntityId} disabled={structureLoading || entities.length === 0}>
-						{#if entities.length === 0}<option value="">{structureLoading ? 'Завантаження...' : 'Немає компаній'}</option>{/if}
-						{#each entities as entity (entity.id)}<option value={entity.id}>{entity.name}</option>{/each}
-					</select>
-					<ChevronDown class="select-chevron" size={17} strokeWidth={2.2} aria-hidden="true" />
-				</label>
 				{#if structureError}<button class="structure-error" type="button" onclick={retryStructure}>{structureError} Повторити</button>{/if}
 			{/if}
 			{#if scenario === 'table'}
@@ -918,29 +944,35 @@
 					<div class="pending-terminal-warning">На цій точці вже є активний рахунок.</div>
 				{/if}
 				{#if structureError}<button class="structure-error" type="button" onclick={retryStructure}>{structureError} Повторити</button>{/if}
-			{:else if scenario === 'open'}
-				<div class="open-note"><span>∞</span><div><strong>Вільна сума</strong><p>Суму введе покупець</p></div></div>
 			{/if}
-
-			<div class="scenario-control" style:--scenario-index={scenarioIndex} role="radiogroup" aria-label="Тип рахунку">
-				<span class="scenario-indicator" aria-hidden="true"></span>
-				<button class:active={scenario === 'fixed'} type="button" role="radio" aria-checked={scenario === 'fixed'} onclick={() => selectScenario('fixed')}>Фіксована</button>
-				<button class:active={scenario === 'table'} type="button" role="radio" aria-checked={scenario === 'table'} onclick={() => selectScenario('table')}>Стіл</button>
-				<button class:active={scenario === 'open'} type="button" role="radio" aria-checked={scenario === 'open'} onclick={() => selectScenario('open')}>Вільна сума</button>
 			</div>
-
-			<div class="keypad" class:muted={scenario === 'open'} aria-label="Клавіатура суми">
-				{#each keys as key}
-					<button
-						class:danger={key === 'C'}
-						class:operator={['÷', '×', '−', '+'].includes(key)}
-						class:equals={key === '='}
-						class:zero={key === '0'}
-						type="button"
-						aria-label={key === '⌫' ? 'Видалити цифру' : key}
-						onclick={() => pressKey(key)}>{key}</button
-					>
-				{/each}
+			<div class="amount-block" class:open-amount={scenario === 'open'}>
+				<p class="amount-caption">{scenario === 'open' ? 'Без фіксованої суми' : 'До сплати'}</p>
+				<h1 id="kasa-title" aria-live="polite" style:--amount-length={Math.max(formattedDisplay.length, 4)}>
+					{#if scenario === 'open'}
+						<span class="open-amount-symbol" aria-label="Вільна сума">∞</span>
+					{:else}
+						<span class="amount-window" aria-label={formattedDisplay}>
+							{#key wheelRevision}
+								<span class:reverse={wheelDirection < 0} class="amount-reel" aria-hidden="true">
+									{#each amountCharacters as character, index}
+										<span class="amount-character" class:changed={previousCharacters[index] !== character}>
+											<span class="previous-character">{previousCharacters[index]}</span>
+											<span class="current-character">{character}</span>
+										</span>
+									{/each}
+								</span>
+							{/key}
+						</span><small>₴</small>
+					{/if}
+				</h1>
+			</div>
+			<div class="entry-workspace">
+				{#if scenario === 'open'}
+					<div class="open-amount-state"><ScanLine size={56} strokeWidth={1.2} aria-hidden="true" /><strong>Суму обирає покупець</strong><span>Вільна сума</span></div>
+				{:else}
+					<AmountKeypad onpress={pressKey} />
+				{/if}
 			</div>
 		</section>
 	{:else if activeView === 'history'}
@@ -978,11 +1010,19 @@
 				</div>
 			{/if}
 		</section>
-	{:else}
+	{:else if activeView === 'profile'}
 		<section class="placeholder-view">
 			<p class="eyebrow">Обліковий запис</p>
 			<h1>Профіль касира</h1>
 			<div class="profile-row"><span>R</span><div><strong>{merchantName}</strong><p>{authState.user.email ?? 'Обліковий запис'}</p></div></div>
+			<div class="appearance-settings">
+				<h2>Оформлення</h2>
+				<div class="theme-options" role="group" aria-label="Тема застосунку">
+					<button type="button" aria-pressed={themePreference === 'system'} onclick={() => themePreference = 'system'}>Системна</button>
+					<button type="button" aria-pressed={themePreference === 'light'} onclick={() => themePreference = 'light'}>Світла</button>
+					<button type="button" aria-pressed={themePreference === 'dark'} onclick={() => themePreference = 'dark'}>Темна</button>
+				</div>
+			</div>
 			<div class="pwa-settings">
 				<div><strong>Застосунок</strong><p>{standalone ? 'Встановлено на пристрій' : 'Відкрито у браузері'}</p></div>
 				{#if installAvailable && !standalone}<button type="button" onclick={installApp}>Встановити</button>{/if}
@@ -1025,7 +1065,11 @@
 
 	<div class="dock-container">
 		<nav class="dock" aria-label="Навігація застосунку">
-			<button class:active={activeView !== 'profile'} type="button" onclick={() => (activeView = activeView === 'kasa' ? 'history' : 'kasa')} aria-label={activeView === 'kasa' ? 'Історія' : 'Каса'}>{#if activeView === 'kasa'}<History size={22} />{:else}<Store size={22} />{/if}</button>
+			<button class:active={activeView === 'kasa'} aria-current={activeView === 'kasa' ? 'page' : undefined} type="button" onclick={() => (activeView = 'kasa')}><span class="nav-symbol"><LiquidNavIcon kind="kasa" active={activeView === 'kasa'} /></span><span>Каса</span></button>
+			<button class:active={activeView === 'history'} aria-current={activeView === 'history' ? 'page' : undefined} type="button" onclick={() => (activeView = 'history')}><span class="nav-symbol"><LiquidNavIcon kind="history" active={activeView === 'history'} /></span><span>Історія</span></button>
+			<button class:active={activeView === 'profile'} aria-current={activeView === 'profile' ? 'page' : undefined} type="button" onclick={() => (activeView = 'profile')}><span class="nav-symbol"><LiquidNavIcon kind="profile" active={activeView === 'profile'} /></span><span>Профіль</span></button>
+		</nav>
+		<div class="payment-toolbar" class:visible={activeView === 'kasa' && entryMode === 'amount'}>
 			{#key paymentLoadAttempt}
 			{#await import('./lib/LiquidPaymentButton.svelte')}
 				<button type="button" disabled aria-busy="true" aria-label="Завантаження оплати">Оплата</button>
@@ -1058,9 +1102,8 @@
 				<button type="button" onclick={() => paymentLoadAttempt++}>Повторити завантаження оплати</button>
 			{/await}
 			{/key}
-			<button class:active={activeView === 'profile'} type="button" onclick={() => (activeView = 'profile')} aria-label="Профіль"><UserRound size={22} /></button>
-		</nav>
-		<button class="voice-button" class:listening={voiceOpen && voicePhase === 'listening'} type="button" aria-label="Створити рахунок голосом" onclick={openVoice}><Mic size={23} strokeWidth={2.1} /></button>
+			<button class="voice-button" class:listening={voiceOpen && voicePhase === 'listening'} type="button" aria-label="Створити рахунок голосом" title="Створити рахунок голосом" onclick={openVoice}><Mic size={23} strokeWidth={2.1} /></button>
+		</div>
 	</div>
 	{/if}
 </main>

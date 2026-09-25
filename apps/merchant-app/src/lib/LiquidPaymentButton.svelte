@@ -15,8 +15,6 @@
 	import {
 		computeLiquidGeometry,
 		stepSpring,
-		lerp,
-		smoothstep,
 		ACTIVATION_THRESHOLD,
 		MAX_DRAG_DISTANCE,
 		type LiquidGeometry,
@@ -82,7 +80,6 @@
 	let windowHeight = $state(520);
 	let viewportWidth = $state(360);
 	let viewportHeight = $state(640);
-	let startCenterX = $state(0);
 	let startCenterY = $state(0);
 
 	function initialOrder() {
@@ -100,6 +97,7 @@
 	let animFrame: number | undefined;
 	let lastTime = 0;
 	let reducedMotion = false;
+	let returnFocus: HTMLElement | null = null;
 	let qrSwipeStartX: number | null = null;
 
 	const fullDateFormatter = new Intl.DateTimeFormat('uk-UA', { dateStyle: 'long', timeStyle: 'short' });
@@ -150,12 +148,7 @@
 		computeLiquidGeometry(spring.value, buttonWidth, windowWidth, windowHeight)
 	);
 
-	let screenCenterX = $derived(viewportWidth / 2);
-	let sheetCenterY = $derived(viewportHeight - windowHeight / 2 - 10);
-
-	let t = $derived(smoothstep(spring.value));
-	let currentCenterX = $derived(lerp(startCenterX || screenCenterX, screenCenterX, t));
-	let currentCenterY = $derived(lerp(startCenterY || sheetCenterY + 200, sheetCenterY, t));
+	let sheetCenterY = $derived(viewportWidth >= 768 ? viewportHeight / 2 : viewportHeight - windowHeight / 2 - 8);
 
 	let isOverlayActive = $derived(Boolean(cachedOrder) || open || spring.value > 0.005 || spring.target > 0 || isPressed);
 	let isExpanded = $derived(spring.value >= 0.82);
@@ -192,7 +185,10 @@
 	let activeQrEntry = $derived(qrEntries[activeQrIndex]);
 
 	$effect(() => {
-		if (isExpanded) cardEl?.focus();
+		if (isExpanded && cardEl && !cardEl.contains(document.activeElement)) {
+			returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+			cardEl.focus();
+		}
 	});
 
 	function portal(node: HTMLElement) {
@@ -228,7 +224,6 @@
 		if (containerEl) {
 			const rect = containerEl.getBoundingClientRect();
 			if (rect.width > 30) buttonWidth = rect.width;
-			startCenterX = rect.left + rect.width / 2;
 			startCenterY = rect.top + rect.height / 2;
 		}
 	}
@@ -238,13 +233,24 @@
 		if (typeof window !== 'undefined') {
 			viewportWidth = window.innerWidth;
 			viewportHeight = window.innerHeight;
-			windowWidth = Math.min(viewportWidth - 16, 440);
-			windowHeight = Math.min(viewportHeight - 20, cachedOrder ? 720 : 560);
+			windowWidth = Math.min(viewportWidth - 16, 460);
+			windowHeight = Math.min(viewportHeight - 32, cachedOrder ? 740 : 440);
 		}
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape' && isOverlayActive) closeWindow();
+		if (!isOverlayActive) return;
+		if (event.key === 'Escape') closeWindow();
+		if (event.key !== 'Tab' || !cardEl) return;
+		const controls = Array.from(cardEl.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), [tabindex="0"]')).filter(control => control.getClientRects().length > 0);
+		const first = controls[0];
+		const last = controls.at(-1);
+		if (!first || !last) { event.preventDefault(); cardEl.focus(); return; }
+		if (event.shiftKey && (document.activeElement === first || document.activeElement === cardEl)) {
+			event.preventDefault(); last.focus();
+		} else if (!event.shiftKey && (document.activeElement === last || document.activeElement === cardEl)) {
+			event.preventDefault(); first.focus();
+		}
 	}
 
 	function loop(time: number) {
@@ -406,7 +412,8 @@
 		onClose?.();
 		spring = { value: spring.value, velocity: 0, target: 0 };
 		haptic('light');
-		containerEl?.querySelector('button')?.focus();
+		if (returnFocus?.isConnected && returnFocus.getClientRects().length) returnFocus.focus();
+		else containerEl?.querySelector('button')?.focus();
 	}
 </script>
 
@@ -424,6 +431,7 @@
 		onpointercancel={handleDockPointerCancel}
 		onkeydown={handleDockKeydown}
 	>
+		<span class="dock-btn-action">Створити рахунок</span>
 		<span class="dock-btn-label">{displayText}</span>
 		<ChevronRight size={18} strokeWidth={2.2} aria-hidden="true" />
 	</button>
@@ -448,12 +456,13 @@
 			role="dialog"
 			tabindex="-1"
 			aria-modal="true"
-			aria-labelledby="liquid-title"
-			style:left="{currentCenterX}px"
-			style:top="{currentCenterY}px"
-			style:width="{geo.width}px"
-			style:height="{geo.height}px"
-			style:border-radius="{geo.borderRadius}px"
+			aria-labelledby="invoice-dialog-title"
+			style:left="{viewportWidth / 2}px"
+			style:top="{sheetCenterY + (1 - Math.min(1, Math.max(0, spring.value))) * 20}px"
+			style:opacity={Math.min(1, Math.max(0, spring.value))}
+			style:width="{windowWidth}px"
+			style:height="{windowHeight}px"
+			style:border-radius="8px"
 			style:--blur="{geo.blur}px"
 			style:--shadow-blur="{geo.shadowBlur}px"
 			style:--shadow-y="{geo.shadowOffsetY}px"
@@ -471,7 +480,8 @@
 				<div class="card-handle" aria-hidden="true"></div>
 			</div>
 
-			<!-- Close Button -->
+			<header class="invoice-dialog-header">
+				<h2 id="invoice-dialog-title">{cachedOrder ? 'Рахунок' : 'Новий рахунок'}</h2>
 			<button
 				type="button"
 				class="card-close-btn"
@@ -480,6 +490,7 @@
 			>
 				<X size={17} />
 			</button>
+			</header>
 
 			<!-- Compact preview during initial drag -->
 			{#if !cachedOrder && geo.buttonContentOpacity > 0.01}
@@ -493,11 +504,13 @@
 			{#if geo.windowContentOpacity > 0.01 || cachedOrder}
 				<div
 					class="layer-creation-content"
+					class:has-order={Boolean(cachedOrder)}
 					style:opacity={cachedOrder ? 1 : geo.windowContentOpacity}
 					style:transform="translateY({cachedOrder ? 0 : (1 - geo.windowContentOpacity) * 14}px)"
 				>
 					{#if cachedOrder}
 						<div class="created-order-view" class:complete={paymentComplete} class:closed={paymentClosed}>
+							<div class="invoice-details">
 							<div class="payment-state" aria-live="polite">
 								<span class="payment-state-mark">
 									{#if paymentComplete}<Check size={18} strokeWidth={2.6} />{:else if paymentClosed}<X size={18} />{:else}<span></span>{/if}
@@ -534,7 +547,7 @@
 										<span>{activeQrIndex + 1} / {qrEntries.length}</span>
 									</div>
 								</div>
-								<p class="payment-instruction">{paymentComplete ? 'Платіж підтверджено' : 'Проведіть убік, щоб змінити QR'}</p>
+								{#if paymentComplete}<p class="payment-instruction">Платіж підтверджено</p>{/if}
 							{:else}
 								<div class="closed-payment-mark"><X size={34} /></div>
 							{/if}
@@ -543,7 +556,9 @@
 								<span>{cachedOrder.orderNumber || orderIdentifier(cachedOrder.id)}</span>
 								<span>{fullDateFormatter.format(new Date(cachedOrder.createdAt))}</span>
 							</div>
+							</div>
 
+							<footer class="invoice-actions">
 							{#if !paymentClosed}<div class="order-actions-grid">
 								<button
 									type="button"
@@ -591,15 +606,15 @@
 									disabled={orderAction === 'cancel'}
 									onclick={() => onCancelOrder?.(cachedOrder!)}
 								>
-									<span>✕</span>
+									<X size={16} />
 									<span>{orderAction === 'cancel' ? 'Скасування...' : cancelConfirmation ? 'Підтвердити скасування' : 'Скасувати рахунок'}</span>
 								</button>
 							{/if}
+							</footer>
 						</div>
 					{:else}
 						<!-- CREATION PREVIEW VIEW -->
 						<div class="creation-preview-view">
-							<div class="creation-status"><QrCode size={15} /> Готово до створення</div>
 							<p class="creation-eyebrow">До сплати</p>
 
 							<h2 id="liquid-title" class="creation-amount">
@@ -611,12 +626,6 @@
 								<div class="terminal-summary">
 									<span><QrCode size={20} /></span>
 									<div><small>Точка приймання</small><strong>{selectedTerminal.name}</strong><em>{selectedTerminal.code}</em></div>
-								</div>
-							{:else}
-								<div class="creation-brand-mark" aria-hidden="true">
-									<svg viewBox="0 0 208 221">
-										<path d="M108.9 29.2c31.7 0 52.6 20.2 52.6 47.8 0 21.2-12.1 38.8-33.1 46.3l40.9 68.1c-25.3 0-48.6-13.3-61-34.7l-13.7-23.7c-12.1 0-21.9 9.6-21.9 21.3v37.1c-19.4 0-35.2-15.3-35.2-34.3v-20c0-18.9 15.8-34.3 35.2-34.3h28.8c15.8 0 24.7-8.3 24.7-22.4 0-13.1-7.5-19.7-22.4-19.7H72.7c-19.4 0-35.2-14.1-35.2-31.5h71.4Z" />
-									</svg>
 								</div>
 							{/if}
 
@@ -659,7 +668,8 @@
 		display: flex;
 		flex: 1;
 		height: 52px;
-		margin: 0 7px;
+		margin: 0;
+		min-width: 0;
 		align-items: center;
 		justify-content: center;
 		user-select: none;
@@ -672,19 +682,18 @@
 		width: 100%;
 		height: 52px;
 		align-items: center;
-		justify-content: center;
-		gap: 7px;
+		justify-content: space-between;
+		gap: 10px;
 		padding: 0 16px;
 		border: 1px solid rgba(255, 255, 255, 0.16);
 		border-top-color: rgba(255, 255, 255, 0.32);
-		border-radius: 999px;
+		border-radius: 8px;
 		color: #ffffff;
 		font-size: 14px;
 		font-weight: 700;
-		background: linear-gradient(110deg, #087cf0 0%, #478cef 48%, #876ee7 100%);
-		box-shadow: 0 4px 22px rgba(10, 132, 255, 0.32), inset 0 1px 1px rgba(255, 255, 255, 0.28);
+		background: var(--action);
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 		cursor: pointer;
-		outline: none;
 		touch-action: none;
 		transition: transform 120ms ease, opacity 180ms ease;
 	}
@@ -702,12 +711,24 @@
 		opacity: 0;
 	}
 
-	.dock-btn-label {
-		overflow: hidden;
+	.dock-btn-action {
+		min-width: 0;
+		text-align: left;
 		font-size: 14px;
+		line-height: 1.2;
+	}
+
+	.dock-btn-label {
+		margin-left: auto;
+		overflow: hidden;
+		font-size: 13px;
 		font-variant-numeric: tabular-nums;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	.dock-pay-btn > :global(svg) {
+		flex-shrink: 0;
 	}
 
 	/* Portal root */
@@ -1036,19 +1057,6 @@
 		color: #ff6961;
 	}
 
-	.creation-status {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		align-self: center;
-		margin-bottom: 2px;
-		font-size: 11px;
-		font-weight: 700;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-		color: #48d7e8;
-	}
-
 	.creation-eyebrow {
 		margin: 0 0 4px;
 		color: rgba(255, 255, 255, 0.48);
@@ -1069,23 +1077,6 @@
 		font-size: 22px;
 		font-weight: 550;
 		color: rgba(255, 255, 255, 0.55);
-	}
-
-	.creation-brand-mark {
-		display: grid;
-		place-items: center;
-		margin: 6px auto 14px;
-		width: 64px;
-		height: 64px;
-		border-radius: 18px;
-		background: rgba(255, 255, 255, 0.05);
-		border: 1px solid rgba(255, 255, 255, 0.1);
-	}
-
-	.creation-brand-mark svg {
-		width: 34px;
-		height: 34px;
-		fill: rgba(255, 255, 255, 0.85);
 	}
 
 	.terminal-summary {
@@ -1314,14 +1305,61 @@
 		}
 	}
 
+	.liquid-card { color: var(--ink); background: var(--panel); border-color: var(--line); overflow: hidden; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: 0 16px 48px rgb(0 0 0 / 16%); }
+	.liquid-card.expanded { border-color: var(--line); border-radius: 8px !important; }
+	.liquid-backdrop { background: rgb(0 0 0 / 48%); backdrop-filter: none; -webkit-backdrop-filter: none; }
+	.invoice-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 68px; flex-shrink: 0; padding: 16px 16px 8px 24px; border-bottom: 1px solid var(--line); }
+	.invoice-dialog-header h2 { margin: 0; font-size: 16px; font-weight: 650; line-height: 1.4; }
+	.invoice-dialog-header .card-close-btn { position: static; flex-shrink: 0; border-radius: 8px; background: transparent; }
+	.card-drag-zone { height: 14px; }
+	.card-close-btn { width: 44px; height: 44px; top: 8px; right: 8px; color: var(--ink); background: var(--key); border-color: var(--line); }
+	.card-close-btn:hover { color: var(--ink); background: var(--surface); }
+	.card-handle { background: var(--muted); }
+	.layer-creation-content { position: relative; inset: auto; flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px max(16px, env(safe-area-inset-bottom)); width: 100%; }
+	.creation-preview-view { min-height: 100%; gap: 16px; }
+	.layer-creation-content.has-order { padding: 0; overflow: hidden; }
+	.created-order-view { gap: 0; height: 100%; min-height: 0; }
+	.invoice-details { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; min-height: 0; width: 100%; overflow-y: auto; padding: 16px 24px; }
+	.invoice-details > * { flex-shrink: 0; }
+	.invoice-actions { flex-shrink: 0; width: 100%; padding: 8px 16px max(8px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--panel); }
+	.invoice-actions:empty { display: none; }
+	.qr-entry-heading { grid-template-columns: 44px minmax(0, 1fr) 44px; }
+	.qr-entry-heading button { width: 44px; height: 44px; color: var(--ink); background: var(--key); border-color: var(--line); }
+	.qr-entry-heading strong, .qr-entry-heading span, .terminal-summary strong { white-space: normal; overflow-wrap: anywhere; }
+	.qr-entry-heading span, .creation-eyebrow, .terminal-summary small, .terminal-summary em, .creation-meta span, .order-reference, .payment-instruction, .creation-amount small { color: var(--muted); font-size: 13px; }
+	.payment-state { color: var(--ink); border-color: var(--line); background: var(--surface); }
+	.payment-state-mark { color: var(--warning); }
+	.payment-state-mark > span { background: var(--warning); }
+	.created-order-view.complete .payment-state-mark { color: var(--success); }
+	.created-order-view.closed .payment-state-mark, .creation-error, .cancel-btn { color: var(--danger); }
+	.order-reference { flex-wrap: wrap; }
+	.creation-amount { font-size: 36px; text-shadow: none; overflow-wrap: anywhere; line-height: 1.2; }
+	.creation-amount small { font-size: 22px; }
+	.creation-meta { border-radius: 0; border-block: 1px solid var(--line); background: var(--line); }
+	.creation-meta > div { background: var(--panel); padding: 12px; }
+	.terminal-summary { border-radius: 0; background: transparent; border: 0; border-top: 1px solid var(--line); padding: 12px 0; }
+	.terminal-summary > span { color: var(--brand); }
+	.action-btn { height: auto; padding: 10px 6px; border-radius: 8px; color: var(--ink); background: var(--surface); border-color: var(--line); font-size: 13px; }
+	.cancel-btn { border-radius: 8px; height: auto; padding: 10px; }
+	.cancel-btn.confirming { background: #b93631; color: white; border-color: #b93631; box-shadow: none; }
+	.creation-submit-btn { background: var(--action); border-radius: 8px; box-shadow: none; }
+	.qr-pagination { height: auto; flex-wrap: wrap; gap: 0; }
+	.qr-pagination button, .qr-pagination button.active { width: 44px; height: 44px; border-radius: 0; background: transparent; position: relative; }
+	.qr-pagination button::after { position: absolute; content: ''; width: 7px; height: 7px; inset: 0; margin: auto; border-radius: 50%; background: var(--muted); }
+	.qr-pagination button.active::after { width: 18px; border-radius: 4px; background: var(--brand); }
+	.qr-pagination span { color: var(--muted); font-size: 12px; }
+	.qr-wrapper { border-radius: 8px; box-shadow: none; margin: 8px auto; }
+	.creation-actions { position: sticky; bottom: -16px; padding: 12px 0; background: var(--panel); }
+	.creation-submit-btn { height: auto; min-height: 48px; padding: 12px; }
+	.order-actions-grid { gap: 8px; }
+	.order-actions-grid .share-btn { grid-column: 1 / -1; background: var(--action); color: white; border-color: transparent; }
+	.action-btn { min-width: 0; overflow-wrap: anywhere; }
+	.action-btn > span { display: flex; flex-shrink: 0; }
+	.cancel-btn { background: transparent; border-color: transparent; }
+	@media (min-width: 768px) { .card-drag-zone { display: none; } .invoice-dialog-header { padding-top: 8px; } }
+	@media (max-width: 374px) { .layer-creation-content { padding-inline: 16px; } .invoice-dialog-header { padding-left: 16px; } .creation-amount { font-size: 30px; } }
+	button:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; }
 	@media (prefers-reduced-motion: reduce) {
-		.liquid-card {
-			transition:
-				left 250ms ease,
-				top 250ms ease,
-				width 250ms ease,
-				height 250ms ease,
-				border-radius 250ms ease !important;
-		}
+		.liquid-card { transition: none !important; }
 	}
 </style>
