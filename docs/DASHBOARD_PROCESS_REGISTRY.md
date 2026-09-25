@@ -63,6 +63,39 @@ changes do not bypass these rules.
   process.
 - **Applicable instruction:** `.github/instructions/invoice-scenario-locks.instructions.md`.
 
+#### Merchant App Creation And Contextual Controls - 2026-09-25
+
+- **Status:** `LOCKED` after completing the user's explicitly approved local changes
+  for `fixed`, `open_amount` and `table`: request/response repairs and contextual
+  cashier controls. Separate security-hardening approval is unchanged.
+- Scope: Merchant App creation, contextual presentation and Worker invoice input
+  validation/error mapping. Table numbers must be entered explicitly when the
+  existing terminal code is not numeric; never infer numbers from arbitrary codes.
+- Preserve amount authority, terminal-owned recipient, recipient validation,
+  existing orders/public links and pinned existing-invoice actions. Delivery,
+  database migrations, recipient edits, commits and deployment are excluded.
+- Evidence: 86 Worker POST tests and 43 Merchant gateway tests pass. Both isolated
+  browser tests pass, covering explicit/numeric terminal numbers, fixed/open payloads,
+  terminal-owned recipients, failure feedback, synthetic success, contextual carts,
+  seven responsive viewports and pinned invoice actions. Svelte/TypeScript check
+  reports zero errors/warnings; Merchant App production build passes.
+- Implementation: explicit table input for nonnumeric codes; strict integer/range
+  validation before RPC; exact known payment-settings errors return actionable 422
+  responses while unknown failures stay sanitized. Disabled creation has accessible
+  semantics; short screens keep the keypad visible alongside the number input.
+- Residuals: browser creation is synthetic, not a live database/payment verification.
+  Invalid recipient data still blocks creation. No recipient, database, commit or
+  deployment changes were made in this scope. Existing diagnostics elsewhere in the
+  Worker and App, and the previously observed unrelated PATCH test failure, are not
+  resolved or claimed as passing by these focused checks.
+- Separate deployment approval: the user authorized `rhnk.pp.ua/app`. The isolated
+  `rhnk-app` Worker was deployed as version `cd3d7384-7da6-4376-a259-25a35935919b`
+  after a successful Merchant App build and app-specific Wrangler dry-run. Both
+  `/app` routes, all seven required site routes and their referenced assets returned
+  HTTP 200; deployed Merchant JS/CSS matched the local build. Unauthenticated
+  `/app/api/v1/orders` returned 401. The separate `rhnk-web` API and its local
+  validation/error-mapping changes were not deployed; no live invoice was created.
+
 #### Merchant App Invoice Dialog Refinement - 2026-09-25
 
 - Separate release approval: the user requested a Git commit and deployment to

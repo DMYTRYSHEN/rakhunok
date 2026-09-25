@@ -425,6 +425,7 @@
 		class:disabled={disabled && !selectedOrder}
 		class:is-active={isOverlayActive}
 		aria-label="Створити рахунок"
+		aria-disabled={disabled}
 		onpointerdown={handleDockPointerDown}
 		onpointermove={handleDockPointerMove}
 		onpointerup={handleDockPointerUp}

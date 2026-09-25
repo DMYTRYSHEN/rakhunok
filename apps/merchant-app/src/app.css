@@ -279,6 +279,10 @@ button:focus-visible, a:focus-visible { outline: 3px solid #155ce6; outline-offs
 .amount-window { max-width: none; overflow: visible; }
 .amount-block small { font-size: .42em; }
 .kasa-controls { display: flex; flex-direction: column; gap: 10px; }
+.table-number-field { display: flex; align-items: center; gap: 12px; min-height: 44px; font-size: 13px; }
+.table-number-field input { flex: 1; width: 0; min-width: 0; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--key); color: var(--ink); font: inherit; }
+.table-number-field input:focus { outline: 2px solid var(--brand); outline-offset: 2px; }
+.table-number-help { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
 .table-select, .open-note { min-height: 64px; margin: 0; border-radius: 8px; background: var(--panel); box-shadow: none; backdrop-filter: none; animation: none; }
 .table-select .terminal-icon { color: var(--brand); background: var(--key); border: 0; box-shadow: none; border-radius: 8px; }
 .table-select .terminal-label { font-size: 12px; }
@@ -494,6 +498,11 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline: 3px solid
 }
 @media (max-height: 620px) and (max-width: 899px) {
 	.kasa-controls { gap: 0; padding-top: 0; }
+	.kasa-controls:has(.table-number-field) { display: grid; grid-template-columns: minmax(0, 1fr) 124px; column-gap: 8px; }
+	.kasa-controls:has(.table-number-field) .scenario-control, .table-number-help { grid-column: 1 / -1; }
+	.table-number-field { gap: 6px; }
+	.table-number-field span { max-width: 44px; }
+	.table-number-field input { padding-inline: 6px; }
 	.amount-block { min-height: 36px; padding-block: 0; }
 	.amount-block h1 { font-size: min(2rem, calc(100cqi / var(--amount-length))); }
 	.amount-caption { display: none; }

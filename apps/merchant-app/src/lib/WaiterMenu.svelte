@@ -29,6 +29,7 @@
 	let confirmClear = $state(false);
 	let cartOpen = $state(false);
 	let cartHeading: HTMLHeadingElement;
+	let menuHeading: HTMLHeadingElement;
 	let cartToggle: HTMLButtonElement;
 	const cartId = $props.id();
 	const filtered = $derived(products.filter(product => (category === 'Усі' || product.category === category) && product.name.toLocaleLowerCase('uk-UA').includes(search.trim().toLocaleLowerCase('uk-UA'))));
@@ -53,18 +54,18 @@
 	async function toggleCart() {
 		cartOpen = !cartOpen;
 		await tick();
-		const target = cartOpen ? cartHeading : cartToggle;
+		const target = cartOpen ? cartHeading : count > 0 ? cartToggle : menuHeading;
 		target.focus({ preventScroll: true });
 		target.scrollIntoView({ block: 'nearest' });
 	}
 </script>
 
-<section class="waiter-menu" class:cart-open={cartOpen} aria-label="Демонстраційне меню">
+<section class="waiter-menu" class:cart-open={cartOpen} class:empty-cart={count === 0 && !cartOpen} aria-label="Демонстраційне меню">
 	<button class="cart-toggle" type="button" bind:this={cartToggle} aria-expanded={cartOpen} aria-controls={cartId} onclick={toggleCart}>
 		{#if cartOpen}<ArrowLeft size={20} aria-hidden="true" /><span>До меню</span>{:else}<ShoppingBag size={20} aria-hidden="true" /><span>Кошик · {count}</span>{/if}
 		<strong aria-live="polite">{currency.format(total / 100)}</strong>
 	</button>
-	<div class="menu-heading"><div><p>Меню закладу</p><h1>Товари</h1></div><span class="demo-label">Демо · без оплати</span></div>
+	<div class="menu-heading"><div><p>Меню закладу</p><h1 bind:this={menuHeading} tabindex="-1">Товари</h1></div><span class="demo-label">Демо · без оплати</span></div>
 	<div class="waiter-layout">
 		<div class="catalog">
 			<label class="product-search"><Search size={19} aria-hidden="true" /><input type="search" bind:value={search} placeholder="Пошук страви чи напою" aria-label="Пошук товарів" /></label>
@@ -108,6 +109,8 @@
 <style>
 	.waiter-menu { padding: 24px 20px; color: var(--ink); }
 	.cart-toggle { display: none; }
+	.empty-cart .cart-toggle:not(:focus), .empty-cart .order-composer:not(:focus-within) { display: none; }
+	.empty-cart .waiter-layout:not(:has(.order-composer:focus-within)) { grid-template-columns: minmax(0, 1fr); }
 	.menu-heading, .order-heading, .product-price, .order-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 	.menu-heading { margin-bottom: 24px; flex-wrap: wrap; }
 	.menu-heading p { color: var(--muted); font-size: 12px; margin: 0 0 6px; }

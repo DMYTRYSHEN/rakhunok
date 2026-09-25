@@ -9,6 +9,7 @@ const user = { id: 'synthetic-user', email: 'cashier@example.test', identities: 
 const merchant = { id: 'synthetic-merchant', name: 'Studio Market' };
 const entities = [{ id: 'entity', name: 'Studio Market long company name for responsive verification' }, { id: 'second-entity', name: 'Second Company' }];
 const terminals = [{ id: 'terminal', name: 'Terrace long terminal name', code: 'T01', type: 'table', entityId: 'entity' }];
+if (new URL(location.href).searchParams.has('creation-check')) terminals.push({ id: 'numeric-terminal', name: 'Numeric terminal', code: '7', type: 'table', entityId: 'entity' });
 const orders = [{ id: 'fixture-order', amount: 1234.56, status: 'paid', createdAt: new Date().toISOString(), orderNumber: 'TEST-001', type: 'fixed', shareUrl: '/pay/fixture-order' }];
 if (new URL(location.href).searchParams.has('invoice-dialogs')) orders.push(...[
   { id: 'fixture-table', type: 'table', status: 'paid', terminalId: 'terminal' },
@@ -21,9 +22,73 @@ export async function getAuthGateway() { return {
 }; }
 export async function getMerchantDataGateway() { return {
   getStructure: async () => ({entities, terminals}), listOrders: async () => orders,
-  subscribeOrders: () => () => {}, createOrder: async () => { throw new Error('Synthetic preview: creation disabled'); }
+  subscribeOrders: () => () => {}, createOrder: async input => {
+    (window.__createdOrders ??= []).push(input);
+    if (!window.__allowSyntheticCreation) throw new Error('Synthetic preview: creation disabled');
+    return { ...input, id: 'synthetic-created', status: 'pending', createdAt: new Date().toISOString(), shareUrl: '/pay/synthetic-created' };
+  }
 }; }
 `;
+
+test('Merchant App creation preserves scenario payloads and displays failures', async () => {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({ serviceWorkers: 'block', reducedMotion: 'reduce' });
+  const page = await context.newPage();
+  await context.route('**/*', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.pathname.endsWith('/auth/supabase-browser.ts')) return route.fulfill({ contentType: 'application/javascript', body: fixture });
+    if (url.origin !== origin || !['GET', 'HEAD'].includes(request.method())) return route.abort();
+    return route.continue();
+  });
+  try {
+    await page.goto(`${origin}/app/?creation-check`);
+    await page.getByRole('combobox', {name:'Компанія',exact:true}).selectOption('second-entity');
+    for (const [scenario, type, terminalId, tableNumber] of [
+      ['Стіл', 'table', 'terminal', 30],
+      ['Стіл', 'table', 'numeric-terminal', 7],
+      ['Фіксована', 'fixed', undefined, undefined],
+      ['Вільна сума', 'open_amount', undefined, undefined]
+    ]) {
+      await page.getByRole('radio', {name:scenario,exact:true}).click();
+      if (terminalId) {
+        await page.locator('.table-select select').selectOption(terminalId);
+        if (terminalId === 'terminal') {
+          const input = page.getByRole('textbox', {name:'Номер столу',exact:true});
+          for (const invalid of ['', '30chairs', '1.5', '-1', '2147483648']) {
+            await input.fill(invalid);
+            assert.equal(await page.locator('.dock-pay-btn').isDisabled(), true);
+          }
+          await input.fill('30');
+        } else assert.equal(await page.locator('.table-number-field').count(), 0);
+      }
+      if (type !== 'open_amount') {
+        await page.getByRole('button', {name:'Очистити суму',exact:true}).click();
+        for (const digit of ['1', '2', ',', '5']) await page.getByRole('button', {name:digit,exact:true}).click();
+      }
+      await page.getByRole('button', {name:'Створити рахунок',exact:true}).click();
+      await page.locator('.creation-submit-btn').click();
+      await page.getByRole('alert').filter({hasText:'Synthetic preview: creation disabled'}).waitFor();
+      const payload = await page.evaluate(() => window.__createdOrders.at(-1));
+      assert.equal(payload.type, type);
+      assert.equal(payload.amount, type === 'open_amount' ? 0 : 12.5);
+      assert.equal(payload.entityId, terminalId ? 'entity' : 'second-entity');
+      assert.equal(payload.terminalId, terminalId);
+      assert.equal(payload.tableNumber, tableNumber);
+      assert.equal(payload.merchantId, 'synthetic-merchant');
+      await page.keyboard.press('Escape');
+      await page.locator('.liquid-card').waitFor({state:'detached'});
+    }
+    await page.evaluate(() => window.__allowSyntheticCreation = true);
+    await page.getByRole('button', {name:'Створити рахунок',exact:true}).click();
+    await page.locator('.creation-submit-btn').click();
+    await page.locator('.invoice-actions').waitFor();
+    assert.equal(await page.locator('.creation-error').count(), 0);
+    assert.equal(await page.evaluate(() => window.__createdOrders.length), 5);
+  } finally {
+    await browser.close();
+  }
+});
 
 test('Merchant App responsive navigation, themes, amounts and payment preview', async () => {
   const browser = await chromium.launch();
@@ -50,7 +115,17 @@ test('Merchant App responsive navigation, themes, amounts and payment preview', 
     await page.getByRole('radio', {name:'Стіл',exact:true}).click();
     assert.equal(await page.locator('.header-company select').count(), 0);
     assert.match(await page.locator('.header-company strong').textContent(), /^Studio Market/);
+    await page.getByRole('button', {name:'1',exact:true}).click();
+    assert.equal(await page.locator('.dock-pay-btn').isDisabled(), true);
+    const tableNumberInput = page.getByRole('textbox', {name:'Номер столу',exact:true});
+    assert.equal(await tableNumberInput.inputValue(), '');
+    await tableNumberInput.fill('30chairs');
+    assert.equal(await tableNumberInput.getAttribute('aria-invalid'), 'true');
+    assert.equal(await page.locator('.dock-pay-btn').isDisabled(), true);
+    await tableNumberInput.fill('30');
+    assert.equal(await page.getByRole('button', {name:'Створити рахунок',exact:true}).isEnabled(), true);
     await page.getByRole('radio', {name:'Фіксована',exact:true}).click();
+    assert.equal(await tableNumberInput.count(), 0);
     assert.equal(await page.getByRole('combobox', {name:'Компанія',exact:true}).inputValue(), 'second-entity');
     await page.getByRole('combobox', {name:'Компанія',exact:true}).selectOption('entity');
     await context.setOffline(true);
@@ -185,6 +260,8 @@ test('Merchant App responsive navigation, themes, amounts and payment preview', 
       await page.getByRole('button', {name:'Каса',exact:true}).click();
       const manualAmount = await page.locator('.amount-window').getAttribute('aria-label');
       await page.getByRole('button', {name:'Товари',exact:true}).click();
+      assert.equal(await page.locator('.order-composer').isVisible(), false, 'Empty inactive cart is hidden');
+      assert.equal(await page.locator('.cart-toggle').isVisible(), false, 'Empty cart toggle is hidden');
       assert.equal(await page.locator('.payment-toolbar').evaluate(element => element.classList.contains('visible')), false);
       for (const image of await page.locator('.product-photo img').all()) {
         await image.scrollIntoViewIfNeeded();
@@ -216,7 +293,7 @@ test('Merchant App responsive navigation, themes, amounts and payment preview', 
       await page.getByRole('button', {name:'Нове замовлення',exact:true}).click();
       if (viewport.width < 640) {
         await page.locator('.cart-toggle').click();
-        assert.equal(await page.locator('.cart-toggle').evaluate(element => element === document.activeElement), true);
+        assert.equal(await page.locator('.menu-heading h1').evaluate(element => element === document.activeElement), true);
       }
       await page.getByRole('button', {name:'Сума',exact:true}).click();
       assert.equal(await page.locator('.amount-window').getAttribute('aria-label'), manualAmount);
@@ -294,6 +371,7 @@ test('Merchant App responsive navigation, themes, amounts and payment preview', 
         for (const scenario of ['Фіксована','Стіл','Вільна сума']) {
           await page.getByRole('button', {name:'Каса',exact:true}).click();
           await page.getByRole('radio', {name:scenario,exact:true}).click();
+          if (scenario === 'Стіл') await page.getByRole('textbox', {name:'Номер столу',exact:true}).fill('30');
           if (scenario !== 'Вільна сума') {
             await page.getByRole('button', {name:'Очистити суму',exact:true}).click();
             for (const digit of ['1','2','5','0']) await page.getByRole('button', {name:digit,exact:true}).click();
