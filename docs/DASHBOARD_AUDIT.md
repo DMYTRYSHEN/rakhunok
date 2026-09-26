@@ -6,6 +6,78 @@ Reviewed process invariants and approval boundaries are maintained in
 [`DASHBOARD_PROCESS_REGISTRY.md`](DASHBOARD_PROCESS_REGISTRY.md). A process marked `LOCKED` there
 must not be changed as part of another module or process without separate explicit approval.
 
+## Local Visual Audit - 2026-09-26
+
+This pass covers the current Svelte Dashboard, not the legacy migration inventory below.
+The user approved visual-only work, including fixed, open_amount, table, delivery and session
+duration selection. Business logic, routes, action order, stored values and remote resources
+were not changed.
+
+### Visual System
+
+- Shared light/dark surface, muted-text, border and hover tokens improve table scanning and
+  distinguish selected options, status labels and form controls.
+- Tables use consistent headers and tabular numbers. Horizontal table scrolling is contained
+  locally on mobile without shrinking columns or hiding their contents.
+- Table-session duration has a readable selected state and visible keyboard focus in dark mode.
+- POS calculator surfaces and operation keys, editor tabs, bank-selection panels and invitation
+  role choices no longer retain incompatible light colors in dark mode.
+- Proforma controls wrap on mobile; the fixed action bar clears the desktop sidebar and wraps
+  its actions without reordering them. The proforma print sheet retains a light paper palette.
+- Existing sidebar focus, navigation labels, semantic colors and touch-target improvements are
+  retained. This is a shared visual-system refresh, not a replacement of Dashboard information
+  architecture or business workflows.
+
+### Coverage And Evidence
+
+`node scripts/dashboard-visual-audit.mjs` passed: **196 captures across 88 route/theme/viewport
+combinations**, Chromium, light/dark, 390 x 1000 and 1440 x 1000. No execution errors, detected
+text-contrast failures or document horizontal overflow remained in this matrix.
+
+| Surface | Exercised states |
+| --- | --- |
+| Overview | Financial baseline and recent invoices |
+| Settings | Default page and all four session durations, without saving |
+| Invoices | Default, populated, desktop row hover, empty search, discrepancies, two demo details, missing detail |
+| Invoice creation | fixed, open_amount, table, delivery, recurring and RTP unavailable states |
+| POS | Default, draft calculator, products, mobile receipt |
+| Proformas | Editor, seller, customer, payment, recurrence, project, preview, act, notes, journal |
+| Business configuration | Structure, invoice rules, payment methods, public page; available details expanded |
+| Checkout templates | List, new editor, fixed/open_amount/tips/fuel-station previews |
+| Team | List and invitation form, without sending |
+| Developer API and sandbox | Default pages |
+
+Additional evidence: **29/29** tests passed with
+`npx playwright test --config playwright.business-ui.config.ts --reporter=line`.
+These include existing demo persistence/workflow regressions, dark control checks and the
+focused session-duration test. ESLint passed for the audit script and Dashboard test file.
+
+The script uses isolated demo contexts and blocks requests except local GET/HEAD, so it cannot
+perform remote business mutations. It exits nonzero for route errors, detected contrast failures,
+document overflow or an empty route selection. Screenshots and the structured report are written
+to the OS temporary directory under `corex-dashboard-visual-audit`. Optional `AUDIT_ROUTE`,
+`AUDIT_THEME` and `AUDIT_WIDTH` environment variables restrict a diagnostic run.
+
+### Limits And Outstanding Coverage
+
+This is **not an exhaustive all-state acceptance audit or WCAG conformance certification**.
+The contrast collector composites solid CSS backgrounds, checks text against 4.5:1 (3:1 for
+large text), and skips disabled controls, opacity below 1, background images/gradients and icons.
+It does not establish focus trapping, screen-reader quality, placeholder contrast, every hover
+state or minimum pointer-target compliance across all pages.
+
+Screenshots were captured, but image tools returned encoded data instead of usable rendered
+images during this session; manual visual review is therefore outstanding. Remote assets are
+blocked in isolated runs, so production fonts/images and external integrations are not certified.
+Only two viewport widths and Chromium were covered, not Safari/iOS or Firefox.
+
+Authenticated role permutations, loading/error/offline fixtures, successful live mutations,
+all nested payment sheets, every template type and all structure-editing dialogs remain outside
+this visual matrix. Existing workflow tests add coverage but do not substitute for visual checks
+of those states. No production readiness claim is made for delivery or unavailable scenarios.
+No full repository build, unit suite or default E2E suite was run for this CSS-only implementation.
+No commit, push or deployment was performed.
+
 ## Source Of Truth
 
 The active dashboard is the inline application in `../core/dashboard/index.html`. It loads `../core/dashboard/dashboard.css` and the Supabase browser SDK. The files under `../core/dashboard/js`, `../core/dashboard/css`, and `../core/dashboard/test.js` are not loaded by the active page and must not be treated as behavioral authority.

@@ -178,7 +178,7 @@ export function createTemplateRepository(
 ) {
 	function client() {
 		const value = getClient();
-		if (!value) throw new Error('Supabase не налаштовано.');
+		if (!value) throw new Error('Database не налаштовано.');
 		return value;
 	}
 	async function rpc(

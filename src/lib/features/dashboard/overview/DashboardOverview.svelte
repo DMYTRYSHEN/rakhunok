@@ -31,7 +31,7 @@
 		>
 			<CircleAlert size={17} class="mt-0.5 shrink-0 text-blue-700" aria-hidden="true" />
 			<p class="text-xs leading-5">
-				<strong>Ознайомчий режим.</strong> Дані локальні; жоден запит до Supabase не виконується.
+				<strong>Ознайомчий режим.</strong> Дані локальні; жоден запит до Database не виконується.
 			</p>
 		</div>
 	{/if}

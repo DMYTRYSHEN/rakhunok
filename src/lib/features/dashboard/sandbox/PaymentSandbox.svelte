@@ -109,7 +109,7 @@
 			/>
 			<p class="text-sm font-extrabold text-zinc-950">Без записів</p>
 			<p class="mt-1 text-xs leading-5 text-zinc-500">
-				Подія не потрапляє у production Supabase або settlement flow.
+				Подія не потрапляє у production Database або settlement flow.
 			</p>
 		</div>
 		<div class="bg-white p-5">

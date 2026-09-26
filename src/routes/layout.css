@@ -1,11 +1,290 @@
 @import 'tailwindcss';
 
+.dashboard-root main div:has(> section[aria-label='Ключові показники']) > section:first-child > a {
+	background-color: #c54132;
+	color: #fff;
+	border-radius: 6px;
+}
+
+.dashboard-root main div:has(> section[aria-label='Ключові показники']) > section:first-child > a:hover {
+	background-color: #a73126;
+}
+
+.dashboard-root main div:has(> section[aria-label='Ключові показники']) > section:first-child p:first-child {
+	color: var(--dashboard-muted);
+	letter-spacing: 0;
+	text-transform: none;
+}
+
+.dashboard-root {
+	--dashboard-muted: #626972;
+	--dashboard-border: #d9dfe2;
+	--dashboard-subtle: #f0f3f4;
+	--dashboard-hover: #e9eff3;
+}
+
+.dashboard-root main {
+	min-width: 0;
+}
+
+html:not([data-theme='dark']) .dashboard-root {
+	--dashboard-muted: #60666f;
+	--dashboard-border: #d7dadd;
+	--dashboard-subtle: #eff2f2;
+	--dashboard-hover: #e8edef;
+	background-color: #f5f6f7;
+	color: #23262b;
+}
+
+html:not([data-theme='dark']) .dashboard-root > div > header {
+	background-color: #fafbfb;
+	border-color: #d7dadd;
+}
+
+html:not([data-theme='dark']) .dashboard-root main div:has(> section[aria-label='Ключові показники']) {
+	--overview-radius: 8px;
+	--overview-spacing: 1.25rem;
+}
+
+html:not([data-theme='dark']) .dashboard-root main div:has(> section[aria-label='Ключові показники']) h1 {
+	color: #23262b;
+	font-weight: 600;
+	line-height: 1.2;
+}
+
+html:not([data-theme='dark']) .dashboard-root main div:has(> section[aria-label='Ключові показники']) > section:first-child {
+	gap: 1.25rem;
+}
+
+html:not([data-theme='dark']) .dashboard-root main div:has(> section[aria-label='Ключові показники']) > section:first-child > a {
+	min-height: 44px;
+	height: auto;
+	padding-block: 0.625rem;
+	border-radius: 6px;
+	font-weight: 600;
+}
+
+html:not([data-theme='dark']) .dashboard-root main section[aria-label='Ключові показники'] {
+	border: 0;
+	border-radius: 0;
+	gap: 1rem;
+	overflow: visible;
+}
+
+html:not([data-theme='dark']) .dashboard-root main section[aria-label='Ключові показники'] > article {
+	min-width: 0;
+	overflow-wrap: anywhere;
+	border: 1px solid var(--dashboard-border);
+	border-radius: var(--overview-radius);
+	padding: var(--overview-spacing);
+	background: #fff;
+}
+
+html:not([data-theme='dark']) .dashboard-root main section[aria-label='Ключові показники'] > article > div > div {
+	border: 0;
+	background: transparent;
+	color: var(--dashboard-muted);
+}
+
+html:not([data-theme='dark']) .dashboard-root main section[aria-label='Ключові показники'] > article > div > p {
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0;
+	text-transform: none;
+}
+
+html:not([data-theme='dark']) .dashboard-root main section[aria-label='Ключові показники'] > article > p:first-of-type {
+	color: #23262b;
+	font-weight: 600;
+}
+
+html:not([data-theme='dark']) .dashboard-root main section[aria-labelledby='invoices-title'] {
+	border: 1px solid var(--dashboard-border);
+	border-radius: var(--overview-radius);
+	background: #fff;
+}
+
+html:not([data-theme='dark']) .dashboard-root main section[aria-labelledby='invoices-title'] > header {
+	padding: var(--overview-spacing);
+	flex-wrap: wrap;
+	border-color: var(--dashboard-border);
+}
+
+html:not([data-theme='dark']) .dashboard-root main section[aria-labelledby='invoices-title'] article {
+	padding-inline: var(--overview-spacing);
+}
+
+html:not([data-theme='dark']) .dashboard-root main #invoices-title {
+	font-size: 1rem;
+	font-weight: 600;
+	color: #23262b;
+}
+
+html:not([data-theme='dark']) .dashboard-root main section[aria-labelledby='invoices-title'] > header a {
+	min-height: 44px;
+	height: auto;
+	border: 1px solid var(--dashboard-border);
+	border-radius: 6px;
+	color: #23262b;
+	font-weight: 600;
+}
+
+.dashboard-root main .overflow-x-auto {
+	max-width: 100%;
+	min-width: 0;
+	contain: inline-size layout paint;
+}
+
+.dashboard-root main footer.fixed .flex {
+	flex-wrap: wrap;
+}
+
+@media (min-width: 1024px) {
+	.dashboard-root main footer.fixed {
+		left: 17.5rem;
+	}
+}
+
+.dashboard-root main :is(.text-zinc-400, .text-zinc-500) {
+	color: var(--dashboard-muted);
+}
+
+.dashboard-root
+	main
+	:is(.bg-zinc-950, .bg-\[\#111313\], .bg-\[\#151718\])
+	:is(.text-zinc-400, .text-zinc-500) {
+	color: #aeb8b8;
+}
+
+.dashboard-root main .bg-zinc-950.text-white {
+	color: #fff;
+}
+
+.dashboard-root main :is(.bg-\[\#229ED9\], .hover\:bg-\[\#1E88E5\]:hover) {
+	background-color: #086c9d;
+}
+
+.dashboard-root main :is(.tracking-tight, .tracking-wide, .tracking-wider, .tracking-widest) {
+	letter-spacing: 0;
+}
+
+.dashboard-root main table {
+	font-variant-numeric: tabular-nums;
+}
+
+.dashboard-root main thead {
+	background-color: var(--dashboard-subtle);
+	color: var(--dashboard-muted);
+}
+
+.dashboard-root main th {
+	font-size: 0.75rem;
+	line-height: 1.25rem;
+	font-weight: 700;
+}
+
+.dashboard-root main tbody tr + tr {
+	border-top: 1px solid var(--dashboard-border);
+}
+
+.dashboard-root main :is(input, textarea)::placeholder {
+	color: var(--dashboard-muted);
+	opacity: 1;
+}
+
+.dashboard-root > aside :is(.text-zinc-500, .text-zinc-600) {
+	color: #aeb8b8;
+}
+
+.dashboard-root > aside nav p {
+	font-size: 0.75rem;
+	letter-spacing: 0;
+}
+
+.dashboard-root > aside #invoice-scenarios .text-\[0\.625rem\] {
+	font-size: 0.75rem;
+	line-height: 1.125rem;
+}
+
+.dashboard-root > aside .text-\[0\.5rem\] {
+	font-size: 0.625rem;
+}
+
+.dashboard-root > aside .nav-active {
+	box-shadow: inset 3px 0 #c54132;
+}
+
+.dashboard-root > aside .bg-\[\#c9ff4a\] {
+	background-color: #e8edef;
+}
+
+html:not([data-theme='dark']) .dashboard-root > aside {
+	background-color: #fafbfb;
+	border-color: #d7dadd;
+	color: #23262b;
+}
+
+html:not([data-theme='dark'])
+	.dashboard-root
+	> aside
+	:is(.text-zinc-300, .text-zinc-400, .text-zinc-500, .text-zinc-600) {
+	color: #58636c;
+}
+
+html:not([data-theme='dark']) .dashboard-root > aside :is(.border-white\/10, .border-zinc-800) {
+	border-color: #d9dfe2;
+}
+
+html:not([data-theme='dark']) .dashboard-root > aside .bg-zinc-800 {
+	background-color: #e8edef;
+}
+
+html:not([data-theme='dark']) .dashboard-root > aside .text-emerald-400 {
+	color: #047857;
+}
+
+html:not([data-theme='dark']) .dashboard-root > aside .bg-emerald-950\/80 {
+	background-color: #dff5e9;
+}
+
+html:not([data-theme='dark']) .dashboard-root > aside .text-red-300 {
+	color: #be123c;
+}
+
+@media (hover: hover) {
+	html:not([data-theme='dark']) .dashboard-root > aside :is(a, button, summary):hover {
+		background-color: #edf2f5;
+		color: #20282d;
+	}
+}
+
+html:not([data-theme='dark']) .dashboard-root > aside .nav-active {
+	background-color: #f8eae6;
+	color: #23262b;
+	box-shadow: inset 3px 0 #c54132;
+}
+
+html:not([data-theme='dark']) .dashboard-root > aside .nav-active :is(a, button) {
+	color: #23262b;
+}
+
+html:not([data-theme='dark'])
+	.dashboard-root.dashboard-root
+	> aside
+	:is(button, a, summary):focus-visible {
+	outline-color: #2563eb;
+}
+
 html[data-theme='dark'],
 html[data-theme='dark'] body {
 	background-color: #17191a;
 }
 
 html[data-theme='dark'] .dashboard-root {
+	--dashboard-muted: #b4bdc2;
+	--dashboard-border: #454d51;
+	--dashboard-subtle: #292f32;
+	--dashboard-hover: #343d42;
 	color-scheme: dark;
 	background: #17191a;
 	color: #f4f4f5;
@@ -13,6 +292,34 @@ html[data-theme='dark'] .dashboard-root {
 
 html[data-theme='dark'] .dashboard-root :is(.bg-white, .bg-white\/95) {
 	background-color: #222526;
+}
+
+html[data-theme='dark'] .dashboard-root :is(.bg-white\/70, .bg-white\/80, .bg-white\/90) {
+	background-color: #222526;
+}
+
+html[data-theme='dark']
+	.dashboard-root
+	:is(
+		.bg-zinc-50\/50,
+		.bg-zinc-50\/60,
+		.bg-zinc-50\/70,
+		.bg-zinc-50\/80,
+		.bg-zinc-100\/50,
+		.bg-zinc-100\/90,
+		.bg-zinc-200\/70,
+		.bg-\[\#f8f9fa\],
+		.bg-\[\#f5f6f7\]
+	) {
+	background-color: var(--dashboard-subtle);
+}
+
+html[data-theme='dark'] .dashboard-root main thead {
+	background-color: var(--dashboard-subtle);
+}
+
+html[data-theme='dark'] .dashboard-root .divide-zinc-100 > :not(:last-child) {
+	border-color: var(--dashboard-border);
 }
 
 html[data-theme='dark'] .dashboard-root :is(.bg-zinc-50, .bg-\[\#f6f7f8\]) {
@@ -31,7 +338,9 @@ html[data-theme='dark'] .dashboard-root :is(.border-zinc-100, .border-zinc-200, 
 	border-color: #3f3f46;
 }
 
-html[data-theme='dark'] .dashboard-root :is(.text-zinc-950, .text-zinc-900, .text-zinc-700, .text-zinc-600) {
+html[data-theme='dark']
+	.dashboard-root
+	:is(.text-zinc-950, .text-zinc-900, .text-zinc-700, .text-zinc-600) {
 	color: #f4f4f5;
 }
 
@@ -47,4 +356,220 @@ html[data-theme='dark'] .dashboard-root :is(input, select, textarea) {
 	background-color: #272a2b;
 	border-color: #52525b;
 	color: #f4f4f5;
+}
+
+html .dashboard-root.dashboard-root :is(button, a, summary, input, select, textarea):focus-visible {
+	outline: 3px solid #2563eb;
+	outline-offset: 3px;
+}
+
+html .dashboard-root.dashboard-root > aside :is(button, a, summary):focus-visible {
+	outline-color: #c9ff4a;
+}
+
+.dashboard-root > aside {
+	max-width: 100vw;
+}
+
+.dashboard-root input[name='table-ttl']:focus-visible + span {
+	outline: 3px solid #2563eb;
+	outline-offset: 3px;
+}
+
+html[data-theme='dark'] .dashboard-root input[name='table-ttl']:checked + span {
+	background-color: #1b324c;
+	border-color: #93c5fd;
+	color: #f4f4f5;
+}
+
+html[data-theme='dark'] .dashboard-root input[name='table-ttl']:focus-visible + span {
+	outline-color: #93c5fd;
+}
+
+html[data-theme='dark'] .dashboard-root :is(.text-zinc-600, .text-zinc-700, .text-zinc-800) {
+	color: #d4d9dc;
+}
+
+html[data-theme='dark']
+	.dashboard-root
+	:is(.text-blue-600, .text-blue-700, .text-blue-800, .text-blue-900, .text-blue-950) {
+	color: #93c5fd;
+}
+
+html[data-theme='dark']
+	.dashboard-root
+	:is(.text-emerald-600, .text-emerald-700, .text-emerald-800, .text-emerald-900) {
+	color: #6ee7b7;
+}
+
+@layer utilities {
+	html[data-theme='dark'] .dashboard-root .\!text-emerald-700 {
+		color: #6ee7b7 !important;
+	}
+}
+
+html[data-theme='dark']
+	.dashboard-root
+	:is(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900, .text-amber-950) {
+	color: #fcd34d;
+}
+
+html[data-theme='dark']
+	.dashboard-root
+	:is(.text-red-600, .text-red-700, .text-red-800, .text-red-900) {
+	color: #fda4af;
+}
+
+html[data-theme='dark']
+	.dashboard-root
+	:is(
+		.bg-blue-50,
+		.bg-blue-100,
+		.bg-blue-50\/30,
+		.bg-blue-50\/40,
+		.bg-blue-50\/70,
+		.bg-blue-50\/80,
+		.bg-blue-200\/80,
+		.bg-\[\#e9f2ff\]
+	) {
+	background-color: #1b324c;
+}
+
+html[data-theme='dark'] .dashboard-root .text-\[\#1769e0\] {
+	color: #93c5fd;
+}
+
+html[data-theme='dark'] .dashboard-root .bg-purple-50\/40 {
+	background-color: #332742;
+}
+
+html[data-theme='dark'] .dashboard-root [aria-label='Режим редактора'] button {
+	color: #b4bdc2;
+}
+
+html[data-theme='dark'] .dashboard-root [aria-label='Режим редактора'] button.active {
+	background-color: #1b324c;
+	color: #f4f4f5;
+}
+
+html[data-theme='dark'] .dashboard-root #proforma-print-sheet {
+	color-scheme: light;
+	background-color: #fff;
+	color: #18181b;
+}
+
+html[data-theme='dark']
+	.dashboard-root
+	#proforma-print-sheet
+	:is(.text-zinc-900, .text-zinc-950, .text-zinc-800, .text-zinc-700) {
+	color: #18181b;
+}
+
+html[data-theme='dark']
+	.dashboard-root
+	#proforma-print-sheet
+	:is(.text-zinc-400, .text-zinc-500, .text-zinc-600) {
+	color: #626972;
+}
+
+html[data-theme='dark']
+	.dashboard-root
+	#proforma-print-sheet
+	:is(.bg-zinc-100\/90, .bg-zinc-50, .bg-zinc-50\/50, .bg-zinc-50\/60, thead) {
+	background-color: #f0f3f4;
+}
+
+html[data-theme='dark'] .dashboard-root #proforma-print-sheet .bg-white {
+	background-color: #fff;
+}
+
+html[data-theme='dark'] .dashboard-root #proforma-print-sheet tbody tr:hover {
+	background-color: #e9eff3;
+}
+
+html[data-theme='dark'] .dashboard-root :is(.bg-emerald-50, .bg-emerald-100, .bg-emerald-50\/60) {
+	background-color: #173c30;
+}
+
+html[data-theme='dark'] .dashboard-root .text-cyan-700 {
+	color: #67e8f9;
+}
+
+html[data-theme='dark'] .dashboard-root .bg-cyan-50 {
+	background-color: #163b42;
+}
+
+html[data-theme='dark'] .dashboard-root :is(.bg-amber-50, .bg-amber-100) {
+	background-color: #40351b;
+}
+
+html[data-theme='dark'] .dashboard-root :is(.bg-red-50, .bg-red-100) {
+	background-color: #48252e;
+}
+
+@media (hover: hover) {
+	.dashboard-root main tbody tr:hover {
+		background-color: var(--dashboard-hover);
+	}
+
+	html[data-theme='dark']
+		.dashboard-root
+		.group:hover
+		:is(.group-hover\:text-blue-700, .group-hover\:text-blue-600) {
+		color: #93c5fd;
+	}
+
+	html[data-theme='dark']
+		.dashboard-root
+		:is(.hover\:bg-zinc-50\/50, .hover\:bg-zinc-50\/70):hover {
+		background-color: var(--dashboard-hover);
+	}
+
+	html[data-theme='dark'] .dashboard-root :is(.hover\:bg-zinc-50, .hover\:bg-zinc-100):hover {
+		background-color: #303638;
+	}
+
+	html[data-theme='dark'] .dashboard-root .hover\:bg-blue-50:hover {
+		background-color: #1b324c;
+	}
+}
+
+@media (pointer: coarse) {
+	.dashboard-root > aside nav :is(a, button, summary),
+	.dashboard-root > aside > div button,
+	.dashboard-root > div > header button {
+		min-height: 2.75rem;
+	}
+
+	.dashboard-root > aside nav button,
+	.dashboard-root > aside > div button,
+	.dashboard-root > div > header button {
+		min-width: 2.75rem;
+	}
+}
+
+@media (max-width: 639px) {
+	.dashboard-root main header > .flex,
+	.dashboard-root main footer .flex {
+		flex-wrap: wrap;
+		min-width: 0;
+		max-width: 100%;
+	}
+
+	.dashboard-root main header input {
+		min-width: 0;
+		max-width: 100%;
+	}
+
+	.dashboard-root main details .grid > * {
+		min-width: 0;
+	}
+
+	.dashboard-root main details .flex {
+		flex-wrap: wrap;
+	}
+
+	.dashboard-root main details :is(.font-mono, .text-xs, .text-sm) {
+		overflow-wrap: anywhere;
+	}
 }

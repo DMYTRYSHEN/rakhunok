@@ -453,7 +453,7 @@ export function createDashboardGateway(
 					};
 				}
 
-				return { status: 'error', message: 'Помилка перевірки сесії Supabase.' };
+				return { status: 'error', message: 'Помилка перевірки сесії Database.' };
 			}
 
 			if (!session) return { status: 'guest' };

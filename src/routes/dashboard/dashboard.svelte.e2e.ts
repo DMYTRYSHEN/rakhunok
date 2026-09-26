@@ -1,5 +1,115 @@
 import { expect, test } from '@playwright/test';
 
+test('dashboard settings duration selection stays readable in dark theme', async ({ page }) => {
+	await page.addInitScript(() => localStorage.setItem('rahunok_theme', 'dark'));
+	await page.goto('/dashboard/settings?demo=1');
+	const options = page.locator('input[name="table-ttl"]');
+	await expect(options).toHaveCount(4);
+	for (const option of await options.all()) {
+		await option.locator('..').click();
+		await expect(option).toBeChecked();
+		const label = option.locator('+ span');
+		await expect(label).toHaveCSS('background-color', 'rgb(27, 50, 76)');
+		await expect(label).toHaveCSS('color', 'rgb(244, 244, 245)');
+	}
+	await page.keyboard.press('Tab');
+	await options.first().focus();
+	await expect(options.first().locator('+ span')).toHaveCSS('outline-color', 'rgb(147, 197, 253)');
+});
+
+for (const theme of ['light', 'dark']) {
+	for (const width of [390, 1440]) {
+		test(`dashboard visual contrast (${theme}, ${width}px)`, async ({ page }) => {
+			await page.setViewportSize({ width, height: 900 });
+			await page.addInitScript((value) => localStorage.setItem('rahunok_theme', value), theme);
+			await page.goto('/dashboard/?demo=1');
+			await expect(page.locator('main h1')).toBeVisible();
+			await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+			if (width < 1024) {
+				await page.getByRole('button', { name: 'Відкрити навігацію', exact: true }).click();
+			}
+			await expect(page.locator('#invoice-scenarios')).toBeVisible();
+			await expect(page.locator('.dashboard-root > aside')).toHaveCSS(
+				'background-color',
+				theme === 'dark' ? 'rgb(17, 19, 19)' : 'rgb(250, 251, 251)'
+			);
+			if (theme === 'light') {
+				await expect(page.locator('.dashboard-root')).toHaveCSS('background-color', 'rgb(245, 246, 247)');
+				await expect(page.locator('section[aria-label="Ключові показники"]')).toHaveCSS('border-radius', '0px');
+				for (const surface of [page.locator('section[aria-label="Ключові показники"] > article').first(), page.locator('section[aria-labelledby="invoices-title"]')]) {
+					await expect(surface).toHaveCSS('border-top-color', 'rgb(215, 218, 221)');
+					await expect(surface).toHaveCSS('border-top-width', '1px');
+					await expect(surface).toHaveCSS('border-radius', '8px');
+				}
+				await expect(page.locator('section[aria-label="Ключові показники"] > article').first()).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+				await expect(page.locator('section[aria-labelledby="invoices-title"]')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+				const activeLink = page.locator('aside nav a.nav-active').first();
+				await expect(activeLink).toHaveCSS('background-color', 'rgb(248, 234, 230)');
+				await expect(activeLink).toHaveCSS('color', 'rgb(35, 38, 43)');
+				const inactiveLink = page.locator('aside nav a:not(.nav-active)').first();
+				await inactiveLink.hover();
+				await expect(inactiveLink).toHaveCSS('background-color', 'rgb(237, 242, 245)');
+				await expect(inactiveLink).toHaveCSS('color', 'rgb(32, 40, 45)');
+				await page.mouse.move(width - 1, 0);
+			}
+			const failures = await page.evaluate(() => {
+				const canvas = document.createElement('canvas');
+				const context = canvas.getContext('2d', { willReadFrequently: true })!;
+				const luminance = (color: string) => {
+					context.clearRect(0, 0, 1, 1);
+					context.fillStyle = color;
+					context.fillRect(0, 0, 1, 1);
+					return [...context.getImageData(0, 0, 1, 1).data]
+						.slice(0, 3)
+						.map((value) => {
+							const channel = value / 255;
+							return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+						})
+						.reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+				};
+				return [
+					...document.querySelectorAll('main p, main h1, main a, nav p, #invoice-scenarios a span')
+				]
+					.filter((element) => element.checkVisibility())
+					.flatMap((element) => {
+						let ancestor: Element | null = element;
+						while (ancestor && getComputedStyle(ancestor).backgroundColor === 'rgba(0, 0, 0, 0)') {
+							ancestor = ancestor.parentElement;
+						}
+						if (!ancestor) return [];
+						const foreground = luminance(getComputedStyle(element).color);
+						const background = luminance(getComputedStyle(ancestor).backgroundColor);
+						const contrast =
+							(Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+						return contrast < 4.5 ? [{ text: element.textContent?.trim(), contrast }] : [];
+					});
+			});
+			expect(failures).toEqual([]);
+			await expect(page.locator('#invoice-scenarios .text-\\[0\\.625rem\\]').first()).toHaveCSS(
+				'font-size',
+				'12px'
+			);
+			await page.keyboard.press('Tab');
+			await page.locator('nav a').first().focus();
+			await expect(page.locator('nav a').first()).toHaveCSS(
+				'outline-color',
+				theme === 'dark' ? 'rgb(147, 197, 253)' : 'rgb(37, 99, 235)'
+			);
+			await expect(page.locator('nav a').first()).toHaveCSS('outline-width', '3px');
+			await page.evaluate(() => {
+				document.documentElement.style.fontSize = '200%';
+			});
+			expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+				width
+			);
+			const navigation = page.getByRole('navigation', { name: 'Основна навігація' });
+			expect(
+				await navigation.evaluate((element) => element.scrollWidth <= element.clientWidth)
+			).toBe(true);
+		});
+	}
+}
+
 test('does not impersonate a merchant without an authenticated session', async ({ page }) => {
 	await page.goto('/dashboard/');
 

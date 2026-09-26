@@ -25,6 +25,83 @@ Before changing Dashboard code:
 Incidental refactoring, formatting, dependency replacement, schema work, and shared-component
 changes do not bypass these rules.
 
+### Dashboard Visual System Audit - 2026-09-26
+
+- Release authorization: the user explicitly approved committing this visual work and deploying
+  Dashboard, Promo Landing and Merchant App to rhnk.pp.ua. No push, API Worker, database,
+  Conf, Pay or Corex deployment is included. Earlier no-deployment notes below describe the
+  local design phase. Release builds and target dry-runs must pass before publication;
+  deployed route and asset smoke checks remain required. Business invariants stay locked.
+- Brand pilot approved by the user: align Landing header, Dashboard overview/shell and
+  Merchant App checkout presentation with graphite, coral accents and shared typography.
+  Scope is visual only; routes, actions, invoice scenarios, amounts, status semantics and
+  authentication remain unchanged. The user separately approved visual-only Merchant App
+  fixed, open_amount and table changes; delivery is excluded. No deployment is approved.
+  Follow-up approval: continue App with Manrope and strengthen light Dashboard recognition
+  against Promo. Light overview now uses Promo's neutral canvas/header, graphite headings,
+  open metric sections with top rules (coral on the first metric), and an unframed invoice list.
+  User correction: restore distinct white backgrounds for the overview metric cards and
+  recent-invoice section against the neutral page canvas, with inner padding retained.
+  Coral rules and other brand styling remain. All four focused Dashboard visual tests pass
+  after this correction, including explicit white-surface assertions.
+  Subsequent user-approved harmony pass (light overview presentation, DASH-SHELL-001):
+  supersedes the decorative top rules with consistent 1px neutral borders, 8px surface
+  radii and aligned inner padding. White metric and invoice backgrounds are preserved.
+  Removed the arbitrary coral first-metric rule and icon backing boxes; coral remains on
+  the primary action and active navigation. Secondary invoice navigation is neutral, both
+  overview actions have 44px minimum height, and the invoice header can wrap.
+  Evidence: four focused visual tests pass (both themes, 390/1440px, 200% text scaling).
+  Browser geometry confirms aligned metric/list sections and no horizontal overflow at
+  390/1440px; editor diagnostics are clean. Manual visual acceptance remains outstanding.
+  Scope is closed locally with business invariants locked; no commit or deployment.
+  Dark Dashboard and semantic status colors are unchanged by this follow-up.
+  App keeps the existing compact layout up to 680px height to accommodate the new font.
+  Its header failure was a transient background read, not overlapping controls; the test now
+  waits for the checkout-specific style before measuring geometry.
+  Evidence: four Dashboard visual tests pass at 390/1440px in both themes, including contrast,
+  focus and 200% text scaling. The existing App responsive test passes seven viewport sizes
+  (320-1440px), both themes, local Manrope loading, coral action colors, scenarios and preview.
+  App tests use synthetic gateways with external requests and real mutations blocked.
+  Editor diagnostics are clean. Browser confirms the light overview canvas/header/rules.
+  Residual risks: reliable manual screenshot review, other browsers, live roles/payment flows,
+  production build and full repository gates were not certified. No commit or deployment.
+  This visual pilot is complete locally; business invariants remain locked and no broader
+  invoice-scenario or authentication change is authorized.
+- **Status:** `LOCKED` after the approved local visual pass; business invariants remained locked.
+- Follow-up sidebar request: the user explicitly approved a light navigation panel in light
+  theme only (DASH-SHELL-001 presentation). Updated sidebar surface, text, borders, badges,
+  active/hover/focus colors through light-only CSS. Dark theme, navigation and business
+  invariants are unchanged. Four focused tests passed across light/dark themes and 390/1440px,
+  covering sidebar background, text contrast, focus and 200% scaling; active/hover checks added.
+  Editor diagnostics are clean. No commit, deployment or remote mutation was performed.
+- Follow-up wording request: the user explicitly requested `Supabase` -> `Database` in the
+  Dashboard interface. Updated explanatory copy and user-facing configuration/session errors
+  only; imports, identifiers, logging, APIs, authentication and persistence behavior are unchanged.
+  Browser verification confirms the overview renders `Database` without the old label. Editor
+  diagnostics found no related errors; the existing TeamSettings Tailwind shorthand suggestion
+  is unrelated. This copy-only follow-up does not unlock any behavioral invariant.
+- The user explicitly approved visual redesign of Dashboard including fixed, open_amount, table,
+  delivery and the session-duration selector after a separate scenario-specific approval request.
+- Scope: Dashboard presentation, shared styles, visual regression tests and audit documentation.
+  Affected presentation owners include DASH-SHELL-001, DASH-POS-SETTINGS-001,
+  DASH-INVOICE-ACTIONS-001 and CROSS-APP-INVOICE-SCENARIOS-001.
+- Preserve routes, navigation order, action availability/order, values, amounts, statuses, recipients,
+  TTL units/defaults, authentication, APIs, persistence and payment behavior. No remote mutations,
+  database changes, commits or deployments are approved. Other products are excluded.
+- Implementation: shared surface/text tokens, table hierarchy/scroll containment, session-duration
+  selection/focus, POS calculator contrast, dialog selected states, mobile proforma wrapping,
+  desktop action-bar clearance and light print-sheet isolation. No component business logic changed.
+- Evidence: 196 demo captures across 88 route/theme/viewport combinations passed the strict visual
+  audit; all 29 Dashboard/business UI regression tests passed. Audit/test ESLint passed.
+- Files: `src/routes/layout.css`, `src/routes/dashboard/dashboard.svelte.e2e.ts`,
+  `scripts/dashboard-visual-audit.mjs`, this registry and `docs/DASHBOARD_AUDIT.md`.
+- Residual risks: rendered screenshot review was unavailable; real roles, live mutations,
+  loading/error/offline fixtures, all nested dialogs/templates, other browsers and full repository
+  gates are not certified. The audit is not exhaustive or a WCAG conformance claim. See the local
+  visual audit section in `DASHBOARD_AUDIT.md` for the exact matrix and collector limitations.
+- No commit, push, deployment or remote mutation was performed. Broader behavioral changes require
+  separate explicit approval; CROSS-APP-INVOICE-SCENARIOS-001 remains locked.
+
 ### BANK-CATALOG-READ-001 — public BankLink catalog (2026-09-22)
 
 - **Status:** `LOCKED` — the user approved and the implementation completed read-only catalog
@@ -522,7 +599,7 @@ changes do not bypass these rules.
   for Monobank (`MONO`/`UNJS`) on iOS, Android, and desktop. Existing platform-specific behavior for
   banks without a Universal Link remains unchanged.
 - The complete Pay suite passes 232/232, the Worker index suite passes 13/13, and root `npm run
-  check` reports 0 Svelte errors and 0 warnings. Root and Pay builds plus backend and checkout
+check` reports 0 Svelte errors and 0 warnings. Root and Pay builds plus backend and checkout
   production-environment dry-runs completed successfully.
 - The correction was deployed only to `letsrealtalk.com`: backend version
   `08512a4b-35ff-475d-b045-0b911e3889cd` and checkout version
@@ -565,7 +642,7 @@ changes do not bypass these rules.
   Android `assetlinks.json` entry for `com.ftband.mono`; Pay rejects the ambiguous `mono://` route,
   mismatched Monobank intent payloads, foreign fallback domains, and unapproved packages.
 - The complete Pay suite passes 232/232, the Worker index suite passes 13/13, and root `npm run
-  check` reports 0 Svelte errors and 0 warnings. Root and Pay builds plus both relevant Wrangler
+check` reports 0 Svelte errors and 0 warnings. Root and Pay builds plus both relevant Wrangler
   dry-runs completed successfully.
 - The correction was deployed only to `letsrealtalk.com`: route-less backend
   `letsrealtalk-web-preview` version `b2f62529-35dd-453f-a855-6e8adb58b4da` and checkout Worker
@@ -875,6 +952,31 @@ contract or behavior.
 ### DASH-SHELL-001 - Dynamic Module Load Recovery (2026-09-16)
 
 - **Status:** `ANALYZING - LOCAL RECOVERY VALIDATED`.
+- **Local visual audit, 2026-09-26:** Authenticated localhost overview inspected without
+  business mutations. Light-theme sidebar descriptions measure 2.42:1 contrast and group
+  headings 3.86:1 against #111313, below the 4.5:1 normal-text target. Descriptions are
+  10px and upcoming-feature badges 8px. Shared dark-theme CSS remaps neutral utilities
+  but leaves blue/emerald text on dark surfaces unchanged; colored pairs need validation.
+  The dark attribute was temporarily applied for computed-style inspection and restored;
+  theme persistence was not changed. Navigation includes technical labels and many equally
+  prominent destinations; role-oriented regrouping remains a proposal, not a changed contract.
+  The user subsequently approved visual-only changes in response to the explicit request covering
+  shared styles and fixed, open_amount, table, and delivery scenario navigation. This temporary
+  scope covers DASH-SHELL-001 and overview presentation only, not routing, menu order, amounts,
+  statuses, recipients, authentication, APIs, persistence, or payment behavior.
+  Shared Dashboard CSS now increases sidebar label contrast and scenario descriptions to 12px,
+  adds an active-location marker, strengthens keyboard focus, and pairs semantic foregrounds with
+  dark-theme backgrounds. Coarse-pointer navigation targets have a 44px minimum height.
+  Demo-only Playwright checks pass 4/4 for light/dark at 390px and 1440px: sampled overview/menu
+  text reaches 4.5:1, scenario descriptions are 12px, focused links have opaque 3px outlines,
+  and document/navigation horizontal overflow checks pass at 200% root font size.
+  Separate touch-emulation checks confirm 44px for the first navigation link in both themes.
+  Four responsive theme screenshots were captured locally. This is not an all-controls touch audit,
+  full text-reflow proof, or Dashboard-wide WCAG certification. All-route semantic color and hover
+  coverage remain unverified. Navigation regrouping and the hardcoded overview date remain unchanged.
+  No deployment, commit, business mutation, or process-contract change was performed.
+  Visual scope locally validated; broader process remains ANALYZING. The temporary rendering-only
+  approval is closed; CROSS-APP-INVOICE-SCENARIOS-001 business invariants remain LOCKED.
 - **Local loading audit, 2026-09-24:** Stabilized localhost guest Dashboard LCP was 2.216 s
   with cold browser cache and 0.476 s warm. Initial dev starts also triggered dependency
   optimization/reloads, so loading-screen samples are not evidence of workspace readiness.

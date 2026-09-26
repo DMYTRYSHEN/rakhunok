@@ -558,7 +558,7 @@
 			<div class="flex items-center gap-2">
 				<span class="hidden items-center gap-2 text-xs font-semibold text-zinc-500 sm:flex">
 					<span class="size-1.5 rounded-full bg-zinc-400"></span>
-					{demo ? 'Ознайомчий режим' : 'Supabase'}
+					{demo ? 'Ознайомчий режим' : 'Database'}
 				</span>
 				<div class="relative">
 					<button

@@ -262,7 +262,7 @@
 					<div>
 						<h2 class="text-base font-extrabold">Короткостроковий JWT</h2>
 						<p class="mt-1 text-sm leading-6 text-zinc-500">
-							Поточний Supabase access token для швидкої перевірки API від імені вашого користувача.
+							Поточний Database access token для швидкої перевірки API від імені вашого користувача.
 							Не передавайте його в query-параметрах або логах.
 						</p>
 					</div>

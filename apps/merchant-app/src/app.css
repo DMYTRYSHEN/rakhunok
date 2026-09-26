@@ -1,3 +1,5 @@
+@import '../../pay/src/fonts.css';
+
 :root {
 	font-family: "Aptos", "SF Pro Text", "Segoe UI Variable", sans-serif;
 	color: var(--ink);
@@ -496,7 +498,7 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline: 3px solid
 	.dock button { height: auto; min-height: 56px; font-size: .75rem; gap: 0; }
 	.dock .nav-symbol { height: 30px; }
 }
-@media (max-height: 620px) and (max-width: 899px) {
+@media (max-height: 680px) and (max-width: 899px) {
 	.kasa-controls { gap: 0; padding-top: 0; }
 	.kasa-controls:has(.table-number-field) { display: grid; grid-template-columns: minmax(0, 1fr) 124px; column-gap: 8px; }
 	.kasa-controls:has(.table-number-field) .scenario-control, .table-number-help { grid-column: 1 / -1; }
@@ -512,4 +514,19 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline: 3px solid
 }
 @media (prefers-reduced-motion: reduce) {
 	*, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+.app-shell:has(> .kasa) :is(.topbar, .kasa, .payment-toolbar, .dock-container) {
+	font-family: 'Manrope', sans-serif;
+}
+.kasa {
+	--brand: #f0a79d;
+}
+.light-theme .kasa { --brand: #b53729; }
+.payment-toolbar > button:not(.voice-button), .payment-toolbar .dock-pay-btn { --action: #c54132; background: #c54132; font-family: 'Manrope', sans-serif; font-weight: 700; border-radius: 6px; }
+.app-shell:has(> .kasa) .dock button.active::before { background: #c54132; }
+.app-shell:has(> .kasa) .header-logo { border-radius: 6px; background: var(--key); }
+.scenario-indicator { border-bottom: 2px solid #c54132; }
+@media (hover: hover) {
+	.payment-toolbar > button:not(.voice-button):hover:not(:disabled), .payment-toolbar .dock-pay-btn:hover:not(:disabled) { background: #a73126; }
 }

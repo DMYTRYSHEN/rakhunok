@@ -27,7 +27,7 @@ export function createSettingsRepository(getClient: () => RpcClient | null = get
 	async function rpc(context: SettingsContext, name: string, args: Record<string, unknown>) {
 		businessDraftScope(context.userId, context.merchantId, context.demo);
 		const client = getClient();
-		if (!client) throw new Error('Supabase не налаштовано. Локальне сховище не замінює базу даних.');
+			if (!client) throw new Error('Database не налаштовано. Локальне сховище не замінює базу даних.');
 		const { data, error } = await client.rpc(name, { p_merchant_id: context.merchantId, ...args });
 		if (error?.code === '40001') throw new SettingsConflictError();
 		if (error?.code === 'PGRST202' || error?.code === '42883') throw new Error('Сховище налаштувань ще не встановлено в цій базі. Потрібне окреме погодження міграції; локальні чернетки не імпортовано.');

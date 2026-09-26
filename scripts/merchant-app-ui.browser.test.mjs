@@ -151,11 +151,14 @@ test('Merchant App responsive navigation, themes, amounts and payment preview', 
     }
     for (const viewport of [{width:320,height:568},{width:375,height:560},{width:375,height:667},{width:390,height:844},{width:768,height:1024},{width:900,height:900},{width:1440,height:900}]) {
       await page.setViewportSize(viewport);
-      assert.equal(await page.locator('.header-logo').evaluate(element => {
+      await page.getByRole('button', { name: 'Каса', exact: true }).click();
+      await page.waitForFunction(() => getComputedStyle(document.querySelector('.header-logo')).backgroundColor !== 'rgba(0, 0, 0, 0)');
+      const headerGeometry = await page.locator('.header-logo').evaluate(element => {
         const bounds = element.getBoundingClientRect();
         const siblings = [...element.parentElement.children].filter(sibling => sibling !== element);
-        return bounds.width >= 44 && bounds.height >= 44 && siblings.every(sibling => bounds.right <= sibling.getBoundingClientRect().left + 1) && getComputedStyle(element).backgroundColor === 'rgba(0, 0, 0, 0)';
-      }), true, 'Bare logo stays to the left of all header controls');
+        return { width: bounds.width, height: bounds.height, right: bounds.right, background: getComputedStyle(element).backgroundColor, siblings: siblings.map(sibling => ({ name: sibling.className, left: sibling.getBoundingClientRect().left, width: sibling.getBoundingClientRect().width })) };
+      });
+      assert.equal(headerGeometry.width >= 44 && headerGeometry.height >= 44 && headerGeometry.siblings.every(sibling => headerGeometry.right <= sibling.left + 1) && headerGeometry.background !== 'rgba(0, 0, 0, 0)', true, JSON.stringify({viewport, headerGeometry}));
       await page.getByRole('button', { name: 'Каса', exact: true }).click();
       await page.getByRole('radio', { name: 'Фіксована', exact: true }).click();
       if (viewport.height <= 667) {
@@ -175,8 +178,8 @@ test('Merchant App responsive navigation, themes, amounts and payment preview', 
         }
         assert.equal(await page.locator('.header-logo').evaluate(element => {
           const style = getComputedStyle(element);
-          return element.parentElement.firstElementChild === element && style.backgroundColor === 'rgba(0, 0, 0, 0)' && element.clientWidth >= 44;
-        }), true, 'Bare logo must be first in header');
+          return element.parentElement.firstElementChild === element && style.backgroundColor !== 'rgba(0, 0, 0, 0)' && element.clientWidth >= 44;
+        }), true, 'Neutral logo tile must be first in header');
         await page.getByRole('radio', {name:'Фіксована',exact:true}).click();
       }
       await page.getByRole('button', { name: 'Очистити суму', exact: true }).click();
@@ -215,6 +218,15 @@ test('Merchant App responsive navigation, themes, amounts and payment preview', 
         await page.getByRole('button', {name:'Очистити суму',exact:true}).click();
         for (const digit of ['1','2','5','0']) await page.getByRole('button', {name:digit,exact:true}).click();
         await page.locator('.kasa').evaluate(element => element.scrollTop = 0);
+        const brand = await page.locator('.kasa').evaluate(async element => {
+          const fonts = await document.fonts.load('600 16px Manrope', '1250 \u041a\u0430\u0441\u0430');
+          const action = getComputedStyle(document.querySelector('.payment-toolbar .dock-pay-btn'));
+          return { font: getComputedStyle(element).fontFamily, loaded: fonts.length > 0 && fonts.every(font => font.status === 'loaded'), background: action.backgroundColor, color: action.color };
+        });
+        assert.match(brand.font, /Manrope/);
+        assert.equal(brand.loaded, true, 'Local Latin and Cyrillic Manrope subsets load');
+        assert.equal(brand.background, 'rgb(197, 65, 50)');
+        assert.equal(brand.color, 'rgb(255, 255, 255)');
         if (viewport.width === 390 || viewport.width === 768) {
           assert.equal(await page.locator('.kasa').evaluate(element => element.scrollHeight <= element.clientHeight + 1), true, 'Primary entry should fit a standard mobile/tablet viewport');
         }

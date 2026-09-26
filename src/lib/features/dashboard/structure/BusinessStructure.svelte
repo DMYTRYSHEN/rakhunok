@@ -889,7 +889,7 @@
 			<div
 				class="mt-6 rounded-md border border-blue-200 bg-blue-50 p-3 text-xs leading-5 text-blue-950"
 			>
-				Юридичні особи та робочі місця зберігаються в Supabase під чинною RLS-політикою.
+				Юридичні особи та робочі місця зберігаються в Database під чинною RLS-політикою.
 			</div>
 			<div class="mt-5 flex justify-end gap-2">
 				<button

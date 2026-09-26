@@ -1812,6 +1812,8 @@
 }
 
 .promo-site { --teal: #be3d30; --mint: #efd5d0; }
+.promo-header .promo-brand-mark { background: #e8edef; color: #23262b; }
+.promo-header .promo-brand { font-weight: 750; }
 .promo-site *, .promo-site .promo-kicker { letter-spacing: 0 !important; }
 .promo-site .promo-button { border-radius: 4px; background: #c54132; color: #fff !important; }
 .promo-site .promo-button:hover { background: #a73126; }
