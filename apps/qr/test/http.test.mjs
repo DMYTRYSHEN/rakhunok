@@ -35,9 +35,24 @@ test('HTTP worker: GET /v1/create-qr-code/ with valid SVG request', async () => 
   assert.equal(res.headers.get('content-type'), 'image/svg+xml; charset=utf-8');
   assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(res.headers.get('cache-control'), 'no-store');
+  assert.equal(res.headers.get('access-control-allow-origin'), '*');
   const svg = await res.text();
   assert.ok(svg.startsWith('<svg'));
   assert.ok(svg.includes('width="240"'));
+});
+
+test('HTTP worker: public QR API supports browser CORS preflight', async () => {
+  const req = new Request('http://localhost:8789/v1/create-qr-code/', {
+    method: 'OPTIONS',
+    headers: {
+      Origin: 'http://127.0.0.1:4179',
+      'Access-Control-Request-Method': 'GET'
+    }
+  });
+  const res = await worker.fetch(req, {}, {});
+  assert.equal(res.status, 204);
+  assert.equal(res.headers.get('access-control-allow-origin'), '*');
+  assert.match(res.headers.get('access-control-allow-methods') || '', /GET/);
 });
 
 test('HTTP worker: HEAD /v1/create-qr-code/ with SVG request', async () => {

@@ -7,12 +7,22 @@ export interface Env {}
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
-  'Cache-Control': 'no-store'
+  'Cache-Control': 'no-store',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type'
 };
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: { ...SECURITY_HEADERS, 'Access-Control-Max-Age': '86400' }
+      });
+    }
 
     // Health check endpoint
     if (url.pathname === '/health' || url.pathname === '/health/') {
