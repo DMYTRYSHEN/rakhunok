@@ -176,10 +176,16 @@ export function buildBankUrls(bank: Partial<BankEntry>, encodedPayload: string):
         web_https = `${bank.universal_link}${encodedPayload}`;
     }
 
+    // Determine the base path (without protocol) from domain_prefix or fallback to default
+    let basePath = 'bank.gov.ua/qr/';
+    if (bank.domain_prefix) {
+        basePath = bank.domain_prefix.replace(/^https?:\/\//, '');
+    }
+
     // Android custom scheme URL (same scheme as iOS — most banks register the same scheme on both platforms)
     let android_scheme: string | null = null;
     if (bank.ios_scheme) {
-        android_scheme = `${bank.ios_scheme}://bank.gov.ua/qr/${encodedPayload}`;
+        android_scheme = `${bank.ios_scheme}://${basePath}${encodedPayload}`;
     }
 
     // Standard Android App Link (android-app://...)
@@ -190,14 +196,14 @@ export function buildBankUrls(bank: Partial<BankEntry>, encodedPayload: string):
         android_app_link = `${bank.universal_link2}${encodedPayload}`;
     } else if (bank.android_package) {
         // Fallback generator for android-app:// format if not explicitly set
-        android_app_link = `android-app://${bank.android_package}/https/bank.gov.ua/qr/${encodedPayload}`;
+        android_app_link = `android-app://${bank.android_package}/https/${basePath}${encodedPayload}`;
     }
 
     // Standard Intent URI with scheme=https
     let android_intent: string | null = null;
     if (bank.android_package) {
         const fallback = bank.playstore_url ? `;S.browser_fallback_url=${encodeURIComponent(bank.playstore_url)}` : '';
-        android_intent = `intent://bank.gov.ua/qr/${encodedPayload}#Intent;scheme=https;package=${bank.android_package}${fallback};end;`;
+        android_intent = `intent://${basePath}${encodedPayload}#Intent;scheme=https;package=${bank.android_package}${fallback};end;`;
     }
 
     let ios_universal: string | null = null;
@@ -211,7 +217,7 @@ export function buildBankUrls(bank: Partial<BankEntry>, encodedPayload: string):
 
     let ios_scheme: string | null = null;
     if (bank.ios_scheme) {
-        ios_scheme = `${bank.ios_scheme}://bank.gov.ua/qr/${encodedPayload}`;
+        ios_scheme = `${bank.ios_scheme}://${basePath}${encodedPayload}`;
     }
 
     return {

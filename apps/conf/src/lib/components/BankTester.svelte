@@ -124,10 +124,10 @@
         }, 1500);
     }
 
-    function generateHtmlButtonSnippet(intentUrl: string | null, bankName: string, color: string | null): string {
+    function generateHtmlButtonSnippet(intentUrl: string | null, bankName: string, color: string | null, prefix: string = 'intent'): string {
         if (!intentUrl) return '';
         const btnColor = color || '#007bff';
-        return `<a href="${intentUrl}" style="display: inline-block; padding: 10px 20px; background-color: ${btnColor}; color: white; text-decoration: none; border-radius: 5px;">💳 intent ${bankName}</a>`;
+        return `<a href="${intentUrl}" style="display: inline-block; padding: 10px 20px; background-color: ${btnColor}; color: white; text-decoration: none; border-radius: 5px;">💳 ${prefix} ${bankName}</a>`;
     }
 
     // Derived payload & URLs
@@ -474,6 +474,19 @@
                                             <span>Скопіювати</span>
                                         {/if}
                                     </button>
+                                    <button
+                                        type="button"
+                                        onclick={() => copyToClipboard(generateHtmlButtonSnippet(urls.ios_universal, bank.name, bank.color, 'link'), 'html-universal')}
+                                        class="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl text-xs flex items-center gap-1 transition-all cursor-pointer"
+                                    >
+                                        {#if copiedKey === 'html-universal'}
+                                            <Check size={12} class="text-emerald-400" />
+                                            <span class="text-emerald-400">Скопійовано!</span>
+                                        {:else}
+                                            <Copy size={12} />
+                                            <span>HTML</span>
+                                        {/if}
+                                    </button>
                                 </div>
                             {:else}
                                 <p class="text-xs text-stone-500">У цього банку відсутній universal_link. Використовуйте scheme або redirect.</p>
@@ -511,6 +524,19 @@
                                         {:else}
                                             <Copy size={12} />
                                             <span>Скопіювати</span>
+                                        {/if}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onclick={() => copyToClipboard(generateHtmlButtonSnippet(urls.ios_scheme, bank.name, bank.color, 'scheme'), 'html-scheme')}
+                                        class="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl text-xs flex items-center gap-1 transition-all cursor-pointer"
+                                    >
+                                        {#if copiedKey === 'html-scheme'}
+                                            <Check size={12} class="text-emerald-400" />
+                                            <span class="text-emerald-400">Скопійовано!</span>
+                                        {:else}
+                                            <Copy size={12} />
+                                            <span>HTML</span>
                                         {/if}
                                     </button>
                                 </div>
