@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import { fade } from 'svelte/transition';
 	import FuelStationDemo from './FuelStationDemo.svelte';
 	import { Fuel } from '@lucide/svelte';
 	import { ScanBarcode, Utensils, Croissant, Truck, Dumbbell, GraduationCap, PawPrint, Sparkles, Camera, Ticket, Gift, Laptop, BriefcaseBusiness, BedDouble } from '@lucide/svelte';
@@ -7,6 +8,7 @@
 
 	let { onConnect }: { onConnect: () => void } = $props();
 	let selected = $state(0);
+	let userInteracted = $state(false);
 	let modal: HTMLDialogElement;
 	let modalOpen = $state(false);
 	let view = $state<'businesses' | 'demo'>('demo');
@@ -15,17 +17,17 @@
 	let qr = $state('');
 	let qrFailed = $state(false);
 	const scenarios = [
-		{ name: 'Каси самообслуговування', icon: ScanBarcode, image: '/images/landing/editorial-kso.jpg', alt: 'Продуктовий магазин', line: 'Ваш кошик. Ваш темп.', detail: 'Скануйте товари на касі. Перевіряйте рахунок у своєму телефоні.', merchant: 'Маркет · Каса № 03', purpose: 'Кошик · 3 товари', amount: '286,00', demo: 'kso', story: 'Хліб до вечері, молоко й кава на ранок. Покупець сканує товари на касі самообслуговування, відкриває рахунок за QR та перевіряє кошик перед переходом у банк.', benefit: 'Каса, кошик і сума в одному рахунку. Інтеграція з КСО погоджується окремо.' },
-		{ name: 'АЗК', icon: Fuel, image: '/images/landing/editorial-fuel.jpg', alt: 'Освітлена автозаправна станція біля дороги', line: 'Оберіть колонку. Оплатіть. У дорогу.', detail: 'Пальне чи зарядка. Введіть суму, літри або кВт·год.', merchant: 'АЗК · Колонка № 1', purpose: 'А-95 · 20 літрів', amount: '1 200,00', demo: 'local-fuel', story: 'Водій обирає колонку, тип пального або зарядку, задає суму чи обсяг і переходить до оплати. Усе замовлення перед очима, не відходячи від авто.', benefit: 'Колонка, пальне та обсяг в одному замовленні. Інтеграція зі станцією погоджується окремо.' },
-		{ name: 'Кав’ярні', icon: Coffee, image: '/images/landing/editorial-cafe.jpg', alt: 'Інтер’єр львівської кав’ярні «Штука» зі столиками', line: 'Більше часу для гостей.', detail: 'Рахунок, склад замовлення та чайові в телефоні гостя.', merchant: 'Бістро «Смак»', purpose: 'Столик 12 · 2 позиції', amount: '386,00', demo: 'table_items', story: 'Розмова ще триває. Кава вже допита. Гість відкриває рахунок за столиком, а команда залишається поруч із гостями.', benefit: 'Столик, замовлення та сума залишаються разом.' },
-		{ name: 'Магазини', icon: ShoppingBag, image: '/images/landing/editorial-retail.jpg', alt: 'Одяг у світлому магазині', line: 'Обрали. Написали. Замовили.', detail: 'Для продажів у магазині, соцмережах і звичному чаті.', merchant: 'Онлайн-замовлення', purpose: 'Замовлення № 1042', amount: '1 240,00', demo: '1', story: '«Забираю!» у повідомленні стає замовленням. Продавець надсилає рахунок у тому самому чаті, де клієнт знайшов свою річ.', benefit: 'Клієнт бачить призначення платежу до переходу в банк.' },
-		{ name: 'Краса й догляд', icon: Scissors, image: '/images/landing/editorial-beauty.jpg', alt: 'Реальний інтер’єр салону краси', line: 'Ваша майстерність. Їхній момент.', detail: 'Послуга, майстер і вартість в одному рахунку.', merchant: 'Салон краси', purpose: 'Стрижка та фарбування · Олена', amount: '1 800,00', demo: 'vertical_beauty', story: 'Останній погляд у дзеркало. Новий запис у календарі. Майстер надсилає рахунок за візит, не перериваючи розмови.', benefit: 'Зрозуміло, за яку послугу та якому бізнесу платити.' },
-		{ name: 'Автосервіс', icon: Wrench, image: '/images/landing/editorial-auto.jpg', alt: 'Автомобіль на обслуговуванні в приміщенні СТО', line: 'Знову в дорогу.', detail: 'Перелік робіт і рахунок до того, як клієнт забере авто.', merchant: 'Автомайстерня', purpose: 'Планове обслуговування', amount: '2 400,00', demo: 'vertical_auto', story: 'Авто готове до щоденних маршрутів. Майстер пояснює виконані роботи, клієнт переглядає їх у рахунку.', benefit: 'Вартість робіт не губиться в листуванні.' },
-		{ name: 'Квіти', icon: Flower2, image: '/images/landing/editorial-flowers.jpg', alt: 'Квіткова крамниця з букетами та вазами квітів', line: 'Для тих, про кого думаєте.', detail: 'Букет на замовлення. Рахунок за посиланням.', merchant: 'Квіткова майстерня', purpose: 'Сезонний букет', amount: '950,00', demo: 'vertical_flowers', story: 'Обрати квіти можна навіть з іншого міста. Флорист погоджує букет у чаті й надсилає рахунок замовнику.', benefit: 'Одна зрозуміла сума за погоджене замовлення.' },
-		{ name: 'Добрі справи', icon: HeartHandshake, image: '/images/landing/editorial-community.jpg', alt: 'Спільна робота волонтерів', line: 'Маленький внесок. Спільна справа.', detail: 'Мета збору та отримувач перед очима благодійника.', merchant: 'Благодійна ініціатива', purpose: 'Приклад благодійного внеску', amount: '200,00', demo: 'donation', story: 'Підтримати важливу справу починається з довіри. Людина бачить отримувача й призначення внеску до підтвердження у банку.', benefit: 'Демонстраційний приклад, не чинний збір.' }
+		{ name: 'Каси самообслуговування', icon: ScanBarcode, image: '/images/landing/editorial-kso.jpg', alt: 'Покупець сканує QR-код для оплати на касі самообслуговування NOVUS', line: 'Ваш кошик. Ваш темп.', detail: 'Скануйте товари на касі. Перевіряйте рахунок у своєму телефоні.', merchant: 'NOVUS · Каса № 03', purpose: 'Кошик · 3 товари', amount: '286,00', demo: 'kso', story: 'Хліб до вечері, молоко й кава на ранок. Покупець сканує товари на касі самообслуговування, відкриває рахунок за QR та перевіряє кошик перед переходом у банк.', benefit: 'Каса, кошик і сума в одному рахунку. Інтеграція з КСО погоджується окремо.' },
+		{ name: 'АЗК', icon: Fuel, image: '/images/landing/editorial-fuel.jpg', alt: 'Сучасний автозаправний комплекс KLO у вечірніх вогнях', line: 'Оберіть колонку. Оплатіть. У дорогу.', detail: 'Пальне чи зарядка. Введіть суму, літри або кВт·год.', merchant: 'АЗК · Колонка № 1', purpose: 'А-95 · 20 літрів', amount: '1 200,00', demo: 'local-fuel', story: 'Водій обирає колонку, тип пального або зарядку, задає суму чи обсяг і переходить до оплати. Усе замовлення перед очима, не відходячи від авто.', benefit: 'Колонка, пальне та обсяг в одному замовленні. Інтеграція зі станцією погоджується окремо.' },
+		{ name: 'Кав’ярні', icon: Coffee, image: '/images/landing/editorial-cafe.jpg', alt: 'Бариста готує авторську каву в затишній кав’ярні на Подолі', line: 'Більше часу для гостей.', detail: 'Рахунок, склад замовлення та чайові в телефоні гостя.', merchant: 'Бістро «Смак»', purpose: 'Столик 12 · 2 позиції', amount: '386,00', demo: 'table_items', story: 'Розмова ще триває. Кава вже допита. Гість відкриває рахунок за столиком, а команда залишається поруч із гостями.', benefit: 'Столик, замовлення та сума залишаються разом.' },
+		{ name: 'Магазини', icon: ShoppingBag, image: '/images/landing/editorial-retail.jpg', alt: 'Відвідувачка обирає лляний одяг у світлому концепт-шоурумі', line: 'Обрали. Написали. Замовили.', detail: 'Для продажів у магазині, соцмережах і звичному чаті.', merchant: 'Онлайн-замовлення', purpose: 'Замовлення № 1042', amount: '1 240,00', demo: '1', story: '«Забираю!» у повідомленні стає замовленням. Продавець надсилає рахунок у тому самому чаті, де клієнт знайшов свою річ.', benefit: 'Клієнт бачить призначення платежу до переходу в банк.' },
+		{ name: 'Краса й догляд', icon: Scissors, image: '/images/landing/editorial-beauty.jpg', alt: 'Майстер і клієнтка в естетичному салоні краси біля круглого дзеркала', line: 'Ваша майстерність. Їхній момент.', detail: 'Послуга, майстер і вартість в одному рахунку.', merchant: 'Салон краси', purpose: 'Стрижка та фарбування · Олена', amount: '1 800,00', demo: 'vertical_beauty', story: 'Останній погляд у дзеркало. Новий запис у календарі. Майстер надсилає рахунок за візит, не перериваючи розмови.', benefit: 'Зрозуміло, за яку послугу та якому бізнесу платити.' },
+		{ name: 'Автосервіс', icon: Wrench, image: '/images/landing/editorial-auto.jpg', alt: 'Майстер проводить точну діагностику авто за допомогою інспекційної лампи', line: 'Знову в дорогу.', detail: 'Перелік робіт і рахунок до того, як клієнт забере авто.', merchant: 'Автомайстерня', purpose: 'Планове обслуговування', amount: '2 400,00', demo: 'vertical_auto', story: 'Авто готове до щоденних маршрутів. Майстер пояснює виконані роботи, клієнт переглядає їх у рахунку.', benefit: 'Вартість робіт не губиться в листуванні.' },
+		{ name: 'Квіти', icon: Flower2, image: '/images/landing/editorial-flowers.jpg', alt: 'Флорист пакує свіжий авторський букет у крафтовий папір', line: 'Для тих, про кого думаєте.', detail: 'Букет на замовлення. Рахунок за посиланням.', merchant: 'Квіткова майстерня', purpose: 'Сезонний букет', amount: '950,00', demo: 'vertical_flowers', story: 'Обрати квіти можна навіть з іншого міста. Флорист погоджує букет у чаті й надсилає рахунок замовнику.', benefit: 'Одна зрозуміла сума за погоджене замовлення.' },
+		{ name: 'Добрі справи', icon: HeartHandshake, image: '/images/landing/editorial-community.jpg', alt: 'Українські волонтери з теплом пакують гуманітарну допомогу', line: 'Маленький внесок. Спільна справа.', detail: 'Мета збору та отримувач перед очима благодійника.', merchant: 'Благодійна ініціатива', purpose: 'Приклад благодійного внеску', amount: '200,00', demo: 'donation', story: 'Підтримати важливу справу починається з довіри. Людина бачить отримувача й призначення внеску до підтвердження у банку.', benefit: 'Демонстраційний приклад, не чинний збір.' }
 	];
 	const additionalBusinesses = [
-		{ name: 'Ресторани', icon: Utensils, photo: 'restaurant', alt: 'Ресторанний зал із сервірованими столами та білими скатертинами', line: 'Вечеря у вашому темпі.', purpose: 'Вечеря на двох', amount: '1 460,00', story: 'Офіціант передає рахунок гостям. Замовлення та сума залишаються пов’язаними зі столиком.' },
+		{ name: 'Ресторани', icon: Utensils, photo: 'restaurant', alt: 'Затишна романтична вечеря в сучасному ресторані при свічках', line: 'Вечеря у вашому темпі.', purpose: 'Вечеря на двох', amount: '1 460,00', story: 'Офіціант передає рахунок гостям. Замовлення та сума залишаються пов’язаними зі столиком.' },
 		{ name: 'Пекарні', icon: Croissant, photo: 'bakery', alt: 'Свіжий хліб у пекарні', line: 'Теплий хліб. Добрий ранок.', purpose: 'Хліб та випічка', amount: '185,00', story: 'Гість обирає улюблену випічку. Продавець формує один рахунок за все замовлення.' },
 		{ name: 'Доставка їжі', icon: Truck, photo: 'delivery', alt: 'Піца для замовлення', line: 'Вечеря прямує до вас.', purpose: 'Замовлення з доставкою', amount: '640,00', story: 'Меню та адресу погоджено. Клієнт отримує рахунок за замовлення. Інтеграція доставки погоджується окремо.' },
 		{ name: 'Фітнес-студії', icon: Dumbbell, photo: 'fitness', alt: 'Обладнання тренувального залу', line: 'Час, присвячений собі.', purpose: 'Персональне тренування', amount: '700,00', story: 'Тренер і клієнт домовляються про заняття. Рахунок містить погоджену послугу й вартість.' },
@@ -46,6 +48,13 @@
 		const previous = document.body.style.overflow;
 		document.body.style.overflow = 'hidden';
 		return () => { document.body.style.overflow = previous; };
+	});
+	$effect(() => {
+		if (userInteracted || modalOpen) return;
+		const timer = setInterval(() => {
+			selected = (selected + 1) % scenarios.length;
+		}, 6000);
+		return () => clearInterval(timer);
 	});
 	async function openDemo(index = selected) {
 		selected = index;
@@ -79,33 +88,43 @@
 
 <section class="experience" aria-labelledby="promo-title">
 	<div class="experience-media">
-		<img src={current.image} alt={current.alt} class="visible" fetchpriority="high" />
+		{#key current.image}
+			<img src={current.image} alt={current.alt} class="visible" fetchpriority="high" in:fade={{ duration: 1200 }} out:fade={{ duration: 1200 }} />
+		{/key}
 	</div>
 	<div class="experience-content">
 		<div class="experience-heading">
 			<p class="eyebrow">ВАША СПРАВА. ВАШ RAHUNOK.</p>
 			<h1 id="promo-title">Rahunok<span>.</span></h1>
 			<div class="experience-message" aria-live="polite" aria-atomic="true">
-				<p class="statement">{current.line}</p>
-				<p class="description">{current.detail}</p>
+				{#key current.demo}
+					<div class="message-wrapper" in:fade={{ duration: 600, delay: 200 }} out:fade={{ duration: 400 }}>
+						<p class="statement">{current.line}</p>
+						<p class="description">{current.detail}</p>
+					</div>
+				{/key}
 			</div>
 			<button class="connect" type="button" onclick={onConnect}>Обговорити підключення <ArrowRight size={18} /></button>
 		</div>
 		<div class="experience-bottom">
 			<div class="scenario-options" role="group" aria-label="Сценарій для вашого бізнесу">
 				{#each scenarios as scenario, index (scenario.demo)}
-					<button type="button" aria-pressed={selected === index} aria-controls="hero-invoice" onclick={() => (selected = index)}>
+					<button type="button" aria-pressed={selected === index} class:auto-cycling={!userInteracted && selected === index && !modalOpen} aria-controls="hero-invoice" onclick={() => { userInteracted = true; selected = index; }}>
 						<scenario.icon size={19} /><span>{scenario.name}</span>
 					</button>
 				{/each}
 			</div>
 			<div id="hero-invoice" class="invoice-preview">
-				<div class="invoice-details" aria-live="polite" aria-atomic="true">
-					<span class="demo-label">ПРИКЛАД РАХУНКУ</span>
-					<strong>{current.merchant}</strong>
-					<span class="purpose">{current.purpose}</span>
-				</div>
-				<p class="invoice-amount">{current.amount}<span> ₴</span></p>
+				{#key current.demo}
+					<div class="invoice-details-wrapper" in:fade={{ duration: 600 }} out:fade={{ duration: 400 }}>
+						<div class="invoice-details" aria-live="polite" aria-atomic="true">
+							<span class="demo-label">ПРИКЛАД РАХУНКУ</span>
+							<strong>{current.merchant}</strong>
+							<span class="purpose">{current.purpose}</span>
+						</div>
+						<p class="invoice-amount">{current.amount}<span> ₴</span></p>
+					</div>
+				{/key}
 				<button class="open-scenario" type="button" onclick={() => openDemo()} aria-haspopup="dialog">Відкрити демо <ArrowRight size={17} /></button>
 			</div>
 			<div class="experience-footer">
@@ -143,7 +162,7 @@
 			</div>
 			{#if current.demo === 'local-fuel'}
 				{#key modalOpen}<FuelStationDemo />{/key}
-			{:else}<div class="demo-checkout"><div class="demo-top"><span>rahunok</span><span>ДЕМО</span></div><current.icon size={28} /><h3>{current.merchant}</h3><p class="demo-purpose">{current.purpose}</p><p class="demo-total">{current.amount} <span>₴</span></p>
+			{:else}<div class="demo-checkout"><div class="demo-top"><span>Rahunok</span><span>ДЕМО</span></div><current.icon size={28} /><h3>{current.merchant}</h3><p class="demo-purpose">{current.purpose}</p><p class="demo-total">{current.amount} <span>₴</span></p>
 				<div class="demo-state" aria-live="polite" aria-atomic="true">
 					{#if current.demo === 'kso' && step === 0}<div class="demo-summary"><span>Хліб · 1 шт.</span><strong>46,00 ₴</strong></div><div class="demo-summary"><span>Молоко · 1 шт.</span><strong>60,00 ₴</strong></div><div class="demo-summary"><span>Кава · 1 шт.</span><strong>180,00 ₴</strong></div>{/if}
 					{#if step === 0}<div class="demo-summary"><span>Рахунок</span><strong>№ 00490</strong></div><div class="demo-summary"><span>До сплати</span><strong>{current.amount} ₴</strong></div><button class="open-scenario" type="button" onclick={() => (step = 1)}>Обрати банк <ArrowRight size={17} /></button>
@@ -165,7 +184,8 @@
 	.eyebrow { margin: 0 0 8px; font-size: 11px; font-weight: 700; }
 	.experience h1 { margin: 0; color: white; font-size: 96px; font-weight: 600; line-height: 1.08; }
 	.experience h1 span { color: #fb7966; }
-	.experience-message { min-height: 104px; max-width: 490px; margin-top: 14px; }
+	.experience-message { display: grid; min-height: 104px; max-width: 490px; margin-top: 14px; }
+	.message-wrapper { grid-area: 1 / 1; }
 	.statement { margin: 0 0 12px; font-size: 29px; line-height: 1.2; font-weight: 600; text-wrap: balance; }
 	.description { margin: 0; font-size: 15px; line-height: 1.55; max-width: 370px; }
 	.connect, .open-scenario { display: inline-flex; align-items: center; justify-content: center; gap: 14px; min-height: 48px; padding: 0 20px; border: 0; border-radius: 4px; background: #c54132; color: white; font: inherit; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer; }
@@ -174,7 +194,15 @@
 	.scenario-options { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 	.scenario-options button { display: flex; align-items: center; gap: 10px; padding: 12px 18px; min-height: 48px; color: white; background: rgb(15 25 22 / 70%); border: 1px solid rgb(255 255 255 / 38%); border-radius: 4px; font: inherit; font-size: 13px; cursor: pointer; }
 	.scenario-options button[aria-pressed='true'] { background: #fff; color: #1b332a; border-color: white; }
-	.invoice-preview { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 32px; padding: 20px 24px; background: #fff; color: #172b24; border-top: 3px solid #b8db9b; }
+	@keyframes hero-progress {
+		from { transform: scaleX(0); }
+		to { transform: scaleX(1); }
+	}
+	.scenario-options button.auto-cycling { position: relative; overflow: hidden; }
+	.scenario-options button.auto-cycling::after { content: ''; position: absolute; bottom: 0; left: 0; height: 3px; width: 100%; background: #c9ff4a; transform-origin: left; transform: scaleX(0); animation: hero-progress 6s linear forwards; }
+	.invoice-preview { position: relative; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 32px; padding: 20px 24px; background: #fff; color: #172b24; border-top: 3px solid #b8db9b; min-height: 98px; }
+	.invoice-details-wrapper { grid-area: 1 / 1; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 32px; }
+	.open-scenario { grid-column: 2; z-index: 1; }
 	.invoice-details { display: grid; gap: 4px; }
 	.demo-label { font-size: 9px; color: #53695e; font-weight: 700; }
 	.invoice-details strong { font-size: 18px; }

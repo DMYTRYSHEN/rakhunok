@@ -41,6 +41,16 @@
 	);
 	let menuOpen = $state(false);
 	let wizardOpen = $state(false);
+	
+	let scrollY = $state(0);
+	let lastScrollY = 0;
+	let scrollDirection = $state('up');
+	$effect(() => {
+		if (scrollY > lastScrollY) scrollDirection = 'down';
+		else if (scrollY < lastScrollY) scrollDirection = 'up';
+		lastScrollY = scrollY;
+	});
+	let headerHidden = $derived(scrollY > 80 && scrollDirection === 'down');
 	const plans = [
 		{
 			name: 'Перший рахунок',
@@ -135,6 +145,22 @@
 		);
 		if (redirectUrl) window.location.assign(redirectUrl);
 	});
+
+	function handleStoryMove(event: MouseEvent) {
+		const card = event.currentTarget as HTMLElement;
+		const rect = card.getBoundingClientRect();
+		const x = event.clientX - rect.left;
+		const y = event.clientY - rect.top;
+		card.style.setProperty('--mouse-x', `${x}px`);
+		card.style.setProperty('--mouse-y', `${y}px`);
+		card.style.setProperty('--rot-x', `${((y / rect.height) - 0.5) * -12}deg`);
+		card.style.setProperty('--rot-y', `${((x / rect.width) - 0.5) * 12}deg`);
+	}
+	function handleStoryLeave(event: MouseEvent) {
+		const card = event.currentTarget as HTMLElement;
+		card.style.setProperty('--rot-x', `0deg`);
+		card.style.setProperty('--rot-y', `0deg`);
+	}
 </script>
 
 <svelte:head>
@@ -159,17 +185,28 @@
 </svelte:head>
 
 <div class="promo-site">
+	{#snippet terminalLink()}
+		<a class="promo-terminal" href="/app" data-sveltekit-reload onclick={() => (menuOpen = false)}>
+			<span class="promo-terminal-icon" aria-hidden="true">
+				<img class="promo-terminal-plane" src={asset('/images/telegram-logo.svg')} alt="" width="32" height="32" />
+				<span class="promo-terminal-coin">₴</span>
+			</span>
+			<span class="promo-terminal-copy"><strong>Термінал</strong><small>by Rahunok</small></span>
+			<ArrowRight size={16} aria-hidden="true" />
+		</a>
+	{/snippet}
 	<a class="promo-skip" href="#content">До вмісту</a>
-	<header class="promo-header">
+	<svelte:window bind:scrollY /><header class="promo-header" class:promo-header-hidden={headerHidden} class:promo-header-scrolled={scrollY > 10}>
 		<div class="promo-container promo-header-inner">
 			<a class="promo-brand" href={resolve('/')} aria-label="Rahunok, на головну"
-				><span class="promo-brand-mark"><BrandIcon /></span><span>rahunok</span></a
+				><span class="promo-brand-mark"><BrandIcon /></span><span>Rahunok</span></a
 			>
 			<nav class="promo-nav" aria-label="Основна навігація">
 				<a href="#ecosystem">Екосистема</a><a href="#banks">Банки</a><a href="#demo">Покупцю</a><a href="#stories">Бізнесу</a
 				><a href="#faq">Підтримка</a>
 			</nav>
 			<div class="promo-header-actions">
+				<div class="promo-terminal-desktop">{@render terminalLink()}</div>
 				<a class="promo-login" href={resolve('/dashboard')} data-sveltekit-reload>Увійти</a><button
 					class="promo-button promo-header-cta"
 					type="button"
@@ -199,7 +236,7 @@
 				><a href="#stories" onclick={() => (menuOpen = false)}>Бізнесу</a><a
 					href="#faq"
 					onclick={() => (menuOpen = false)}>Підтримка</a
-				><a href={resolve('/dashboard')} data-sveltekit-reload>Увійти</a>
+				>{@render terminalLink()}<a href={resolve('/dashboard')} data-sveltekit-reload>Увійти</a>
 			</nav>{/if}
 	</header>
 
@@ -232,7 +269,7 @@
 					<p>Від столика до власної платформи. Сценарій змінюється, принцип залишається зрозумілим.</p>
 				</div>
 				<div class="promo-stories-grid">
-					{#each cases as story, index (story.label)}<article class="promo-story">
+					{#each cases as story, index (story.label)}<article class="promo-story" onmousemove={handleStoryMove} onmouseleave={handleStoryLeave}>
 							<div class="promo-story-image">
 								<img src={story.image} alt={story.alt} loading="lazy" />
 								<span>0{index + 1}</span>
@@ -406,7 +443,7 @@
 			<div class="promo-footer-grid">
 				<div>
 					<a class="promo-brand" href={resolve('/')} aria-label="Rahunok, на головну"
-						><span class="promo-brand-mark"><BrandIcon /></span><span>rahunok</span></a
+						><span class="promo-brand-mark"><BrandIcon /></span><span>Rahunok</span></a
 					>
 					<p>Для кожної справи,<br />яка рухається далі.</p>
 				</div>

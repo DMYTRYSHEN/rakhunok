@@ -13,7 +13,8 @@ const homepage = nodeNames[2];
 if (!homepage) throw new Error('Landing build is missing the homepage node');
 
 const pending = [
-	'index.html', '__data.json', 'robots.txt', '_app/env.js',
+	'index.html', '__data.json', 'robots.txt', '_app/env.js', 'favicon.svg',
+	'images/telegram-logo.svg',
 	html.match(/\/(_app\/immutable\/entry\/start\.[\w-]+\.js)/)?.[1], entry,
 	`_app/immutable/nodes/${nodeNames[0]}`,
 	`_app/immutable/nodes/${nodeNames[1]}`,

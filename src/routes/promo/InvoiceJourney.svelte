@@ -53,9 +53,9 @@
 				<div class="phone-area">
 					<div class="phone" aria-label="Демонстраційний checkout покупця">
 						<div class="phone-screen">
-							<div class="phone-status" aria-hidden="true"><span>9:41</span><span class="phone-island"></span><span><Signal size={12} /><Wifi size={12} /><BatteryFull size={17} /></span></div>
+							<div class="phone-status" aria-hidden="true"><span>9:41</span><div class="phone-island" class:expanded={demoPaid}>{#if demoPaid}<div class="island-content"><Check size={12} color="#c9ff4a" strokeWidth={3} /><span>Сплачено</span></div>{/if}</div><span><Signal size={12} /><Wifi size={12} /><BatteryFull size={17} /></span></div>
 							<div class="phone-address"><LockKeyhole size={10} /> rakhunok.com <span>ДЕМО</span></div>
-							<header class="checkout-header"><strong>rahunok<span>.</span></strong><span>№ 00490</span></header>
+							<header class="checkout-header"><strong>Rahunok<span>.</span></strong><span>№ 00490</span></header>
 							<div class="checkout-body">
 								<div class="checkout-merchant"><span><Coffee size={21} strokeWidth={1.5} /></span><div><strong>Кав'ярня «Ранок»</strong><small>Столик 04</small></div></div>
 								<p class="checkout-amount">490<span>,00 ₴</span></p><p class="checkout-purpose">Кава та сніданок</p>
@@ -128,8 +128,11 @@
 	.phone-screen { background: #fff; border: 3px solid #1c2023; border-radius: 32px; overflow: hidden; height: 626px; display: flex; flex-direction: column; }
 	.phone-status { display: flex; justify-content: space-between; align-items: center; position: relative; padding: 12px 16px 9px; font-size: 10px; font-weight: 700; height: 39px; flex-shrink: 0; }
 	.phone-status > span:last-child { display: flex; gap: 3px; align-items: center; }
-	.phone-island { width: 76px; height: 21px; border-radius: 20px; background: #15191b; position: absolute; left: 50%; top: 7px; transform: translateX(-50%); }
-	.phone-address { display: flex; justify-content: center; align-items: center; gap: 5px; font-size: 9px; padding: 8px; background: #f1f3f4; }
+	.phone-island { width: 76px; height: 21px; border-radius: 20px; background: #000000; position: absolute; left: 50%; top: 7px; transform: translateX(-50%); transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05); z-index: 10; }
+	.phone-island.expanded { width: 140px; height: 32px; top: 7px; border-radius: 16px; background: #000000; box-shadow: 0 10px 20px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,255,255,0.1); }
+	.island-content { display: flex; align-items: center; gap: 6px; color: #fff; font-size: 11px; font-weight: 700; opacity: 0; animation: island-fade-in 0.3s 0.3s forwards; }
+	@keyframes island-fade-in { from { opacity: 0; transform: translateY(2px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+	.phone-address { display: flex; justify-content: center; align-items: center; gap: 5px; font-size: 9px; padding: 12px 8px 8px; background: #f1f3f4; transition: opacity 0.3s; }
 	.phone-address > span { font-size: 7px; color: #687078; margin-left: 8px; }
 	.checkout-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid #e8ecee; }
 	.checkout-header strong { font-size: 18px; }

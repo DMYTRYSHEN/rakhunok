@@ -37,7 +37,7 @@
 </script>
 
 <div class="fuel-demo">
-	<div class="demo-top"><strong>rahunok</strong><span>ДЕМО АЗК</span></div>
+	<div class="demo-top"><strong>Rahunok</strong><span>ДЕМО АЗК</span></div>
 	<Fuel size={28} />
 	<h3>Заправка без зайвих кроків</h3>
 	{#if stage === 'order'}
