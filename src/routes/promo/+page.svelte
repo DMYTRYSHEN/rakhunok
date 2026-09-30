@@ -184,6 +184,7 @@
 	<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 </svelte:head>
 
+<svelte:window bind:scrollY />
 <div class="promo-site">
 	{#snippet terminalLink()}
 		<a class="promo-terminal" href="/app" data-sveltekit-reload onclick={() => (menuOpen = false)}>
@@ -196,7 +197,7 @@
 		</a>
 	{/snippet}
 	<a class="promo-skip" href="#content">До вмісту</a>
-	<svelte:window bind:scrollY /><header class="promo-header" class:promo-header-hidden={headerHidden} class:promo-header-scrolled={scrollY > 10}>
+	<header class="promo-header" class:promo-header-hidden={headerHidden} class:promo-header-scrolled={scrollY > 10}>
 		<div class="promo-container promo-header-inner">
 			<a class="promo-brand" href={resolve('/')} aria-label="Rahunok, на головну"
 				><span class="promo-brand-mark"><BrandIcon /></span><span>Rahunok</span></a
