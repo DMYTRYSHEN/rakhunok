@@ -1996,3 +1996,57 @@
   animation: pulse-soft 3s infinite ease-in-out;
 }
 
+
+.promo-site .promo-terminal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 48px;
+  min-height: 48px;
+  padding: 6px 16px 6px 12px;
+  border: 1px solid #96d7f4;
+  border-radius: 99px;
+  background: #e3f4fc;
+  color: #073d58;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.promo-site .promo-terminal:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(150, 215, 244, 0.4);
+}
+.promo-terminal-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+.promo-terminal-plane {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.promo-site .promo-terminal:hover .promo-terminal-plane {
+  transform: scale(1.15) rotate(-10deg);
+}
+.promo-terminal-coin {
+  display: none; /* Was there a coin animation? Let's hide it or style it */
+}
+.promo-terminal-copy {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.promo-terminal-copy strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+.promo-terminal-copy small {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
