@@ -56,6 +56,13 @@ test('merges backend order scenario_config dynamically', () => {
 	assert.deepEqual(result.config.quickAmounts, [100, 200, 1000]);
 });
 
+test('donation checkout flow resolves its screen without reinterpreting ordinary open amount', () => {
+	assert.equal(resolveScenario({ type: 'open_amount' }).screen, 'amount');
+	assert.equal(resolveScenario({ type: 'open_amount', scenario_config: {
+		checkout_flow: { id: 'donation', version: 1, invoice_type: 'open_amount' }
+	} }).screen, 'donation');
+});
+
 test('uses versioned checkout flow identity independently of invoice type', () => {
 	const result = resolveScenario({
 		type: 'open_amount',

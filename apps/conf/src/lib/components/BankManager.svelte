@@ -1,8 +1,8 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { Building2, CheckCircle2, CheckSquare, FlaskConical, LogOut, Moon, Plus, RefreshCw, Search, SlidersHorizontal, Sun, Zap } from '@lucide/svelte';
+    import { Building2, CheckCircle2, CheckSquare, DatabaseBackup, FlaskConical, LogOut, Moon, Plus, RefreshCw, Search, SlidersHorizontal, Sun, Zap } from '@lucide/svelte';
     import type { BankEntry } from '../types';
-    import { BankLinkStore, DEFAULT_BANKS } from '../services/banklink-store';
+    import { BankLinkStore, DEFAULT_BANKS, supabase } from '../services/banklink-store';
     import BankConfiguratorModal from './BankConfiguratorModal.svelte';
     import BankTester from './BankTester.svelte';
 
@@ -16,6 +16,9 @@
     let bankList = $state<BankEntry[]>([]);
     let selectedBank = $state<BankEntry | null>(null);
     let isLoading = $state(true);
+    let isSyncing = $state(false);
+    let syncMessage = $state('');
+    let syncFailed = $state(false);
     let search = $state('');
     let filterActive = $state(false);
     let filterChecked = $state(false);
@@ -25,10 +28,55 @@
 
     onMount(loadBanks);
 
+    async function syncToD1() {
+        if (isSyncing) return;
+        isSyncing = true;
+        syncFailed = false;
+        syncMessage = 'Синхронізація з D1…';
+        const errors: Record<string, string> = {
+            sync_not_configured: 'D1 ще не налаштовано на сервері.',
+            authentication_required: 'Сесія недійсна. Увійдіть повторно.',
+            sync_forbidden: 'Для цього облікового запису синхронізацію не дозволено.',
+            origin_not_allowed: 'Адресу запиту синхронізації не дозволено.',
+            auth_unavailable: 'Не вдалося перевірити сесію. Спробуйте пізніше.',
+            source_unavailable: 'Не вдалося прочитати banklink або перевищено ліміт 1,5 МБ.',
+            source_incomplete_or_empty: 'Джерело порожнє, неповне або містить понад 500 банків.',
+            source_invalid: 'У banklink є некоректні або дубльовані записи.',
+            snapshot_storage_unavailable: 'Не вдалося зберегти знімок у D1.'
+        };
+        try {
+            const { data, error } = await supabase.auth.getSession();
+            if (error || !data.session?.access_token) throw new Error(errors.authentication_required);
+            const response = await fetch('/conf/api/banks/sync', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${data.session.access_token}` },
+                cache: 'no-store',
+                redirect: 'error',
+                signal: AbortSignal.timeout(45_000)
+            });
+            if (!response.headers.get('Content-Type')?.includes('application/json')) {
+                throw new Error('Сервер синхронізації недоступний.');
+            }
+            const result = await response.json();
+            if (!response.ok) throw new Error(errors[result?.error] ?? 'Синхронізацію не виконано.');
+            if (!['imported', 'unchanged'].includes(result?.status) ||
+                !Number.isInteger(result?.snapshot?.bank_count) || result.snapshot.bank_count < 1 ||
+                typeof result.snapshot.content_hash !== 'string' || !/^[a-f0-9]{64}$/.test(result.snapshot.content_hash)) {
+                throw new Error('Сервер повернув некоректний результат синхронізації.');
+            }
+            syncMessage = `${result.status === 'imported' ? 'Збережено в D1' : 'D1: без змін'}: ${result.snapshot.bank_count} банків. Знімок ${result.snapshot.content_hash.slice(0, 12)}.`;
+        } catch (error) {
+            syncFailed = true;
+            syncMessage = error instanceof Error && !['AbortError', 'TimeoutError', 'TypeError'].includes(error.name)
+                ? error.message : 'Зв’язок перервано. Результат невідомий; повторіть синхронізацію.';
+        } finally {
+            isSyncing = false;
+        }
+    }
+
     async function loadBanks() {
         isLoading = true;
         try {
-            await BankLinkStore.syncMissingAndroidLinks();
             bankList = await BankLinkStore.getAll();
         } catch (error) {
             console.error('Failed to load banks:', error);
@@ -118,11 +166,16 @@
                 <button onclick={loadBanks} class="icon-button" title="Оновити з banklink">
                     <RefreshCw size={16} class={isLoading ? 'animate-spin' : ''} />
                 </button>
+                <button onclick={syncToD1} class="icon-button" title="Синхронізувати з D1" aria-label="Синхронізувати з D1" disabled={isSyncing} aria-busy={isSyncing}>
+                    <DatabaseBackup size={16} class={isSyncing ? 'animate-pulse' : ''} />
+                </button>
                 <button onclick={onLogout} class="icon-button" title="Вийти">
                     <LogOut size={16} />
                 </button>
             </div>
         </div>
+
+        <div class="sync-status" class:failed={syncFailed} role="status" aria-live="polite" hidden={!syncMessage}>{syncMessage}</div>
 
         <div class="sidebar-search">
             <div class="search-field">
@@ -208,3 +261,9 @@
         </button>
     </nav>
 </div>
+
+<style>
+    .sync-status { padding: 10px 14px; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; border-bottom: 1px solid var(--ios-line, #d1d5db); }
+    .sync-status.failed { border-left: 3px solid #dc2626; }
+    button:disabled { opacity: 0.5; cursor: wait; }
+</style>

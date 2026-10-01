@@ -2,20 +2,24 @@
   import { checkout, formatNumber, vibrate } from '../state/checkout.svelte.js';
   import Odometer from '../components/Odometer.svelte';
 
-  const donation = $derived(checkout.order?.donation || {
-    goal_title: '10 FPV-дронів для 72-ї ОМБр «Чорні Запорожці»',
-    organizer: 'БФ «Повернись живим»',
-    target_amount: 200000,
-    collected_amount: 145000,
-    presets: [100, 200, 500, 1000]
-  });
+  const configuredDonation = $derived(
+    checkout.order?.scenario_config?.checkout_flow &&
+    typeof checkout.order.scenario_config.checkout_flow === 'object' &&
+    'id' in checkout.order.scenario_config.checkout_flow &&
+    checkout.order.scenario_config.checkout_flow.id === 'donation'
+      ? (checkout.order.scenario_config.flow_data as { donation?: typeof checkout.order.donation } | undefined)?.donation
+      : undefined
+  );
+  const donation = $derived(configuredDonation || checkout.order?.donation);
+  const organizer = $derived(donation?.organizer || checkout.order?.merchant?.display_name || 'Організатор збору');
+  const goalTitle = $derived(donation?.goal_title || checkout.order?.title || 'Збір коштів');
 
-  const presets = $derived(donation.presets || [100, 200, 500, 1000]);
+  const presets = $derived(checkout.order?.scenario_config?.quick_amounts as number[] | undefined || donation?.presets || [100, 200, 500, 1000]);
   let customMode = $state(false);
   let customValue = $state('');
 
   const progressPct = $derived.by(() => {
-    if (!donation.target_amount) return 0;
+    if (!donation?.target_amount || !donation.collected_amount) return 0;
     return Math.min(100, Math.round((donation.collected_amount / donation.target_amount) * 100));
   });
 
@@ -27,9 +31,7 @@
   function handleCustomInput(val: string): void {
     customValue = val.replace(/[^0-9]/g, '');
     const num = parseInt(customValue, 10);
-    if (!isNaN(num) && num > 0) {
-      checkout.setDonationAmount(num);
-    }
+    checkout.setDonationAmount(Number.isFinite(num) && num > 0 ? num : 0);
   }
 
   function handleBack(): void {
@@ -58,9 +60,9 @@
 
     <div class="order-merchant">
       <div class="merchant-avatar donation-avatar">
-        <span>🇺🇦</span>
+        <span>₴</span>
       </div>
-      <span class="order-merchant-name">{donation.organizer}</span>
+      <span class="order-merchant-name">{organizer}</span>
     </div>
 
     <button
@@ -88,19 +90,16 @@
   <!-- Donation Header -->
   <section class="donation-hero">
     <div class="donation-badge">
-      <span class="ua-flag">🇺🇦</span>
-      <span>Волонтерська Банка</span>
-      <svg viewBox="0 0 24 24" width="13" height="13" fill="#22c55e" stroke="#22c55e">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path>
-      </svg>
+      <span>Збір коштів</span>
     </div>
 
-    <h1 class="donation-title">{donation.goal_title}</h1>
+    <h1 class="donation-title">{goalTitle}</h1>
     <div class="donation-organizer-row">
-      <span>Організатор: <strong>{donation.organizer}</strong></span>
+      <span>Організатор: <strong>{organizer}</strong></span>
     </div>
 
     <!-- Progress Card -->
+    {#if donation?.target_amount && donation.collected_amount !== undefined}
     <div class="donation-progress-card">
       <div class="donation-progress-bar-wrap">
         <div class="donation-progress-fill" style="width: {progressPct}%"></div>
@@ -116,6 +115,7 @@
         </div>
       </div>
     </div>
+    {/if}
 
     <div class="order-hero-amount" style="margin-top: 14px;">
       <Odometer value={formatNumber(checkout.totalAmount)} suffix=" ₴" />
@@ -142,6 +142,7 @@
       class:active={customMode}
       onclick={() => {
         customMode = true;
+        checkout.setDonationAmount(0);
         vibrate(8);
       }}
     >
@@ -162,29 +163,14 @@
     </div>
   {/if}
 
-  <!-- Comment & Anonymous Checkbox -->
-  <div class="tips-note-card">
-    <div class="tips-note-label">Слова підтримки або позивний:</div>
-    <input
-      type="text"
-      class="tips-note-input"
-      placeholder="На перемогу! Слава Україні! 🇺🇦"
-      bind:value={checkout.donationComment}
-    />
-    <label class="donation-anon-label">
-      <input type="checkbox" bind:checked={checkout.isAnonymousDonation} />
-      <span>Зробити донат анонімним</span>
-    </label>
-  </div>
-
   <div class="tips-trust-footer">
     <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
     </svg>
-    <span>100% коштів зараховуються на офіційний рахунок збору</span>
+    <span>Перед оплатою перевірте отримувача та призначення платежу</span>
   </div>
 
-  <button class="order-cta donation-cta" onclick={() => checkout.openPaymentSheet()}>
+  <button class="order-cta donation-cta" disabled={checkout.totalAmount <= 0} onclick={() => checkout.openPaymentSheet()}>
     <span>Задонатити {formatNumber(checkout.totalAmount)} ₴</span>
     <svg
       viewBox="0 0 24 24"

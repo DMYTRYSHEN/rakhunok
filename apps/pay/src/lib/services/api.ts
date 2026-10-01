@@ -127,21 +127,14 @@ function isSafeBankRedirect(value: unknown): value is string {
   if (typeof value !== 'string' || !value || /[\s\u0000-\u001f\u007f\\]/u.test(value)) return false;
   if (!/^[a-z][a-z0-9+.-]*:\/\/[^/?#]+/i.test(value)) return false;
 
-  const monobankIntent = value.match(
-    /^intent:\/\/bank\.gov\.ua\/qr\/([A-Za-z0-9_-]+)#Intent;scheme=https;package=com\.ftband\.mono;S\.browser_fallback_url=https%3A%2F%2Fmbnk\.app%2Fqr%2F([A-Za-z0-9_-]+);end$/
-  );
-  if (monobankIntent) return monobankIntent[1] === monobankIntent[2];
-
   try {
     const url = new URL(value);
     if (!url.hostname || url.username || url.password || /^[^:]+:\/\/[^/?#]*@/.test(value)) return false;
-    if (url.protocol === 'https:') return true;
-    // Custom schemes already supported by the local bank router.
-    if (url.protocol === 'izibank:' || url.protocol === 'novapay-mobile:') return true;
-    // Android intents must target a known bank, without arbitrary intent extras.
-    return url.protocol === 'intent:' && url.host === 'bank.gov.ua' &&
-      url.pathname.startsWith('/qr/') &&
-      /^#Intent;scheme=https;package=(?:ua\.izibank\.app|ua\.novapay\.novapaymobile);end$/.test(url.hash);
+    // Allow https, valid custom schemes (e.g. p24:, izibank:, monobank:), and intent:
+    if (['http:', 'https:', 'intent:'].includes(url.protocol)) return true;
+    // Allow any custom app scheme as long as it's not javascript/data
+    if (url.protocol && !['javascript:', 'data:', 'vbscript:', 'file:'].includes(url.protocol)) return true;
+    return false;
   } catch {
     return false;
   }

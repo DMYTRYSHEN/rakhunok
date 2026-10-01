@@ -24,6 +24,97 @@
     let dynamicIslandExpanded = $state(false);
     let copiedToast = $state(false);
 
+    // === OS Routing Simulator ===
+    type SimulatedOS = 'ios' | 'android' | 'desktop';
+    let simulatedOS = $state<SimulatedOS>('ios');
+    let simResult = $state<{ redirectUrl: string; fallbackUrl: string; steps: string[] } | null>(null);
+
+    function simulateRouting() {
+        const steps: string[] = [];
+        const payload = encodedPayload;
+        let redirectUrl = `https://qr.bank.gov.ua/${payload}`;
+        let fallbackUrl = 'https://qr.bank.gov.ua/';
+
+        const isUniversalLinkValid = bank.universal_link && bank.universal_link.startsWith('https://');
+        let basePath = 'bank.gov.ua/qr/';
+        if (bank.domain_prefix) {
+            basePath = bank.domain_prefix.replace(/^https?:\/\//, '');
+            steps.push(`📍 Domain Prefix → basePath = "${basePath}"`);
+        } else {
+            steps.push(`📍 Domain Prefix не задано → basePath = "bank.gov.ua/qr/" (за замовчуванням)`);
+        }
+
+        // Step 1: iOS Universal Link
+        let ios_universal: string | null = null;
+        if (isUniversalLinkValid) {
+            if (bank.url_template && bank.url_template.includes('{payload}')) {
+                ios_universal = bank.url_template.replace('{payload}', payload);
+                steps.push(`✅ Universal Link (url_template) → ${ios_universal}`);
+            } else {
+                ios_universal = `${bank.universal_link}${payload}`;
+                steps.push(`✅ Universal Link → ${ios_universal}`);
+            }
+        } else {
+            steps.push(`⚠️ Universal Link відсутній або не починається з https://`);
+        }
+
+        // Step 2: iOS Scheme
+        let ios_scheme: string | null = null;
+        if (bank.ios_scheme) {
+            ios_scheme = `${bank.ios_scheme}://${basePath}${payload}`;
+            steps.push(`📱 iOS Scheme → ${ios_scheme}`);
+        } else {
+            steps.push(`⚠️ iOS Scheme не налаштовано`);
+        }
+
+        // Step 3: Android Intent
+        let android_intent: string | null = null;
+        if (bank.android_package) {
+            const fallback = bank.playstore_url ? `;S.browser_fallback_url=${encodeURIComponent(bank.playstore_url)}` : '';
+            android_intent = `intent://${basePath}${payload}#Intent;scheme=https;package=${bank.android_package}${fallback};end;`;
+            steps.push(`🤖 Android Intent → intent://...#Intent;package=${bank.android_package};end;`);
+        } else {
+            steps.push(`⚠️ Android Package не налаштовано`);
+        }
+
+        // Step 4: Web HTTPS
+        let web_https = bank.domain_prefix ? `${bank.domain_prefix}${payload}` : '';
+        if (!web_https && bank.universal_link) {
+            web_https = `${bank.universal_link}${payload}`;
+        }
+
+        // Step 5: OS-specific resolution (mirrors worker buildBankRedirect)
+        steps.push(`\n🖥️ Обрана ОС: ${simulatedOS.toUpperCase()}`);
+
+        if (ios_universal) {
+            redirectUrl = ios_universal;
+            fallbackUrl = ios_universal;
+            steps.push(`🎯 Пріоритет: Universal Link (однаковий для iOS та Android)`);
+        } else {
+            if (simulatedOS === 'ios') {
+                if (ios_scheme) {
+                    redirectUrl = ios_scheme;
+                    steps.push(`🎯 iOS → використовуємо iOS Scheme`);
+                }
+                fallbackUrl = bank.appstore_url || web_https || fallbackUrl;
+                steps.push(`🔄 Fallback → ${fallbackUrl}`);
+            } else if (simulatedOS === 'android') {
+                if (android_intent) {
+                    redirectUrl = android_intent;
+                    steps.push(`🎯 Android → використовуємо Intent`);
+                }
+                fallbackUrl = bank.playstore_url || web_https || fallbackUrl;
+                steps.push(`🔄 Fallback → ${fallbackUrl}`);
+            } else {
+                redirectUrl = web_https || redirectUrl;
+                fallbackUrl = web_https || fallbackUrl;
+                steps.push(`🎯 Desktop → використовуємо Web HTTPS`);
+            }
+        }
+
+        simResult = { redirectUrl, fallbackUrl, steps };
+    }
+
     function triggerFaceId() {
         if (isFaceIdActive) return;
         isFaceIdActive = true;
@@ -96,6 +187,72 @@
             <Layers size={13} />
             <span>Android Duo</span>
         </button>
+    </div>
+
+    <!-- OS Routing Simulator Panel -->
+    <div class="os-sim-panel">
+        <div class="os-sim-header">
+            <Zap size={14} />
+            <span>Симуляція маршрутизації</span>
+        </div>
+        <div class="os-sim-body">
+            <div class="os-selector">
+                <button
+                    class="os-btn"
+                    class:active={simulatedOS === 'ios'}
+                    onclick={() => { simulatedOS = 'ios'; simResult = null; }}
+                >
+                    <span class="os-emoji">🍎</span> iOS
+                </button>
+                <button
+                    class="os-btn"
+                    class:active={simulatedOS === 'android'}
+                    onclick={() => { simulatedOS = 'android'; simResult = null; }}
+                >
+                    <span class="os-emoji">🤖</span> Android
+                </button>
+                <button
+                    class="os-btn"
+                    class:active={simulatedOS === 'desktop'}
+                    onclick={() => { simulatedOS = 'desktop'; simResult = null; }}
+                >
+                    <span class="os-emoji">🖥️</span> Desktop
+                </button>
+            </div>
+            <button class="sim-run-btn" onclick={simulateRouting}>
+                <Play size={14} /> Змоделювати
+            </button>
+        </div>
+
+        {#if simResult}
+            <div class="sim-result">
+                <div class="sim-steps">
+                    {#each simResult.steps as step}
+                        <div class="sim-step">{step}</div>
+                    {/each}
+                </div>
+                <div class="sim-urls">
+                    <div class="sim-url-row">
+                        <span class="sim-url-label">🎯 Redirect URL:</span>
+                        <code class="sim-url-value">{simResult.redirectUrl}</code>
+                        <button class="link-copy-btn" onclick={() => copyLink(simResult?.redirectUrl || '')} title="Копіювати">
+                            {#if copiedToast}
+                                <Check size={12} class="text-emerald-400" />
+                            {:else}
+                                <Copy size={12} />
+                            {/if}
+                        </button>
+                    </div>
+                    <div class="sim-url-row">
+                        <span class="sim-url-label">🔄 Fallback URL:</span>
+                        <code class="sim-url-value">{simResult.fallbackUrl}</code>
+                        <button class="link-copy-btn" onclick={() => copyLink(simResult?.fallbackUrl || '')} title="Копіювати">
+                            <Copy size={12} />
+                        </button>
+                    </div>
+                </div>
+            </div>
+        {/if}
     </div>
 
     <!-- Phone Hardware Frame Wrapper -->
@@ -1317,5 +1474,177 @@
     :global([data-theme="dark"]) .link-copy-btn:hover {
         background: rgba(255, 255, 255, 0.08);
         color: #f8fafc;
+    }
+
+    /* OS Routing Simulator */
+    .os-sim-panel {
+        width: 100%;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 14px;
+        background: rgba(0, 0, 0, 0.02);
+        overflow: hidden;
+    }
+
+    :global([data-theme="dark"]) .os-sim-panel {
+        background: rgba(255, 255, 255, 0.03);
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .os-sim-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #f59e0b;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    :global([data-theme="dark"]) .os-sim-header {
+        border-color: rgba(255, 255, 255, 0.06);
+    }
+
+    .os-sim-body {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+    }
+
+    .os-selector {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex: 1;
+    }
+
+    .os-btn {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 6px 8px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        color: #64748b;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 150ms ease;
+    }
+
+    .os-btn:hover {
+        background: rgba(0, 0, 0, 0.05);
+    }
+
+    :global([data-theme="dark"]) .os-btn:hover {
+        background: rgba(255, 255, 255, 0.06);
+    }
+
+    .os-btn.active {
+        background: #fff;
+        color: #0284c7;
+        border-color: #0284c7;
+        box-shadow: 0 1px 4px rgba(2, 132, 199, 0.15);
+    }
+
+    :global([data-theme="dark"]) .os-btn.active {
+        background: #1e293b;
+        color: #38bdf8;
+        border-color: #38bdf8;
+    }
+
+    .os-emoji {
+        font-size: 14px;
+    }
+
+    .sim-run-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border: none;
+        border-radius: 8px;
+        background: #10b981;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 150ms ease;
+        white-space: nowrap;
+    }
+
+    .sim-run-btn:hover {
+        background: #059669;
+    }
+
+    .sim-result {
+        border-top: 1px solid rgba(0, 0, 0, 0.06);
+        padding: 10px 12px;
+    }
+
+    :global([data-theme="dark"]) .sim-result {
+        border-color: rgba(255, 255, 255, 0.06);
+    }
+
+    .sim-steps {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        margin-bottom: 10px;
+    }
+
+    .sim-step {
+        font-size: 11px;
+        font-family: monospace;
+        color: #64748b;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+
+    :global([data-theme="dark"]) .sim-step {
+        color: #94a3b8;
+    }
+
+    .sim-urls {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .sim-url-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 6px 8px;
+        background: rgba(0, 0, 0, 0.03);
+        border-radius: 8px;
+    }
+
+    :global([data-theme="dark"]) .sim-url-row {
+        background: rgba(255, 255, 255, 0.04);
+    }
+
+    .sim-url-label {
+        font-size: 10px;
+        font-weight: 700;
+        white-space: nowrap;
+        color: #64748b;
+    }
+
+    .sim-url-value {
+        flex: 1;
+        font-size: 10px;
+        font-family: monospace;
+        color: #0284c7;
+        word-break: break-all;
+    }
+
+    :global([data-theme="dark"]) .sim-url-value {
+        color: #38bdf8;
     }
 </style>

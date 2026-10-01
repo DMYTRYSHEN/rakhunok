@@ -10,6 +10,8 @@
 
   // Track geometry & 3D carousel
   let trackWidth = $state<number>(0);
+  let programmaticScroll = false;
+  let scrollTimer: ReturnType<typeof setTimeout> | undefined;
 
   // Coupon state
   let couponCode = $state<string>('');
@@ -73,7 +75,10 @@
   }
 
   function scrollToCard(index: number, delayMs = 0): void {
-    setTimeout(() => {
+    programmaticScroll = true;
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      scrollTimer = undefined;
       if (!trackEl) return;
       const wrappers = trackEl.querySelectorAll<HTMLElement>('.card-wrapper');
       const wrapper = wrappers[index];
@@ -85,6 +90,21 @@
         trackEl.scrollLeft = pos;
       }
     }, delayMs);
+  }
+
+  function beginManualScroll(): void {
+    clearTimeout(scrollTimer);
+    scrollTimer = undefined;
+    if (programmaticScroll && trackEl) {
+      trackEl.scrollTo({ left: trackEl.scrollLeft, behavior: 'instant' });
+    }
+    programmaticScroll = false;
+  }
+
+  function handleCarouselKey(event: KeyboardEvent): void {
+    if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+      beginManualScroll();
+    }
   }
 
   function updateCardTransforms(): void {
@@ -117,7 +137,7 @@
       card.style.opacity = String(opacity);
     });
 
-    if (activeIdx !== checkout.selectedBankIndex) {
+    if (!programmaticScroll && activeIdx !== checkout.selectedBankIndex) {
       checkout.selectBank(activeIdx);
     }
   }
@@ -135,11 +155,12 @@
 
   $effect(() => {
     if (checkout.isSheetOpen && trackEl) {
-      const timer = setTimeout(() => {
-        updateCardTransforms();
-        scrollToCard(checkout.selectedBankIndex);
-      }, 250);
-      return () => clearTimeout(timer);
+      programmaticScroll = true;
+      const timer = setTimeout(() => scrollToCard(checkout.selectedBankIndex), 250);
+      return () => {
+        clearTimeout(timer);
+        clearTimeout(scrollTimer);
+      };
     }
   });
 </script>
@@ -261,6 +282,9 @@
       <div
         bind:this={trackEl}
         class="carousel-track"
+        onpointerdown={beginManualScroll}
+        onwheel={beginManualScroll}
+        onkeydown={handleCarouselKey}
         onscroll={() => requestAnimationFrame(updateCardTransforms)}
       >
         {#each checkout.banks as bank, index}

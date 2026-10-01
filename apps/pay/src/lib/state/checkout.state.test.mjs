@@ -555,3 +555,41 @@ test('public showcase exposes all catalog fixtures without enabling payment', as
     assert.equal(blocked.store.order, null);
   }
 });
+
+test('donation flow pays the selected contribution while ordinary open amount uses the keypad', async () => {
+  const h = harness();
+  h.store.order = invoice('order-a', {
+    type: 'open_amount', total_amount: 0, base_amount: 0,
+    scenario_config: { checkout_flow: { id: 'donation', version: 1, invoice_type: 'open_amount' } }
+  });
+  assert.equal(h.store.baseAmount, 0);
+  h.store.setDonationAmount(350);
+  assert.equal(h.store.baseAmount, 350);
+  h.store.setDonationAmount(0);
+  assert.equal(h.store.baseAmount, 0);
+  assert.equal(h.store.totalAmount, 0);
+  await h.store.executePay();
+  assert.equal(h.calls.initiate.length, 0);
+  h.store.setDonationAmount(350);
+  await h.store.executePay();
+  assert.equal(h.calls.initiate.length, 1);
+  assert.equal(h.calls.initiate[0][2], 350);
+});
+
+test('opening another collection clears the previous donation amount', async () => {
+  const h = harness();
+  const collection = id => invoice(id, {
+    type: 'open_amount', total_amount: 0, base_amount: 0,
+    scenario_config: { checkout_flow: { id: 'donation', version: 1, invoice_type: 'open_amount' } }
+  });
+  h.mocks.load = async id => ({ order: collection(id), reason: null });
+  await h.store.init();
+  h.store.setDonationAmount(350);
+  assert.equal(h.store.baseAmount, 350);
+  h.window.location = new URL('https://checkout.invalid/pay/?id=order-b');
+  await h.store.init();
+  assert.equal(h.store.orderId, 'order-b');
+  assert.equal(h.store.baseAmount, 0);
+  await h.store.executePay();
+  assert.equal(h.calls.initiate.length, 0);
+});

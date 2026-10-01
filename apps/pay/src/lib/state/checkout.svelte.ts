@@ -121,7 +121,7 @@ class CheckoutStore {
 	splitCustomAmount = $state<number>(0);
 
 	// Donation / Banka
-	donationAmount = $state<number>(200);
+	donationAmount = $state<number>(0);
 	donationComment = $state<string>('');
 	isAnonymousDonation = $state<boolean>(false);
 
@@ -170,6 +170,12 @@ class CheckoutStore {
 	baseAmount = $derived.by(() => {
 		if (this.order?.type === 'open_amount' && this.order.total_amount > 0) {
 			return this.order.total_amount;
+		}
+		if (this.order?.scenario_config?.checkout_flow &&
+			typeof this.order.scenario_config.checkout_flow === 'object' &&
+			'id' in this.order.scenario_config.checkout_flow &&
+			this.order.scenario_config.checkout_flow.id === 'donation') {
+			return this.donationAmount;
 		}
 		if (
 			this.order?.type === 'open_amount' ||
@@ -615,7 +621,7 @@ class CheckoutStore {
 	}
 
 	setDonationAmount(amt: number): void {
-		this.donationAmount = Math.max(10, round2(amt));
+		this.donationAmount = Number.isFinite(amt) && amt > 0 ? Math.max(10, round2(amt)) : 0;
 		vibrate(8);
 	}
 
@@ -799,6 +805,7 @@ class CheckoutStore {
 		this.tipAmount = 0;
 		this.tipPercentage = null;
 		this.splitMode = 'none';
+		this.donationAmount = 0;
 		this.splitCustomAmount = 0;
 		this.keypadValue = '';
 		this.isRoundUpActive = false;
@@ -900,6 +907,7 @@ class CheckoutStore {
 		this.keypadValue = '';
 		this.tipAmount = 0;
 		this.tipPercentage = null;
+		this.donationAmount = 0;
 		this.isRoundUpActive = false;
 		this.useBonuses = false;
 		this.loyaltyCard = null;

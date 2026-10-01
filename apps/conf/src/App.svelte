@@ -8,7 +8,6 @@
     type Theme = 'light' | 'dark';
 
     let googleUser = $state<User | null>(null);
-    let passwordAuthenticated = $state(false);
     let isChecking = $state<boolean>(true);
     let theme = $state<Theme>('dark');
 
@@ -26,26 +25,12 @@
             const { data } = await supabase.auth.getSession();
             if (!active) return;
             googleUser = data.session?.user ?? null;
-            try {
-                const savedAuth = sessionStorage.getItem('banklink_auth');
-                if (savedAuth) {
-                    if (!googleUser) {
-                        googleUser = { id: savedAuth, email: 'local-admin@banklink.lan' } as User;
-                    }
-                    passwordAuthenticated = true;
-                }
-            } catch {
-                passwordAuthenticated = false;
-            }
             isChecking = false;
         };
         void restoreSession();
 
         const { data } = supabase.auth.onAuthStateChange((_event, session) => {
             googleUser = session?.user ?? null;
-            if (!googleUser && !sessionStorage.getItem('banklink_auth')) {
-                passwordAuthenticated = false;
-            }
         });
 
         return () => {
@@ -62,24 +47,9 @@
         });
         if (error) throw error;
         googleUser = data.user;
-        passwordAuthenticated = false;
-    }
-
-    function handlePasswordAuthenticated() {
-        if (!googleUser) {
-            googleUser = { id: 'dev-lan-admin', email: 'dev@banklink.lan' } as User;
-        }
-        try {
-            sessionStorage.setItem('banklink_auth', googleUser.id);
-        } catch {}
-        passwordAuthenticated = true;
     }
 
     async function handleLogout() {
-        try {
-            sessionStorage.removeItem('banklink_auth');
-        } catch {}
-        passwordAuthenticated = false;
         googleUser = null;
         await supabase.auth.signOut();
     }
@@ -97,13 +67,9 @@
     <div class="min-h-screen bg-stone-950 flex items-center justify-center text-stone-500 text-xs font-mono">
         Ініціалізація BankLink...
     </div>
-{:else if !passwordAuthenticated}
+{:else if !googleUser}
     <AuthGate
-        step={googleUser ? 'password' : 'both'}
-        userEmail={googleUser?.email}
         onGoogleLogin={handleGoogleLogin}
-        onPasswordAuthenticated={handlePasswordAuthenticated}
-        onGoogleLogout={handleLogout}
     />
 {:else}
     <BankManager {theme} onThemeToggle={toggleTheme} onLogout={() => void handleLogout()} />

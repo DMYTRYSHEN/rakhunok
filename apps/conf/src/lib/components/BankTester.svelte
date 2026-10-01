@@ -356,7 +356,7 @@
                 class="py-3 px-2 border-b-2 flex items-center justify-center gap-1.5 transition-all cursor-pointer {activeTab === 'IPHONE' ? 'border-blue-500 text-blue-400 font-bold' : 'border-transparent text-stone-400 hover:text-stone-200'}"
             >
                 <Smartphone size={15} />
-                <span>{embedded ? 'DUO' : 'iPhone Duo'}</span>
+                <span>{embedded ? 'SIM' : 'Симулятор'}</span>
             </button>
             <button
                 onclick={() => activeTab = 'DEBUG'}
