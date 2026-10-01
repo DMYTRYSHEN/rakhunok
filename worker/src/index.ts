@@ -11,14 +11,19 @@ import {
 	sendNotificationToTelegramUser
 } from './telegram-bot.ts';
 import { handleInvoiceImageGet } from './invoice-image.ts';
+import { handleMerchantApiKey } from './merchant-api-key.ts';
+import { handleBankLogoProxy } from './bank-logo-proxy.ts';
 
 interface Env extends TelegramInvoiceEnv, MerchantTelegramInvoiceEnv {
 	ASSETS: Fetcher;
 	BANKS_KV?: KVNamespace;
+	BANK_LOGOS_BUCKET?: R2Bucket;
 	ORDERS_KV?: KVNamespace;
 	PUBLIC_DOMAIN?: string;
 	SUPABASE_URL?: string;
 	SUPABASE_ANON_KEY?: string;
+	SUPABASE_SERVICE_ROLE_KEY?: string;
+	MERCHANT_API_KEYS_ENABLED?: string;
 	AZURE_AI_KEY?: string;
 	AZURE_BEARER_TOKEN?: string;
 	AZURE_HOST?: string;
@@ -79,11 +84,30 @@ async function persistedRow(
 }
 
 async function persistedRpcRow(response: Response): Promise<Record<string, unknown> | Response> {
-	if (!response.ok) return persistenceError(response.status);
+	if (!response.ok) {
+		if (response.status === 400) {
+			const error: unknown = await response.clone().json().catch(() => null);
+			if (
+				error && typeof error === 'object' && !Array.isArray(error) &&
+				'code' in error && 'message' in error &&
+				error.code === '22023' && error.message === 'Invoice payment settings are not configured'
+			) {
+				return jsonResponse({ error: 'Налаштуйте платіжні реквізити компанії в особистому кабінеті.' }, 422);
+			}
+			if (
+				error && typeof error === 'object' && !Array.isArray(error) &&
+				'code' in error && 'message' in error &&
+				error.code === '22023' && error.message === 'Invoice payment settings are incomplete'
+			) {
+				return jsonResponse({ error: 'Реквізити отримувача заповнені некоректно. Перевірте назву, IBAN, податковий номер і призначення платежу' }, 422);
+			}
+		}
+		return persistenceError(response.status);
+	}
 	const row: unknown = await response.json();
 	if (
 		!row || typeof row !== 'object' || Array.isArray(row) ||
-		typeof row.id !== 'string' || !row.id.trim()
+		!('id' in row) || typeof row.id !== 'string' || !row.id.trim()
 	) return persistenceError();
 	return row as Record<string, unknown>;
 }
@@ -212,26 +236,21 @@ function isBankCatalogEntry(value: unknown): value is BankCatalogEntry {
 }
 
 async function resolveBankCatalog(env: Env): Promise<BankCatalogEntry[]> {
-	const supabaseUrl = env.SUPABASE_URL?.trim().replace(/\/$/, '');
-	const supabaseAnonKey = env.SUPABASE_ANON_KEY?.trim();
-	if (!supabaseUrl || !supabaseAnonKey) return DEFAULT_BANKS;
-
+	if (!env.BANK_CATALOG_DB) return DEFAULT_BANKS;
 	try {
-		const response = await fetch(`${supabaseUrl}/rest/v1/banklink?select=*&order=name.asc`, {
-			method: 'GET',
-			headers: {
-				apikey: supabaseAnonKey,
-				Authorization: `Bearer ${supabaseAnonKey}`
-			}
-		});
-		if (!response.ok) return DEFAULT_BANKS;
+		const result = await env.BANK_CATALOG_DB.prepare(
+			"SELECT payload_json FROM conf_banks WHERE active = 1"
+		).all<{ payload_json: string }>();
 
-		const banks: unknown = await response.json();
-		if (!Array.isArray(banks) || banks.length === 0 || !banks.every(isBankCatalogEntry)) {
+		if (!result.results || result.results.length === 0) return DEFAULT_BANKS;
+
+		const banks = result.results.map((r) => JSON.parse(r.payload_json));
+		if (!banks.every(isBankCatalogEntry)) {
 			return DEFAULT_BANKS;
 		}
-		return banks;
-	} catch {
+		// Sort by name ascending
+		return banks.sort((a, b) => a.name.localeCompare(b.name));
+	} catch (err) {
 		return DEFAULT_BANKS;
 	}
 }
@@ -369,58 +388,61 @@ export function generateNbuQrPayload(input: NbuQrInput): NbuQrOutput {
 	};
 }
 
-export function buildBankRedirect(bankCode: string, payload: string, os = 'desktop'): { redirectUrl: string; fallbackUrl: string } {
-	const code = (bankCode || '').toUpperCase();
+export async function buildBankRedirect(env: Env, bankCode: string, payload: string, os = 'desktop'): Promise<{ redirectUrl: string; fallbackUrl: string }> {
+	const code = (bankCode || 'UNJS').toUpperCase();
 	let redirectUrl = `https://qr.bank.gov.ua/${payload}`;
 	let fallbackUrl = 'https://qr.bank.gov.ua/';
 
-	switch (code) {
-		case 'MONO':
-		case 'UNJS':
-			fallbackUrl = `https://mbnk.app/qr/${payload}`;
-			redirectUrl = fallbackUrl;
-			break;
-		case 'PBAN':
-			redirectUrl = `https://www.privat24.ua/rd/send_qr/nbu/${payload}`;
-			fallbackUrl = 'https://next.privat24.ua/pay/';
-			break;
-		case 'TASB':
-			redirectUrl =
-				os === 'android'
-					? `intent://bank.gov.ua/qr/${payload}#Intent;scheme=https;package=ua.izibank.app;end`
-					: `izibank://bank.gov.ua/qr/${payload}`;
-			fallbackUrl = 'https://apps.apple.com/ua/app/izibank/id1527341829';
-			break;
-		case 'SENS':
-			redirectUrl = `https://app.sensebank.ua/gkR4?code=${payload}`;
-			fallbackUrl = 'https://sensebank.ua';
-			break;
-		case 'ABUA':
-			redirectUrl = `https://abank24.page.link/qr/${payload}`;
-			fallbackUrl = 'https://a-bank.com.ua';
-			break;
-		case 'FUIB':
-			redirectUrl = `https://mobile-app.pumb.ua/qr.bank.gov.ua/${payload}`;
-			fallbackUrl = 'https://pumb.ua';
-			break;
-		case 'AVAL':
-			redirectUrl = `https://my-raif.apps.raiffeisen.ua/qr?payload=${payload}`;
-			fallbackUrl = 'https://raiffeisen.ua';
-			break;
-		case 'GLBU':
-			redirectUrl = `https://gpls.app/qr/${payload}`;
-			fallbackUrl = 'https://globusplus.com.ua';
-			break;
-		case 'NOVA':
-			redirectUrl =
-				os === 'android'
-					? `intent://bank.gov.ua/qr/${payload}#Intent;scheme=https;package=ua.novapay.novapaymobile;end`
-					: `novapay-mobile://bank.gov.ua/qr/${payload}`;
-			fallbackUrl = 'https://novapay.ua';
-			break;
-		default:
-			redirectUrl = `https://qr.bank.gov.ua/${payload}`;
-			fallbackUrl = 'https://qr.bank.gov.ua/';
+	const banks = await resolveBankCatalog(env);
+	const bank = banks.find((b) => b.code.toUpperCase() === code || b.id.toUpperCase() === code);
+
+	if (bank) {
+		const isUniversalLinkValid = bank.universal_link && bank.universal_link.startsWith('https://');
+		let basePath = 'bank.gov.ua/qr/';
+		if (bank.domain_prefix) {
+			basePath = bank.domain_prefix.replace(/^https?:\/\//, '');
+		}
+
+		let ios_universal: string | null = null;
+		if (isUniversalLinkValid) {
+			if (bank.url_template && bank.url_template.includes('{payload}')) {
+				ios_universal = bank.url_template.replace('{payload}', payload);
+			} else {
+				ios_universal = `${bank.universal_link}${payload}`;
+			}
+		}
+
+		let ios_scheme: string | null = null;
+		if (bank.ios_scheme) {
+			ios_scheme = `${bank.ios_scheme}://${basePath}${payload}`;
+		}
+
+		let android_intent: string | null = null;
+		if (bank.android_package) {
+			const fallback = bank.playstore_url ? `;S.browser_fallback_url=${encodeURIComponent(bank.playstore_url)}` : '';
+			android_intent = `intent://${basePath}${payload}#Intent;scheme=https;package=${bank.android_package}${fallback};end;`;
+		}
+
+		let web_https = bank.domain_prefix ? `${bank.domain_prefix}${payload}` : '';
+		if (!web_https && bank.universal_link) {
+			web_https = `${bank.universal_link}${payload}`;
+		}
+
+		if (ios_universal) {
+			redirectUrl = ios_universal;
+			fallbackUrl = ios_universal;
+		} else {
+			if (os === 'ios') {
+				if (ios_scheme) redirectUrl = ios_scheme;
+				fallbackUrl = bank.appstore_url || web_https || fallbackUrl;
+			} else if (os === 'android') {
+				if (android_intent) redirectUrl = android_intent;
+				fallbackUrl = bank.playstore_url || web_https || fallbackUrl;
+			} else {
+				redirectUrl = web_https || redirectUrl;
+				fallbackUrl = web_https || fallbackUrl;
+			}
+		}
 	}
 
 	return { redirectUrl, fallbackUrl };
@@ -456,7 +478,7 @@ export function buildMerchantInfo(row: Record<string, any>) {
 	};
 }
 
-export async function routeWebRequest(request: Request, env: Env): Promise<Response> {
+export async function routeWebRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 	const url = new URL(request.url);
 
 	if (url.pathname === '/') {
@@ -483,6 +505,17 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 		});
 	}
 
+	if (env.MERCHANT_API_KEYS_ENABLED === 'false' &&
+		/^(?:\S+\s+)?rhk_/i.test(request.headers.get('Authorization') ?? '')) {
+		return jsonResponse({ error: 'Unauthorized' }, 401);
+	}
+	if (env.MERCHANT_API_KEYS_ENABLED !== 'false') {
+		const merchantApiResponse = await handleMerchantApiKey(request, env);
+		if (merchantApiResponse) {
+			return merchantApiResponse;
+		}
+	}
+
 	// 1. Health check
 	if (url.pathname === '/health' || url.pathname === '/api/v1/health') {
 		if (request.method === 'GET') {
@@ -502,7 +535,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 			return jsonResponse({
 				supabaseUrl: 'https://mwaeazabpvbxqfrceogr.supabase.co',
 				supabaseAnonKey: 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk',
-				publicDomain: 'https://letsrealtalk.com',
+				publicDomain: env.PUBLIC_DOMAIN || 'https://letsrealtalk.com',
 				providers: ['google']
 			});
 		}
@@ -804,6 +837,12 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 		}
 	}
 
+	// 3.5 Bank Logo Proxy
+	const matchLogo = url.pathname.match(/^\/api\/v1\/bank-logo\/([a-zA-Z0-9_-]+)$/i);
+	if (matchLogo) {
+		return handleBankLogoProxy(request, env, ctx, matchLogo[1]);
+	}
+
 	// 4. Banks catalog & Logos
 	if (
 		url.pathname === '/api/v1/banks' ||
@@ -814,17 +853,33 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 		if (request.method === 'GET') {
 			const banks = await resolveBankCatalog(env);
 			const bankCodeMatch = url.pathname.match(/^\/(?:api\/v1\/)?banks\/([a-zA-Z0-9_-]+)$/i);
+			
+			const sanitizeBank = (b: BankCatalogEntry) => ({
+				id: b.id,
+				code: b.code,
+				name: b.name,
+				alias: b.alias || '',
+				feePct: typeof b.feePct === 'number' ? b.feePct : 0,
+				color: b.color || '#000000',
+				bg: b.bg || '',
+				bg_gradient: b.bg_gradient || '',
+				logo: b.logo || '',
+				nbu_version: b.nbu_version,
+				nbu_function: b.nbu_function,
+				encoding: b.encoding
+			});
+
 			if (bankCodeMatch) {
 				const idOrCode = bankCodeMatch[1].toLowerCase();
 				const bank = banks.find(
 					(b) => String(b.code).toLowerCase() === idOrCode || String(b.id).toLowerCase() === idOrCode
 				);
 				if (bank) {
-					return jsonResponse(bank);
+					return jsonResponse(sanitizeBank(bank));
 				}
 				return jsonResponse({ error: `Bank ${idOrCode} not found` }, 404);
 			}
-			return jsonResponse(banks);
+			return jsonResponse(banks.map(sanitizeBank));
 		}
 	}
 
@@ -1173,7 +1228,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 				orderNumber: orderNum
 			});
 
-			const { redirectUrl, fallbackUrl } = buildBankRedirect(bankCode, nbu.base64UrlPayload, clientOS);
+			const { redirectUrl, fallbackUrl } = await buildBankRedirect(env, bankCode, nbu.base64UrlPayload, clientOS);
 
 			return Response.json({
 				success: true,
@@ -1517,6 +1572,13 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 					}
 				}
 				if (merchantId && authHeader) {
+					const rawTableNumber = body.table_number;
+					const tableNumber = typeof rawTableNumber === 'number' ||
+						(typeof rawTableNumber === 'string' && /^\d+$/.test(rawTableNumber))
+						? Number(rawTableNumber) : NaN;
+					if (type === 'table' && (!Number.isInteger(tableNumber) || tableNumber < 0 || tableNumber > 2147483647)) {
+						return jsonResponse({ error: 'Вкажіть цілий номер столу від 0 до 2147483647.' }, 422);
+					}
 					const rpcPayload = {
 						p_merchant_id: merchantId,
 						p_entity_id: entityId,
@@ -1525,7 +1587,7 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 						p_description: body.description ? String(body.description) : null,
 						p_base_amount: baseAmount,
 						p_delivery_fee: deliveryFee,
-						p_table_number: body.table_number ? parseInt(String(body.table_number), 10) : null,
+						p_table_number: type === 'table' ? tableNumber : body.table_number ? parseInt(String(body.table_number), 10) : null,
 						p_terminal_id: terminalId ?? null,
 						p_scenario_config: body.scenario_config ?? null,
 						p_expires_at: type === 'table' && typeof body.expires_at === 'string' ? body.expires_at : null
@@ -1628,6 +1690,8 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 		if (request.method === 'GET') {
 			const orderIdMatch = url.pathname.match(/^\/api\/v1\/orders\/([a-zA-Z0-9_-]+)$/);
 			const orderId = orderIdMatch ? orderIdMatch[1] : null;
+			const authHeader = bearerHeader(request);
+			if (!authHeader) return persistenceError(401);
 
 			if (orderId) {
 				const cached = orderCache.get(orderId);
@@ -1636,7 +1700,6 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 				}
 				const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
 				const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
-				const authHeader = request.headers.get('Authorization') || `Bearer ${supabaseAnonKey}`;
 				try {
 					const res = await fetch(
 						`${supabaseUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}&select=*,merchants(*),business_entities(*)&limit=1`,
@@ -1666,7 +1729,6 @@ export async function routeWebRequest(request: Request, env: Env): Promise<Respo
 
 			const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
 			const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
-			const authHeader = request.headers.get('Authorization') || `Bearer ${supabaseAnonKey}`;
 
 			let query = `${supabaseUrl}/rest/v1/orders?select=*&order=created_at.desc&limit=${limit}&offset=${offset}`;
 			if (status) query += `&status=eq.${encodeURIComponent(status)}`;

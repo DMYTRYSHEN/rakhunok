@@ -91,6 +91,12 @@ export async function syncBanks(request: Request, env: BankSyncEnv): Promise<Res
 				['id', 'code', 'name'].some((field) => typeof row[field] !== 'string' || !row[field].trim() || row[field].length > 256) || ids.has(row.id)) {
 				return reply(422, { error: 'source_invalid' });
 			}
+			
+			// Rewrite logo URL to use R2 proxy
+			if (typeof row.logo === 'string' && row.logo.startsWith('http') && !row.logo.includes('/api/v1/bank-logo/')) {
+				row.logo = `https://rhnk.pp.ua/api/v1/bank-logo/${row.code}?url=${encodeURIComponent(row.logo)}`;
+			}
+			
 			ids.add(row.id);
 		}
 		rows = data.sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
