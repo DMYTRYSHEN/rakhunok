@@ -52,5 +52,10 @@ export const BANK_LOGOS_BY_CODE: Readonly<Record<string, string>> = {
 };
 
 export function withBankLogo(bank: BankEntry): BankEntry {
-    return { ...bank, logo: BANK_LOGOS_BY_CODE[bank.code] ?? bank.logo };
+    // Якщо в базі вже є лого (навіть порожній рядок, що означає "видалено"), використовуємо його
+    if (bank.logo !== null && bank.logo !== undefined) {
+        return bank;
+    }
+    // Інакше беремо з константи
+    return { ...bank, logo: BANK_LOGOS_BY_CODE[bank.code] || null };
 }

@@ -17,7 +17,7 @@
 
     let { bank, formData, urls, encodedPayload, onTestSuccess }: Props = $props();
 
-    type ViewMode = 'safari' | 'bank_app' | 'store' | 'duo_android';
+    type ViewMode = 'safari' | 'bank_app' | 'store' | 'duo_android' | 'desktop_qr';
     let viewMode = $state<ViewMode>('bank_app');
     let isFaceIdActive = $state(false);
     let faceIdSuccess = $state(false);
@@ -90,11 +90,20 @@
             redirectUrl = ios_universal;
             fallbackUrl = ios_universal;
             steps.push(`🎯 Пріоритет: Universal Link (однаковий для iOS та Android)`);
+            
+            // Візуалізація: Універсальна лінка відкриває додаток банку або питає в Safari
+            if (simulatedOS === 'ios') viewMode = 'safari';
+            else if (simulatedOS === 'android') viewMode = 'duo_android';
+            else viewMode = 'desktop_qr';
+
         } else {
             if (simulatedOS === 'ios') {
                 if (ios_scheme) {
                     redirectUrl = ios_scheme;
                     steps.push(`🎯 iOS → використовуємо iOS Scheme`);
+                    viewMode = 'safari'; // iOS Scheme показує системний алерт в Safari
+                } else {
+                    viewMode = 'store'; // Відправляє в App Store якщо немає нічого
                 }
                 fallbackUrl = bank.appstore_url || web_https || fallbackUrl;
                 steps.push(`🔄 Fallback → ${fallbackUrl}`);
@@ -105,10 +114,12 @@
                 }
                 fallbackUrl = bank.playstore_url || web_https || fallbackUrl;
                 steps.push(`🔄 Fallback → ${fallbackUrl}`);
+                viewMode = 'duo_android';
             } else {
                 redirectUrl = web_https || redirectUrl;
                 fallbackUrl = web_https || fallbackUrl;
-                steps.push(`🎯 Desktop → використовуємо Web HTTPS`);
+                steps.push(`🎯 Desktop → використовуємо Web HTTPS (QR)`);
+                viewMode = 'desktop_qr';
             }
         }
 
@@ -186,6 +197,15 @@
         >
             <Layers size={13} />
             <span>Android Duo</span>
+        </button>
+        <button
+            class="duo-mode-btn"
+            class:active={viewMode === 'desktop_qr'}
+            onclick={() => { viewMode = 'desktop_qr'; }}
+            title="Desktop QR"
+        >
+            <QrCode size={13} />
+            <span>Desktop QR</span>
         </button>
     </div>
 
@@ -553,6 +573,24 @@
                                     <button class="android-btn secondary" onclick={() => copyLink(urls.android_intent || '')}>
                                         <Copy size={14} /> Копіювати Intent
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+
+                    <!-- MODE 5: DESKTOP QR VIEW -->
+                    {:else if viewMode === 'desktop_qr'}
+                        <div class="desktop-qr-view">
+                            <div class="desktop-qr-header">
+                                <span class="desktop-qr-tag">Web HTTPS / Desktop Checkout</span>
+                            </div>
+                            <div class="desktop-qr-card">
+                                <div class="desktop-qr-icon">
+                                    <QrCode size={120} class="text-stone-700 dark:text-stone-300 opacity-60" />
+                                </div>
+                                <h4>Скануйте для оплати</h4>
+                                <p>Наведіть камеру смартфона, щоб відкрити <strong>{bank.name}</strong></p>
+                                <div class="desktop-qr-link">
+                                    <span class="font-mono text-[10px] truncate">{urls.web_https || 'URL не налаштовано'}</span>
                                 </div>
                             </div>
                         </div>
@@ -1396,6 +1434,76 @@
     .android-btn.launch {
         background: #f59e0b;
         color: #fff;
+    }
+
+    /* Desktop QR View */
+    .desktop-qr-view {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        height: 100%;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        padding: 0 10px;
+    }
+
+    .desktop-qr-header {
+        margin-bottom: auto;
+        padding-top: 20px;
+    }
+
+    .desktop-qr-tag {
+        font-size: 10px;
+        font-weight: 800;
+        color: #94a3b8;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 4px 10px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .desktop-qr-card {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 24px;
+        padding: 24px 16px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: auto;
+    }
+
+    .desktop-qr-icon {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 8px;
+    }
+
+    .desktop-qr-card h4 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 800;
+        color: #f8fafc;
+    }
+
+    .desktop-qr-card p {
+        margin: 0;
+        font-size: 12px;
+        color: #94a3b8;
+        line-height: 1.4;
+    }
+
+    .desktop-qr-link {
+        margin-top: 8px;
+        padding: 6px 10px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+        width: 100%;
+        color: #38bdf8;
     }
 
     /* Home indicator */
