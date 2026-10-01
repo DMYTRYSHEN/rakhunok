@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { onMount } from 'svelte';
     import { Building2, CheckCircle2, CheckSquare, DatabaseBackup, FlaskConical, LogOut, Moon, Plus, RefreshCw, Search, SlidersHorizontal, Sun, Zap } from '@lucide/svelte';
     import type { BankEntry } from '../types';
@@ -32,17 +32,17 @@
         if (isSyncing) return;
         isSyncing = true;
         syncFailed = false;
-        syncMessage = 'Синхронізація з D1…';
+        syncMessage = 'РЎРёРЅС…СЂРѕРЅС–Р·Р°С†С–СЏ Р· D1вЂ¦';
         const errors: Record<string, string> = {
-            sync_not_configured: 'D1 ще не налаштовано на сервері.',
-            authentication_required: 'Сесія недійсна. Увійдіть повторно.',
-            sync_forbidden: 'Для цього облікового запису синхронізацію не дозволено.',
-            origin_not_allowed: 'Адресу запиту синхронізації не дозволено.',
-            auth_unavailable: 'Не вдалося перевірити сесію. Спробуйте пізніше.',
-            source_unavailable: 'Не вдалося прочитати banklink або перевищено ліміт 1,5 МБ.',
-            source_incomplete_or_empty: 'Джерело порожнє, неповне або містить понад 500 банків.',
-            source_invalid: 'У banklink є некоректні або дубльовані записи.',
-            snapshot_storage_unavailable: 'Не вдалося зберегти знімок у D1.'
+            sync_not_configured: 'D1 С‰Рµ РЅРµ РЅР°Р»Р°С€С‚РѕРІР°РЅРѕ РЅР° СЃРµСЂРІРµСЂС–.',
+            authentication_required: 'РЎРµСЃС–СЏ РЅРµРґС–Р№СЃРЅР°. РЈРІС–Р№РґС–С‚СЊ РїРѕРІС‚РѕСЂРЅРѕ.',
+            sync_forbidden: 'Р”Р»СЏ С†СЊРѕРіРѕ РѕР±Р»С–РєРѕРІРѕРіРѕ Р·Р°РїРёСЃСѓ СЃРёРЅС…СЂРѕРЅС–Р·Р°С†С–СЋ РЅРµ РґРѕР·РІРѕР»РµРЅРѕ.',
+            origin_not_allowed: 'РђРґСЂРµСЃСѓ Р·Р°РїРёС‚Сѓ СЃРёРЅС…СЂРѕРЅС–Р·Р°С†С–С— РЅРµ РґРѕР·РІРѕР»РµРЅРѕ.',
+            auth_unavailable: 'РќРµ РІРґР°Р»РѕСЃСЏ РїРµСЂРµРІС–СЂРёС‚Рё СЃРµСЃС–СЋ. РЎРїСЂРѕР±СѓР№С‚Рµ РїС–Р·РЅС–С€Рµ.',
+            source_unavailable: 'РќРµ РІРґР°Р»РѕСЃСЏ РїСЂРѕС‡РёС‚Р°С‚Рё banklink Р°Р±Рѕ РїРµСЂРµРІРёС‰РµРЅРѕ Р»С–РјС–С‚ 1,5 РњР‘.',
+            source_incomplete_or_empty: 'Р”Р¶РµСЂРµР»Рѕ РїРѕСЂРѕР¶РЅС”, РЅРµРїРѕРІРЅРµ Р°Р±Рѕ РјС–СЃС‚РёС‚СЊ РїРѕРЅР°Рґ 500 Р±Р°РЅРєС–РІ.',
+            source_invalid: 'РЈ banklink С” РЅРµРєРѕСЂРµРєС‚РЅС– Р°Р±Рѕ РґСѓР±Р»СЊРѕРІР°РЅС– Р·Р°РїРёСЃРё.',
+            snapshot_storage_unavailable: 'РќРµ РІРґР°Р»РѕСЃСЏ Р·Р±РµСЂРµРіС‚Рё Р·РЅС–РјРѕРє Сѓ D1.'
         };
         try {
             const { data, error } = await supabase.auth.getSession();
@@ -55,23 +55,69 @@
                 signal: AbortSignal.timeout(45_000)
             });
             if (!response.headers.get('Content-Type')?.includes('application/json')) {
-                throw new Error('Сервер синхронізації недоступний.');
+                throw new Error('РЎРµСЂРІРµСЂ СЃРёРЅС…СЂРѕРЅС–Р·Р°С†С–С— РЅРµРґРѕСЃС‚СѓРїРЅРёР№.');
             }
             const result = await response.json();
-            if (!response.ok) throw new Error(errors[result?.error] ?? 'Синхронізацію не виконано.');
+            if (!response.ok) throw new Error(errors[result?.error] ?? 'РЎРёРЅС…СЂРѕРЅС–Р·Р°С†С–СЋ РЅРµ РІРёРєРѕРЅР°РЅРѕ.');
             if (!['imported', 'unchanged'].includes(result?.status) ||
                 !Number.isInteger(result?.snapshot?.bank_count) || result.snapshot.bank_count < 1 ||
                 typeof result.snapshot.content_hash !== 'string' || !/^[a-f0-9]{64}$/.test(result.snapshot.content_hash)) {
-                throw new Error('Сервер повернув некоректний результат синхронізації.');
+                throw new Error('РЎРµСЂРІРµСЂ РїРѕРІРµСЂРЅСѓРІ РЅРµРєРѕСЂРµРєС‚РЅРёР№ СЂРµР·СѓР»СЊС‚Р°С‚ СЃРёРЅС…СЂРѕРЅС–Р·Р°С†С–С—.');
             }
-            syncMessage = `${result.status === 'imported' ? 'Збережено в D1' : 'D1: без змін'}: ${result.snapshot.bank_count} банків. Знімок ${result.snapshot.content_hash.slice(0, 12)}.`;
+            syncMessage = `${result.status === 'imported' ? 'Р—Р±РµСЂРµР¶РµРЅРѕ РІ D1' : 'D1: Р±РµР· Р·РјС–РЅ'}: ${result.snapshot.bank_count} Р±Р°РЅРєС–РІ. Р—РЅС–РјРѕРє ${result.snapshot.content_hash.slice(0, 12)}.`;
         } catch (error) {
             syncFailed = true;
             syncMessage = error instanceof Error && !['AbortError', 'TimeoutError', 'TypeError'].includes(error.name)
-                ? error.message : 'Зв’язок перервано. Результат невідомий; повторіть синхронізацію.';
+                ? error.message : 'РЎРёРЅС…СЂРѕРЅС–Р·Р°С†С–СЏ РЅРµ РІРґР°Р»Р°СЃСЏ. РњРѕР¶Р»РёРІРѕ РјРµСЂРµР¶РµРІР° РїРѕРјРёР»РєР°; СЃРїСЂРѕР±СѓР№С‚Рµ РїС–Р·РЅС–С€Рµ.';
         } finally {
             isSyncing = false;
         }
+    }
+
+    let isFetchingLogos = $state(false);
+    
+    async function autoFetchLogos() {
+        if (!confirm('Р’Рё РґС–Р№СЃРЅРѕ С…РѕС‡РµС‚Рµ РѕРЅРѕРІРёС‚Рё Р»РѕРіРѕС‚РёРїРё РґР»СЏ РІСЃС–С… Р±Р°РЅРєС–РІ Р· App Store?')) return;
+        isFetchingLogos = true;
+        syncFailed = false;
+        syncMessage = 'РџРѕС€СѓРє Р»РѕРіРѕС‚РёРїС–РІ...';
+        
+        let updated = 0;
+        let failed = 0;
+        
+        for (const bank of bankList) {
+            if (!bank.appstore_url) continue;
+            
+            const match = bank.appstore_url.match(/\/id(\d+)/);
+            if (!match) continue;
+            const id = match[1];
+            
+            syncMessage = `РћРЅРѕРІР»РµРЅРЅСЏ: ${bank.name}...`;
+            try {
+                const res = await fetch(`https://itunes.apple.com/lookup?id=${id}&country=ua`);
+                if (!res.ok) continue;
+                const data = await res.json();
+                
+                if (data.results && data.results.length > 0) {
+                    const logoUrl = data.results[0].artworkUrl512 || data.results[0].artworkUrl100;
+                    if (logoUrl && bank.logo !== logoUrl) {
+                        bank.logo = logoUrl;
+                        await BankLinkStore.save(bank, bank.id);
+                        updated++;
+                    }
+                }
+            } catch (e) {
+                console.warn(`Failed to fetch logo for ${bank.code}`, e);
+                failed++;
+            }
+        }
+        
+        syncMessage = `РћРЅРѕРІР»РµРЅРѕ: ${updated} Р»РѕРіРѕС‚РёРїС–РІ. ${failed > 0 ? `РџРѕРјРёР»РѕРє: ${failed}.` : ''} РћРЅРѕРІС–С‚СЊ СЃС‚РѕСЂС–РЅРєСѓ.`;
+        setTimeout(() => {
+            isFetchingLogos = false;
+            syncMessage = '';
+            loadBanks();
+        }, 5000);
     }
 
     async function loadBanks() {
@@ -98,7 +144,7 @@
         selectedBank = {
             id: `bank-${Date.now()}`,
             code: 'NEWB',
-            name: 'Новий Банк',
+            name: 'РќРѕРІРёР№ Р‘Р°РЅРє',
             nbu_version: '003',
             encoding: '1',
             nbu_function: 'ICT',
@@ -131,13 +177,13 @@
         if (originalIndex >= 0) bankList[originalIndex] = saved;
         else bankList = [saved, ...bankList];
         selectedBank = saved;
-        showToast(`Банк ${saved.name} збережено`);
+        showToast(`Р‘Р°РЅРє ${saved.name} Р·Р±РµСЂРµР¶РµРЅРѕ`);
     }
 
     function deleteBank(deletedId: string) {
         bankList = bankList.filter((bank) => bank.id !== deletedId);
         selectedBank = bankList[0] ?? null;
-        showToast('Банк видалено');
+        showToast('Р‘Р°РЅРє РІРёРґР°Р»РµРЅРѕ');
     }
 
     let filteredBanks = $derived(bankList.filter((bank) => {
@@ -158,18 +204,19 @@
                 <button
                     onclick={onThemeToggle}
                     class="icon-button"
-                    title={theme === 'dark' ? 'Увімкнути світлу тему' : 'Увімкнути темну тему'}
-                    aria-label={theme === 'dark' ? 'Увімкнути світлу тему' : 'Увімкнути темну тему'}
+                    title={theme === 'dark' ? 'РЈРІС–РјРєРЅСѓС‚Рё СЃРІС–С‚Р»Сѓ С‚РµРјСѓ' : 'РЈРІС–РјРєРЅСѓС‚Рё С‚РµРјРЅСѓ С‚РµРјСѓ'}
+                    aria-label={theme === 'dark' ? 'РЈРІС–РјРєРЅСѓС‚Рё СЃРІС–С‚Р»Сѓ С‚РµРјСѓ' : 'РЈРІС–РјРєРЅСѓС‚Рё С‚РµРјРЅСѓ С‚РµРјСѓ'}
                 >
                     {#if theme === 'dark'}<Sun size={16} />{:else}<Moon size={16} />{/if}
                 </button>
-                <button onclick={loadBanks} class="icon-button" title="Оновити з banklink">
+                <button onclick={loadBanks} class="icon-button" title="РћРЅРѕРІРёС‚Рё Р· banklink">
                     <RefreshCw size={16} class={isLoading ? 'animate-spin' : ''} />
                 </button>
-                <button onclick={syncToD1} class="icon-button" title="Синхронізувати з D1" aria-label="Синхронізувати з D1" disabled={isSyncing} aria-busy={isSyncing}>
+                <button onclick={autoFetchLogos} class="icon-button" title="Оновити лого з App Store" disabled={isFetchingLogos}><Zap size={16} class={isFetchingLogos ? 'animate-pulse text-yellow-400' : ''} /></button>
+                <button onclick={syncToD1} class="icon-button" title="РЎРёРЅС…СЂРѕРЅС–Р·СѓРІР°С‚Рё Р· D1" aria-label="РЎРёРЅС…СЂРѕРЅС–Р·СѓРІР°С‚Рё Р· D1" disabled={isSyncing} aria-busy={isSyncing}>
                     <DatabaseBackup size={16} class={isSyncing ? 'animate-pulse' : ''} />
                 </button>
-                <button onclick={onLogout} class="icon-button" title="Вийти">
+                <button onclick={onLogout} class="icon-button" title="Р’РёР№С‚Рё">
                     <LogOut size={16} />
                 </button>
             </div>
@@ -183,8 +230,8 @@
                 <input bind:value={search} placeholder="Search banks..." />
             </div>
             <div class="filter-buttons">
-                <button class:active={filterActive} onclick={() => filterActive = !filterActive} title="Тільки активні"><Zap size={14} /></button>
-                <button class:active={filterChecked} onclick={() => filterChecked = !filterChecked} title="Тільки перевірені"><CheckSquare size={14} /></button>
+                <button class:active={filterActive} onclick={() => filterActive = !filterActive} title="РўС–Р»СЊРєРё Р°РєС‚РёРІРЅС–"><Zap size={14} /></button>
+                <button class:active={filterChecked} onclick={() => filterChecked = !filterChecked} title="РўС–Р»СЊРєРё РїРµСЂРµРІС–СЂРµРЅС–"><CheckSquare size={14} /></button>
             </div>
         </div>
 
@@ -202,11 +249,11 @@
                         <strong>{bank.name}</strong>
                         <span><b>{bank.code}</b>{bank.domain_prefix?.replace('https://', '').replace('/qr/', '') || 'No domain'}</span>
                     </span>
-                    {#if bank.active}<span class="status-dot" title="Активний"></span>{/if}
+                    {#if bank.active}<span class="status-dot" title="РђРєС‚РёРІРЅРёР№"></span>{/if}
                 </button>
             {/each}
             {#if !isLoading && filteredBanks.length === 0}
-                <p class="empty-list">Банків не знайдено</p>
+                <p class="empty-list">Р‘Р°РЅРєС–РІ РЅРµ Р·РЅР°Р№РґРµРЅРѕ</p>
             {/if}
         </div>
 
@@ -239,25 +286,25 @@
             {/key}
         </aside>
     {:else}
-        <main class="empty-workbench">Оберіть банк або створіть новий.</main>
+        <main class="empty-workbench">РћР±РµСЂС–С‚СЊ Р±Р°РЅРє Р°Р±Рѕ СЃС‚РІРѕСЂС–С‚СЊ РЅРѕРІРёР№.</main>
     {/if}
 
     {#if toastMessage}
         <div class="conf-toast"><CheckCircle2 size={15} />{toastMessage}</div>
     {/if}
 
-    <nav class="mobile-navigation" aria-label="Основна навігація">
+    <nav class="mobile-navigation" aria-label="РћСЃРЅРѕРІРЅР° РЅР°РІС–РіР°С†С–СЏ">
         <button class:active={mobileView === 'banks'} onclick={() => mobileView = 'banks'}>
             <Building2 size={19} />
-            <span>Банки</span>
+            <span>Р‘Р°РЅРєРё</span>
         </button>
         <button class:active={mobileView === 'config'} onclick={() => mobileView = 'config'} disabled={!selectedBank}>
             <SlidersHorizontal size={19} />
-            <span>Налаштування</span>
+            <span>РќР°Р»Р°С€С‚СѓРІР°РЅРЅСЏ</span>
         </button>
         <button class:active={mobileView === 'test'} onclick={() => mobileView = 'test'} disabled={!selectedBank}>
             <FlaskConical size={19} />
-            <span>Тест</span>
+            <span>РўРµСЃС‚</span>
         </button>
     </nav>
 </div>
@@ -267,3 +314,4 @@
     .sync-status.failed { border-left: 3px solid #dc2626; }
     button:disabled { opacity: 0.5; cursor: wait; }
 </style>
+
