@@ -1,0 +1,81 @@
+{
+  "$schema": "../worker/node_modules/wrangler/config-schema.json",
+  "name": "rhnk-pay",
+  "main": "../worker/src/checkout.js",
+  "compatibility_date": "2026-09-10",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "../apps/pay/dist",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "services": [
+    {
+      "binding": "API",
+      "service": "rhnk-web"
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true
+    }
+  },
+  "routes": [
+    {
+      "pattern": "rhnk.pp.ua/checkout*",
+      "zone_name": "rhnk.pp.ua"
+    },
+    {
+      "pattern": "rhnk.pp.ua/o/*",
+      "zone_name": "rhnk.pp.ua"
+    },
+    {
+      "pattern": "rhnk.pp.ua/t/*",
+      "zone_name": "rhnk.pp.ua"
+    },
+    {
+      "pattern": "rhnk.pp.ua/tag/*",
+      "zone_name": "rhnk.pp.ua"
+    },
+    {
+      "pattern": "rhnk.pp.ua/pos/*",
+      "zone_name": "rhnk.pp.ua"
+    },
+    {
+      "pattern": "rhnk.pp.ua/pay",
+      "zone_name": "rhnk.pp.ua"
+    },
+    {
+      "pattern": "rhnk.pp.ua/pay/*",
+      "zone_name": "rhnk.pp.ua"
+    },
+    {
+      "pattern": "rhnk.pp.ua/api/v1/checkout*",
+      "zone_name": "rhnk.pp.ua"
+    },
+    {
+      "pattern": "rhnk.pp.ua/api/v1/banks*",
+      "zone_name": "rhnk.pp.ua"
+    },
+    {
+      "pattern": "rhnk.pp.ua/api/v1/logos*",
+      "zone_name": "rhnk.pp.ua"
+    },
+    {
+      "pattern": "rhnk.pp.ua/api/v1/bank-logo*",
+      "zone_name": "rhnk.pp.ua"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "BANK_CATALOG_DB",
+      "database_name": "letsrealtalk-conf-snapshots",
+      "database_id": "2e5d61b8-d603-420e-8a17-231cd5c9340f"
+    }
+  ]
+}

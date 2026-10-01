@@ -1,0 +1,301 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import {
+		Building2,
+		CheckCircle2,
+		Fingerprint,
+		KeyRound,
+		Lock,
+		Shield,
+		ShieldAlert,
+		ShieldCheck,
+		UserCheck,
+		UserCog,
+		Users
+	} from '@lucide/svelte';
+	import type { Dac7Role, Dac7RolePermission } from '../types';
+	import type { Dac7Gateway } from '../dac7-gateway';
+
+	let {
+		gateway,
+		currentRole = $bindable('admin'),
+		demo = false
+	}: {
+		gateway: Dac7Gateway;
+		currentRole: Dac7Role;
+		demo?: boolean;
+	} = $props();
+
+	let permissions = $state<Dac7RolePermission[]>([]);
+	let loading = $state(true);
+	let notification = $state<string | null>(null);
+
+	const roleConfig: Record<
+		Dac7Role,
+		{ title: string; desc: string; badgeClass: string; icon: any }
+	> = {
+		admin: {
+			title: 'Адміністратор системи',
+			desc: 'Повний контроль над доступом, ролями та налаштуваннями платформ',
+			badgeClass: 'bg-stone-900 text-white',
+			icon: UserCog
+		},
+		platform: {
+			title: 'Платформа (Bolt Food · CFO)',
+			desc: 'Податковий агент: утримання 10% ПДФО, батчі, виплати, DAC7 XML',
+			badgeClass: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+			icon: Building2
+		},
+		business: {
+			title: 'БІЗНЕС (МЕРЧАНТ)',
+			desc: 'Партнер (напр. ресторан чи VARUS), що отримує платежі клієнтів',
+			icon: Building2,
+			badgeClass: 'bg-orange-50 text-orange-700 border border-orange-200'
+		},
+		seller: {
+			title: "Кур'єр (Олексій · Самозайнятий)",
+			desc: 'Кабінет кур’єра: виплати на IBAN, автоматичний податок, статус Дія',
+			badgeClass: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+			icon: UserCheck
+		},
+		gov: {
+			title: 'Держава (ДПС · Мінфін · НБУ)',
+			desc: 'Регуляторний нагляд: телеметрія доходів, контроль лімітів, fraud-сигнали',
+			badgeClass: 'bg-purple-100 text-purple-800 border border-purple-200',
+			icon: ShieldCheck
+		},
+		dev: {
+			title: 'Розробник (API & Webhooks)',
+			desc: 'Керування API-ключами платформи, симуляція вебхуків та логів',
+			badgeClass: 'bg-amber-100 text-amber-800 border border-amber-200',
+			icon: KeyRound
+		},
+		sso: {
+			title: 'Rahunok ID (Дія.Підпис SSO)',
+			desc: 'Верифікація особи через Дія.Підпис (РНОКПП, ПІБ, КЕП P7S)',
+			badgeClass: 'bg-sky-100 text-sky-800 border border-sky-200',
+			icon: Fingerprint
+		},
+		passport: {
+			title: 'Passkeys & pinPay (Retail KCO)',
+			desc: 'Біометричний вхід (FaceID) та 5-значний PIN для кас самообслуговування',
+			badgeClass: 'bg-rose-100 text-rose-800 border border-rose-200',
+			icon: Lock
+		}
+	};
+
+	async function loadPermissions() {
+		loading = true;
+		permissions = await gateway.listPermissions();
+		loading = false;
+	}
+
+	async function changeRole(userId: string, newRole: Dac7Role) {
+		await gateway.updateRolePermission(userId, newRole);
+		const user = permissions.find((p) => p.userId === userId);
+		if (user) {
+			user.role = newRole;
+		}
+		notification = `Роль для ${user?.fullName || userId} успішно змінена на "${roleConfig[newRole].title}"`;
+		setTimeout(() => (notification = null), 4000);
+	}
+
+	function switchToRole(role: Dac7Role) {
+		currentRole = role;
+	}
+
+	onMount(() => {
+		loadPermissions();
+	});
+</script>
+
+<div class="space-y-6">
+	<!-- Header Banner -->
+	<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+		<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+			<div class="space-y-1">
+				<div class="flex items-center gap-2">
+					<span
+						class="inline-flex size-6 items-center justify-center rounded-md bg-stone-900 text-white"
+					>
+						<Shield size={14} />
+					</span>
+					<h2 class="text-base font-bold text-stone-900">
+						Модуль налаштування прав та ролей (Закон № 4903-IX)
+					</h2>
+				</div>
+				<p class="text-xs text-stone-500">
+					Конфігурація доступу та повноважень учасників екосистеми згідно з вимогами DAC7 та
+					законодавства про цифрові платформи
+				</p>
+			</div>
+
+			<div class="flex items-center gap-2">
+				<span
+					class="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-bold text-stone-700"
+				>
+					<Users size={12} />
+					Користувачів з правами: {permissions.length}
+				</span>
+			</div>
+		</div>
+
+		{#if notification}
+			<div
+				class="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800"
+			>
+				<CheckCircle2 size={16} />
+				<span>{notification}</span>
+			</div>
+		{/if}
+	</div>
+
+	<!-- Roles Matrix & Quick Switch -->
+	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+		{#each Object.entries(roleConfig) as [key, roleInfo]}
+			{@const rKey = key as Dac7Role}
+			{@const isActiveView = currentRole === rKey}
+			<div
+				class="flex flex-col justify-between rounded-2xl border bg-white p-5 shadow-sm transition hover:border-stone-400 {isActiveView
+					? 'border-stone-900 ring-2 ring-stone-900/10'
+					: 'border-stone-200'}"
+			>
+				<div class="space-y-3">
+					<div class="flex items-center justify-between">
+						<span
+							class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold {roleInfo.badgeClass}"
+						>
+							<roleInfo.icon size={13} />
+							<span>{roleInfo.title.split(' ')[0]}</span>
+						</span>
+						{#if isActiveView}
+							<span
+								class="rounded-full bg-stone-900 px-2 py-0.5 text-[10px] font-extrabold text-white"
+							>
+								Поточний екран
+							</span>
+						{/if}
+					</div>
+					<div>
+						<h3 class="text-sm font-bold text-stone-900">{roleInfo.title}</h3>
+						<p class="mt-1 text-xs leading-relaxed text-stone-500">{roleInfo.desc}</p>
+					</div>
+				</div>
+
+				<div class="mt-5 border-t border-stone-100 pt-3">
+					<button
+						type="button"
+						onclick={() => switchToRole(rKey)}
+						class="w-full rounded-xl border py-2 text-xs font-bold transition {isActiveView
+							? 'border-stone-900 bg-stone-900 text-white'
+							: 'border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100'}"
+					>
+						{isActiveView ? 'Перегляд активний' : 'Перейти в інтерфейс'}
+					</button>
+				</div>
+			</div>
+		{/each}
+	</div>
+
+	<!-- Users and Access Assignments Table -->
+	<div class="space-y-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+		<div class="flex items-center justify-between">
+			<div>
+				<h3 class="text-sm font-bold text-stone-900">Призначення прав доступу користувачам</h3>
+				<p class="text-xs text-stone-500">
+					{demo
+						? 'Демонстраційний режим (імітація збереження)'
+						: 'Синхронізація з Supabase merchant_memberships'}
+				</p>
+			</div>
+			<button
+				type="button"
+				onclick={loadPermissions}
+				class="rounded-lg border border-stone-200 px-3 py-1 text-xs font-semibold text-stone-700 hover:bg-stone-50"
+			>
+				Оновити
+			</button>
+		</div>
+
+		<div class="overflow-x-auto">
+			<table class="w-full text-left text-xs">
+				<thead class="border-b border-stone-200 bg-stone-50/70 text-stone-500">
+					<tr>
+						<th class="p-3 font-bold">Користувач / Організація</th>
+						<th class="p-3 font-bold">Email</th>
+						<th class="p-3 font-bold">Призначена роль</th>
+						<th class="p-3 font-bold">Live Доступ</th>
+						<th class="p-3 text-right font-bold">Зміна ролі</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-stone-100 text-stone-700">
+					{#if loading}
+						<tr>
+							<td colspan="5" class="p-4 text-center text-stone-400">Завантаження прав...</td>
+						</tr>
+					{:else}
+						{#each permissions as perm}
+							<tr class="hover:bg-stone-50/50">
+								<td class="p-3 font-medium text-stone-900">{perm.fullName}</td>
+								<td class="p-3 font-mono text-stone-500">{perm.email}</td>
+								<td class="p-3">
+									<span
+										class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-bold {roleConfig[
+											perm.role
+										]?.badgeClass || 'bg-stone-100'}"
+									>
+										{roleConfig[perm.role]?.title || perm.role}
+									</span>
+								</td>
+								<td class="p-3">
+									{#if perm.isLiveAllowed}
+										<span class="inline-flex items-center gap-1 font-semibold text-emerald-700">
+											<CheckCircle2 size={12} /> Активний
+										</span>
+									{:else}
+										<span class="text-stone-400">Лише демо</span>
+									{/if}
+								</td>
+								<td class="p-3 text-right">
+									<select
+										value={perm.role}
+										onchange={(e) => changeRole(perm.userId, e.currentTarget.value as Dac7Role)}
+										class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-stone-800 shadow-sm focus:border-stone-900 focus:outline-none"
+									>
+										{#each Object.entries(roleConfig) as [rKey, rVal]}
+											<option value={rKey}>{rVal.title.split('(')[0]}</option>
+										{/each}
+									</select>
+								</td>
+							</tr>
+						{/each}
+					{/if}
+				</tbody>
+			</table>
+		</div>
+	</div>
+
+	<!-- Legal Framework Context -->
+	<div
+		class="space-y-2 rounded-2xl border border-stone-200 bg-amber-50/40 p-5 text-xs text-amber-900"
+	>
+		<div class="flex items-center gap-2 font-bold text-amber-950">
+			<ShieldAlert size={14} />
+			<span>Юридичні обмеження згідно із Законом України № 4903-IX:</span>
+		</div>
+		<ul class="list-disc space-y-1 pl-5 text-stone-600">
+			<li>
+				<strong>Податковий агент:</strong> Цифрова платформа автоматично нараховує та утримує 10% ПДФО
+				з виплат самозайнятим фізичним особам (військовий збір становить 0%).
+			</li>
+			<li>
+				<strong>ФОП 1-3 груп:</strong> Якщо виконавець зареєстрований як ФОП, платформа виплачує 100%
+				суми без утримання податку (0%), виконавець сплачує податки самостійно.
+			</li>
+			<li>
+				<strong>Річний ліміт:</strong> Дохід фізичної особи без статусу ФОП обмежений 834 розмірами мінімальної
+				заробітної плати на календарний рік.
+			</li>
+		</ul>
+	</div>
+</div>

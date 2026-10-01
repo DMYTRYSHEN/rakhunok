@@ -1,0 +1,11 @@
+@import 'tailwindcss' source(none);
+@source './';
+
+html {
+	font-family: 'Helvetica Neue', Helvetica, sans-serif;
+	letter-spacing: 0;
+}
+
+body {
+	margin: 0;
+}

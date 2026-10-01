@@ -163,6 +163,19 @@ for (const [label, body] of [
 	});
 }
 
+for (const tableNumber of [undefined, null, '', 'table-30', '30chairs', '1.5', 1.5, -1, 2147483648, true, []]) {
+	test(`POST orders: invalid table number ${JSON.stringify(tableNumber)} never reaches RPC`, async () => {
+		respond = (url) => {
+			assert.ok(!url.includes('/rpc/'));
+			return Response.json([{ id: url.includes('/merchants?') ? 'merchant-test' : 'terminal-test', user_id: 'owner-test' }]);
+		};
+		await failure(await routeWebRequest(request('POST', '/api/v1/orders', {
+			merchant_id: 'merchant-test', entity_id: 'entity-test', terminal_id: 'terminal-test',
+			type: 'table', amount: 12, table_number: tableNumber
+		}), env), 422, 'Вкажіть цілий номер столу від 0 до 2147483647.');
+	});
+}
+
 for (const explicitMerchant of [true, false]) {
 	test(`POST orders: confirmed success, explicit merchant=${explicitMerchant}`, async () => {
 		let inserted;
@@ -245,6 +258,26 @@ test('POST orders: open amount preserves zero semantics', async () => {
 	assert.equal(response.status, 200);
 	assert.equal(calls.length, 2);
 });
+
+for (const [label, rpcError, status, message] of [
+	['unconfigured payment settings', { code: '22023', message: 'Invoice payment settings are not configured' }, 422,
+		'Налаштуйте платіжні реквізити компанії в особистому кабінеті.'],
+	['incomplete payment settings', { code: '22023', message: 'Invoice payment settings are incomplete' }, 422,
+		'Реквізити отримувача заповнені некоректно. Перевірте назву, IBAN, податковий номер і призначення платежу'],
+	['unrelated RPC error', { code: '22023', message: 'Other private database error' }, 503, 'Service unavailable'],
+	['same message with another code', { code: '42501', message: 'Invoice payment settings are incomplete' }, 503, 'Service unavailable']
+]) {
+	test(`POST orders: ${label}`, async () => {
+		respond = (url) => url.includes('/merchants?')
+			? Response.json([{ id: 'merchant-test', user_id: 'owner-test' }])
+			: Response.json(rpcError, { status: 400 });
+		await failure(await routeWebRequest(request('POST', '/api/v1/orders', {
+			merchant_id: 'merchant-test', entity_id: 'entity-test', type: 'fixed', amount: 12
+		}), env), status, message);
+		assert.equal(calls.length, 2);
+		assert.ok(calls[1].url.endsWith('/rest/v1/rpc/create_authoritative_invoice'));
+	});
+}
 
 test('PATCH rejects a different returned row id', async () => {
 	respond = () => Response.json([{ id: 'wrong-order', status: 'cancelled' }]);

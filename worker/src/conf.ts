@@ -1,4 +1,6 @@
-interface Env {
+import { syncBanks, type BankSyncEnv } from './conf-bank-sync.ts';
+
+interface Env extends BankSyncEnv {
 	ASSETS: Fetcher;
 	API?: Fetcher;
 }
@@ -14,6 +16,10 @@ function isConfApiPath(pathname: string): boolean {
 export default {
 	async fetch(request, env): Promise<Response> {
 		const url = new URL(request.url);
+
+		if (url.pathname === '/conf/api/banks/sync') {
+			return syncBanks(request, env);
+		}
 
 		if (!isConfPath(url.pathname)) {
 			return new Response('Not Found', {

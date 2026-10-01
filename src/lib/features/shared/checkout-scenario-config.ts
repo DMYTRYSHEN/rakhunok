@@ -86,6 +86,7 @@ export const CHECKOUT_TEMPLATE_SCENARIOS = [
 	'delivery',
 	'tips',
 	'open_amount',
+	'donation',
 	'fuel_station',
 
 	// Standard Checkout Engines

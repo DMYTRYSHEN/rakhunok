@@ -405,8 +405,8 @@ export async function buildBankRedirect(env: Env, bankCode: string, payload: str
 
 		let ios_universal: string | null = null;
 		if (isUniversalLinkValid) {
-			if (bank.url_template && bank.url_template.includes('{payload}')) {
-				ios_universal = bank.url_template.replace('{payload}', payload);
+			if (bank.universal_link.includes('{payload}')) {
+				ios_universal = bank.universal_link.replace('{payload}', payload);
 			} else {
 				ios_universal = `${bank.universal_link}${payload}`;
 			}
@@ -414,7 +414,11 @@ export async function buildBankRedirect(env: Env, bankCode: string, payload: str
 
 		let ios_scheme: string | null = null;
 		if (bank.ios_scheme) {
-			ios_scheme = `${bank.ios_scheme}://${basePath}${payload}`;
+			if (bank.url_template && bank.url_template.includes('{payload}')) {
+				ios_scheme = bank.url_template.replace('{payload}', payload);
+			} else {
+				ios_scheme = `${bank.ios_scheme}://${basePath}${payload}`;
+			}
 		}
 
 		let android_intent: string | null = null;
@@ -428,16 +432,55 @@ export async function buildBankRedirect(env: Env, bankCode: string, payload: str
 			web_https = `${bank.universal_link}${payload}`;
 		}
 
-		if (ios_universal) {
-			redirectUrl = ios_universal;
-			fallbackUrl = ios_universal;
-		} else {
-			if (os === 'ios') {
-				if (ios_scheme) redirectUrl = ios_scheme;
+		const p_ios = bank.priority_ios;
+		const p_and = bank.priority_android;
+
+		if (os === 'ios') {
+			if (p_ios === 'store' && bank.appstore_url) {
+				redirectUrl = bank.appstore_url;
+				fallbackUrl = bank.appstore_url;
+			} else if (p_ios === 'scheme' && ios_scheme) {
+				redirectUrl = ios_scheme;
 				fallbackUrl = bank.appstore_url || web_https || fallbackUrl;
-			} else if (os === 'android') {
-				if (android_intent) redirectUrl = android_intent;
+			} else if (p_ios === 'universal_link' && ios_universal) {
+				redirectUrl = ios_universal;
+				fallbackUrl = bank.appstore_url || web_https || fallbackUrl;
+			} else {
+				if (ios_universal) {
+					redirectUrl = ios_universal;
+					fallbackUrl = bank.appstore_url || web_https || fallbackUrl;
+				} else if (ios_scheme) {
+					redirectUrl = ios_scheme;
+					fallbackUrl = bank.appstore_url || web_https || fallbackUrl;
+				} else {
+					fallbackUrl = bank.appstore_url || web_https || fallbackUrl;
+				}
+			}
+		} else if (os === 'android') {
+			if (p_and === 'store' && bank.playstore_url) {
+				redirectUrl = bank.playstore_url;
+				fallbackUrl = bank.playstore_url;
+			} else if (p_and === 'scheme' && android_intent) {
+				redirectUrl = android_intent;
 				fallbackUrl = bank.playstore_url || web_https || fallbackUrl;
+			} else if (p_and === 'universal_link' && ios_universal) {
+				redirectUrl = ios_universal;
+				fallbackUrl = bank.playstore_url || web_https || fallbackUrl;
+			} else {
+				if (ios_universal) {
+					redirectUrl = ios_universal;
+					fallbackUrl = bank.playstore_url || web_https || fallbackUrl;
+				} else if (android_intent) {
+					redirectUrl = android_intent;
+					fallbackUrl = bank.playstore_url || web_https || fallbackUrl;
+				} else {
+					fallbackUrl = bank.playstore_url || web_https || fallbackUrl;
+				}
+			}
+		} else {
+			if (ios_universal) {
+				redirectUrl = ios_universal;
+				fallbackUrl = ios_universal;
 			} else {
 				redirectUrl = web_https || redirectUrl;
 				fallbackUrl = web_https || fallbackUrl;
@@ -885,7 +928,7 @@ export async function routeWebRequest(request: Request, env: Env, ctx: Execution
 
 	if (url.pathname === '/api/v1/logos' || url.pathname === '/logos') {
 		if (request.method === 'GET') {
-			return jsonResponse(DEFAULT_LOGOS);
+			return jsonResponse({});
 		}
 	}
 

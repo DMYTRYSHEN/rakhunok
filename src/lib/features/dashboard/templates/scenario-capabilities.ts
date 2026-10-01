@@ -16,6 +16,7 @@ export const SCENARIO_CAPABILITIES = [
 	{ id: 'delivery', label: 'Доставка', group: 'core', readiness: 'testing' },
 	{ id: 'tips', label: 'Чайові', group: 'core', readiness: 'available' },
 	{ id: 'open_amount', label: 'Вільна сума', group: 'core', readiness: 'available' },
+	{ id: 'donation', label: 'Збір коштів', group: 'core', readiness: 'available' },
 	{ id: 'fuel_station', label: 'АЗС · Пальне', group: 'core', readiness: 'testing' },
 	{ id: 'engine_buy', label: 'Buy · Товар і кошик', group: 'engine', readiness: 'preview' },
 	{ id: 'engine_order', label: 'Order · Вибір і опції', group: 'engine', readiness: 'preview' },

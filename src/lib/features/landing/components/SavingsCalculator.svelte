@@ -1,24 +1,42 @@
 <script lang="ts">
-	import { ArrowRight, Calculator, Sparkles, TrendingUp } from '@lucide/svelte';
-	import { calculateAcquiringCosts, formatMoney } from '../utils/calculator';
+	import { compareMonthlyCosts } from '../utils/cost-comparison';
+	import { getBaselineCopy } from '../baseline/copy';
 	import SectionHeading from './SectionHeading.svelte';
-	import type { Translations } from '../data/translations';
+	import type { Locale, Translations } from '../data/translations';
 
-	let { t }: { t: Translations } = $props();
+	let { t, locale = 'uk' }: { t: Translations; locale?: Locale } = $props();
 
 	let turnover = $state(500_000);
 	let fee = $state(1.5);
 	let terminals = $state(2);
-	let costs = $derived(calculateAcquiringCosts(turnover, fee, terminals));
+	let rent = $state<number | undefined>(400);
+	let subscription = $state<number | undefined>(490);
+	let proposedRate = $state<number | undefined>(0.5);
+	const copy = $derived(getBaselineCopy(locale));
+	const costs = $derived(
+		compareMonthlyCosts(
+			turnover,
+			fee,
+			rent === undefined ? undefined : terminals * rent,
+			subscription,
+			proposedRate
+		)
+	);
+	const formatMoney = (value: number) =>
+		new Intl.NumberFormat(locale, {
+			style: 'currency',
+			currency: 'UAH',
+			maximumFractionDigits: 0
+		}).format(value);
 </script>
 
 <section class="section" id="calculator">
 	<div class="calculator-layout container">
 		<SectionHeading
 			eyebrow={t.calculator.eyebrow}
-			title={t.calculator.title}
+			title={copy.roiTitle}
 			accent=""
-			copy={t.calculator.subtitle}
+			copy={copy.roiNote}
 		/>
 
 		<div class="calculator-card">
@@ -41,33 +59,65 @@
 			<label>
 				<span>
 					POS
-					<b>{terminals} шт.</b>
+					<b>{terminals}</b>
 				</span>
 				<input bind:value={terminals} type="range" min="0" max="20" />
 			</label>
 
-			<div class="result-grid">
-				<div>
-					<span>{t.calculator.currentCost}</span>
-					<b>{formatMoney(costs.annualCommission)}</b>
+			<label>
+				<span>{copy.product.rentUnit}</span>
+				<input type="number" min="0" step="1" bind:value={rent} />
+			</label>
+			<label>
+				<span>{copy.shared.fee}</span>
+				<input type="number" min="0" step="1" bind:value={subscription} />
+			</label>
+			<label>
+				<span>{copy.shared.rate}</span>
+				<input type="number" min="0" max="100" step="0.1" bind:value={proposedRate} />
+			</label>
+
+			{#if costs}
+				<div class="result-grid" aria-live="polite" aria-atomic="true">
+					<div>
+						<span>{t.calculator.currentCost} / {copy.product.monthly}</span>
+						<b>{formatMoney(costs.current)}</b>
+					</div>
+					<div>
+						<span>{t.calculator.rahunokCost} / {copy.product.monthly}</span>
+						<b>{formatMoney(costs.proposed)}</b>
+					</div>
+					<div class="accent">
+						<span>{t.calculator.monthlyEconomy}</span>
+						<b>{formatMoney(costs.difference)}</b>
+					</div>
+					<div>
+						<span>{t.calculator.annualEconomy}</span>
+						<b>{formatMoney(costs.difference * 12)}</b>
+					</div>
 				</div>
-				<div>
-					<span>POS Rent</span>
-					<b>{formatMoney(costs.annualRent)}</b>
-				</div>
-				<div class="accent">
-					<span>{t.calculator.monthlyEconomy}</span>
-					<b>{formatMoney(Math.round(costs.annualCost / 12))}</b>
-				</div>
-				<div>
-					<span>{t.calculator.annualEconomy}</span>
-					<b>до {formatMoney(costs.annualCost)}</b>
-				</div>
-			</div>
+			{:else}
+				<p role="status">{copy.invalidCost}</p>
+			{/if}
 
 			<p class="microcopy">
-				{t.calculator.calculateNote}
+				{copy.product.sample}
 			</p>
 		</div>
 	</div>
 </section>
+
+<style>
+	input[type='number'] {
+		width: 100%;
+		min-height: 44px;
+		border: 1px solid var(--border-glass);
+		border-radius: 6px;
+		padding: 10px 12px;
+		background: var(--bg-input);
+		color: var(--text-primary);
+	}
+	.result-grid b {
+		overflow-wrap: anywhere;
+	}
+</style>

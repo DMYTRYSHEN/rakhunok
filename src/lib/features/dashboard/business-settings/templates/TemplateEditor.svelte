@@ -116,6 +116,22 @@
 
 		try {
 			const finalConfig = resolveCheckoutConfig(scenarioType, config);
+			if (scenarioType === 'donation') {
+				const donation = finalConfig.flow_data?.donation as Record<string, unknown> | undefined;
+				if (!donation || typeof donation.goal_title !== 'string' || !donation.goal_title.trim() ||
+					typeof donation.organizer !== 'string' || !donation.organizer.trim() ||
+					typeof donation.target_amount !== 'number' || !Number.isFinite(donation.target_amount) || donation.target_amount <= 0) {
+					throw new Error('Вкажіть мету, організатора та цільову суму збору.');
+				}
+				finalConfig.flow_data = {
+					...finalConfig.flow_data,
+					donation: {
+						goal_title: donation.goal_title.trim(),
+						organizer: donation.organizer.trim(),
+						target_amount: donation.target_amount
+					}
+				};
+			}
 			if (!['fixed', 'open_amount', 'table', 'delivery', 'tips'].includes(scenarioType)) {
 				finalConfig.checkout_flow = {
 					id: scenarioType,

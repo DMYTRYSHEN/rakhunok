@@ -54,6 +54,113 @@
 				"$tsc"
 			],
 			"group": "test"
+		},
+		{
+			"label": "test-worker-index-field-11",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"--experimental-strip-types",
+				"--test",
+				"worker/src/index.test.mjs"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "test-short-id-migration",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"--experimental-strip-types",
+				"--test",
+				"worker/src/checkout-backend/short-id.test.mjs"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "test-short-id-security",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"--experimental-strip-types",
+				"--test",
+				"worker/src/index.test.mjs",
+				"worker/src/checkout-backend/short-id.test.mjs"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "validate-short-id-to-files",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$log='.validation-short-id.log'; $code='.validation-short-id.exit'; node --experimental-strip-types --test worker/src/index.test.mjs worker/src/checkout-backend/short-id.test.mjs *> $log; $LASTEXITCODE | Set-Content -NoNewline $code; exit $LASTEXITCODE"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "test-invoice-payment-snapshots",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"--test",
+				"worker/src/checkout-backend/invoice-payment-snapshots.test.mjs"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "git-status-before-commit",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Merchant App local UI",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"D:/svetle/corex/apps/merchant-app",
+				"run",
+				"dev",
+				"--",
+				"--port",
+				"5174"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Conf local UI",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"D:/svetle/corex/apps/conf",
+				"run",
+				"dev"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
 		}
 	]
 }

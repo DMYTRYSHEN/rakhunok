@@ -138,8 +138,7 @@
 
 		<div class="solution-index">
 			{#each t.productSections.solutions as item, index (item.title)}
-				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-				<article use:reveal onclick={() => openSolutionModal(index)}>
+				<article use:reveal>
 					<header>
 						<b>0{index + 1}</b>
 						<small>{item.label}</small>
@@ -154,24 +153,6 @@
 								loading="lazy"
 							/>
 						{/if}
-						<div class="solution-visual__overlay">
-							{#if index === 0}
-								<div class="visual-icon-wrap"><Coffee size={40} /></div>
-								<div class="visual-tag">Table 12 · 850 ₴</div>
-							{:else if index === 1}
-								<div class="visual-icon-wrap"><ShoppingBag size={40} /></div>
-								<div class="visual-tag">POS · QR Scan</div>
-							{:else if index === 2}
-								<div class="visual-icon-wrap"><Send size={40} /></div>
-								<div class="visual-tag">pay.rahunok.app/link</div>
-							{:else}
-								<div class="api-visual">
-									<span>POST /v1/invoices/create</span>
-									<i></i>
-									<strong>200 OK — SETTLED ON IBAN</strong>
-								</div>
-							{/if}
-						</div>
 					</figure>
 
 					<div>
@@ -183,7 +164,9 @@
 						class="solution-action"
 						type="button"
 						onclick={() => openSolutionModal(index)}
-						aria-label={`Дізнатися більше про рішення ${item.label}`}
+						aria-label={item.title}
+						aria-haspopup="dialog"
+						title={item.title}
 					>
 						<ArrowUpRight size={18} />
 					</button>

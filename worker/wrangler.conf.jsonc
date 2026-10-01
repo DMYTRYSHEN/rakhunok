@@ -24,6 +24,14 @@
 			"name": "letsrealtalk-conf",
 			"workers_dev": false,
 			"preview_urls": false,
+			"d1_databases": [
+				{
+					"binding": "BANK_CATALOG_DB",
+					"database_name": "letsrealtalk-conf-snapshots",
+					"database_id": "2e5d61b8-d603-420e-8a17-231cd5c9340f",
+					"migrations_dir": "migrations-conf"
+				}
+			],
 			"services": [
 				{ "binding": "API", "service": "rahunok" }
 			],

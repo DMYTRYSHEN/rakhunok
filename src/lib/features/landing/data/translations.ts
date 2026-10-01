@@ -327,13 +327,13 @@ export const translations: Record<Locale, Translations> = {
 			finalHeadlineMiddle: ', що відчувається ',
 			finalHeadlineEnd: 'природно.',
 			subhead:
-				'Прямі розрахунки з банківських додатків клієнтів на ваш IBAN. Без оренди POS-терміналів, без еквайрингового переплачування та із вбудованою фіскалізацією ПРРО.',
+				'Створіть рахунок і передайте клієнту QR-код або посилання для оплати через банк. Доступні банки, тарифи та інтеграції узгоджуємо для вашого пілота.',
 			tryPilotBtn: 'Спробувати пілот',
 			calculateSavingsBtn: 'Розрахувати вигоду',
 			proof: {
-				zeroHardware: { title: '0 ₴ за термінал', desc: 'Смартфон замінює все' },
+				zeroHardware: { title: 'Рахунок зі смартфона', desc: 'QR-код або платіжне посилання' },
 				instantSettlement: { title: 'Миттєво на IBAN', desc: 'Без посередників' },
-				autoPrro: { title: 'ПРРО вбудовано', desc: 'Автофіскалізація' }
+				autoPrro: { title: 'Інтеграція з ПРРО', desc: 'За умови підключення та налаштування' }
 			},
 			dashboard: {
 				title: 'Rahunok Core',
@@ -381,7 +381,7 @@ export const translations: Record<Locale, Translations> = {
 				customer: 'КЛІЄНТ',
 				theirBank: 'ЙОГО БАНК',
 				yourAccount: 'ВАШ IBAN РАХУНОК',
-				note: 'Одна безшовна дія для покупця. Повний контроль і фіскалізація для бізнесу.'
+				note: 'Реквізити вашого бізнесу в платіжному запиті. Переказ виконує банк.'
 			}
 		},
 		sandbox: {
@@ -1448,13 +1448,13 @@ export const translations: Record<Locale, Translations> = {
 			finalHeadlineMiddle: ', that feels ',
 			finalHeadlineEnd: 'natural.',
 			subhead:
-				'Direct account-to-account payments from your customers’ mobile banking apps straight to your IBAN. No hardware rentals, no interchange bloat, and automated fiscalization.',
+				'Create an invoice and share a QR code or link for payment through a bank. Available banks, fees and integrations are agreed for your pilot.',
 			tryPilotBtn: 'Try Pilot',
 			calculateSavingsBtn: 'Calculate ROI',
 			proof: {
-				zeroHardware: { title: '$0 for terminal', desc: 'Smartphone is all you need' },
+				zeroHardware: { title: 'Invoice from your phone', desc: 'Share a QR code or payment link' },
 				instantSettlement: { title: 'Direct to IBAN', desc: 'Zero middlemen' },
-				autoPrro: { title: 'Built-in Fiscalization', desc: 'Instant digital receipts' }
+				autoPrro: { title: 'Fiscalization integration', desc: 'Requires connection and configuration' }
 			},
 			dashboard: {
 				title: 'Rahunok Core',
@@ -1502,7 +1502,7 @@ export const translations: Record<Locale, Translations> = {
 				customer: 'CUSTOMER',
 				theirBank: 'THEIR BANK',
 				yourAccount: 'YOUR IBAN ACCOUNT',
-				note: 'One seamless action for your customer. Full financial control & fiscalization for your business.'
+				note: 'Your business account details in the payment request. The bank executes the transfer.'
 			}
 		},
 		sandbox: {
@@ -2577,13 +2577,13 @@ export const translations: Record<Locale, Translations> = {
 			finalHeadlineMiddle: ', która jest ',
 			finalHeadlineEnd: 'naturalna.',
 			subhead:
-				'Bezpośrednie rozliczenia z aplikacji bankowych klientów prosto na Twój numer rachunku IBAN. Bez dzierżawy terminali POS, bez wysokich prowizji kartowych i z wbudowaną fiskalizacją.',
+				'Utwórz rachunek i udostępnij kod QR lub link do płatności przez bank. Dostępne banki, opłaty i integracje uzgadniamy dla Twojego pilotażu.',
 			tryPilotBtn: 'Wypróbuj pilotaż',
 			calculateSavingsBtn: 'Oblicz oszczędności',
 			proof: {
-				zeroHardware: { title: '0 zł za terminal', desc: 'Wystarczy zwykły smartfon' },
+				zeroHardware: { title: 'Rachunek ze smartfona', desc: 'Kod QR lub link do płatności' },
 				instantSettlement: { title: 'Prosto na IBAN', desc: 'Bez pośredników' },
-				autoPrro: { title: 'Wbudowana fiskalizacja', desc: 'Natychmiastowe paragony' }
+				autoPrro: { title: 'Integracja fiskalizacji', desc: 'Wymaga podłączenia i konfiguracji' }
 			},
 			dashboard: {
 				title: 'Rahunok Core',
@@ -2631,7 +2631,7 @@ export const translations: Record<Locale, Translations> = {
 				customer: 'KLIENT',
 				theirBank: 'JEGO BANK',
 				yourAccount: 'TWOJE KONTO IBAN',
-				note: 'Jedno płynne działanie dla klienta. Pełna kontrola finansowa i fiskalizacja dla firmy.'
+				note: 'Dane rachunku Twojej firmy w żądaniu płatności. Przelew realizuje bank.'
 			}
 		},
 		sandbox: {

@@ -3,7 +3,7 @@ import type { Bank } from '../types/bank.js';
 export const DEFAULT_BANKS: Bank[] = [
   {
     name: 'Monobank',
-    code: 'UNJS',
+    code: 'MONO',
     id: 'mono',
     logo: 'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/a7/06/5a/a7065ad9-93f8-5705-4b1a-81ade2916c05/Placeholder.mill/200x200bb-75.webp',
     bg: 'linear-gradient(135deg, #000000, #2c2c2e)',

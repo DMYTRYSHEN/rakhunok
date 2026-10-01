@@ -7,7 +7,7 @@ const CHECKOUT_SHELL_PATHS = new Set([
 	'/pay/',
 	'/pay/index.html'
 ]);
-const PUBLIC_API_PREFIXES = ['/api/v1/checkout/', '/api/v1/banks', '/api/v1/logos'];
+const PUBLIC_API_PREFIXES = ['/api/v1/checkout/', '/api/v1/banks', '/api/v1/logos', '/api/v1/bank-logo'];
 
 function notFound() {
 	return new Response('Not Found', {

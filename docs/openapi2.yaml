@@ -1,0 +1,1449 @@
+openapi: 3.1.0
+info:
+  title: Rahunok API основного Worker — поточна реалізація
+  version: 2026.09.24
+  description: |
+    Документ описує код worker/src/index.ts і підключений обробник рахунків Telegram.
+    Охоплює операції попередньої специфікації з виправленими маршрутами та окремими
+    альтернативними шляхами. Це не повний перелік внутрішніх маршрутів, AI, адміністрування
+    Telegram чи пісочниці. Описано наявну поведінку разом із дефектами, а не підтверджено
+    безпечність API чи придатність заглушок до використання у реальних інтеграціях.
+
+    Джерела перевірки: аналіз коду та окремі локальні виклики обробників із підміною зовнішніх
+    fetch-запитів. Версії розгорнутих сервісів, політики бази та банківські розрахунки не перевірені.
+    Локально слід запускати основний Worker, а не окрему точку входу checkout-backend.
+
+    Маршрутизація залежить від домену: checkout.js пересилає checkout/banks/logos через прив'язку API.
+    Для letsrealtalk.com налаштовано letsrealtalk-web-preview, для rakhunok.com — rahunok;
+    розгорнуту реалізацію останнього не встановлено. Production навмисно не додано до серверів
+    інтерактивного виклику. За замовчуванням використано localhost, щоб уникнути випадкових
+    записів у віддалені системи.
+
+    Операції запису мерчанта передають JWT Bearer-токен у Supabase. Merchant API keys rhk_live
+    підтримуються окремим серверним шляхом лише для GET/POST /orders і GET/PATCH /orders/{id}.
+    Передавайте Authorization: Bearer rhk_live_<64 lowercase hex>. Ключ створюється в Dashboard,
+    показується один раз, у базі зберігається SHA-256; строк дії та відкликання перевіряються
+    на кожному запиті. orders:read дозволяє читання, orders:write дозволяє створення та зміну.
+    stats:read поки не реалізований; ключ на інших /api/v1 маршрутах отримує 403 (OPTIONS виняток).
+    Некоректний/невідомий/прострочений/відкликаний ключ дає 401; брак scope дає 403,
+    чужий рахунок дає 404. last_used_at оновлюється після успішної авторизації, навіть якщо
+    сама операція згодом повертає 404/422. Ключ не отримує доступу до рахунків інших мерчантів.
+
+    Для активації потрібні локальна міграція 20260923225403_merchant_api_key_orders.sql після
+    попередніх міграцій, SUPABASE_URL і серверний секрет SUPABASE_SERVICE_ROLE_KEY (service_role JWT)
+    у основному Worker. Секрет не передавати клієнтам. RPC доступна лише service_role; вона
+    виконує перевірку ключа та операцію в одній транзакції. Немає конфігурації/RPC або БД недоступна:
+    503 без переходу до публічного читання. Локальні тести пройдено; міграція та Worker віддалено
+    НЕ розгорнуті, інтеграція з реальним PostgREST не перевірена.
+
+    JWT і публічний шлях залишені сумісними. Частина читань дозволяє запити без авторизації та повертає
+    демодані або приховує помилки залежного сервісу. KSO та банківські вебхуки не перевіряють HMAC.
+
+    OPTIONS повертає 200 із CORS для всіх джерел і методами GET, POST, PUT, PATCH, DELETE, OPTIONS.
+    Непідтримувані методи відхиляються непослідовно: частина checkout приймає додаткові методи,
+    а GET без відповідного API-маршруту може повернути HTML замість JSON. Необроблені винятки
+    не приводяться до єдиного формату помилок API.
+
+    Приклади відповідей містять вигадані дані для розробки, а не результати production-запитів.
+    Тестові токени, реквізити та платіжні посилання не можна використовувати для реальних оплат.
+servers:
+  - url: http://localhost:8787/api/v1
+    description: Локальний основний Worker, а не окремий сервер checkout
+security: []
+tags:
+  - name: System
+    description: Стан сервісу
+  - name: Auth
+    description: Авторизація та публічна конфігурація
+  - name: Merchant
+    description: Профіль і реєстрація мерчанта
+  - name: Team
+    description: Команда та запрошення
+  - name: Orders
+    description: Створення, читання та зміна рахунків
+  - name: Telegram
+    description: Надсилання рахунків у Telegram
+  - name: Checkout
+    description: Публічний рахунок і платіжні дії
+  - name: Banks
+    description: Каталог банків і логотипи
+  - name: Stubs
+    description: Демонстраційні заглушки без підтвердження реальних операцій
+x-source-files:
+  - worker/src/index.ts
+  - worker/src/merchant-telegram-invoice.ts
+  - worker/src/checkout.js
+  - worker/src/merchant-api-key.ts
+  - supabase/migrations/20260923225403_merchant_api_key_orders.sql
+x-deployment-verification: not-performed
+paths:
+  /health:
+    get:
+      operationId: currentHealth
+      tags: [System]
+      summary: Отримати сталі відомості про сервіс і поточний час
+      responses:
+        '200':
+          description: Процес відповідає; доступність бази та банків не перевіряється
+          content:
+            application/json:
+              example:
+                status: ok
+                service: Rahunok Edge API
+                version: 1.2.0
+                nbu_standard: v003_ICT_Sandbox
+                timestamp: '2026-09-24T10:00:00Z'
+              schema:
+                type: object
+                required: [status, service, version, nbu_standard, timestamp]
+                properties:
+                  status: { type: string, const: ok }
+                  service: { type: string, const: Rahunok Edge API }
+                  version: { type: string, const: 1.2.0 }
+                  nbu_standard: { type: string, const: v003_ICT_Sandbox }
+                  timestamp: { type: string, format: date-time }
+  /auth/config:
+    get:
+      operationId: currentAuthConfig
+      tags: [Auth]
+      summary: Отримати публічну конфігурацію клієнта, задану в коді
+      responses:
+        '200':
+          description: У цій реалізації publicDomain завжди дорівнює https://letsrealtalk.com
+          content:
+            application/json:
+              example:
+                supabaseUrl: https://supabase.example.invalid
+                supabaseAnonKey: MOCK_PUBLIC_KEY_NOT_A_CREDENTIAL
+                publicDomain: https://letsrealtalk.com
+                providers: [google]
+              schema:
+                type: object
+                required: [supabaseUrl, supabaseAnonKey, publicDomain, providers]
+                properties:
+                  supabaseUrl: { type: string, format: uri }
+                  supabaseAnonKey: { type: string }
+                  publicDomain: { type: string, const: 'https://letsrealtalk.com' }
+                  providers: { type: array, items: { type: string }, const: [google] }
+  /auth/demo-session:
+    post:
+      operationId: currentDemoSession
+      tags: [Auth]
+      summary: Отримати демотокен і тестового мерчанта
+      description: Не видає JWT Supabase або облікові дані для запису в базу.
+      responses:
+        '200':
+          description: Стала демонстраційна сесія
+          content:
+            application/json:
+              example:
+                success: true
+                token: demo_merchant_token
+                user:
+                  id: '11111111-1111-4111-8111-111111111111'
+                  email: owner@example.com
+                merchant:
+                  id: '22222222-2222-4222-8222-222222222222'
+                  business_name: Демо кав'ярня
+                  display_name: Демо кав'ярня
+                  onboarding_completed: true
+              schema:
+                type: object
+                required: [success, token, user, merchant]
+                properties:
+                  success: { const: true }
+                  token: { type: string, const: demo_merchant_token }
+                  user: { $ref: '#/components/schemas/Record' }
+                  merchant: { $ref: '#/components/schemas/Record' }
+  /merchant/me:
+    get:
+      operationId: currentGetMerchant
+      tags: [Merchant]
+      summary: Отримати об'єкт мерчанта або резервну відповідь
+      security: [{}, { BearerAuth: [] }]
+      description: |
+        Без Authorization або зі значенням, що містить demo_merchant_token, повертається демомерчант.
+        Інші облікові дані передаються без змін. Помилка залежного сервісу або відсутність запису
+        повертає onboarding_completed=false і display_name з HTTP 200. Обгортки success/merchant немає.
+      responses:
+        '200':
+          description: Запис мерчанта, демомерчант або мінімальний резервний об'єкт
+          content:
+            application/json:
+              examples:
+                merchant:
+                  summary: Вигаданий профіль мерчанта
+                  value:
+                    id: '22222222-2222-4222-8222-222222222222'
+                    business_name: Демо кав'ярня
+                    display_name: Демо кав'ярня
+                    business_type: fop
+                    onboarding_completed: true
+                fallback:
+                  summary: Резервна відповідь, коли запис не отримано
+                  value: { onboarding_completed: false, display_name: Мерчант }
+              schema: { $ref: '#/components/schemas/Record' }
+    put:
+      operationId: currentUpdateMerchant
+      tags: [Merchant]
+      summary: Передати поля мерчанта для створення або оновлення в Supabase
+      security: [{ BearerAuth: [] }]
+      description: |
+        Це не часткове оновлення. Пропущені поля або значення, що приводяться до false,
+        замінюються заданими в коді значеннями, зокрема реквізитами отримувача.
+        onboarding_completed стає true; avatar_url ігнорується. POST до merchants не містить
+        явних id/user_id. Прийняття запису залежить від обмежень бази та RLS. Не використовуйте
+        цей метод як безпечне оновлення лише назви.
+      requestBody: { $ref: '#/components/requestBodies/MerchantWrite' }
+      responses:
+        '200': { $ref: '#/components/responses/MerchantSaved' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /merchant/onboarding:
+    post:
+      operationId: currentOnboarding
+      tags: [Merchant]
+      summary: Виконати те саме збереження мерчанта, що й PUT merchant/me
+      security: [{ BearerAuth: [] }]
+      description: |
+        Worker не перевіряє обов'язковість бізнес-полів. Пропущені або хибні значення замінюються
+        демонстраційними, як у PUT /merchant/me. Для успіху база має повернути збережений запис.
+      requestBody: { $ref: '#/components/requestBodies/MerchantWrite' }
+      responses:
+        '200': { $ref: '#/components/responses/MerchantSaved' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /merchant/team:
+    get:
+      operationId: currentTeam
+      tags: [Team]
+      summary: Отримати учасників команди, демозаписи або порожній масив
+      security: [{}, { BearerAuth: [] }]
+      description: Без авторизації або з демотокеном повертає демозаписи; помилки залежного сервісу дають порожній масив із 200.
+      responses:
+        '200':
+          description: Записи учасників зі зв'язком terminals або демозаписи; спільна нормалізація відсутня
+          content:
+            application/json:
+              examples:
+                members:
+                  summary: Приклад учасника з терміналом; поля залежать від запису бази
+                  value:
+                    - id: '33333333-3333-4333-8333-333333333333'
+                      role: cashier
+                      terminal_id: '44444444-4444-4444-8444-444444444444'
+                      terminals:
+                        id: '44444444-4444-4444-8444-444444444444'
+                        name: Демо каса
+                empty:
+                  summary: Порожня команда або помилка залежного сервісу
+                  value: []
+              schema: { type: array, items: { $ref: '#/components/schemas/Record' } }
+  /merchant/team/{memberId}:
+    parameters:
+      - name: memberId
+        in: path
+        required: true
+        schema: { type: string, pattern: '^[a-zA-Z0-9_-]+$' }
+    delete:
+      operationId: currentRemoveMember
+      tags: [Team]
+      summary: Спробувати видалити учасника без підтвердження зміни в базі
+      security: [{}, { BearerAuth: [] }]
+      description: |
+        Worker не перевіряє авторизацію, а передає Authorization далі. Відмова залежного сервісу,
+        відсутність змінених рядків та мережеві помилки ігноруються. success=true не підтверджує
+        відкликання доступу.
+      responses:
+        '200': { $ref: '#/components/responses/UnconfirmedSuccess' }
+        '400': { $ref: '#/components/responses/Error' }
+  /merchant/invitations:
+    get:
+      operationId: currentInvitations
+      tags: [Team]
+      summary: Отримати запрошення, демозаписи або порожній масив
+      security: [{}, { BearerAuth: [] }]
+      responses:
+        '200':
+          description: Без авторизації або з демотокеном повертає демозаписи; при помилці залежного сервісу — порожній масив
+          content:
+            application/json:
+              examples:
+                invitations:
+                  summary: Одне вигадане запрошення
+                  value:
+                    - id: '55555555-5555-4555-8555-555555555555'
+                      email: cashier@example.com
+                      role: cashier
+                      terminal_id: null
+                      token: mock-invitation-token
+                      status: pending
+                      created_at: '2026-09-24T10:00:00Z'
+                      expires_at: '2026-10-01T10:00:00Z'
+                empty:
+                  summary: Запрошень немає або залежний сервіс повернув помилку
+                  value: []
+              schema: { type: array, items: { $ref: '#/components/schemas/Record' } }
+    post:
+      operationId: currentCreateInvitation
+      tags: [Team]
+      summary: Згенерувати запрошення без підтвердження збереження
+      security: [{}, { BearerAuth: [] }]
+      description: |
+        email і role не є обов'язковими та не перевіряються. Локально генерується токен на сім днів.
+        Спроба збереження виконується лише з недемонстраційним Authorization; помилки ігноруються.
+        Відповідь 201 не підтверджує збереження придатного запрошення чи надсилання листа.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, default: '' }
+                role: { type: string, default: cashier }
+                terminal_id: { type: [string, 'null'] }
+      responses:
+        '201':
+          description: Згенероване запрошення, яке могло не зберегтися
+          content:
+            application/json:
+              example:
+                success: true
+                invitation:
+                  id: '55555555-5555-4555-8555-555555555555'
+                  email: cashier@example.com
+                  role: cashier
+                  terminal_id: null
+                  token: mock-invitation-token
+                  status: pending
+                  created_at: '2026-09-24T10:00:00Z'
+                  expires_at: '2026-10-01T10:00:00Z'
+              schema:
+                type: object
+                required: [success, invitation]
+                properties:
+                  success: { const: true }
+                  invitation: { $ref: '#/components/schemas/Invitation' }
+        '400': { $ref: '#/components/responses/Error' }
+  /merchant/invitations/{token}/accept:
+    parameters:
+      - $ref: '#/components/parameters/InvitationToken'
+    patch:
+      operationId: currentAcceptInvitation
+      tags: [Team]
+      summary: Викликати RPC прийняття запрошення
+      security: [{}, { BearerAuth: [] }]
+      description: |
+        Authorization передається без локальної перевірки. Успішна відповідь RPC повертається
+        без перетворення. Неуспішна відповідь залежного сервісу стає 400; при винятку повертаються
+        success=true, role=cashier. Сам HTTP 200 тому не підтверджує активацію участі в команді.
+      responses:
+        '200':
+          description: JSON від RPC або штучна успішна відповідь при винятку; формат RPC не перевіряється
+          content:
+            application/json:
+              examples:
+                exceptionFallback:
+                  summary: Відповідь при винятку; не підтверджує прийняття запрошення
+                  value: { success: true, role: cashier }
+              schema: {}
+        '400': { $ref: '#/components/responses/Error' }
+  /merchant/invitations/{token}/revoke:
+    parameters:
+      - $ref: '#/components/parameters/InvitationToken'
+    patch:
+      operationId: currentRevokeInvitation
+      tags: [Team]
+      summary: Повернути відповідь заглушки без відкликання запрошення
+      responses:
+        '200': { $ref: '#/components/responses/InvitationAction' }
+  /merchant/invitations/{token}/resend:
+    parameters:
+      - $ref: '#/components/parameters/InvitationToken'
+    patch:
+      operationId: currentResendInvitation
+      tags: [Team]
+      summary: Повернути відповідь заглушки без повторного надсилання
+      responses:
+        '200': { $ref: '#/components/responses/InvitationAction' }
+  /orders:
+    get:
+      operationId: currentListOrders
+      tags: [Orders]
+      summary: Отримати доступні за RLS рахунки або порожню сторінку
+      security: [{}, { BearerAuth: [] }, { MerchantApiKey: [] }]
+      x-merchant-api-key-scopes: [orders:read]
+      description: |
+        Merchant API key: лише рахунки мерчанта ключа, кеш не використовується, limit 1..100,
+        offset >= 0; некоректна пагінація дає 422. Помилка залежного сервісу дає 503, не порожній 200.
+        Наступна поведінка стосується лише JWT/публічного шляху:
+        Локальної перевірки авторизації немає. Без Authorization як Bearer використовується
+        публічний ключ із коду. total — кількість записів поточної сторінки, а не загальна кількість
+        у базі. Помилки залежного сервісу дають 200 з порожньою сторінкою. limit/offset обробляються
+        parseInt без перевірки меж; некоректні значення можуть перетворитися на null.
+        status передається до бази без перевірки переліку дозволених значень.
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+        '200':
+          description: Сторінка результатів або порожня резервна відповідь
+          content:
+            application/json:
+              examples:
+                page:
+                  summary: Один тестовий рахунок на сторінці
+                  value:
+                    orders:
+                      - id: '66666666-6666-4666-8666-666666666666'
+                        short_id: DEMO001
+                        title: Демо замовлення
+                        type: fixed
+                        base_amount: 250
+                        discount_amount: 0
+                        delivery_fee: 0
+                        total_amount: 250
+                        currency: UAH
+                        status: pending
+                    total: 1
+                    limit: 50
+                    offset: 0
+                empty:
+                  summary: Немає доступних рахунків або сталася помилка читання
+                  value: { orders: [], total: 0, limit: 50, offset: 0 }
+              schema:
+                type: object
+                required: [orders, total, limit, offset]
+                properties:
+                  orders: { type: array, items: { $ref: '#/components/schemas/Record' } }
+                  total: { type: integer, minimum: 0 }
+                  limit: { type: [integer, 'null'] }
+                  offset: { type: [integer, 'null'] }
+    post:
+      operationId: currentCreateOrder
+      tags: [Orders]
+      summary: Створити рахунок у базі через create_authoritative_invoice
+      security: [{ BearerAuth: [] }, { MerchantApiKey: [] }]
+      x-merchant-api-key-scopes: [orders:write]
+      description: |
+        Merchant API key: мерчант визначається ключем; інший merchant_id відхиляється з 403.
+        Підтримуються fixed, open_amount, table, delivery через ту саму авторитетну функцію БД.
+        Для ключа entity_id/terminal_id мають бути UUID, table_number приводиться до integer у БД;
+        невалідні значення дають 422. Власник визначається сервером, user_id з тіла ігнорується.
+        Потрібні доступний за RLS мерчант та entity_id. Для table також потрібен terminal_id.
+        Переданий термінал має бути активним і належати вибраній юридичній особі та власнику мерчанта.
+        amount має пріоритет над base_amount. Базова сума й вартість доставки приводяться до чисел
+        і мають бути скінченними та невід'ємними. Їхня сума має бути додатною, крім open_amount.
+        order_number, items, discount_amount і total_amount ігноруються; title за замовчуванням порожній.
+        expires_at передається лише для table. Правила RPC/бази можуть відхиляти й інші випадки.
+        Повертає 200 із share_url усередині order; полів share чи nbuQr на верхньому рівні немає.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateOrder' }
+      responses:
+        '200': { $ref: '#/components/responses/OrderSaved' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: currentGetOrder
+      tags: [Orders]
+      summary: Прочитати рахунок із кешу або знайти за orders.id
+      security: [{}, { BearerAuth: [] }, { MerchantApiKey: [] }]
+      x-merchant-api-key-scopes: [orders:read]
+      description: |
+        Merchant API key: пошук лише за orders.id і мерчантом ключа без читання спільного кешу.
+        Чужий або відсутній рахунок дає 404, помилка залежного сервісу дає 503.
+        Наступна поведінка стосується лише JWT/публічного шляху:
+        Пошук без кешу фільтрує лише id, а не short_id/order_number. Короткі ідентифікатори працюють,
+        лише якщо їх раніше додано до checkout-кешу поточного ізоляту. Кеш не перевіряє авторизацію
+        повторно. Запит до бази використовує переданий Authorization або публічний ключ як Bearer.
+        Помилки залежного сервісу повертаються як 404. Відповідь — запис бази або кешований об'єкт checkout.
+      responses:
+        '200': { $ref: '#/components/responses/OrderRead' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: currentUpdateOrder
+      tags: [Orders]
+      summary: Змінити статус або суму з переданим Bearer-токеном
+      security: [{ BearerAuth: [] }, { MerchantApiKey: [] }]
+      x-merchant-api-key-scopes: [orders:write]
+      description: |
+        Merchant API key: змінює лише рахунок свого мерчанта; чужий/відсутній id дає 404.
+        Використовуються ті самі поля зміни, без додаткових правил переходів статусів.
+        Поля власника, мерчанта, платіжного snapshot і номер рахунку не змінюються цим маршрутом.
+        Worker не перевіряє перелік статусів або дозволені переходи; остаточні обмеження задає база.
+        amount перезаписує base_amount і total_amount без додавання доставки чи віднімання знижки.
+        Дані оплати використовуються лише при status=paid; paid_at за замовчуванням — поточний час.
+        Числа приводяться без перевірки скінченності та невід'ємності. Порожній об'єкт допускається.
+        Потрібен успішно повернутий запис; відповідні записи локального кешу рахунків видаляються.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string }
+                amount: { type: number }
+                paid_at: { type: string }
+                paid_bank_code: { type: string }
+                paid_amount: { type: number }
+      responses:
+        '200': { $ref: '#/components/responses/OrderSaved' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /merchant/telegram-invoice:
+    post:
+      operationId: currentSendMerchantInvoice
+      tags: [Telegram]
+      summary: Надіслати рахунок перевіреного власника в його прив'язаний Telegram
+      security: [{ BearerAuth: [] }]
+      description: |
+        Фактичний маршрут — цей, а не /merchant/telegram/invoices/send, який повертає 404.
+        Потрібні налаштування Telegram/Supabase; конфігурація перевіряється раніше за авторизацію.
+        Тіло має містити лише order_id і не перевищувати 1024 байти. Параметри URL відхиляються.
+        Перевіряються користувач та активне право власності. Надсилаються лише непрострочені
+        рахунки fixed/table у UAH зі статусом pending, додатними узгодженими сумами,
+        без розділеної оплати та вже сплаченої суми. Потрібен рівно один підтримуваний
+        Telegram-акаунт. Автоматичного повтору надсилання немає.
+        Методи крім POST повертають порожню відповідь 405 із заголовком Allow зі значенням POST.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [order_id]
+              properties:
+                order_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Telegram підтвердив надсилання повідомлення
+          content:
+            application/json:
+              example:
+                ok: true
+                delivery: sent
+                order_id: '66666666-6666-4666-8666-666666666666'
+                message_id: 12345
+              schema:
+                type: object
+                required: [ok, delivery, order_id, message_id]
+                properties:
+                  ok: { const: true }
+                  delivery: { const: sent }
+                  order_id: { type: string, format: uuid }
+                  message_id: { type: integer, minimum: 1 }
+        '400': { $ref: '#/components/responses/TelegramError' }
+        '401': { $ref: '#/components/responses/TelegramError' }
+        '403': { $ref: '#/components/responses/TelegramError' }
+        '404': { $ref: '#/components/responses/TelegramError' }
+        '409': { $ref: '#/components/responses/TelegramError' }
+        '429': { $ref: '#/components/responses/TelegramError' }
+        '502': { $ref: '#/components/responses/TelegramError' }
+        '503': { $ref: '#/components/responses/TelegramError' }
+  /checkout/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: currentCheckout
+      tags: [Checkout]
+      summary: Отримати публічний об'єкт рахунку для checkout
+      description: |
+        Шукає за UUID id або short_id/order_number без Bearer-токена користувача та кешує на 60 секунд
+        у пам'яті ізоляту. Доступ до бази залежить від публічних політик. Інші методи також можуть
+        потрапити в цю гілку читання. Форми даних із кешу та бази можуть відрізнятися; не всі поля
+        бази потрапляють у відповідь.
+      responses:
+        '200': { $ref: '#/components/responses/OrderRead' }
+        '404': { $ref: '#/components/responses/Error' }
+  /checkout/{id}/initiate:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: currentInitiate
+      tags: [Checkout]
+      summary: Сформувати дані NBU і банківське посилання без підтвердження оплати
+      description: |
+        Використовується bank_code, типово UNJS, а не bank. recaptcha_token ігнорується.
+        Запит до банку не надсилається. Збережений total_amount має пріоритет над amount із тіла.
+        Повний знімок платіжних реквізитів визначає отримувача і призначення. Неповний знімок
+        або знайдений рахунок без short_id дає 409. Навіть без рахунку генеруються дані
+        з тіла запиту або типових реквізитів; перевірки з 404 немає. Стани paid/expired/cancelled
+        тут не блокують ініціювання. Відсутній або некоректний JSON стає порожнім об'єктом.
+        Методи крім POST також ініціюють оплату без читання тіла; GET описано окремо як наявний дефект.
+      requestBody: { $ref: '#/components/requestBodies/Initiate' }
+      responses:
+        '200': { $ref: '#/components/responses/Initiated' }
+        '409': { $ref: '#/components/responses/Error' }
+    get:
+      operationId: currentInitiateViaGet
+      tags: [Checkout]
+      summary: Ініціювати з типовими значеннями через відсутність обмеження методу
+      deprecated: true
+      description: Виконує ту саму гілку ініціювання без розбору тіла; не рекомендований метод для клієнтів.
+      responses:
+        '200': { $ref: '#/components/responses/Initiated' }
+        '409': { $ref: '#/components/responses/Error' }
+  /checkout/{id}/pay:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: currentPayAlias
+      tags: [Checkout]
+      summary: Альтернативний шлях POST checkout/{id}/initiate
+      description: Ті самі тіло, типові значення, поведінка без рахунку та обмеження, що й у initiate.
+      requestBody: { $ref: '#/components/requestBodies/Initiate' }
+      responses:
+        '200': { $ref: '#/components/responses/Initiated' }
+        '409': { $ref: '#/components/responses/Error' }
+    get:
+      operationId: currentPayViaGet
+      tags: [Checkout]
+      summary: Альтернативний шлях GET checkout/{id}/initiate
+      deprecated: true
+      responses:
+        '200': { $ref: '#/components/responses/Initiated' }
+        '409': { $ref: '#/components/responses/Error' }
+  /checkout/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: currentCheckoutStatus
+      tags: [Checkout]
+      summary: Прочитати статус із кешу або об'єкта checkout
+      description: |
+        Метод не перевіряється. Об'єкт, побудований без кешу, не містить paid_at, paid_bank_code
+        і paid_amount: перші два поля стають null, а paid_amount при paid береться з total_amount.
+        Перелік статусів не перевіряється; типовий статус — open. Це не підтверджені банком дані.
+      responses:
+        '200':
+          description: Поточний статус із доступного об'єкта рахунку
+          content:
+            application/json:
+              examples:
+                pending:
+                  summary: Рахунок очікує оплати
+                  value:
+                    id: '66666666-6666-4666-8666-666666666666'
+                    order_id: '66666666-6666-4666-8666-666666666666'
+                    status: pending
+                    paid: false
+                    paid_at: null
+                    paid_bank_code: null
+                    paid_amount: null
+                paidProjection:
+                  summary: Статус paid без метаданих оплати; не є доказом від банку
+                  value:
+                    id: '66666666-6666-4666-8666-666666666666'
+                    order_id: '66666666-6666-4666-8666-666666666666'
+                    status: paid
+                    paid: true
+                    paid_at: null
+                    paid_bank_code: null
+                    paid_amount: 250
+              schema:
+                type: object
+                required: [id, order_id, status, paid, paid_at, paid_bank_code, paid_amount]
+                properties:
+                  id: { type: string }
+                  order_id: { type: string }
+                  status: { type: string }
+                  paid: { type: boolean }
+                  paid_at: { type: [string, 'null'] }
+                  paid_bank_code: { type: [string, 'null'] }
+                  paid_amount: { type: [number, string, 'null'] }
+        '404': { $ref: '#/components/responses/Error' }
+  /checkout/{id}/events:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: currentCheckoutEvents
+      tags: [Checkout]
+      summary: Повернути порожню історію без читання сховища
+      description: Наявний рахунок не потрібен. Усі методи крім POST для events/event повертають цю структуру.
+      responses:
+        '200':
+          description: Історія-заглушка
+          content:
+            application/json:
+              example:
+                order_id: '66666666-6666-4666-8666-666666666666'
+                events: []
+              schema:
+                type: object
+                required: [order_id, events]
+                properties:
+                  order_id: { type: string }
+                  events: { type: array, maxItems: 0, items: {} }
+  /checkout/{id}/event:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: currentCheckoutEvent
+      tags: [Checkout]
+      summary: Повернути передану подію без збереження
+      description: |
+        Не перевіряє рахунок і не записує подію у сховище. Відсутній або некоректний JSON стає
+        порожнім об'єктом. POST /checkout/{id}/events — альтернативний шлях із тією самою поведінкою.
+      requestBody:
+        content:
+          application/json:
+            schema: {}
+      responses:
+        '200':
+          description: Переданий JSON, а не ідентифікатор збереженої події
+          content:
+            application/json:
+              example:
+                success: true
+                order_id: '66666666-6666-4666-8666-666666666666'
+                event:
+                  type: checkout_opened
+                  source: mock-client
+                  timestamp: '2026-09-24T10:00:00Z'
+              schema:
+                type: object
+                required: [success, order_id, event]
+                properties:
+                  success: { const: true }
+                  order_id: { type: string }
+                  event: {}
+  /checkout/{id}/apply-promo:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: currentPromo
+      tags: [Checkout]
+      summary: Обчислити умовну знижку лише в пам'яті ізоляту
+      description: |
+        Це не механізм промоакцій зі збереженням. Код із 10 дає знижку 10; інакше з 20 — 20;
+        інакше із SAVE — 50; решта, включно з порожнім кодом, — 10. Підсумок не нижчий за нуль.
+        Рахунок, статус, чинність промокоду та особа не перевіряються. Полів valid/new_total немає.
+        Методи крім POST переходять до читання рахунку замість відповіді 405.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                promo_code: { type: string }
+                code: { type: string, description: Запасна назва поля промокоду }
+      responses:
+        '200':
+          description: Обчислені значення, що не підтверджують збереження змін рахунку
+          content:
+            application/json:
+              examples:
+                discount10:
+                  summary: Промокод DEMO10 для тестової суми 250
+                  value: { success: true, discount_amount: 10, total_amount: 240 }
+              schema:
+                type: object
+                required: [success, discount_amount, total_amount]
+                properties:
+                  success: { const: true }
+                  discount_amount: { type: number }
+                  total_amount: { type: [number, 'null'] }
+  /checkout/{id}/delivery:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: currentDelivery
+      tags: [Checkout]
+      summary: Змінити вартість доставки лише в пам'яті ізоляту
+      description: |
+        Збереження доставки не готове до production. recipient_name, recipient_phone, method,
+        city і branch_info ігноруються. Читається лише delivery_fee, приводиться через Number,
+        типове значення — 70. Підсумок дорівнює базовій сумі мінус знижка плюс доставка;
+        від'ємні та нескінченні значення не відхиляються. Без рахунку все одно повертається
+        успіх із order=null. Методи крім POST переходять до читання.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                delivery_fee: { type: [number, string, 'null'], default: 70 }
+      responses:
+        '200':
+          description: Лише розрахунок у кеші; дані отримувача не зберігаються
+          content:
+            application/json:
+              examples:
+                cachedDelivery:
+                  summary: Базова сума 250, знижка 10 і доставка 70; лише в кеші
+                  value:
+                    success: true
+                    delivery_fee: 70
+                    total_amount: 310
+                    order:
+                      id: '77777777-7777-4777-8777-777777777777'
+                      type: delivery
+                      base_amount: 250
+                      discount_amount: 10
+                      delivery_fee: 70
+                      total_amount: 310
+              schema:
+                type: object
+                required: [success, delivery_fee, total_amount, order]
+                properties:
+                  success: { const: true }
+                  delivery_fee: { type: [number, 'null'] }
+                  total_amount: { type: [number, 'null'] }
+                  order: { type: [object, 'null'], additionalProperties: true }
+  /checkout/{id}/callback:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: currentUnsignedCallback
+      tags: [Checkout]
+      summary: Застаріла зміна статусу без підпису, що не підтверджує розрахунок
+      deprecated: true
+      description: |
+        Небезпечна застаріла поведінка, а не рекомендація для інтеграції. Підпис та авторизація
+        не перевіряються. status=success/paid, state=success або err_code=0 числом чи рядком
+        дає paid; інакше береться body.status або failed. Оновлюється кеш ізоляту та виконується
+        спроба анонімного PATCH до бази; статус і помилки залежного сервісу ігноруються.
+        Навіть без рахунку повертається успіх. Інші методи виконують цю гілку з порожнім тілом,
+        що за замовчуванням дає failed.
+      requestBody: { $ref: '#/components/requestBodies/Callback' }
+      responses:
+        '200': { $ref: '#/components/responses/Callback' }
+  /checkout/{id}/webhook:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: currentUnsignedCheckoutWebhook
+      tags: [Checkout]
+      summary: Альтернативний шлях callback checkout без перевірки підпису
+      deprecated: true
+      description: Та сама небезпечна зміна та непідтверджене збереження, що й у callback; це не підтвердження банку.
+      requestBody: { $ref: '#/components/requestBodies/Callback' }
+      responses:
+        '200': { $ref: '#/components/responses/Callback' }
+  /banks:
+    get:
+      operationId: currentBanks
+      tags: [Banks]
+      summary: Отримати налаштований каталог банків або вбудований список
+      description: Читає публічний banklink за наявності конфігурації; без неї, при помилках чи некоректних даних використовує DEFAULT_BANKS.
+      responses:
+        '200':
+          description: Записи каталогу; список і окремий запис мають однакову структуру елемента
+          content:
+            application/json:
+              example:
+                - id: demo-bank
+                  code: DEMO
+                  name: Тестовий банк
+                  active: true
+                  logo: https://example.invalid/logos/demo-bank.png
+                  color: '#125C46'
+                  bg: '#FFFFFF'
+                  fee_pct: 0
+              schema: { type: array, items: { $ref: '#/components/schemas/Bank' } }
+  /banks/{idOrCode}:
+    parameters:
+      - name: idOrCode
+        in: path
+        required: true
+        schema: { type: string, pattern: '^[a-zA-Z0-9_-]+$' }
+    get:
+      operationId: currentBank
+      tags: [Banks]
+      summary: Знайти банк за id або code без урахування регістру
+      responses:
+        '200':
+          description: Той самий запис, що й у списку; наявність полів шаблонів URL не гарантована
+          content:
+            application/json:
+              example:
+                id: demo-bank
+                code: DEMO
+                name: Тестовий банк
+                active: true
+                logo: https://example.invalid/logos/demo-bank.png
+                color: '#125C46'
+                bg: '#FFFFFF'
+                fee_pct: 0
+              schema: { $ref: '#/components/schemas/Bank' }
+        '404': { $ref: '#/components/responses/Error' }
+  /logos:
+    get:
+      operationId: currentLogos
+      tags: [Banks]
+      summary: Отримати вбудовані логотипи банків і платіжних систем
+      responses:
+        '200':
+          description: Сталий об'єкт логотипів, а не результат читання KV
+          content:
+            application/json:
+              examples:
+                logos:
+                  summary: Вигадані назви й адреси зображень зі збереженими ключами каталогу
+                  value:
+                    MONO: { color: '#000000', logo: 'https://example.invalid/logos/mono.png', name: Демо MONO }
+                    PBAN: { color: '#008000', logo: 'https://example.invalid/logos/pban.png', name: Демо PBAN }
+                    SENS: { color: '#CC0000', logo: 'https://example.invalid/logos/sens.png', name: Демо SENS }
+                    ABUA: { color: '#00AA00', logo: 'https://example.invalid/logos/abua.png', name: Демо ABUA }
+                    FUIB: { color: '#BB0000', logo: 'https://example.invalid/logos/fuib.png', name: Демо FUIB }
+                    AVAL: { color: '#FFFF00', logo: 'https://example.invalid/logos/aval.png', name: Демо AVAL }
+                    NOVA: { color: '#DD0000', logo: 'https://example.invalid/logos/nova.png', name: Демо NOVA }
+                    TASB: { color: '#003399', logo: 'https://example.invalid/logos/tasb.png', name: Демо TASB }
+                    GLBU: { color: '#006699', logo: 'https://example.invalid/logos/glbu.png', name: Демо GLBU }
+              schema:
+                type: object
+                description: Ключі — MONO, PBAN, SENS, ABUA, FUIB, AVAL, NOVA, TASB і GLBU
+                additionalProperties:
+                  type: object
+                  required: [color, logo, name]
+                  properties:
+                    color: { type: string }
+                    logo: { type: string, format: uri }
+                    name: { type: string }
+  /kso/checkout-requests:
+    post:
+      operationId: currentKsoStubCreate
+      tags: [Stubs]
+      summary: Згенерувати тестову відповідь KSO без збереження
+      description: |
+        Немає перевірки HMAC, часової мітки, nonce, ідемпотентності чи бізнес-полів.
+        amount_minor ігнорується; читається amount або 0. Відсутній чи некоректний JSON ігнорується.
+        Платіж або URL checkout не створюється. POST із суфіксом id також потрапляє в цю гілку.
+        Не використовуйте для реального checkout.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount: {}
+      responses:
+        '201':
+          description: Згенерований ідентифікатор заглушки, а не збережений запит checkout
+          content:
+            application/json:
+              example:
+                id: kso_mock_001
+                status: initiated
+                amount: 250
+                currency: UAH
+                created_at: '2026-09-24T10:00:00Z'
+              schema: { $ref: '#/components/schemas/KsoStub' }
+  /kso/checkout-requests/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: currentKsoStubStatus
+      tags: [Stubs]
+      summary: Повернути initiated і суму 100 для будь-якого відповідного id
+      description: Немає авторизації та читання сховища; невідомий id не дає 404. GET колекції повертає id=kso_demo.
+      responses:
+        '200':
+          description: Штучний статус із поточною часовою міткою
+          content:
+            application/json:
+              example:
+                id: kso_mock_001
+                status: initiated
+                amount: 100
+                currency: UAH
+                created_at: '2026-09-24T10:01:00Z'
+              schema: { $ref: '#/components/schemas/KsoStub' }
+  /webhooks/{bankCode}:
+    parameters:
+      - name: bankCode
+        in: path
+        required: true
+        schema: { type: string, pattern: '^[a-zA-Z0-9_-]+$', not: { const: simulate } }
+    post:
+      operationId: currentBankWebhookEcho
+      tags: [Stubs]
+      summary: Повернути дані банківського вебхука без перевірки та розрахунку
+      description: |
+        Немає перевірки HMAC, ідентифікатора ключа, часу, повторного надсилання, явного обмеження
+        розміру тіла чи збереження. Відсутній або некоректний JSON стає порожнім об'єктом.
+        Рахунок не позначається оплаченим, мерчант не сповіщається. Зарезервований код simulate
+        викликає інший внутрішній обробник пісочниці й навмисно не входить до цього контракту.
+      requestBody:
+        content:
+          application/json:
+            schema: {}
+      responses:
+        '200':
+          description: Лише повернення отриманих даних
+          content:
+            application/json:
+              example:
+                success: true
+                bank_code: DEMO
+                received_at: '2026-09-24T10:00:00Z'
+                payload:
+                  order_id: '66666666-6666-4666-8666-666666666666'
+                  status: pending
+                  amount: 250
+              schema:
+                type: object
+                required: [success, bank_code, received_at, payload]
+                properties:
+                  success: { const: true }
+                  bank_code: { type: string }
+                  received_at: { type: string, format: date-time }
+                  payload: {}
+  /stats/summary:
+    get:
+      operationId: currentStatsStub
+      tags: [Stubs]
+      summary: Отримати сталу демостатистику без авторизації
+      description: Це не аналітика продажів конкретного мерчанта; звернень до бази немає.
+      responses:
+        '200':
+          description: Лічильники з коду та поточна часова мітка
+          content:
+            application/json:
+              example:
+                total_orders: 142
+                volume_uah: 58240
+                active_merchants: 12
+                uptime: '99.98%'
+                timestamp: '2026-09-24T10:00:00Z'
+              schema:
+                type: object
+                required: [total_orders, volume_uah, active_merchants, uptime, timestamp]
+                properties:
+                  total_orders: { type: integer, const: 142 }
+                  volume_uah: { type: number, const: 58240 }
+                  active_merchants: { type: integer, const: 12 }
+                  uptime: { type: string, const: '99.98%' }
+                  timestamp: { type: string, format: date-time }
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Токен доступу Supabase передається до залежних маршрутів, захищених RLS. Основні операції
+        запису мерчантів і рахунків перевіряють синтаксис Bearer, а далі покладаються на авторизацію
+        залежного сервісу. Читання з необов'язковою авторизацією можуть повертати демодані
+        чи резервну відповідь. Merchant API keys описано окремою схемою.
+    MerchantApiKey:
+      type: http
+      scheme: bearer
+      bearerFormat: rhk_live_<64 lowercase hex>
+      description: |
+        Довготривалий ключ із Dashboard. Передається замість JWT у тому самому Authorization.
+        orders:read для GET /orders і GET /orders/{id}; orders:write для POST /orders і PATCH /orders/{id}.
+        Один ключ прив'язаний до одного мерчанта. Не підтримує stats:read чи інші маршрути.
+        Строк дії, відкликання і scopes перевіряються сервером на кожному запиті.
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      description: Ідентифікатор із латинських літер, цифр, підкреслення чи дефіса; спосіб пошуку залежить від операції
+      schema: { type: string, pattern: '^[a-zA-Z0-9_-]+$' }
+    InvitationToken:
+      name: token
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[a-zA-Z0-9_-]+$' }
+  schemas:
+    Record:
+      type: object
+      additionalProperties: true
+      description: Запис залежного сервісу або вибрані поля; обробник не забезпечує суворішої схеми
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+      additionalProperties: true
+    Invitation:
+      type: object
+      required: [id, email, role, terminal_id, token, status, created_at, expires_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        role: { type: string }
+        terminal_id: { type: [string, 'null'] }
+        token: { type: string }
+        status: { const: pending }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+    CreateOrder:
+      type: object
+      required: [entity_id]
+      properties:
+        merchant_id: { type: string, description: JWT вибирає першого доступного мерчанта без поля; API key завжди використовує свого мерчанта і відхиляє інший id }
+        entity_id: { type: string, pattern: '\S' }
+        terminal_id: { type: [string, 'null'], description: Для table потрібен непорожній рядок }
+        type: { type: string, enum: [fixed, open_amount, table, delivery], default: fixed }
+        title: { type: string, default: '' }
+        description: { type: [string, 'null'] }
+        amount: { type: [number, string, 'null'], description: Приводиться через Number; має пріоритет над base_amount якщо не null }
+        base_amount: { type: [number, string, 'null'], default: 0 }
+        delivery_fee: { type: [number, string, 'null'], default: 0 }
+        table_number: { type: [integer, string, 'null'], description: Обробляється parseInt якщо значення приводиться до true }
+        scenario_config: {}
+        expires_at: { type: string, description: Передається лише для table; строк дії перевіряє база }
+      allOf:
+        - if:
+            required: [type]
+            properties:
+              type: { const: table }
+          then:
+            required: [terminal_id]
+            properties:
+              terminal_id: { type: string, pattern: '\S' }
+    KsoStub:
+      type: object
+      required: [id, status, amount, currency, created_at]
+      properties:
+        id: { type: string, description: Згенерований ідентифікатор із kso_ або переданий id пошуку; не UUID }
+        status: { const: initiated }
+        amount: {}
+        currency: { const: UAH }
+        created_at: { type: string, format: date-time }
+    Bank:
+      type: object
+      required: [id, code, name]
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        code: { type: string }
+        name: { type: string }
+        active: { type: boolean }
+        is_active: { type: boolean }
+        routing_mode: { type: string }
+        logo: { type: [string, 'null'] }
+        color: { type: [string, 'null'] }
+        bg: { type: [string, 'null'] }
+        fee_pct: { type: [number, 'null'] }
+  requestBodies:
+    MerchantWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              business_name: { type: string }
+              name: { type: string, description: Запасна назва поля business_name }
+              business_type: { type: string, default: fop }
+              tax_id: { type: string }
+              iban: { type: string }
+              display_name: { type: string }
+              bank_name: { type: string }
+    Initiate:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              bank_code: { type: string, default: UNJS }
+              os: { type: string, default: desktop }
+              amount: { type: number, description: Використовується лише за відсутності збереженого total_amount }
+              merchantName: { type: string, description: Застаріле запасне поле отримувача без повного знімка реквізитів }
+              merchantIban: { type: string, description: Застаріле запасне поле отримувача без повного знімка реквізитів }
+              merchantTaxId: { type: string, description: Застаріле запасне поле отримувача без повного знімка реквізитів }
+              purpose: { type: string, description: Застаріле запасне призначення без збереженого призначення чи назви }
+              orderNumber: { type: string, description: Використовується лише без short_id знайденого рахунку }
+    Callback:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string }
+              state: { type: string }
+              err_code: { type: [string, number] }
+  responses:
+    Error:
+      description: |
+        error — рядок, а не булеве поле в обгортці error/message. Операції збереження мерчанта
+        чи рахунку передають статуси 401/403/409/422 залежного сервісу; більшість інших помилок
+        стають 503. Публічне читання натомість може повернути 404 або резервну відповідь 200,
+        як зазначено в описі відповідної операції.
+      content:
+        application/json:
+          examples:
+            mockFailure:
+              summary: Умовний текст помилки; конкретний текст залежить від операції та HTTP-статусу
+              description: Це приклад структури, а не фіксований код помилки. Орієнтуйтеся на HTTP-статус та опис операції.
+              value: { error: Mock operation error }
+          schema: { $ref: '#/components/schemas/Error' }
+    MerchantSaved:
+      description: База повернула рівно один збережений запис мерчанта
+      content:
+        application/json:
+          example:
+            success: true
+            merchant:
+              id: '22222222-2222-4222-8222-222222222222'
+              business_name: Демо кав'ярня
+              display_name: Демо кав'ярня
+              business_type: fop
+              tax_id: '0000000000'
+              iban: UA000000000000000000000000000
+              bank_name: Тестовий банк
+              onboarding_completed: true
+          schema:
+            type: object
+            required: [success, merchant]
+            properties:
+              success: { const: true }
+              merchant: { $ref: '#/components/schemas/Record' }
+    UnconfirmedSuccess:
+      description: Лише підтвердження прийняття; успіх залежного сервісу не перевірено
+      content:
+        application/json:
+          example: { success: true }
+          schema:
+            type: object
+            required: [success]
+            properties:
+              success: { const: true }
+    InvitationAction:
+      description: Відповідь заглушки без звернення до сховища чи служби надсилання
+      content:
+        application/json:
+          examples:
+            revoke:
+              summary: Лише для маршруту revoke; запрошення фактично не відкликається
+              value: { success: true, action: revoke }
+            resend:
+              summary: Лише для маршруту resend; лист фактично не надсилається
+              value: { success: true, action: resend }
+          schema:
+            type: object
+            required: [success, action]
+            properties:
+              success: { const: true }
+              action: { type: string, enum: [revoke, resend] }
+    OrderSaved:
+      description: Збережений запис в обгортці order; при створенні share_url формується з джерела запиту
+      content:
+        application/json:
+          examples:
+            created:
+              summary: Відповідь POST orders; посилання навмисно не працює
+              value:
+                success: true
+                order:
+                  id: '66666666-6666-4666-8666-666666666666'
+                  short_id: DEMO001
+                  type: fixed
+                  title: Демо замовлення
+                  base_amount: 250
+                  delivery_fee: 0
+                  discount_amount: 0
+                  total_amount: 250
+                  currency: UAH
+                  status: pending
+                  share_url: https://example.invalid/pay/66666666-6666-4666-8666-666666666666
+            updated:
+              summary: Відповідь PATCH після зміни суми; share_url не додається
+              value:
+                success: true
+                order:
+                  id: '66666666-6666-4666-8666-666666666666'
+                  type: fixed
+                  base_amount: 275
+                  total_amount: 275
+                  currency: UAH
+                  status: pending
+          schema:
+            type: object
+            required: [success, order]
+            properties:
+              success: { const: true }
+              order:
+                type: object
+                required: [id]
+                additionalProperties: true
+                properties:
+                  id: { type: string }
+                  share_url: { type: string }
+    OrderRead:
+      description: Запис бази або вибрані поля checkout залежно від кешу та маршруту
+      content:
+        application/json:
+          example:
+            id: '66666666-6666-4666-8666-666666666666'
+            short_id: DEMO001
+            merchant_id: '22222222-2222-4222-8222-222222222222'
+            type: fixed
+            order_number: DEMO001
+            title: Демо замовлення
+            description: Тестові товари, не реальний рахунок
+            base_amount: 250
+            discount_amount: 0
+            delivery_fee: 0
+            total_amount: 250
+            currency: UAH
+            status: pending
+            terminal_id: null
+            table_number: null
+            payment_recipient_name: Демо кав'ярня
+            payment_recipient_iban: UA000000000000000000000000000
+            payment_recipient_tax_id: '0000000000'
+            payment_purpose: Тестова оплата DEMO001, не оплачувати
+            payment_settings_revision: 1
+            created_at: '2026-09-24T10:00:00Z'
+            expires_at: null
+          schema:
+            type: object
+            additionalProperties: true
+            properties:
+              id: { type: string }
+              short_id: { type: [string, 'null'] }
+              merchant_id: { type: [string, 'null'] }
+              type: { type: string }
+              order_number: { type: [string, 'null'] }
+              title: { type: [string, 'null'] }
+              description: { type: [string, 'null'] }
+              amount: { type: [number, string, 'null'] }
+              base_amount: { type: [number, string, 'null'] }
+              discount_amount: { type: [number, string, 'null'] }
+              delivery_fee: { type: [number, string, 'null'] }
+              total_amount: { type: [number, string, 'null'] }
+              currency: { type: string }
+              status: { type: string }
+              terminal_id: { type: [string, 'null'] }
+              table_number: { type: [integer, string, 'null'] }
+              scenario_config: {}
+              payment_acceptance_mode: { type: [string, 'null'] }
+              payment_recipient_name: { type: [string, 'null'] }
+              payment_recipient_iban: { type: [string, 'null'] }
+              payment_recipient_tax_id: { type: [string, 'null'] }
+              payment_purpose: { type: [string, 'null'] }
+              payment_id: { type: [string, 'null'] }
+              payment_settings_revision: { type: [integer, 'null'] }
+              merchant: { type: [object, 'null'], additionalProperties: true }
+              created_at: { type: [string, 'null'] }
+              expires_at: { type: [string, 'null'] }
+              share_url: { type: [string, 'null'] }
+    Initiated:
+      description: Локально згенеровані банківські URL і дані NBU; спроба оплати тут не зберігається
+      content:
+        application/json:
+          examples:
+            nonPayableMock:
+              summary: Тестова структура відповіді, непридатна для оплати
+              description: nbu_raw_string — навмисна заглушка, а не валідний документ NBU. Base64 кодує цю заглушку; URL не ведуть до банків.
+              value:
+                success: true
+                redirect_url: https://example.invalid/bank/pay/DEMO001
+                fallback_url: https://example.invalid/pay/DEMO001
+                nbu_raw_string: MOCK_NOT_PAYABLE
+                nbu_payload_base64: TU9DS19OT1RfUEFZQUJMRQ==
+                nbu_qr_url: https://example.invalid/qr/DEMO001
+          schema:
+            type: object
+            required: [success, redirect_url, fallback_url, nbu_raw_string, nbu_payload_base64, nbu_qr_url]
+            properties:
+              success: { const: true }
+              redirect_url: { type: string }
+              fallback_url: { type: string }
+              nbu_raw_string: { type: string }
+              nbu_payload_base64: { type: string }
+              nbu_qr_url: { type: string }
+    Callback:
+      description: Заявлений статус; збереження в базі та підтвердження банку не встановлені
+      content:
+        application/json:
+          examples:
+            claimedPaid:
+              summary: Відповідь на status=success; не доводить фактичне надходження коштів
+              value:
+                success: true
+                order_id: '66666666-6666-4666-8666-666666666666'
+                status: paid
+                received_at: '2026-09-24T10:00:00Z'
+          schema:
+            type: object
+            required: [success, order_id, status, received_at]
+            properties:
+              success: { const: true }
+              order_id: { type: string }
+              status: { type: string }
+              received_at: { type: string, format: date-time }
+    TelegramError:
+      description: |
+        Помилка цього обробника з ok=false та рядковими error/message. Передбачено коди
+        invalid_request, unauthorized, forbidden, order_not_found, telegram_identity_required,
+        invoice_not_deliverable, telegram_rate_limited, telegram_rejected, telegram_unavailable,
+        verification_unavailable, render_unavailable і delivery_unknown. Статус 503 може означати
+        невизначений результат доставки, а не обов'язково відсутність надсилання.
+        Не повторюйте запит автоматично.
+      content:
+        application/json:
+          examples:
+            invalidRequest:
+              summary: Приклад для HTTP 400, некоректний запит
+              description: Текст message умовний; код error збережено відповідно до контракту.
+              value: { ok: false, error: invalid_request, message: Mock invalid request }
+            unauthorized:
+              summary: Приклад для HTTP 401, потрібна авторизація
+              value: { ok: false, error: unauthorized, message: Mock authorization required }
+            forbidden:
+              summary: Приклад для HTTP 403, доступ заборонено
+              value: { ok: false, error: forbidden, message: Mock access denied }
+            notFound:
+              summary: Приклад для HTTP 404, рахунок не знайдено
+              value: { ok: false, error: order_not_found, message: Mock order not found }
+            notDeliverable:
+              summary: Приклад для HTTP 409, рахунок не відповідає умовам надсилання
+              value: { ok: false, error: invoice_not_deliverable, message: Mock invoice cannot be delivered }
+            rateLimited:
+              summary: Приклад для HTTP 429, обмеження частоти Telegram
+              value: { ok: false, error: telegram_rate_limited, message: Mock Telegram rate limit }
+            rejected:
+              summary: Приклад для HTTP 502, Telegram відхилив надсилання
+              value: { ok: false, error: telegram_rejected, message: Mock Telegram rejection }
+            unknownDelivery:
+              summary: Приклад для HTTP 503, результат надсилання невідомий
+              description: Не повторюйте автоматично; умовний текст message не є стабільним API-кодом.
+              value: { ok: false, error: delivery_unknown, message: Mock delivery outcome unknown }
+          schema:
+            type: object
+            required: [ok, error, message]
+            properties:
+              ok: { const: false }
+              error: { type: string }
+              message: { type: string }

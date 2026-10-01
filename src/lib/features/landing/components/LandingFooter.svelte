@@ -42,7 +42,7 @@
 		<nav aria-label="Навігація">
 			<strong>{t.footer.navTitle}</strong>
 			<a href={resolve('/#payment-flow')}>{t.nav.howItWorks}</a>
-			<a href={resolve('/#demo')}>Sandbox</a>
+			<a href={resolve('/#banks')}>Banks</a>
 			<a href={resolve('/#solutions')}>{t.nav.forBusiness}</a>
 			<a href={resolve('/#pricing')}>{t.nav.pricing}</a>
 		</nav>

@@ -17,7 +17,7 @@ export default {
 		// The isolated build keeps this prefix on disk; do not strip it or serve the SPA.
 		// This entrypoint is shared with production, whose routing must remain unchanged.
 		if (
-			url.hostname === 'letsrealtalk.com' &&
+			(url.hostname === 'letsrealtalk.com' || url.hostname === 'rhnk.pp.ua') &&
 			(url.pathname === '/corex/_app' || url.pathname.startsWith('/corex/_app/'))
 		) {
 			return env.ASSETS.fetch(request);

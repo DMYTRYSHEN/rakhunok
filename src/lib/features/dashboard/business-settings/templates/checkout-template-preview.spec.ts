@@ -8,6 +8,7 @@ describe('checkout template preview model', () => {
 		['delivery', false, 1240],
 		['tips', false, 100],
 		['open_amount', true, 0],
+		['donation', true, 0],
 		['fuel_station', false, 1190]
 	] as const)('builds the %s payer scenario', (scenario, isOpenAmount, amount) => {
 		const model = buildCheckoutPreviewModel(scenario);
@@ -66,6 +67,6 @@ describe('checkout template preview model', () => {
 	it('narrows only supported template scenarios', () => {
 		expect(isCheckoutTemplateScenario('delivery')).toBe(true);
 		expect(isCheckoutTemplateScenario('fuel_station')).toBe(true);
-		expect(isCheckoutTemplateScenario('donation')).toBe(false);
+		expect(isCheckoutTemplateScenario('donation')).toBe(true);
 	});
 });

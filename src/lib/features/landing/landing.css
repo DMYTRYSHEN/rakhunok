@@ -4,7 +4,7 @@
 
 .landing-vision {
 	/* Palette — Pearlescent Light (Ceramic Studio) */
-	--bg-canvas: #f8f9fa;
+	--bg-canvas: #fafbf9;
 	--bg-surface: rgba(255, 255, 255, 0.82);
 	--bg-surface-elevated: rgba(255, 255, 255, 0.94);
 	--bg-glass: rgba(255, 255, 255, 0.7);
@@ -13,14 +13,14 @@
 	--bg-paper: #f0f2f5;
 
 	--text-primary: #0a0c10;
-	--text-secondary: #58606e;
-	--text-muted: #8c96a5;
+	--text-secondary: #4e5c55;
+	--text-muted: #617167;
 	--text-inverse: #ffffff;
 
 	/* Apple Intelligence Chromatic Spectrum */
-	--accent-blue: #0071e3;
-	--accent-purple: #9b51e0;
-	--accent-indigo: #5856d6;
+	--accent-blue: #186c55;
+	--accent-purple: #386a60;
+	--accent-indigo: #315f73;
 	--accent-cyan: #00c7be;
 	--accent-emerald: #10b981;
 	--accent-lime: #c9ff4a;
@@ -37,10 +37,10 @@
 	--shadow-glow: 0 0 40px -10px rgba(0, 113, 227, 0.25);
 
 	/* Geometry */
-	--radius-sm: 10px;
-	--radius-md: 16px;
-	--radius-lg: 24px;
-	--radius-xl: 32px;
+	--radius-sm: 6px;
+	--radius-md: 8px;
+	--radius-lg: 8px;
+	--radius-xl: 8px;
 	--radius-pill: 9999px;
 	--max-width: 1280px;
 
@@ -55,7 +55,7 @@
 
 /* Dark Mode — Cosmic Obsidian & Siri Fluid Aurora */
 .landing-vision[data-money-vision='apple-dark'] {
-	--bg-canvas: #060709;
+	--bg-canvas: #121714;
 	--bg-surface: rgba(18, 20, 26, 0.75);
 	--bg-surface-elevated: rgba(24, 27, 36, 0.9);
 	--bg-glass: rgba(18, 22, 32, 0.65);
@@ -65,16 +65,16 @@
 
 	--text-primary: #f5f6f8;
 	--text-secondary: #9aa2b1;
-	--text-muted: #626b7d;
+	--text-muted: #a0ada5;
 	--text-inverse: #050608;
 
 	--border-subtle: rgba(255, 255, 255, 0.08);
 	--border-glass: rgba(255, 255, 255, 0.12);
-	--border-glow: rgba(155, 81, 224, 0.4);
+	--border-glow: rgba(174, 211, 156, 0.4);
 	--specular: inset 0 1px 1px 0 rgba(255, 255, 255, 0.2);
 	--shadow-subtle: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
 	--shadow-elevated: 0 24px 60px -12px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(255, 255, 255, 0.08);
-	--shadow-glow: 0 0 50px -10px rgba(155, 81, 224, 0.35);
+	--shadow-glow: 0 0 0 transparent;
 }
 
 /* Base resets & typography */
@@ -185,16 +185,17 @@ body.modal-open:has(.landing-vision) {
 /* Floating Glass Header */
 .site-header {
 	position: sticky;
-	top: 16px;
+	top: 0;
 	z-index: 100;
 	margin-inline: auto;
-	width: min(var(--max-width), calc(100% - 32px));
-	border-radius: var(--radius-pill);
-	background: var(--bg-glass);
+	width: 100%;
+	border-radius: 0;
+	background: var(--bg-canvas);
 	backdrop-filter: var(--blur-glass);
 	-webkit-backdrop-filter: var(--blur-glass);
-	border: 1px solid var(--border-subtle);
-	box-shadow: var(--shadow-subtle), var(--specular);
+	border: 0;
+	border-bottom: 1px solid var(--border-subtle);
+	box-shadow: none;
 	transition: all 0.3s var(--ease-smooth);
 }
 
@@ -430,7 +431,7 @@ body.modal-open:has(.landing-vision) {
 	color: var(--text-primary);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1200px) {
 	.desktop-nav,
 	.desktop-cta {
 		display: none;
@@ -438,6 +439,31 @@ body.modal-open:has(.landing-vision) {
 	.menu-button {
 		display: flex;
 	}
+}
+
+@media (max-width: 420px) {
+	.site-header .nav { padding-inline: 0; gap: 8px; }
+	.site-header .nav-actions { gap: 6px; }
+	.site-header .nav-actions > .lang-switcher { display: none; }
+}
+
+.landing-vision .button-primary {
+	background: #1c322c;
+	box-shadow: none;
+	border-radius: 6px;
+}
+
+.landing-vision .calculator-card {
+	box-shadow: none;
+	backdrop-filter: none;
+}
+
+.landing-vision .result-grid {
+	background: transparent;
+	border: 0;
+	border-top: 1px solid var(--border-subtle);
+	border-radius: 0;
+	padding: 24px 0 0;
 }
 
 .mobile-nav {
@@ -2440,18 +2466,13 @@ body.modal-open:has(.landing-vision) {
 	grid-template-columns: 1fr 1.05fr;
 	gap: 56px;
 	align-items: center;
-	background: var(--bg-surface);
-	backdrop-filter: var(--blur-heavy);
-	border: 1px solid var(--border-glass);
-	border-radius: var(--radius-xl);
-	padding: 48px;
-	box-shadow: var(--shadow-elevated), var(--specular);
+	padding: 32px 0;
 }
 
 @media (max-width: 960px) {
 	.role-story {
 		grid-template-columns: 1fr;
-		padding: 28px;
+		padding: 24px 0;
 	}
 }
 
@@ -2500,10 +2521,6 @@ body.modal-open:has(.landing-vision) {
 .role-steps button.active {
 	border-color: var(--accent-blue);
 	background: var(--bg-surface-elevated);
-	box-shadow:
-		0 8px 24px -4px rgba(0, 113, 227, 0.18),
-		var(--specular);
-	transform: translateX(6px);
 }
 
 .role-steps button span {
@@ -2955,7 +2972,7 @@ body.modal-open:has(.landing-vision) {
 		transform 0.25s var(--ease-spring),
 		border-color 0.25s ease,
 		box-shadow 0.25s ease;
-	cursor: pointer;
+	cursor: default;
 }
 
 .solution-index article:hover {
@@ -3046,12 +3063,12 @@ body.modal-open:has(.landing-vision) {
 	object-position: center;
 	transition: transform 0.4s ease;
 	z-index: 1;
-	opacity: 0.6; /* Dim the image so icons are visible */
+	opacity: 1;
 }
 
 .solution-index article:hover .solution-visual__img {
 	transform: scale(1.03);
-	opacity: 0.8;
+	opacity: 1;
 }
 
 .solution-visual__overlay {
@@ -5431,5 +5448,20 @@ body.modal-open:has(.landing-vision) {
 	.plan-b-cta-btn {
 		width: 100%;
 		justify-content: center;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html:has(.landing-vision) {
+		scroll-behavior: auto;
+	}
+
+	.landing-vision *,
+	.landing-vision *::before,
+	.landing-vision *::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
 	}
 }

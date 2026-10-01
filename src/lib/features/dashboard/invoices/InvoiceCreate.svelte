@@ -125,6 +125,8 @@
 	let terminalId = $state('');
 	let scenarioConfig = $state<CheckoutScenarioConfig>(getScenarioDefaults('fixed'));
 	let templates = $state<CheckoutTemplate[]>([]);
+	let templatesLoading = $state(false);
+	let templatesError = $state<string | null>(null);
 	let selectedTemplateId = $state<string>('');
 	let deliveryCity = $state('Київ');
 	let deliveryBranch = $state('Відділення №24');
@@ -248,20 +250,42 @@
 		}
 	});
 
-	onMount(async () => {
+	onMount(() => {
 		invoiceRules = loadInvoiceRules();
-		if (businessContext?.merchantId) {
-			try {
-				templates = await listTemplates(businessContext.merchantId, demo);
-				const defaultTemplate = templates.find((t) => t.is_default);
-				if (defaultTemplate) {
-					applyTemplate(defaultTemplate);
-				}
-			} catch (err) {
-				console.error('Failed to load templates', err);
-			}
-		}
 	});
+
+	$effect(() => {
+		const merchantId = businessContext?.merchantId;
+		const isDemo = demo;
+		if (!merchantId) {
+			templates = [];
+			templatesError = 'Не визначено бізнес для завантаження шаблонів.';
+			return;
+		}
+		void loadCheckoutTemplates(merchantId, isDemo);
+	});
+
+	async function loadCheckoutTemplates(merchantId: string, isDemo: boolean) {
+		templatesLoading = true;
+		templatesError = null;
+		try {
+			const loaded = await listTemplates(merchantId, isDemo);
+			if (businessContext?.merchantId !== merchantId || demo !== isDemo) return;
+			templates = loaded;
+			if (selectedTemplateId && !loaded.some((template) => template.id === selectedTemplateId)) {
+				selectedTemplateId = '';
+			}
+			const defaultTemplate = loaded.find((template) => template.is_default);
+			if (defaultTemplate && !selectedTemplateId) applyTemplate(defaultTemplate);
+		} catch (cause: unknown) {
+			if (businessContext?.merchantId !== merchantId || demo !== isDemo) return;
+			templates = [];
+			templatesError =
+				cause instanceof Error ? cause.message : 'Не вдалося завантажити шаблони чекауту.';
+		} finally {
+			if (businessContext?.merchantId === merchantId && demo === isDemo) templatesLoading = false;
+		}
+	}
 
 	function applyTemplate(t: CheckoutTemplate) {
 		const invoiceScenario = buildTemplateInvoiceScenario(t.scenario_type, t.scenario_config);
@@ -770,11 +794,28 @@
 					</label>
 
 					<div class="border-t border-zinc-100 pt-2 sm:col-span-2">
-						{#if templates.length > 0}
-							<div class="mb-4">
-								<span class="mb-2 block text-xs font-bold text-zinc-600"
-									>Застосувати шаблон чекауту</span
-								>
+						<div class="mb-4">
+							<div class="mb-2 flex items-center justify-between gap-3">
+								<span class="block text-xs font-bold text-zinc-600">Застосувати шаблон чекауту</span>
+								<a
+									href={resolve(demo ? '/dashboard/checkout-templates?demo=1' : '/dashboard/checkout-templates')}
+									class="text-xs font-bold text-blue-600 hover:text-blue-800"
+								>Керувати шаблонами</a>
+							</div>
+							{#if templatesLoading}
+								<p class="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-500">Завантажуємо шаблони…</p>
+							{:else if templatesError}
+								<div class="flex items-center justify-between gap-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
+									<span>{templatesError}</span>
+									<button type="button" class="shrink-0 font-bold underline" onclick={() => {
+										if (businessContext?.merchantId) void loadCheckoutTemplates(businessContext.merchantId, demo);
+									}}>Повторити</button>
+								</div>
+							{:else if templates.length === 0}
+								<p class="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+									Для цього бізнесу ще немає збережених шаблонів.
+								</p>
+							{:else}
 								<select
 									bind:value={selectedTemplateId}
 									onchange={(e) => {
@@ -788,8 +829,8 @@
 										<option value={t.id}>{t.name} ({t.scenario_type})</option>
 									{/each}
 								</select>
-							</div>
-						{/if}
+							{/if}
+						</div>
 						<CheckoutConfigEditor bind:config={scenarioConfig} {scenario} />
 					</div>
 				</div>

@@ -2834,7 +2834,7 @@
 					"summary": "Реєстрація оператора цифрової платформи в Реєстрі ДПС",
 					"tags": ["Platform Onboarding"],
 					"status": "planned",
-					"source": "docs/dac7-openapi.yaml"
+					"source": "apps/platform/docs/dac7-openapi.yaml"
 				},
 				{
 					"method": "POST",
@@ -2843,7 +2843,7 @@
 					"summary": "Онбординг та верифікація виконавця / кур'єра через Дія.Підпис (KYC Tier-2)",
 					"tags": ["Performer KYC"],
 					"status": "planned",
-					"source": "docs/dac7-openapi.yaml"
+					"source": "apps/platform/docs/dac7-openapi.yaml"
 				},
 				{
 					"method": "POST",
@@ -2852,7 +2852,7 @@
 					"summary": "Реєстрація спеціального рахунку кур'єра (IBAN) з повідомленням ДПС",
 					"tags": ["Performer Banking"],
 					"status": "planned",
-					"source": "docs/dac7-openapi.yaml"
+					"source": "apps/platform/docs/dac7-openapi.yaml"
 				},
 				{
 					"method": "POST",
@@ -2861,7 +2861,7 @@
 					"summary": "Розрахунок 4-way сплиту замовлення у Payment Ledger",
 					"tags": ["Order Split & Ledger"],
 					"status": "planned",
-					"source": "docs/dac7-openapi.yaml"
+					"source": "apps/platform/docs/dac7-openapi.yaml"
 				},
 				{
 					"method": "POST",
@@ -2870,7 +2870,7 @@
 					"summary": "Обробка інцидентів доставки (пошкодження товару, втрата, перепризначення, сторно)",
 					"tags": ["Logistics & Incidents"],
 					"status": "planned",
-					"source": "docs/dac7-openapi.yaml"
+					"source": "apps/platform/docs/dac7-openapi.yaml"
 				},
 				{
 					"method": "POST",
@@ -2879,7 +2879,7 @@
 					"summary": "Пакетне завантаження подій платформи (Bulk Ingestion)",
 					"tags": ["DAC7 Ingestion"],
 					"status": "planned",
-					"source": "docs/dac7-openapi.yaml"
+					"source": "apps/platform/docs/dac7-openapi.yaml"
 				},
 				{
 					"method": "POST",
@@ -2888,7 +2888,7 @@
 					"summary": "Розрахунок батчу виплат на IBAN з утриманням 10% ПДФО (0% ВЗ)",
 					"tags": ["DAC7 Payouts"],
 					"status": "planned",
-					"source": "docs/dac7-openapi.yaml"
+					"source": "apps/platform/docs/dac7-openapi.yaml"
 				},
 				{
 					"method": "POST",
@@ -2897,7 +2897,7 @@
 					"summary": "Формування платіжної інструкції сплати ПДФО 10% до Казначейства",
 					"tags": ["Treasury Settlement"],
 					"status": "planned",
-					"source": "docs/dac7-openapi.yaml"
+					"source": "apps/platform/docs/dac7-openapi.yaml"
 				},
 				{
 					"method": "GET",
@@ -2906,7 +2906,7 @@
 					"summary": "Генерація квартального податкового розрахунку Додаток 4ДФ",
 					"tags": ["State Tax Reporting"],
 					"status": "planned",
-					"source": "docs/dac7-openapi.yaml"
+					"source": "apps/platform/docs/dac7-openapi.yaml"
 				},
 				{
 					"method": "GET",
@@ -2915,7 +2915,7 @@
 					"summary": "Генерація податкового звіту OECD DPI XML (DAC7) для ДПС",
 					"tags": ["OECD DAC7 Compliance"],
 					"status": "planned",
-					"source": "docs/dac7-openapi.yaml"
+					"source": "apps/platform/docs/dac7-openapi.yaml"
 				}
 			]
 		}

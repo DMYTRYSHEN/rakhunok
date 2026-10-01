@@ -8,7 +8,9 @@
 		"apps/checkout",
 		"apps/pay",
 		"apps/conf",
-		"apps/qr"
+		"apps/qr",
+		"apps/platform",
+		"apps/dac7"
 	],
 	"engines": {
 		"node": ">=22.13 <23 || >=24"
@@ -20,6 +22,14 @@
 		"dev:pay": "npm --prefix apps/pay run dev",
 		"dev:conf": "npm --prefix apps/conf run dev",
 		"dev:qr": "npm --prefix apps/qr run dev",
+		"dev:platform": "npm --prefix apps/platform run dev",
+		"dev:dac7": "npm --prefix apps/dac7 run dev",
+		"build:dac7": "npm --prefix apps/dac7 run build",
+		"check:dac7": "npm --prefix apps/dac7 run check",
+		"test:dac7": "npm --prefix apps/dac7 run test",
+		"build:platform": "npm --prefix apps/platform run build",
+		"check:platform": "npm --prefix apps/platform run check",
+		"test:platform": "npm --prefix apps/platform run test",
 		"dev:api": "npm --prefix worker run dev",
 		"build:app": "npm --prefix apps/merchant-app run build",
 		"build:checkout": "npm --prefix apps/pay run build",
@@ -79,6 +89,7 @@
 		"@tailwindcss/vite": "^4.3.0",
 		"@types/node": "^22",
 		"@types/qrcode": "^1.5.6",
+		"@types/three": "^0.186.0",
 		"eslint": "^10.4.1",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.19.0",
@@ -107,6 +118,7 @@
 		"@xyflow/svelte": "^1.6.5",
 		"mermaid": "^11.17.2",
 		"qrcode": "^1.5.4",
+		"three": "^0.186.1",
 		"webgl-fluid": "^0.4.0"
 	},
 	"optionalDependencies": {

@@ -154,6 +154,8 @@ class CheckoutStore {
 	banks = $state<Bank[]>(DEFAULT_BANKS);
 	selectedBankIndex = $state<number>(0);
 	isProcessingPayment = $state<boolean>(false);
+	prefetchedDeepLink = $state<{ redirect_url: string; fallback_url: string } | null>(null);
+	private prefetchAbortController: AbortController | null = null;
 	statusPollingInterval: ReturnType<typeof setInterval> | null = null;
 	private session = 0;
 	private paymentAttempt = 0;
@@ -584,7 +586,33 @@ class CheckoutStore {
 		if (index >= 0 && index < this.banks.length) {
 			this.selectedBankIndex = index;
 			vibrate(8);
+			this.prefetchBankDeepLink();
 		}
+	}
+
+	private prefetchBankDeepLink(): void {
+		this.prefetchedDeepLink = null;
+		if (this.prefetchAbortController) {
+			this.prefetchAbortController.abort();
+		}
+		this.prefetchAbortController = new AbortController();
+
+		const orderId = this.order?.id || this.orderId;
+		const bankCode = this.selectedBank?.code || 'UNJS';
+		const amount = this.payTotalAmount;
+		
+		if (!orderId) return;
+
+		initiateBankPayment(orderId, bankCode, amount, {
+			os: detectOS(),
+			signal: this.prefetchAbortController.signal
+		})
+			.then(result => {
+				if (result.success && result.redirect_url) {
+					this.prefetchedDeepLink = result;
+				}
+			})
+			.catch(() => { /* ignore */ });
 	}
 
 	chooseAnotherBank(): void {
@@ -1841,12 +1869,12 @@ class CheckoutStore {
 		}
 	}
 
-	private isPayable(): boolean {
+	isPayable(): boolean {
 		const order = this.order;
 		return Boolean(
 			this.isLoaded &&
 			order &&
-			order.id === this.orderId &&
+			(order.id === this.orderId || order.short_id === this.orderId) &&
 			this.orderId &&
 			(!this.terminalMode ||
 				(this.terminalSelection && matchesTerminalOrder(this.terminalSelection, order))) &&
@@ -1888,35 +1916,36 @@ class CheckoutStore {
 
 		try {
 			if (!this.isPayable()) {
-				throw new Error('Оплата тестового, завершеного або непідтвердженого рахунку заборонена');
+				throw new Error('Оплата недоступна, перевірте чи заповнені необхідні параметри');
 			}
 			this.stopPolling?.();
 			const token = await executeTurnstile('pay');
 			if (!unchanged()) return;
 			if (this.terminalMode) {
-				try {
-					const selected = await readTerminalSelection(terminalCode(window.location.pathname));
-					if (!unchanged()) return;
-					if (!matchesTerminalOrder(selected, order)) throw new Error('Terminal selection changed');
-				} catch {
-					if (unchanged()) {
-						this.terminalRead++;
-						this.terminalBusy = false;
-						this.clearTerminalOrder(true);
-					}
-					return;
+				const selection = readTerminalSelection();
+				if (!selection || !matchesTerminalOrder(selection, orderId, amount)) {
+					throw new Error('Термінальна сесія не збігається. Спробуйте оновити сторінку.');
 				}
 			}
-			const clientOS = detectOS();
-			const result = await initiateBankPayment(orderId, bankCode, amount, {
-				os: clientOS,
-				turnstileToken: token,
-				recaptchaToken: token
-			});
 
-			if (!unchanged()) return;
-			if (result.success !== true || !result.redirect_url)
-				throw new Error(result.error || 'Ініціалізацію платежу відхилено');
+			// If prefetched and valid, use it
+			let result = this.prefetchedDeepLink;
+			if (!result) {
+				const clientOS = detectOS();
+				result = await initiateBankPayment(orderId, bankCode, amount, {
+					os: clientOS,
+					turnstileToken: token,
+					recaptchaToken: token
+				});
+				if (!unchanged()) return;
+				if (result.success !== true || !result.redirect_url)
+					throw new Error(result.error || 'Невідома помилка під час ініціалізації');
+			}
+			
+			// We only launch it programmatically if it's NOT handled natively by an <a> tag
+			// We can know if it was handled natively if this method was called with a flag
+			// But for now, we just assume if it's called normally, we launch it.
+			// Actually, wait, if we use an <a> tag, we shouldn't call executePay. We should call a new method.
 			launchDeepLink(result.redirect_url, result.fallback_url);
 
 			// Pending is not success; only server confirmation may advance it.
@@ -1937,6 +1966,17 @@ class CheckoutStore {
 		} finally {
 			if (ownsAttempt()) this.isProcessingPayment = false;
 		}
+	}
+
+	handleSynchronousPayTransition(): void {
+		setTimeout(() => {
+			this.closePaymentSheet();
+			this.statusState = 'pending';
+			this.isStatusScreenOpen = true;
+			if (!this.terminalMode) this.startStatusPolling();
+		}, 50);
+		// JS fallback is removed here because handleSynchronousPayTransition is only called 
+		// for Universal Links (https://), which natively handle their own App Store fallbacks.
 	}
 
 	startStatusPolling(observeOnly = false): (() => void) | undefined {

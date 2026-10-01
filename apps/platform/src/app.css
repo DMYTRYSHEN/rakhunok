@@ -1,0 +1,23 @@
+@import 'tailwindcss' source(none);
+@source './';
+
+html {
+	font-family: 'Helvetica Neue', Helvetica, sans-serif;
+	letter-spacing: 0;
+}
+
+body {
+	margin: 0;
+}
+
+@utility antigravity-glass {
+  @apply bg-white/60 backdrop-blur-3xl border border-white/80 shadow-[0_12px_40px_rgba(0,0,0,0.06)];
+}
+
+@utility antigravity-dark-glass {
+  @apply bg-black/90 backdrop-blur-3xl border border-white/10 shadow-[0_16px_48px_rgba(0,0,0,0.4)];
+}
+
+@utility text-gradient-aurora {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-fuchsia-400 to-emerald-400;
+}

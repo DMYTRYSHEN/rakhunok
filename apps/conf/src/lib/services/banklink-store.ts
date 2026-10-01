@@ -94,7 +94,7 @@ export const BankLinkStore = {
             'id', 'code', 'name', 'nbu_version', 'encoding', 'nbu_function',
             'domain_prefix', 'android_package', 'android_intent', 'ios_scheme',
             'universal_link', 'universal_link2', 'url_template', 'alternative_url',
-            'extra_links', 'routing_mode', 'logo', 'color', 'active', 'checked',
+            'extra_links', 'routing_mode', 'priority_ios', 'priority_android', 'logo', 'color', 'active', 'checked',
             'verified', 'mode', 'last_test_result', 'last_test_at', 'appstore_url',
             'playstore_url'
         ];

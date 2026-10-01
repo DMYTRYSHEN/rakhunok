@@ -413,21 +413,43 @@
       </section>
     {/if}
 
-    <!-- Pay Button -->
-    <section class="action-area">
-      <button
-        class="pay-btn"
-        class:processing={checkout.isProcessingPayment}
-        disabled={checkout.isProcessingPayment}
-        onclick={() => checkout.executePay()}
-      >
-        <span class="btn-text">
-          {checkout.isProcessingPayment
-            ? `Переходимо в ${checkout.selectedBank?.name || 'банк'}...`
-            : 'Ви підтвердите платіж у застосунку банку'}
-        </span>
-        <div class="spinner"></div>
-      </button>
+          <!-- Pay Button -->
+      <section class="action-area">
+        {#if checkout.prefetchedDeepLink?.redirect_url && checkout.prefetchedDeepLink.redirect_url.startsWith('https://')}
+          <a
+            href={checkout.prefetchedDeepLink.redirect_url}
+            target="_blank"
+            rel="external noopener noreferrer"
+            data-sveltekit-reload
+            class="pay-btn"
+            class:processing={checkout.isProcessingPayment}
+            onclick={(e) => {
+                if (!checkout.isPayable()) {
+                    e.preventDefault();
+                    checkout.executePay(); // This will throw the correct 'Expired' error UI
+                    return;
+                }
+                checkout.handleSynchronousPayTransition();
+            }}
+            style="text-decoration: none; display: flex;"
+          >
+            <span class="btn-text">Перейти до оплати в додатку банку</span>
+          </a>
+        {:else}
+          <button
+            class="pay-btn"
+            class:processing={checkout.isProcessingPayment}
+            disabled={checkout.isProcessingPayment}
+            onclick={() => checkout.executePay()}
+          >
+            <span class="btn-text">
+              {checkout.isProcessingPayment
+                ? `Підготовка у ${checkout.selectedBank?.name || 'банк'}...`
+                : 'Перейти до оплати в додатку банку'}
+            </span>
+            <div class="spinner"></div>
+          </button>
+        {/if}
 
       <!-- Secondary Action: Other Payment Methods & Promo Coupon -->
       {#if checkout.showOtherBanks}

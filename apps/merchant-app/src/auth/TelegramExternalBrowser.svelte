@@ -2,6 +2,17 @@
 	let copied = $state(false);
 	let copyFailed = $state(false);
 	const url = `${window.location.origin}/app/`;
+	
+	function openNative() {
+		// @ts-ignore
+		if (typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+			// @ts-ignore
+			window.Telegram.WebApp.openLink(url);
+		} else {
+			copyLink();
+		}
+	}
+
 	async function copyLink() {
 		try {
 			await navigator.clipboard.writeText(url);
@@ -12,8 +23,10 @@
 </script>
 
 <div role="status">
-	<p>Вхід і прив’язування Telegram у вбудованому браузері вимкнено. У меню Telegram ⋯ виберіть «Відкрити в Safari» або «Відкрити в браузері».</p>
-	<p>Або скопіюйте адресу й відкрийте її в Safari чи системному браузері. Для прив’язування спочатку увійдіть там через Google у той самий акаунт.</p>
-	<button type="button" onclick={copyLink}>{copied ? 'Адресу скопійовано' : 'Скопіювати адресу для браузера'}</button>
-	{#if copyFailed}<p>Скопіюйте адресу вручну: <span>{url}</span></p>{/if}
+	<p>Вхід і прив’язування Telegram у вбудованому браузері вимкнено.</p>
+	<p>Щоб авторизуватись, відкрийте Касу в Safari або Chrome за допомогою кнопки нижче.</p>
+	<button type="button" onclick={openNative} style="padding: 16px; font-size: 16px; font-weight: bold; background: #007aff; color: white; border-radius: 12px; border: none; width: 100%; margin-top: 10px; cursor: pointer;">
+		Відкрити в Safari / Chrome
+	</button>
+	{#if copyFailed}<p>Не вдалося скопіювати посилання: <span>{url}</span></p>{/if}
 </div>

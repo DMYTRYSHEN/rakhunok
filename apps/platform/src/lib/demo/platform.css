@@ -1,0 +1,121 @@
+.demo-shell.demo-shell .workflow-guide { margin: 16px 0 24px; padding: 0; border-bottom: 1px solid var(--line); }
+.demo-shell.demo-shell .workflow-guide summary { padding: 12px 0; min-height: 44px; color: var(--accent); cursor: pointer; font-size: 13px; font-weight: 650; }
+.demo-shell.demo-shell .workflow-guide ol { padding-left: 22px; max-width: 85ch; }
+.demo-shell.demo-shell .workflow-guide li { padding: 5px 0; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.demo-shell.demo-shell .workflow-guide p { font-size: 12px; line-height: 1.7; }
+@font-face { font-family: 'Manrope'; src: url('../../../../pay/src/assets/fonts/manrope-latin.woff2') format('woff2'); font-weight: 200 800; font-display: swap; unicode-range: U+0000-00FF; }
+@font-face { font-family: 'Manrope'; src: url('../../../../pay/src/assets/fonts/manrope-cyrillic.woff2') format('woff2'); font-weight: 200 800; font-display: swap; unicode-range: U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+.demo-shell.demo-shell { --ink: #23262b; --muted: #60666f; --accent: #176c63; --mint: #bceade; --line: #d7dadd; font-family: 'Manrope', sans-serif; color: var(--ink); background: #f5f6f7; letter-spacing: 0; }
+.demo-shell *, .demo-shell *::before, .demo-shell *::after { box-sizing: border-box; }
+.demo-shell h1, .demo-shell h2, .demo-shell h3 { font-family: inherit; letter-spacing: 0; font-weight: 750; }
+.demo-shell .brand { color: var(--accent); font-weight: 800; }
+.demo-shell aside { background: #f5f8f6; }
+.demo-shell nav button.active { background: var(--mint); color: #164b44; }
+.demo-shell .metrics strong { font-variant-numeric: tabular-nums; font-weight: 750; }
+.demo-shell .metrics > div:nth-child(2) strong { color: var(--accent); }
+.demo-shell .metrics > div:nth-child(3) strong { color: #665295; }
+.demo-shell :is(input, select, textarea, button) { font-family: inherit; }
+.demo-shell :is(input, select, textarea) { max-width: 100%; min-width: 0; }
+.demo-shell :is(button, input, select, textarea, a):focus-visible { outline: 3px solid #ffac5f; outline-offset: 3px; }
+.demo-shell .primary { background: var(--accent); color: white; }
+.demo-shell .primary:hover { background: #004f4a; }
+.demo-shell :is(td, th) { font-variant-numeric: tabular-nums; }
+.demo-shell button:disabled { opacity: .5; cursor: not-allowed; }
+.demo-shell .module { padding: 24px 0; border-top: 1px solid var(--line); margin-top: 24px; font-size: 13px; }
+.demo-shell .module h2 { font-size: 18px; margin: 8px 0 20px; }
+.demo-shell .module h3 { font-size: 15px; margin: 20px 0 12px; }
+.demo-shell .module small { color: var(--accent); font-size: 11px; font-weight: 700; }
+.demo-shell .module p { color: var(--muted); line-height: 1.7; overflow-wrap: anywhere; }
+.demo-shell .module label { display: grid; gap: 7px; margin: 12px 0; font-size: 12px; }
+.demo-shell .module :is(input, select, textarea) { width: 100%; border: 1px solid var(--line); border-radius: 5px; padding: 10px 12px; background: #fff; color: var(--ink); font: inherit; }
+.demo-shell .module textarea { resize: vertical; font-family: ui-monospace, monospace; font-size: 12px; }
+.demo-shell .module button { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 14px; border: 1px solid var(--line); border-radius: 5px; background: #fff; font-size: 12px; font-weight: 650; cursor: pointer; }
+.demo-shell .module button.primary { background: var(--accent); color: #fff; }
+.demo-shell .module .toolbar { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+.demo-shell .module .toolbar > label { flex: 1; min-width: 160px; }
+.demo-shell .module label.check { display: flex; align-items: center; }
+.demo-shell .module input[type='checkbox'] { width: 18px; height: 18px; accent-color: var(--accent); }
+.demo-shell .module .record { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); padding: 16px 0; }
+.demo-shell .module .record > div { flex: 1; min-width: 180px; overflow-wrap: anywhere; }
+.demo-shell .module .scroll { overflow-x: auto; width: 100%; margin: 16px 0; }
+.demo-shell .module table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+.demo-shell .module th { background: #edf0f2; color: var(--muted); font-weight: 650; }
+.demo-shell .module :is(th, td) { padding: 13px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.demo-shell .module td { background: #fff; }
+.demo-shell .module [role='alert'] { color: #a33325; }
+.demo-shell .module pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }
+@media (max-width: 700px) { .demo-shell .module .toolbar > label { flex-basis: 100%; } .demo-shell .module .toolbar button { flex: 1; } }
+
+.demo-shell.demo-shell.demo-shell { --ink: #0f172a; --muted: #64748b; --accent: #4f46e5; --mint: #e0e7ff; --line: #e2e8f0; background: radial-gradient(at 0% 0%, #e0e7ff 0%, transparent 50%), radial-gradient(at 100% 0%, #ecfdf5 0%, transparent 50%), radial-gradient(at 50% 100%, #f3e8ff 0%, transparent 50%), #fff; }
+.demo-shell.demo-shell aside { background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(24px); border-right: 1px solid rgba(255,255,255,0.8); padding: 28px 18px; gap: 14px; }
+.demo-shell.demo-shell .brand { color: #0f172a; padding: 0 8px; }
+.demo-shell.demo-shell .brand strong { font-size: 20px; font-weight: 800; }
+.demo-shell.demo-shell .environment { padding: 0 8px; margin: 4px 0 12px; }
+.demo-shell.demo-shell .context-label { margin-bottom: -6px; }
+.demo-shell.demo-shell nav { gap: 8px; }
+.demo-shell.demo-shell nav button { min-height: 44px; border-radius: 12px; padding: 8px 12px; font-size: 13px; font-weight: 650; transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid transparent; }
+.demo-shell.demo-shell nav button:hover { background: rgba(255,255,255,0.6); }
+.demo-shell.demo-shell nav button.active { background: rgba(255,255,255,0.9); color: #4338ca; font-weight: 800; box-shadow: 0 8px 20px rgba(0,0,0,0.04); border: 1px solid #ffffff; }
+.demo-shell.demo-shell main { padding: 36px 40px; width: 100%; max-width: 1440px; margin-inline: auto; }
+.demo-shell.demo-shell header { min-height: 56px; margin-bottom: 24px; }
+.demo-shell.demo-shell h1 { font-size: 32px; letter-spacing: -0.02em; line-height: 1.25; font-weight: 900; }
+.demo-shell.demo-shell .eyebrow { color: #64748b; font-weight: 600; font-size: 12px; margin-bottom: 8px; }
+.demo-shell.demo-shell .disclosure { color: #64748b; font-size: 11px; line-height: 1.6; padding: 10px 0; border-top: 0; }
+.demo-shell.demo-shell .metrics { padding: 28px 0; gap: 0; }
+.demo-shell.demo-shell .metrics > div { padding: 0 22px; border-left: 1px solid rgba(0,0,0,0.05); }
+.demo-shell.demo-shell .metrics > div:first-child { padding-left: 0; border-left: 0; }
+.demo-shell.demo-shell .metrics span { font-size: 12px; line-height: 1.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; }
+.demo-shell.demo-shell .metrics strong { font-size: 36px; font-weight: 900; line-height: 1.1; margin-top: 10px; letter-spacing: -0.05em; background: linear-gradient(to right, #0f172a, #334155); -webkit-background-clip: text; color: transparent; }
+.demo-shell.demo-shell .metrics > div:nth-child(3) strong { background: linear-gradient(to right, #059669, #10b981); -webkit-background-clip: text; color: transparent; }
+.demo-shell.demo-shell h2 { font-size: 18px; line-height: 1.4; font-weight: 800; color: #0f172a; }
+.demo-shell.demo-shell :is(button, input, select) { min-height: 44px; }
+.demo-shell.demo-shell button { font-weight: 750; border-radius: 9999px; transition: all 300ms ease; border: 1px solid transparent; }
+.demo-shell.demo-shell button:not(:disabled):hover { border-color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.7); box-shadow: 0 4px 15px rgba(0,0,0,0.03); transform: translateY(-1px); }
+.demo-shell.demo-shell .primary { background: linear-gradient(135deg, #4f46e5, #3b82f6); border-color: transparent; color: #fff; box-shadow: 0 4px 15px rgba(79,70,229,0.3); }
+.demo-shell.demo-shell .primary:not(:disabled):hover { background: linear-gradient(135deg, #4338ca, #2563eb); border-color: transparent; box-shadow: 0 6px 20px rgba(79,70,229,0.4); transform: translateY(-2px); }
+.demo-shell.demo-shell button:disabled { opacity: 0.6; color: #94a3b8; background: #f1f5f9; cursor: not-allowed; border-color: transparent; transform: none; }
+.demo-shell.demo-shell :is(input, select, textarea) { border-color: rgba(0,0,0,0.05); border-radius: 12px; background: rgba(255,255,255,0.7); color: #0f172a; font-size: 14px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); transition: all 300ms ease; }
+.demo-shell.demo-shell :is(input, select, textarea):hover { border-color: rgba(0,0,0,0.1); background: rgba(255,255,255,0.9); }
+.demo-shell.demo-shell :is(input, select, textarea):focus { border-color: #4f46e5; background: #fff; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02), 0 0 0 3px rgba(79,70,229,0.1); outline: none; }
+.demo-shell.demo-shell :is(button, a, summary):focus-visible { outline: 3px solid #818cf8; outline-offset: 3px; }
+.demo-shell.demo-shell input::placeholder, .demo-shell.demo-shell textarea::placeholder { color: #94a3b8; }
+.demo-shell.demo-shell .module { margin-top: 28px; padding: 32px 36px; background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 2.5rem; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.04); }
+.demo-shell.demo-shell .module h2 { margin: 0 0 24px; font-weight: 800; font-size: 20px; }
+.demo-shell.demo-shell .module label { font-size: 12px; font-weight: 700; line-height: 1.5; gap: 8px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
+.demo-shell.demo-shell .module :is(input, select, textarea) { font-weight: 500; text-transform: none; letter-spacing: 0; }
+.demo-shell.demo-shell .module textarea { font-size: 13px; line-height: 1.7; padding: 16px; tab-size: 2; border-radius: 16px; }
+.demo-shell.demo-shell .module .toolbar { gap: 16px; margin: 16px 0 24px; }
+.demo-shell.demo-shell .module .toolbar > label { min-width: 180px; }
+.demo-shell.demo-shell .module .toolbar > label.check { flex: 0 1 auto; min-width: 0; align-self: center; gap: 9px; }
+.demo-shell.demo-shell .module input[type='checkbox'] { min-height: 18px; width: 18px; height: 18px; flex: 0 0 18px; box-shadow: none; border-radius: 6px; accent-color: #4f46e5; }
+.demo-shell.demo-shell .module small { background: #f8fafc; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 6px; white-space: nowrap; vertical-align: middle; font-weight: 700; color: #64748b; }
+.demo-shell.demo-shell .module .record { padding: 18px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+.demo-shell.demo-shell .module .record strong { font-weight: 800; }
+.demo-shell.demo-shell .module details { border-bottom: 1px solid rgba(0,0,0,0.05); padding: 12px 0; }
+.demo-shell.demo-shell summary { cursor: pointer; font-size: 13px; font-weight: 800; padding: 8px 0; color: #4f46e5; }
+.demo-shell.demo-shell .module pre { background: rgba(255,255,255,0.7); backdrop-filter: blur(10px); padding: 16px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.8); box-shadow: 0 4px 15px rgba(0,0,0,0.02); font-size: 12px; line-height: 1.7; }
+.demo-shell.demo-shell :is(th, td) { padding: 16px 14px; border-bottom: 1px solid rgba(0,0,0,0.03); }
+.demo-shell.demo-shell th { background: transparent; color: #64748b; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; }
+.demo-shell.demo-shell tbody tr { transition: background 200ms ease; }
+.demo-shell.demo-shell tbody tr:hover td { background: rgba(255,255,255,0.6); }
+.demo-shell.demo-shell .notice { border-left-width: 3px; border-radius: 8px; background: rgba(236,253,245,0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.8); line-height: 1.7; padding: 16px; margin: 16px 0; color: #065f46; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
+.demo-shell.demo-shell .notice.error { background: rgba(254,242,242,0.7); color: #991b1b; border-left-color: #ef4444; }
+.demo-shell.demo-shell footer { margin-top: 48px; color: #65716a; }
+@media (min-width: 1100px) { .demo-shell.demo-shell aside { position: sticky; top: 0; height: 100dvh; overflow-y: auto; } }
+@media (max-width: 1100px) { .demo-shell.demo-shell main { padding: 28px 24px; } .demo-shell.demo-shell .metrics strong { font-size: 23px; } }
+@media (max-width: 1000px) { .demo-shell.demo-shell .metrics { gap: 24px 0; } .demo-shell.demo-shell .metrics > div:nth-child(3) { padding-left: 0; border-left: 0; } }
+@media (max-width: 700px) {
+	.demo-shell.demo-shell aside { padding: 18px 16px; gap: 10px; }
+	.demo-shell.demo-shell .brand { padding: 0; }
+	.demo-shell.demo-shell .environment { margin: 0; padding: 0; }
+	.demo-shell.demo-shell main { padding: 24px 16px; }
+	.demo-shell.demo-shell h1 { font-size: 25px; }
+	.demo-shell.demo-shell nav { margin: 4px -4px 0; padding: 4px 4px 8px; }
+	.demo-shell.demo-shell nav button.active { box-shadow: inset 0 -3px #126450; }
+	.demo-shell.demo-shell .metrics > div { padding: 0 14px; }
+	.demo-shell.demo-shell .metrics strong { font-size: 21px; }
+	.demo-shell.demo-shell .module .toolbar > label.check { flex-basis: auto; }
+	.demo-shell.demo-shell .module .toolbar { gap: 10px; }
+	.demo-shell.demo-shell .module .toolbar button { min-width: 0; white-space: normal; }
+}
+@media (prefers-reduced-motion: reduce) { .demo-shell.demo-shell button { transition: none; } }

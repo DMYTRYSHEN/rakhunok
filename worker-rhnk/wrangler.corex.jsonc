@@ -1,0 +1,28 @@
+{
+	"$schema": "../worker/node_modules/wrangler/config-schema.json",
+	"name": "rhnk-corex",
+	"main": "../worker/src/corex.ts",
+	"compatibility_date": "2026-09-10",
+	"workers_dev": false,
+	"preview_urls": false,
+	"workflows": [{
+		"name": "rhnk-corex-process",
+		"binding": "COREX_PROCESS_WORKFLOW",
+		"class_name": "CorexProcessWorkflow"
+	}],
+	"vars": {
+		"SUPABASE_URL": "https://mwaeazabpvbxqfrceogr.supabase.co",
+		"SUPABASE_PUBLISHABLE_KEY": "sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk"
+	},
+	"assets": {
+		"directory": "../build-corex",
+		"binding": "ASSETS",
+		"run_worker_first": true,
+		"not_found_handling": "single-page-application"
+	},
+	"observability": { "enabled": true, "traces": { "enabled": true } },
+	"routes": [
+		{ "pattern": "rhnk.pp.ua/corex", "zone_name": "rhnk.pp.ua" },
+		{ "pattern": "rhnk.pp.ua/corex/*", "zone_name": "rhnk.pp.ua" }
+	]
+}

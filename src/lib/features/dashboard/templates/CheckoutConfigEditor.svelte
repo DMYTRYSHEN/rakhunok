@@ -47,6 +47,19 @@
 </script>
 
 <div class="border-t border-zinc-100 pt-2">
+	{#if scenario === 'donation'}
+		<div class="mb-4 grid gap-3 rounded-md border border-zinc-200 p-3">
+			<label class="grid gap-1 text-sm font-medium text-zinc-700">Мета збору
+				<input class="rounded-md border border-zinc-200 p-2" maxlength="120" value={String((config.flow_data?.donation as Record<string, unknown> | undefined)?.goal_title ?? '')} oninput={(event) => config = { ...config, flow_data: { ...config.flow_data, donation: { ...(config.flow_data?.donation as Record<string, unknown> | undefined), goal_title: event.currentTarget.value } } }} />
+			</label>
+			<label class="grid gap-1 text-sm font-medium text-zinc-700">Організатор
+				<input class="rounded-md border border-zinc-200 p-2" maxlength="120" value={String((config.flow_data?.donation as Record<string, unknown> | undefined)?.organizer ?? '')} oninput={(event) => config = { ...config, flow_data: { ...config.flow_data, donation: { ...(config.flow_data?.donation as Record<string, unknown> | undefined), organizer: event.currentTarget.value } } }} />
+			</label>
+			<label class="grid gap-1 text-sm font-medium text-zinc-700">Цільова сума, ₴
+				<input type="number" min="1" step="1" class="rounded-md border border-zinc-200 p-2" value={Number((config.flow_data?.donation as Record<string, unknown> | undefined)?.target_amount ?? 0)} oninput={(event) => config = { ...config, flow_data: { ...config.flow_data, donation: { ...(config.flow_data?.donation as Record<string, unknown> | undefined), target_amount: event.currentTarget.valueAsNumber } } }} />
+			</label>
+		</div>
+	{/if}
 	{#if scenario === 'fuel_station'}
 		<div class="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
 			<strong class="block font-semibold">Сценарій АЗС</strong>
@@ -371,7 +384,7 @@
 		</div>
 	{/if}
 
-	{#if scenario === 'open_amount'}
+	{#if scenario === 'open_amount' || scenario === 'donation'}
 		<p class="mb-2 text-[10px] font-bold tracking-widest text-zinc-400 uppercase">Відкрита сума</p>
 		<div class="mb-4 rounded-md border border-zinc-200 p-3">
 			<div class="mb-2 flex items-center justify-between gap-3">

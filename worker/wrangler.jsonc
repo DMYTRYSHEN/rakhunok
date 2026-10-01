@@ -1,42 +1,55 @@
 {
-	"$schema": "./node_modules/wrangler/config-schema.json",
-	"name": "letsrealtalk-web-preview",
-	"main": "src/index.ts",
-	"compatibility_date": "2026-08-28",
-	"workers_dev": true,
-	"preview_urls": true,
-	"assets": {
-		"directory": "../build",
-		"binding": "ASSETS",
-		"run_worker_first": true,
-		"not_found_handling": "single-page-application"
-	},
-	"observability": {
-		"enabled": true,
-		"head_sampling_rate": 1
-	},
-	"kv_namespaces": [
-		{ "binding": "ORDERS_KV", "id": "0c5bedeab0064a54882319a5f810306c" }
-	],
-	"env": {
-		"production": {
-			"name": "letsrealtalk-web",
-			"workers_dev": false,
-			"preview_urls": false,
-			"kv_namespaces": [
-				{ "binding": "ORDERS_KV", "id": "0c5bedeab0064a54882319a5f810306c" }
-			],
-			"routes": [
-				{
-					"pattern": "letsrealtalk.com/*",
-					"zone_name": "letsrealtalk.com"
-				}
-			],
-			"vars": {
-				"TELEGRAM_INVOICE_PUBLIC_ORIGIN": "https://letsrealtalk.com",
-				"SUPABASE_URL": "https://mwaeazabpvbxqfrceogr.supabase.co",
-				"SUPABASE_ANON_KEY": "sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk"
-			}
-		}
-	}
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "letsrealtalk-web-preview",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-28",
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": "../build",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "not_found_handling": "single-page-application"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "kv_namespaces": [
+    {
+      "binding": "ORDERS_KV",
+      "id": "0c5bedeab0064a54882319a5f810306c"
+    }
+  ],
+  "env": {
+    "production": {
+      "name": "letsrealtalk-web",
+      "workers_dev": false,
+      "preview_urls": false,
+      "kv_namespaces": [
+        {
+          "binding": "ORDERS_KV",
+          "id": "0c5bedeab0064a54882319a5f810306c"
+        }
+      ],
+      "routes": [
+        {
+          "pattern": "letsrealtalk.com/*",
+          "zone_name": "letsrealtalk.com"
+        }
+      ],
+      "vars": {
+        "TELEGRAM_INVOICE_PUBLIC_ORIGIN": "https://letsrealtalk.com",
+        "SUPABASE_URL": "https://mwaeazabpvbxqfrceogr.supabase.co",
+        "SUPABASE_ANON_KEY": "sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk"
+      }
+    }
+  },
+  "d1_databases": [
+    {
+      "binding": "BANK_CATALOG_DB",
+      "database_name": "letsrealtalk-conf-snapshots",
+      "database_id": "2e5d61b8-d603-420e-8a17-231cd5c9340f"
+    }
+  ]
 }

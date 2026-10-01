@@ -10,6 +10,7 @@
 		Info,
 		MapPin,
 		ReceiptText,
+		Delete,
 		ShieldCheck,
 		Star,
 		Truck,
@@ -44,7 +45,10 @@
 	} = $props();
 
 	let step = $state<CheckoutPreviewStep>('checkout');
-	let enteredAmount = $state(200);
+	let enteredAmount = $state(0);
+	let donationCustomMode = $state(false);
+	let donationAmountSheetOpen = $state(false);
+	let donationDraft = $state('');
 	let selectedTip = $state(10);
 	let promoApplied = $state(false);
 	let promoCode = $state('');
@@ -94,6 +98,9 @@
 	] as const;
 
 	const model = $derived(buildCheckoutPreviewModel(scenario, config));
+	const donationDetails = $derived(
+		config.flow_data?.donation as { goal_title?: string; organizer?: string; target_amount?: number } | undefined
+	);
 	const displayedAmount = $derived(model.isOpenAmount ? enteredAmount : model.amount);
 	const discount = $derived(
 		promoApplied && model.config.allow_promo ? Number(model.config.promo_discount ?? 0) : 0
@@ -114,8 +121,28 @@
 	);
 	const theme = $derived(model.config.theme === 'light' ? 'light' : 'dark');
 
+	function openDonationAmountSheet(): void {
+		donationDraft = donationCustomMode && enteredAmount > 0 ? String(enteredAmount) : '';
+		donationAmountSheetOpen = true;
+	}
+
+	function enterDonationDigit(digit: string): void {
+		if (donationDraft.length < 9 && (donationDraft !== '' || digit !== '0')) {
+			donationDraft += digit;
+		}
+	}
+
+	function confirmDonationAmount(): void {
+		const amount = Number(donationDraft);
+		if (!Number.isSafeInteger(amount) || amount <= 0) return;
+		enteredAmount = amount;
+		donationCustomMode = true;
+		donationAmountSheetOpen = false;
+	}
+
 	function selectStep(next: CheckoutPreviewStep): void {
 		if (next === 'payment') {
+			if (scenario === 'donation' && (!Number.isFinite(enteredAmount) || enteredAmount <= 0)) return;
 			step = 'checkout';
 			paymentSheetView = 'banks';
 			paymentSheetOpen = true;
@@ -155,7 +182,7 @@
 	<div class="step-tabs" aria-label="Етап оплати">
 		<button class:active={step === 'checkout'} onclick={() => selectStep('checkout')}>Чекаут</button
 		>
-		<button class:active={paymentSheetOpen} onclick={() => selectStep('payment')}>Оплата</button>
+		<button class:active={paymentSheetOpen} disabled={scenario === 'donation' && (!Number.isFinite(enteredAmount) || enteredAmount <= 0)} onclick={() => selectStep('payment')}>Оплата</button>
 		<button class:active={step === 'success'} onclick={() => selectStep('success')}>Готово</button>
 	</div>
 
@@ -194,6 +221,24 @@
 					<FlowerGiftTemplatePreview {scenario} onPay={(amt) => { flowerAmount = amt; selectStep('payment'); }} />
 				{:else if isCourierScenario(scenario)}
 					<CourierDeliveryTemplatePreview {scenario} onPay={(amt) => { courierAmount = amt; selectStep('payment'); }} />
+				{:else if scenario === 'donation'}
+					<section class="hero donation-hero">
+						<span class="eyebrow">Збір коштів</span>
+						<strong class="donation-goal">{donationDetails?.goal_title?.trim() || 'Назва мети збору'}</strong>
+						<span>Організатор: {donationDetails?.organizer?.trim() || 'Не вказано'}</span>
+						{#if donationDetails?.target_amount && donationDetails.target_amount > 0}
+							<span class="donation-target">Мета збору: {donationDetails.target_amount.toLocaleString('uk-UA')} ₴</span>
+						{/if}
+						<strong class="donation-contribution">{Number.isFinite(enteredAmount) && enteredAmount > 0 ? enteredAmount.toLocaleString('uk-UA') : '0'} ₴</strong>
+						<span class="eyebrow">Сума вашого внеску</span>
+					</section>
+					<div class="chips amounts donation-amounts">
+						{#each model.quickAmounts as amount (amount)}
+							<button class:active={!donationCustomMode && enteredAmount === amount} onclick={() => { donationCustomMode = false; enteredAmount = amount; }}>{amount} ₴</button>
+						{/each}
+						<button class:active={donationCustomMode} onclick={openDonationAmountSheet}>Інша сума</button>
+					</div>
+					<button class="primary" disabled={!Number.isFinite(enteredAmount) || enteredAmount <= 0} onclick={() => selectStep('payment')}>{model.ctaText}<ChevronRight size={16} /></button>
 				{:else}
 					<section class="hero">
 						<span class="eyebrow">{model.contextLabel}</span>
@@ -394,6 +439,26 @@
 			{/if}
 		</main>
 
+		{#if donationAmountSheetOpen && scenario === 'donation' && step === 'checkout'}
+			<button class="sheet-backdrop" aria-label="Закрити введення суми" onclick={() => (donationAmountSheetOpen = false)}></button>
+			<div class="donation-amount-sheet" role="dialog" aria-modal="true" aria-label="Власна сума внеску">
+				<div class="sheet-handle"></div>
+				<div class="donation-sheet-heading">
+					<span>Ваш внесок</span>
+					<button class="sheet-icon" aria-label="Закрити" onclick={() => (donationAmountSheetOpen = false)}><X size={16} /></button>
+				</div>
+				<strong class="donation-sheet-amount" aria-live="polite">{donationDraft ? Number(donationDraft).toLocaleString('uk-UA') : '0'} <span>₴</span></strong>
+				<div class="donation-keypad" aria-label="Клавіатура суми">
+					{#each ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as digit (digit)}
+						<button aria-label={`Цифра ${digit}`} onclick={() => enterDonationDigit(digit)}>{digit}</button>
+					{/each}
+					<span></span>
+					<button aria-label="Цифра 0" onclick={() => enterDonationDigit('0')}>0</button>
+					<button aria-label="Видалити цифру" onclick={() => (donationDraft = donationDraft.slice(0, -1))}><Delete size={22} /></button>
+				</div>
+				<button class="donation-sheet-confirm" disabled={!Number.isSafeInteger(Number(donationDraft)) || Number(donationDraft) <= 0} onclick={confirmDonationAmount}>Підтвердити суму</button>
+			</div>
+		{/if}
 		{#if paymentSheetOpen}
 			<button
 				class="sheet-backdrop"
@@ -569,6 +634,93 @@
 	.phone.light {
 		background: #fafafa;
 		color: #18181b;
+	}
+	.donation-goal {
+		display: block;
+		overflow-wrap: anywhere;
+		font-size: 20px;
+		line-height: 1.3;
+	}
+	.donation-hero {
+		gap: 8px;
+	}
+	.donation-target {
+		margin-top: 5px;
+		color: #fda4af;
+		font-size: 11px;
+		font-weight: 700;
+	}
+	.light .donation-target {
+		color: #be123c;
+	}
+	.donation-contribution {
+		margin-top: 8px;
+		font-size: 30px;
+		line-height: 1;
+	}
+	.donation-amount-sheet {
+		position: absolute;
+		z-index: 11;
+		right: 0;
+		bottom: 0;
+		left: 0;
+		display: grid;
+		gap: 10px;
+		padding: 0 18px 20px;
+		border-radius: 18px 18px 0 0;
+		background: #f8f8fa;
+		color: #18181b;
+		box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.28);
+	}
+	.donation-sheet-heading {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		font-size: 12px;
+		font-weight: 700;
+	}
+	.donation-sheet-amount {
+		min-height: 52px;
+		text-align: center;
+		font-size: 38px;
+		line-height: 1.3;
+		font-variant-numeric: tabular-nums;
+	}
+	.donation-sheet-amount span {
+		color: #71717a;
+		font-size: 22px;
+	}
+	.donation-keypad {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		grid-template-rows: repeat(4, 47px);
+		gap: 4px;
+	}
+	.donation-keypad button {
+		display: grid;
+		place-items: center;
+		border: 0;
+		border-radius: 6px;
+		background: transparent;
+		color: #18181b;
+		font-size: 24px;
+		font-weight: 600;
+	}
+	.donation-keypad button:active {
+		background: #e4e4e7;
+	}
+	.donation-sheet-confirm {
+		min-height: 44px;
+		border: 0;
+		border-radius: 8px;
+		background: #18181b;
+		color: #fff;
+		font-size: 12px;
+		font-weight: 700;
+	}
+	button:disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
 	}
 	.phone-bar {
 		height: 22px;
@@ -765,6 +917,9 @@
 	.chips.amounts {
 		justify-content: center;
 		margin: -6px 0 10px;
+	}
+	.chips.donation-amounts {
+		margin: 8px 0 12px;
 	}
 	.chips button {
 		min-height: 28px;

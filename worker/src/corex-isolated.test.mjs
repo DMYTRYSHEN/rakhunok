@@ -33,12 +33,14 @@ function fixture() {
 
 test('serves scoped assets verbatim before fallback and without reading DB configuration', async () => {
 	for (const path of ['/corex/_app', '/corex/_app/env.js', '/corex/_app/version.json', '/corex/_app/immutable/entry/start.js?v=1', '/corex/_app/immutable/missing.js']) {
+		for (const host of ['letsrealtalk.com', 'rhnk.pp.ua']) {
 		const { env, requests } = fixture();
 		Object.defineProperty(env, 'SUPABASE_URL', { get() { throw new Error('Assets must not touch the control plane'); } });
-		const request = new Request(`https://letsrealtalk.com${path}`, { method: 'HEAD', headers: { 'If-None-Match': 'test' } });
+		const request = new Request(`https://${host}${path}`, { method: 'HEAD', headers: { 'If-None-Match': 'test' } });
 		const response = await worker.fetch(request, env);
 		assert.equal(response.status, path.includes('missing') ? 404 : 200);
 		assert.deepEqual(requests, [request]);
+		}
 	}
 });
 

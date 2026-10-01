@@ -36,6 +36,7 @@ const SCENARIO_PRESENTATION: Record<
 	},
 	tips: { merchantName: 'Кав’ярня Центральна', contextLabel: 'Чайові офіціанту', amount: 100 },
 	open_amount: { merchantName: 'Rahunok', contextLabel: 'Введіть суму до сплати', amount: 0 },
+	donation: { merchantName: 'Збір коштів', contextLabel: 'Благодійний внесок', amount: 0 },
 	fuel_station: { merchantName: 'Rahunok АЗС', contextLabel: 'Колонка · пальне · об’єм', amount: 1190 },
 
 	// Engines
@@ -72,7 +73,7 @@ export function buildCheckoutPreviewModel(
 		scenario,
 		config: resolved,
 		...SCENARIO_PRESENTATION[scenario],
-		isOpenAmount: scenario === 'open_amount',
+		isOpenAmount: scenario === 'open_amount' || scenario === 'donation',
 		quickAmounts: resolved.quick_amounts ?? [],
 		tipPresets: resolved.tip_presets ?? [],
 		ctaText: resolved.cta_text?.trim() || 'Перейти до оплати'

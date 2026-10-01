@@ -5,7 +5,7 @@ import type {
 import type { PersistedInvoiceType } from '../types';
 
 export function templateInvoiceType(scenario: CheckoutFlowId): PersistedInvoiceType {
-	if (scenario === 'tips' || scenario === 'open_amount' || scenario === 'fuel_station') {
+	if (scenario === 'tips' || scenario === 'open_amount' || scenario === 'donation' || scenario === 'fuel_station') {
 		return 'open_amount';
 	}
 	if (scenario === 'table' || scenario === 'engine_split') {

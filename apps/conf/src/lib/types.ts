@@ -15,6 +15,8 @@ export interface BankEntry {
     alternative_url: string | null;
     extra_links: string | null;
     routing_mode: 'universal_link' | 'scheme' | 'intent' | 'redirect' | 'store_links';
+    priority_ios?: 'universal_link' | 'scheme' | 'store' | null;
+    priority_android?: 'universal_link' | 'scheme' | 'store' | null;
     logo: string | null;
     color: string;
     active: boolean;

@@ -12,7 +12,13 @@ export default defineConfig({
   ],
   server: {
     host: true,
-    port: 5176
+    port: 5176,
+    proxy: {
+      '^/conf/api/banks/sync$': {
+        target: 'http://127.0.0.1:8796',
+        changeOrigin: false
+      }
+    }
   },
   build: {
     sourcemap: false,

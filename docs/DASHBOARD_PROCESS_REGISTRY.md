@@ -104,6 +104,70 @@ changes do not bypass these rules.
 
 ### BANK-CATALOG-READ-001 — public BankLink catalog (2026-09-22)
 
+- **2026-09-28 separate approval:** user requested a dedicated Conf D1 sync button.
+  Implemented a private Supabase-to-D1 snapshot import in the Conf Worker only;
+  public catalog resolution and invoice/payment behavior remain locked and unchanged.
+  Local D1 schema applied; no remote resources, writes, or deployment. Authorization
+  uses verified Supabase user identity plus explicit server allowlist, preserving RLS.
+  Two local-D1 tests pass with mocked source/auth; Conf check has zero errors and
+  22 existing warnings. Follow-up: configured the explicitly approved admin UID and
+  existing public Supabase settings in ignored local env; restarted only local Conf API.
+  Direct and proxied unauthenticated requests now return 401 instead of configuration
+  503. No import was triggered. Real authenticated browser import remains unverified;
+  the shared browser is signed out and previously rejected localhost Google OAuth.
+  See `CONF_D1_BANK_CATALOG_PLAN.md` for limits and local setup.
+- **2026-09-28 test-server follow-up:** the later server-setup request supersedes
+  the local-only deployment status above for `letsrealtalk.com` only. Conf has the
+  private D1 binding. A workerd regression reproduced auth 502 caused by unsupported
+  `redirect: 'error'`; both Supabase requests now use `manual` and reject 3xx.
+  Three focused tests pass, including workerd auth, redirect rejection, local import
+  and deduplication; narrow typecheck and Conf dry-run pass. Deployed Conf version
+  `8ee58821-b1cc-48cb-8082-27ba1b37e201`: missing/invalid bearer returns 401,
+  foreign Origin returns 403. Seven domain routes and linked JS/CSS pass HTTP/type
+  smoke checks. Real authenticated remote import remains unverified because the
+  shared browser has no Conf session and blocks the Google popup. No production,
+  payment behavior, catalog authority, or Supabase policy changes.
+- **2026-09-28 separately approved `conf_banks`:** user confirmed the real import
+  `e41d87a3b474` and requested one bank per row. Applied `0002_conf_banks.sql` only
+  to test D1 `letsrealtalk-conf-snapshots`: 46 unique bank rows, 1,288 JSON fields,
+  zero payload mismatches with the preserved snapshot. Generated code/name/active
+  columns retain full JSON; EXPLAIN confirms indexed case-insensitive code lookup.
+  Sync updates rows and snapshots atomically. Three tests passed without Node test
+  process isolation, including migration backfill, replacement and rollback;
+  typecheck and Conf dry-run passed. Deployed test Conf version
+  `3c9f4325-2cf0-4436-957c-50207aaf1a12`; seven routes/assets and 401/403 guards
+  passed remote smoke checks. Authenticated sync after this deployment is not yet
+  verified. No Checkout, catalog authority, Supabase policy, or production changes.
+- **2026-09-28 routing analysis only:** Supabase exposes all 28 BankLink fields;
+  the MONO routing values match the current Conf D1 snapshot. Across 46 source rows,
+  23 universal links and 6 URL templates are nonempty; all Android Intent templates
+  are empty. Package, iOS scheme, secondary link and both store URLs are populated
+  for all 46 rows, which does not establish device compatibility. Pay's configured
+  test checkout forwards APIs to `letsrealtalk-web-preview`; its initiation path
+  uses the hardcoded `worker/src/index.ts` bank redirect switch, not Conf D1 or
+  `routing_mode`. Pay validates one redirect and one fallback; its validator rejects
+  MONO custom schemes, android-app URLs and Conf's generated MONO store-fallback
+  Intent. The desktop UI uses a 768px breakpoint and encodes the checkout URL in QR.
+  Conf `buildBankUrls` ignores `android_intent` and `routing_mode`, generates Intent
+  from package/store fields, and requires HTTPS `universal_link` before applying
+  `url_template`. The modal's Intent template input actually binds `universal_link2`.
+  Evidence: source inspection and read-only Supabase/D1 queries; no payment requests
+  or physical-device launch tests. This does not re-certify all source rows against
+  the snapshot. Payload generation, routing, database contents and deployments remain
+  unchanged. Any implementation requires separate approval for affected locked
+  invoice scenarios; catalog and scenario locks remain in force.
+- **2026-09-28 test Conf access and ABUA comparison:** Removed only the client-side
+  `777` step after Supabase Google sign-in in Conf; restored Google sessions now open
+  the manager directly. Worker-side sync authorization remains unchanged. Conf check,
+  root build, Conf build and Conf dry-run passed; deployed only test `letsrealtalk-conf`
+  version `01f9afcd-6a01-47c8-9c59-3dcdb10a5c6b`. Seven required routes and
+  Conf JS/CSS assets return HTTP 200 with expected content types; authenticated
+  browser reload was not tested. Read-only ABUA comparison: current Supabase and
+  test D1 agree on routing fields in snapshot `e41d87a3b474`; local `abank24` and
+  `ABUA` have identical 25-field JSON values. Local differs from source: active
+  true/false, verified true/false, color `#03d350`/`#FF0000`, missing/present
+  Android app prefix and App Store URL, and populated/null alternative URL,
+  respectively. D1 remains a manual snapshot; no bank record was changed.
 - **Status:** `LOCKED` — the user approved and the implementation completed read-only catalog
   resolution only. Payment initiation, invoice scenarios, Conf management, database writes,
   migrations, and deployment were not unlocked.
@@ -123,6 +187,53 @@ changes do not bypass these rules.
   the changed Worker source and test. Pay validation passes all 236 tests and `svelte-check` with
   zero errors; the local target invoice renders 46 bank rows, including bundled-only `ALLI` and
   API-only `UNJS`. No remote query, migration, or deployment was performed.
+
+- Follow-up feasibility review (planning only): Conf currently edits and reads `banklink`;
+  its reload also invokes Android-link backfill writes. The proposed publication boundary is
+  Supabase drafts -> approved revision in D1 -> derived KV catalog, not bidirectional sync.
+  Production checkout configuration forwards bank routes to external service `rahunok`.
+  Its adjacent source in `../core/worker/src/routes/banks.ts` caches an upstream `bank-api`
+  catalog in KV; `logos.ts` separately caches Supabase `banksy`. D1 ownership behind that
+  upstream, live bindings, authorization and RLS remain unverified. Existing Pay bundled/API
+  merging and separate logo overrides must be addressed before claiming a single published
+  authority. No runtime changes, remote operations or deployment were performed; this process
+  remains `LOCKED`. Changing catalog authority/fallback semantics requires explicit approval.
+
+- Local Monobank review (2026-09-28, analysis only): the open Pay invoice displayed 123 UAH
+  and `pending`; its loaded catalog contained both `MONO` and `UNJS`. Pay merges by code,
+  so these aliases remain separate entries. Selecting a bank only changes local selection;
+  payment submission calls the local Worker `/initiate` endpoint. That handler generates
+  the NBU payload from invoice data and hardcodes the same `https://mbnk.app/qr/{payload}`
+  redirect and fallback for both aliases on iOS, Android, and desktop. Conf routing fields
+  do not control this handler; no D1/KV bank-link publication is involved in this local path.
+  Five focused routing/launcher tests passed. An isolated OS probe confirmed that an iPad
+  desktop User-Agent is classified as desktop. App installation and actual bank opening
+  remain unverified; desktop popup blocking and identical mobile fallback URLs remain risks.
+  No payment request, external bank navigation, remote mutation, or deployment was performed.
+  This process remains `LOCKED`. Separately, the previously approved Conf refresh change
+  removed Android-link backfill from `loadBanks`; its refresh now calls only `getAll`.
+
+- LAN and carousel follow-up (2026-09-28, analysis only): a separate Pay Vite process on
+  `0.0.0.0:5177` served the pending 123 UAH invoice over the LAN address and successfully
+  proxied same-origin API GET requests to the existing loopback Worker. No source configuration
+  or firewall rules changed. In an isolated browser tab, choosing the `UNJS` grid entry
+  immediately selected `UNJS`, but smooth-scroll callbacks then selected intermediate banks,
+  including `ACBR` at about 571 ms, before returning to `UNJS` at about 1420 ms. No initiation
+  request occurred. `BankSheet.svelte` updates selection on every carousel scroll; this
+  reproduces transient wrong-bank selection, not external Accord app navigation. The local
+  QR helper is not called by `executePay`; the Worker returns one Monobank universal link.
+  Fixing shared bank-selection behavior affects payment entry across all four locked invoice
+  scenarios and requires separate explicit approval. No scenario lock was changed.
+
+- D1 architecture plan (2026-09-28, documentation only):
+  [Conf D1 bank catalog plan](CONF_D1_BANK_CATALOG_PLAN.md) proposes D1-owned drafts and
+  immutable releases, a derived minimal KV catalog, and server-only selected-bank routing.
+  This supersedes the earlier Supabase-draft proposal only as a recommendation, not as an
+  implemented authority change. KV staleness requires a primary D1 check of the active bank
+  revision and emergency block at initiation; already issued external links cannot be revoked.
+  Legacy bundled/API exposure, MONO/UNJS identity, production API ownership and permissions
+  remain migration gates. No runtime, remote data, access policy or deployment changed.
+  `BANK-CATALOG-READ-001` remains `LOCKED`; the plan grants no invoice-scenario unlock.
 
 ### CROSS-APP-INVOICE-SCENARIOS-001 — established invoice scenarios (2026-09-21)
 
@@ -758,6 +869,43 @@ focused unit plus browser validation. Restore `LOCKED` after the approved work i
 
 ### DASH-CHECKOUT-TEMPLATES-001 — checkout template management (2026-09-16)
 
+- Donation collection extension (2026-09-30): the user explicitly approved representing
+  `Збір коштів` as an `open_amount` invoice while preserving ordinary `open_amount` behavior.
+  The temporary `CROSS-APP-INVOICE-SCENARIOS-001` scope covers only donation-template
+  configuration, its versioned checkout identity, goal-first Dashboard preview and Pay
+  renderer, and payment amount selection for invoices bearing that identity. Direct invoice
+  creation, Merchant POS, existing links/orders, Worker APIs, database schema, other invoice
+  scenarios, and deployment remain outside the approval. This local scope is complete and
+  the cross-app scenario process is `LOCKED` again.
+- Donation configuration requires a nonblank goal and organizer and a positive finite target;
+  it persists as `open_amount` with `checkout_flow.id = donation`. A configured collection
+  shows its purpose before preset/custom contribution entry; cleared input and navigation
+  to another invoice reset the payable amount. Ordinary `open_amount` keeps its keypad.
+  Unsent message/anonymity options are not shown. Focused Dashboard template tests passed
+  18/18 on the final run (25/25 in the earlier broader slice); Pay state/config tests passed
+  53/53. Dashboard browser demo verified the
+  purpose-first preview, disabled payment until amount choice, and a 200 UAH preview sheet.
+  Pay Svelte check reports 0 errors and one pre-existing BankSheet accessibility warning;
+  root check has three unrelated platform demo errors and one landing CSS warning. A real
+  authenticated invoice/payment flow, remote storage, and deployment were not verified.
+- Donation preview follow-up (2026-09-30): the user requested a mix of the public donation
+  demo and free amount entry. The Dashboard preview now presents the purpose and target first,
+  followed by preset contributions and a separate `Інша сума` input. Switching from a preset
+  clears the payable preview amount until a positive custom value is entered; choosing a preset
+  hides the custom field. Browser demo verified the disabled/active transitions (including
+  200 UAH and 350 UAH), and the preview region has no horizontal or vertical overflow at the
+  tested desktop viewport. No unverified collected-progress amount is displayed. Focused
+  Dashboard tests passed 18/18; root check remains blocked by unrelated platform demo errors.
+  Preview-only approval is complete; scenario and template behavior outside this scope remain
+  locked. No commit, remote mutation, or deployment was performed.
+- Donation amount-sheet follow-up (2026-09-30): the user separately approved a numeric keypad
+  popup for `Інша сума` in the Dashboard donation preview only. The popup keeps a draft amount;
+  closing discards unconfirmed digits, backspace removes a digit, and confirmation applies only
+  a positive integer. Preset selection and ordinary `open_amount` preview are unchanged. The
+  local browser demo verified open/close, 350 UAH entry, deletion, 42 UAH confirmation, return
+  to presets, and that the sheet fits inside the phone at the tested viewport. Svelte diagnostics
+  and the official Svelte autofixer reported no issues. This approval is closed: Pay checkout,
+  payment execution, persistence and deployment remain out of scope and locked.
 - CSS-only checkpoint (2026-09-24): the user explicitly approved removing seven unused Events
   preview selectors and correcting two Fitness icon styles. Removed the unused Events blocks;
   passed the existing color/spacing properties directly to the Lucide components via `style`.
@@ -1003,6 +1151,13 @@ contract or behavior.
 ### DASH-AUTH-001 - Authentication And Session Lifecycle
 
 - **Status:** `LOCKED` — local context candidate validated; runtime invariants unchanged.
+- **Platform extraction analysis:** `/dac7` now delegates to the independently owned
+  `apps/platform/src/App.svelte`, without importing Dashboard auth, gateway or login code.
+  Dashboard implementation and navigation URLs are unchanged. Platform owns its SDK client
+  and Google nonce flow; a different origin requires separate Google configuration and may
+  require a new sign-in. Local Platform typecheck and 11 gateway tests pass; root typecheck
+  has no errors (one unrelated Landing CSS warning). Real sign-in and cross-app session
+  transitions remain unverified. This process remains `LOCKED`.
 - **Local loading audit, 2026-09-24:** Guest login rendered after hydration; fresh-browser Google
   Identity button requests returned 403, with an origin-not-allowed diagnostic in the integrated
   browser. No sign-in action, authenticated readiness test, auth mutation or invariant change was

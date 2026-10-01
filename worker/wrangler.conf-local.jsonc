@@ -1,0 +1,28 @@
+{
+    "$schema": "./node_modules/wrangler/config-schema.json",
+    "name": "conf-local-only",
+    "main": "src/conf.ts",
+    "compatibility_date": "2026-08-28",
+    "compatibility_flags": ["nodejs_compat"],
+    "workers_dev": false,
+    "preview_urls": false,
+    "assets": {
+        "directory": "../apps/conf/dist",
+        "binding": "ASSETS",
+        "run_worker_first": true,
+        "not_found_handling": "single-page-application"
+    },
+    "d1_databases": [{
+        "binding": "BANK_CATALOG_DB",
+        "database_name": "conf-bank-snapshots-local",
+        "database_id": "local-conf-bank-snapshots",
+        "migrations_dir": "migrations-conf",
+        "remote": false
+    }],
+    "dev": { "ip": "127.0.0.1", "port": 8796 },
+    "vars": {
+        "CONF_SUPABASE_URL": "",
+        "CONF_SUPABASE_PUBLISHABLE_KEY": "",
+        "CONF_BANK_SYNC_ADMIN_IDS": ""
+    }
+}

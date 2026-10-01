@@ -86,41 +86,84 @@
         // Step 5: OS-specific resolution (mirrors worker buildBankRedirect)
         steps.push(`\n🖥️ Обрана ОС: ${simulatedOS.toUpperCase()}`);
 
-        if (ios_universal) {
-            redirectUrl = ios_universal;
-            fallbackUrl = ios_universal;
-            steps.push(`🎯 Пріоритет: Universal Link (однаковий для iOS та Android)`);
-            
-            // Візуалізація: Універсальна лінка відкриває додаток банку або питає в Safari
-            if (simulatedOS === 'ios') viewMode = 'safari';
-            else if (simulatedOS === 'android') viewMode = 'duo_android';
-            else viewMode = 'desktop_qr';
+        const p_ios = bank.priority_ios;
+        const p_and = bank.priority_android;
 
-        } else {
-            if (simulatedOS === 'ios') {
-                if (ios_scheme) {
-                    redirectUrl = ios_scheme;
-                    steps.push(`🎯 iOS → використовуємо iOS Scheme`);
-                    viewMode = 'safari'; // iOS Scheme показує системний алерт в Safari
-                } else {
-                    viewMode = 'store'; // Відправляє в App Store якщо немає нічого
-                }
+        if (simulatedOS === 'ios') {
+            if (p_ios === 'store' && bank.appstore_url) {
+                redirectUrl = bank.appstore_url;
+                fallbackUrl = bank.appstore_url;
+                steps.push('✅ Пріоритет: Store Links -> App Store');
+                viewMode = 'store';
+            } else if (p_ios === 'scheme' && ios_scheme) {
+                redirectUrl = ios_scheme;
                 fallbackUrl = bank.appstore_url || web_https || fallbackUrl;
-                steps.push(`🔄 Fallback → ${fallbackUrl}`);
-            } else if (simulatedOS === 'android') {
-                if (android_intent) {
-                    redirectUrl = android_intent;
-                    steps.push(`🎯 Android → використовуємо Intent`);
+                steps.push('✅ Пріоритет: OS App Setup -> URL Scheme');
+                viewMode = 'safari';
+            } else if (p_ios === 'universal_link' && ios_universal) {
+                redirectUrl = ios_universal;
+                fallbackUrl = bank.appstore_url || web_https || fallbackUrl;
+                steps.push('✅ Пріоритет: Universal Link');
+                viewMode = 'safari';
+            } else {
+                if (ios_universal) {
+                    redirectUrl = ios_universal;
+                    fallbackUrl = bank.appstore_url || web_https || fallbackUrl;
+                    steps.push('➡️ Default: Universal Link');
+                    viewMode = 'safari';
+                } else if (ios_scheme) {
+                    redirectUrl = ios_scheme;
+                    fallbackUrl = bank.appstore_url || web_https || fallbackUrl;
+                    steps.push('➡️ Default: URL Scheme');
+                    viewMode = 'safari';
+                } else {
+                    fallbackUrl = bank.appstore_url || web_https || fallbackUrl;
+                    steps.push('➡️ Default: Store Fallback');
+                    viewMode = 'store';
                 }
-                fallbackUrl = bank.playstore_url || web_https || fallbackUrl;
-                steps.push(`🔄 Fallback → ${fallbackUrl}`);
+            }
+        } else if (simulatedOS === 'android') {
+            if (p_and === 'store' && bank.playstore_url) {
+                redirectUrl = bank.playstore_url;
+                fallbackUrl = bank.playstore_url;
+                steps.push('✅ Пріоритет: Store Links -> Google Play');
                 viewMode = 'duo_android';
+            } else if (p_and === 'scheme' && android_intent) {
+                redirectUrl = android_intent;
+                fallbackUrl = bank.playstore_url || web_https || fallbackUrl;
+                steps.push('✅ Пріоритет: OS App Setup -> Intent');
+                viewMode = 'duo_android';
+            } else if (p_and === 'universal_link' && ios_universal) {
+                redirectUrl = ios_universal;
+                fallbackUrl = bank.playstore_url || web_https || fallbackUrl;
+                steps.push('✅ Пріоритет: Universal Link (App Link)');
+                viewMode = 'duo_android';
+            } else {
+                if (ios_universal) {
+                    redirectUrl = ios_universal;
+                    fallbackUrl = bank.playstore_url || web_https || fallbackUrl;
+                    steps.push('➡️ Default: App Link');
+                    viewMode = 'duo_android';
+                } else if (android_intent) {
+                    redirectUrl = android_intent;
+                    fallbackUrl = bank.playstore_url || web_https || fallbackUrl;
+                    steps.push('➡️ Default: Intent');
+                    viewMode = 'duo_android';
+                } else {
+                    fallbackUrl = bank.playstore_url || web_https || fallbackUrl;
+                    steps.push('➡️ Default: Store Fallback');
+                    viewMode = 'duo_android';
+                }
+            }
+        } else {
+            if (ios_universal) {
+                redirectUrl = ios_universal;
+                fallbackUrl = ios_universal;
             } else {
                 redirectUrl = web_https || redirectUrl;
                 fallbackUrl = web_https || fallbackUrl;
-                steps.push(`🎯 Desktop → використовуємо Web HTTPS (QR)`);
-                viewMode = 'desktop_qr';
             }
+            viewMode = 'desktop_qr';
         }
 
         simResult = { redirectUrl, fallbackUrl, steps };

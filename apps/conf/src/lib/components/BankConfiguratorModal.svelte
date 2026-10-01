@@ -6,7 +6,7 @@
     } from '@lucide/svelte';
     import type { BankEntry } from '../types';
     import { BankLinkStore } from '../services/banklink-store';
-    import IphoneDuoSimulator from './IphoneDuoSimulator.svelte';
+    import RoutingPriorityManager from './RoutingPriorityManager.svelte';
     import { generateTestPayload, buildBankUrls } from '../services/payload-builder';
 
     interface Props {
@@ -166,11 +166,11 @@
                 {/if}
                 <button
                     onclick={() => showIphoneDuoModal = true}
-                    title="Live iPhone Duo Simulator"
+                    title="Live Simulator"
                     class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-white transition-all cursor-pointer border border-stone-700/50 shadow-sm"
                 >
                     <Smartphone size={14} class="text-blue-400" />
-                    <span class="hidden sm:inline">iPhone Duo</span>
+                    <span class="hidden sm:inline">Пріоритети</span>
                 </button>
                 <button
                     onclick={handleClone}
@@ -463,6 +463,26 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="conf-label">Пріоритет iOS</label>
+                                <select bind:value={localBank.priority_ios} class="conf-input">
+                                    <option value={null}>Авто (за замовчуванням)</option>
+                                    <option value="universal_link">Universal Link</option>
+                                    <option value="scheme">OS App Setup (URL Scheme)</option>
+                                    <option value="store">Store Links (App Store)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="conf-label">Пріоритет Android</label>
+                                <select bind:value={localBank.priority_android} class="conf-input">
+                                    <option value={null}>Авто (за замовчуванням)</option>
+                                    <option value="universal_link">App Link</option>
+                                    <option value="scheme">OS App Setup (Intent)</option>
+                                    <option value="store">Store Links (Google Play)</option>
+                                </select>
+                            </div>
+                        </div>
                         <div>
                             <label class="conf-label">URL Template <span class="text-stone-600 font-normal">(use &#123;payload&#125;)</span></label>
                             <input
@@ -597,7 +617,7 @@
             <div class="w-full flex items-center justify-between pb-3 border-b border-stone-800 mb-3">
                 <div class="flex items-center gap-2">
                     <Smartphone size={18} class="text-blue-400" />
-                    <h3 class="text-sm font-bold text-white uppercase tracking-wider">iPhone Duo Live Preview</h3>
+                    <h3 class="text-sm font-bold text-white uppercase tracking-wider">Пріоритети та Маршрутизація</h3>
                 </div>
                 <button
                     onclick={() => showIphoneDuoModal = false}
@@ -606,10 +626,8 @@
                     <X size={16} />
                 </button>
             </div>
-            <IphoneDuoSimulator
-                bank={localBank}
-                formData={sampleFormData}
-                urls={previewUrls}
+            <RoutingPriorityManager
+                bind:bank={localBank}
                 encodedPayload={previewPayload.encodedPayload}
             />
         </div>

@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { ArrowUpRight, Moon, Sun } from '@lucide/svelte';
+	import { ArrowUpRight, Menu, Moon, Sun, X } from '@lucide/svelte';
 	import type { Locale, Translations } from '../data/translations';
+	import { ecosystemCopy } from '../data/ecosystem-copy';
 
 	let {
 		onSignup,
@@ -20,19 +22,30 @@
 	} = $props();
 
 	let menuOpen = $state(false);
+	let menuButton: HTMLButtonElement;
 	const dashboardPath = '/dashboard/' as '/';
 	const merchantAppPath = '/app/' as '/';
 
 	function closeMenu() {
 		menuOpen = false;
 	}
+	onMount(() => {
+		const dismissMenu = (event: KeyboardEvent) => {
+			if (event.key === 'Escape' && menuOpen) {
+				closeMenu();
+				menuButton.focus();
+			}
+		};
+		window.addEventListener('keydown', dismissMenu);
+		return () => window.removeEventListener('keydown', dismissMenu);
+	});
 
 	const navItems = $derived([
-		{ label: t.nav.howItWorks, href: '#payment-flow' },
-		{ label: t.nav.forBusiness, href: '#solutions' },
-		{ label: t.nav.moneyFlow, href: '#money-flow' },
-		{ label: t.nav.pricing, href: '#pricing' },
-		{ label: t.nav.faq, href: '#faq' }
+		{ label: ecosystemCopy[locale].nav[0], href: '#ecosystem' },
+		{ label: ecosystemCopy[locale].nav[1], href: '#banks' },
+		{ label: ecosystemCopy[locale].nav[2], href: '#how-it-works' },
+		{ label: ecosystemCopy[locale].nav[3], href: '#calculator' },
+		{ label: ecosystemCopy[locale].nav[4], href: '#faq' }
 	]);
 </script>
 
@@ -68,7 +81,7 @@
 
 		<div class="desktop-nav">
 			{#each navItems as link (link.href)}
-				<a href={link.href}>{link.label}</a>
+				<a href={resolve(`/${link.href}` as '/#top')}>{link.label}</a>
 			{/each}
 			<a href={resolve(merchantAppPath)}>{t.nav.pos}</a>
 			<a class="account-link" href={resolve(dashboardPath)}>{t.nav.account}</a>
@@ -77,14 +90,23 @@
 		<div class="nav-actions">
 			<!-- Language Switcher -->
 			<div class="lang-switcher" role="group" aria-label="Мова сайту">
-				<button type="button" class:active={locale === 'uk'} onclick={() => onLocaleChange?.('uk')}
-					>UA</button
+				<button
+					type="button"
+					aria-pressed={locale === 'uk'}
+					class:active={locale === 'uk'}
+					onclick={() => onLocaleChange?.('uk')}>UA</button
 				>
-				<button type="button" class:active={locale === 'en'} onclick={() => onLocaleChange?.('en')}
-					>EN</button
+				<button
+					type="button"
+					aria-pressed={locale === 'en'}
+					class:active={locale === 'en'}
+					onclick={() => onLocaleChange?.('en')}>EN</button
 				>
-				<button type="button" class:active={locale === 'pl'} onclick={() => onLocaleChange?.('pl')}
-					>PL</button
+				<button
+					type="button"
+					aria-pressed={locale === 'pl'}
+					class:active={locale === 'pl'}
+					onclick={() => onLocaleChange?.('pl')}>PL</button
 				>
 			</div>
 
@@ -110,20 +132,25 @@
 
 			<button
 				class="menu-button"
+				bind:this={menuButton}
 				type="button"
 				aria-label={menuOpen ? 'Закрити меню' : 'Відкрити меню'}
 				aria-expanded={menuOpen}
+				aria-controls="landing-mobile-nav"
 				onclick={() => (menuOpen = !menuOpen)}
 			>
-				{menuOpen ? '✕' : '☰'}
+				{#if menuOpen}<X size={22} aria-hidden="true" />{:else}<Menu
+						size={22}
+						aria-hidden="true"
+					/>{/if}
 			</button>
 		</div>
 	</nav>
 
 	{#if menuOpen}
-		<nav class="mobile-nav" aria-label="Мобільна навігація">
+		<nav id="landing-mobile-nav" class="mobile-nav" aria-label="Мобільна навігація">
 			{#each navItems as link (link.href)}
-				<a href={link.href} onclick={closeMenu}>{link.label}</a>
+				<a href={resolve(`/${link.href}` as '/#top')} onclick={closeMenu}>{link.label}</a>
 			{/each}
 			<a href={resolve(merchantAppPath)} onclick={closeMenu}>{t.nav.pos}</a>
 			<a href={resolve(dashboardPath)} onclick={closeMenu}>{t.nav.account}</a>
@@ -134,6 +161,7 @@
 					<button
 						type="button"
 						class:active={locale === 'uk'}
+						aria-pressed={locale === 'uk'}
 						onclick={() => {
 							onLocaleChange?.('uk');
 							closeMenu();
@@ -142,6 +170,7 @@
 					<button
 						type="button"
 						class:active={locale === 'en'}
+						aria-pressed={locale === 'en'}
 						onclick={() => {
 							onLocaleChange?.('en');
 							closeMenu();
@@ -150,6 +179,7 @@
 					<button
 						type="button"
 						class:active={locale === 'pl'}
+						aria-pressed={locale === 'pl'}
 						onclick={() => {
 							onLocaleChange?.('pl');
 							closeMenu();

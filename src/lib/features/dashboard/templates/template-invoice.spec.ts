@@ -8,6 +8,7 @@ describe('checkout template invoice integration', () => {
 		['table', 'table'],
 		['delivery', 'delivery'],
 		['open_amount', 'open_amount'],
+		['donation', 'open_amount'],
 		['tips', 'open_amount']
 	] as const)(
 		'maps %s templates to the supported %s invoice scenario',

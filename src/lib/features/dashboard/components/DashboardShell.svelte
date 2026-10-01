@@ -277,27 +277,29 @@
 				onclick={() => (menuOpen = false)}
 				aria-current={activeSection === 'overview' ? 'page' : undefined}
 				class:nav-active={activeSection === 'overview'}
-				class="flex h-10 items-center gap-3 rounded-md px-3 text-sm font-bold text-zinc-400 hover:text-white"
+				class="group flex h-10 items-center gap-3 rounded-md px-3 text-sm font-bold text-zinc-400 hover:text-white"
 			>
 				<HugeiconsIcon icon={DashboardSquare01Icon} size={17} aria-hidden="true" />
 				Огляд
+				<span class="ml-auto hidden rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.55rem] font-bold text-zinc-500 lg:block group-hover:text-zinc-400 group-hover:border-white/20">ALT 1</span>
 			</a>
 			<a
 				href={resolve(demo ? '/dashboard/pos?demo=1' : '/dashboard/pos')}
 				onclick={() => (menuOpen = false)}
 				aria-current={activeSection === 'pos' ? 'page' : undefined}
 				class:nav-active={activeSection === 'pos'}
-				class="mt-1 flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-semibold text-zinc-400 hover:text-white"
+				class="group mt-1 flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-semibold text-zinc-400 hover:text-white"
 			>
 				<HugeiconsIcon icon={Store01Icon} size={17} aria-hidden="true" />
 				Каса
+				<span class="ml-auto hidden rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.55rem] font-bold text-zinc-500 lg:block group-hover:text-zinc-400 group-hover:border-white/20">ALT 2</span>
 			</a>
 			<a
 				href={resolve(demo ? '/dashboard/proformas?demo=1' : '/dashboard/proformas')}
 				onclick={() => (menuOpen = false)}
 				aria-current={activeSection === 'proformas' ? 'page' : undefined}
 				class:nav-active={activeSection === 'proformas'}
-				class="mt-1 flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-semibold text-zinc-400 hover:text-white"
+				class="group mt-1 flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-semibold text-zinc-400 hover:text-white"
 			>
 				<HugeiconsIcon icon={Scroll01Icon} size={17} aria-hidden="true" />
 				Проформи
@@ -311,10 +313,11 @@
 						href={resolve(demo ? '/dashboard/invoices?demo=1' : '/dashboard/invoices')}
 						onclick={() => (menuOpen = false)}
 						aria-current={activeSection === 'invoices' ? 'page' : undefined}
-						class="flex min-w-0 flex-1 items-center gap-3 self-stretch px-3 text-sm font-semibold hover:text-white"
+						class="group flex min-w-0 flex-1 items-center gap-3 self-stretch px-3 text-sm font-semibold hover:text-white"
 					>
 						<HugeiconsIcon icon={Invoice01Icon} size={17} aria-hidden="true" />
 						Рахунки
+						<span class="ml-auto hidden rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.55rem] font-bold text-zinc-500 lg:block group-hover:text-zinc-400 group-hover:border-white/20">ALT 3</span>
 					</a>
 					<button
 						type="button"
@@ -677,7 +680,7 @@
 
 	.dashboard-root :global(button:focus-visible),
 	.dashboard-root :global(a:focus-visible) {
-		outline: 3px solid rgb(37 99 235 / 35%);
+		outline: 3px solid #c9ff4a59;
 		outline-offset: 2px;
 	}
 
