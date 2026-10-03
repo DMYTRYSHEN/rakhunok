@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f6f7" />
+    <meta name="description" content="Створіть QR НБУ за IBAN або QR для посилання з власним логотипом. Перевірка реквізитів у браузері, створення зображення через A2 QR API." />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="author" content="A2 QR" />
+    <meta property="og:locale" content="uk_UA" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="A2 QR" />
+    <meta property="og:title" content="Створити QR НБУ для оплати за IBAN | A2 QR" />
+    <meta property="og:description" content="Створіть QR НБУ за IBAN або QR для посилання з власним логотипом. Перевірка реквізитів у браузері, створення зображення через A2 QR API." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Створити QR НБУ для оплати за IBAN | A2 QR" />
+    <meta name="twitter:description" content="QR НБУ за IBAN та QR для посилань із власним логотипом. Зображення платіжного QR створюється через A2 QR API." />
+    <link rel="icon" href="%BASE_URL%favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <title>Створити QR НБУ для оплати за IBAN | A2 QR</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "name": "A2 QR",
+            "inLanguage": "uk-UA",
+            "description": "Онлайн-генератор QR НБУ для оплати за IBAN"
+          },
+          {
+            "@type": "WebApplication",
+            "name": "Генератор QR НБУ для оплати за IBAN",
+            "applicationCategory": "FinanceApplication",
+            "operatingSystem": "Будь-яка платформа з браузером",
+            "inLanguage": "uk-UA",
+            "isAccessibleForFree": true,
+            "description": "Створює платіжний QR НБУ з реквізитами IBAN, сумою та призначенням платежу. Не є сервісом еквайрингу і не проводить платежі.",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "UAH"
+            }
+          },
+          {
+            "@type": "FAQPage",
+            "inLanguage": "uk-UA",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Як створити QR НБУ для оплати за IBAN?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                    "text": "Вкажіть отримувача, ЄДРПОУ або РНОКПП, український IBAN, за потреби суму та призначення платежу. Після перевірки реквізитів сервіс сформує QR-код, який можна завантажити."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Що відбувається після сканування платіжного QR?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Відкривається сумісний банківський застосунок або офіційна платіжна сторінка з підготовленими реквізитами. Платник перевіряє дані та сам підтверджує платіж."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Чи робить QR оплату миттєвою?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "QR прискорює заповнення реквізитів, але швидкість зарахування залежить від банків платника й отримувача та використаної платіжної інфраструктури. Сам код не гарантує миттєве зарахування коштів."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Чи є QR НБУ сервісом QR-еквайрингу?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Ні. Цей генератор лише кодує платіжну інструкцію для переказу за IBAN. Еквайринг приймає та обробляє оплату через банк або платіжного провайдера, зазвичай із договором, комісією та підтвердженням статусу платежу."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Куди передаються банківські реквізити?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Перевірка й формування платіжного посилання відбуваються у браузері. Посилання містить закодовані, а не зашифровані реквізити й передається до A2 QR API для створення зображення. Не додавайте зайві персональні дані до призначення платежу."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

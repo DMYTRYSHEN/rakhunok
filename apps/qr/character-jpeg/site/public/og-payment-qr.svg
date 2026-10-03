@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">A2 QR — QR НБУ для оплати за IBAN</title>
+  <desc id="desc">Безкоштовний генератор платіжного QR НБУ</desc>
+  <rect width="1200" height="630" fill="#f2f0e8"/>
+  <path d="M0 510 1200 236v394H0z" fill="#f04424"/>
+  <path d="M710 0h490v630H865z" fill="#1747d1"/>
+  <g fill="#111">
+    <path d="M64 70h96v16H64zm0 28h68v16H64zm0 28h84v16H64z"/>
+    <text x="64" y="224" font-family="Manrope,Arial,sans-serif" font-size="74" font-weight="800">QR НБУ</text>
+    <text x="64" y="307" font-family="Manrope,Arial,sans-serif" font-size="74" font-weight="800">ДЛЯ ОПЛАТИ</text>
+    <text x="64" y="390" font-family="Manrope,Arial,sans-serif" font-size="74" font-weight="800">ЗА IBAN</text>
+  </g>
+  <g transform="translate(822 150)">
+    <rect width="284" height="284" fill="#fff"/>
+    <g fill="#111">
+      <path d="M24 24h72v72H24zm12 12v48h48V36zM188 24h72v72h-72zm12 12v48h48V36zM24 188h72v72H24zm12 12v48h48v-48z"/>
+      <path d="M116 24h16v38h-16zm28 0h16v72h-16zm-28 54h16v18h-16zm0 38h44v16h-44zm72 0h72v16h-72zm-72 28h16v44h-16zm28 0h44v16h-44zm60 0h16v44h-16zm28 0h28v16h-28zm-88 44h44v16h-44zm60 16h16v56h-16zm28-28h28v16h-28zm-116 32h16v52h-16zm28 28h44v16h-44zm88 12h28v32h-28z"/>
+    </g>
+    <circle cx="142" cy="142" r="32" fill="#fff"/>
+    <path d="M125 142h34m-17-17v34" stroke="#f04424" stroke-width="9" stroke-linecap="round"/>
+  </g>
+  <text x="822" y="474" fill="#fff" font-family="IBM Plex Mono,monospace" font-size="20">СТВОРИТИ ОНЛАЙН · БЕЗКОШТОВНО</text>
+</svg>
