@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "letsrealtalk-qr",
+  "main": "src/qr.ts",
+  "compatibility_date": "2026-08-28",
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "../apps/qr/site/dist",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "not_found_handling": "none"
+  },
+  "routes": [
+    { "pattern": "letsrealtalk.com/qr", "zone_name": "letsrealtalk.com" },
+    { "pattern": "letsrealtalk.com/qr/*", "zone_name": "letsrealtalk.com" }
+  ]
+}
