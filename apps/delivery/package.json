@@ -1,0 +1,47 @@
+{
+	"name": "delivery",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"setup:tracking": "node setup-local-tracking.mjs",
+		"mcp:local": "node --experimental-strip-types mcp-local.mjs",
+		"test:mcp": "node --expose-gc --experimental-strip-types --test mcp-read-model.test.mjs mcp-server.test.mjs mcp-stdio.test.mjs",
+		"dev:dashboard-auth": "node dev-dashboard-auth.mjs",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+	},
+	"devDependencies": {
+		"@libsql/client": "^0.18.0",
+		"@sveltejs/adapter-auto": "^8.0.0",
+		"@sveltejs/adapter-cloudflare": "8.0.0",
+		"@sveltejs/kit": "^3.0.0",
+		"@sveltejs/vite-plugin-svelte": "^7.2.0",
+		"@tailwindcss/vite": "^4.3.3",
+		"@types/leaflet": "^1.9.21",
+		"dotenv": "^18.0.5",
+		"drizzle-kit": "^0.31.11",
+		"drizzle-orm": "^0.45.3",
+		"svelte": "^5.57.1",
+		"svelte-check": "^4.6.0",
+		"tailwindcss": "^4.0.0",
+		"typescript": "^6.0.3",
+		"vite": "^8.3.0",
+		"wrangler": "4.148.0"
+	},
+	"imports": {
+		"#lib": "./src/lib/index.js",
+		"#lib/*": "./src/lib/*"
+	},
+	"dependencies": {
+		"@fontsource-variable/manrope": "^5.3.0",
+		"@lucide/svelte": "^1.52.0",
+		"@modelcontextprotocol/sdk": "^1.32.1",
+		"leaflet": "^1.9.4",
+		"zod": "^4.6.5"
+	}
+}

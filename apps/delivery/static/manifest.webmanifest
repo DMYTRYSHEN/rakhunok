@@ -1,0 +1,15 @@
+{
+	"id": "./",
+	"name": "Rahunok Delivery",
+	"short_name": "Delivery",
+	"lang": "uk",
+	"start_url": "./business",
+	"scope": "./",
+	"display": "standalone",
+	"background_color": "#f8f9f5",
+	"theme_color": "#ddf988",
+	"icons": [
+		{ "src": "pwa/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+		{ "src": "pwa/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+	]
+}
