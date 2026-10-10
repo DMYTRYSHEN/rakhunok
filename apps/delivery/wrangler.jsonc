@@ -1,0 +1,43 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "rhnk-to-delivery",
+	"account_id": "753ff9292511c16a281c5cfa8e105c63",
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"compatibility_date": "2026-10-09",
+	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": false,
+	"preview_urls": false,
+	"ratelimits": [
+		{
+			"name": "DELIVERY_PUBLIC_TRACKING_LIMITER",
+			"namespace_id": "2026100901",
+			"simple": { "limit": 30, "period": 60 }
+		}
+	],
+	"secrets": {
+		"required": [
+			"DELIVERY_TURSO_AUTH_TOKEN",
+			"DELIVERY_CREDENTIAL_ENCRYPTION_KEY"
+		]
+	},
+	"routes": [
+		{ "pattern": "rhnk.to/delivery", "zone_name": "rhnk.to" },
+		{ "pattern": "rhnk.to/delivery/*", "zone_name": "rhnk.to" }
+	],
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare",
+		"html_handling": "none",
+		"run_worker_first": true
+	},
+	"vars": {
+		"DELIVERY_TURSO_DATABASE_URL": "libsql://delivery-rhnk.aws-eu-west-1.turso.io",
+		"DELIVERY_SUPABASE_URL": "https://mwaeazabpvbxqfrceogr.supabase.co",
+		"DELIVERY_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk",
+		"DELIVERY_GOOGLE_CLIENT_ID": "71189835004-89bcpnuhv5lb7d01tdp40oqo61beun1b.apps.googleusercontent.com"
+	},
+	"observability": {
+		"enabled": true,
+		"traces": { "enabled": true }
+	}
+}

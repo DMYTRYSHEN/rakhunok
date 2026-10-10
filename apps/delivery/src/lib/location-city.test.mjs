@@ -7,8 +7,11 @@ test('recommendations sort working suitable points, excluding invalid coordinate
 	const point = { ref: 'near', cityRef: 'city', name: 'Near', address: 'Address', number: '1', typeRef: 'type', schedule: {}, latitude: 50.451, longitude: 30.52, status: 'Working', category: 'Postomat', maxWeight: 20 };
 	const far = { ...point, ref: 'far', latitude: 50.48, category: 'Branch', maxWeight: 0 };
 	assert.deepEqual(recommendPoints([far, point, point, { ...point, ref: 'closed', status: 'Closed' },
-		{ ...point, ref: 'small', maxWeight: 2 }, { ...point, ref: 'missing', latitude: null }], location, 5).map(item => item.ref), ['near', 'far']);
-	assert.deepEqual(recommendPoints([point, far], location, 25).map(item => item.ref), ['far']);
+		{ ...point, ref: 'small', maxWeight: 2 }, { ...point, ref: 'missing', latitude: null }], location, 5).map(item => item.ref), ['near']);
+	assert.deepEqual(recommendPoints([point, far], location, 25).map(item => item.ref), []);
+	const boundary = { ...point, ref: 'boundary', latitude: location.latitude + 180 / (Math.PI * 6371) };
+	assert.ok(Math.abs(pointDistance(boundary, location) - 1) < 1e-10);
+	assert.deepEqual(recommendPoints([{ ...boundary, latitude: boundary.latitude - 1e-9 }, { ...boundary, ref: 'outside', latitude: boundary.latitude + 1e-9 }], location, 5).map(item => item.ref), ['boundary']);
 	assert.deepEqual(recommendPoints([point], location, NaN), []);
 	assert.equal(pointDistance({ latitude: 0, longitude: 0 }, location), Infinity);
 	assert.equal(pointDistance({ latitude: 91, longitude: 30 }, location), Infinity);

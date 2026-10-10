@@ -7,6 +7,20 @@ const url = new URL('https://delivery.example/api/v1/tracking/20450000000000?car
 const result = { carrier: 'nova_poshta', trackingNumber: '20450000000000', trackingState: 'active',
 	deliveryStatus: 'in_transit', checkedAt: '2026-10-09T10:00:00.000Z', providerStatusCode: '5' };
 
+test('edge limiter stops provider calls and fails closed when unavailable', async () => {
+	let calls = 0;
+	const handle = createPublicTrackingHandler(async () => { calls += 1; return result; });
+	const blocked = await handle(result.trackingNumber, url, async () => false);
+	assert.equal(blocked.status, 429);
+	assert.equal(blocked.headers.get('retry-after'), '60');
+	const unavailable = await handle(result.trackingNumber, url, async () => { throw new Error('SECRET'); });
+	assert.equal(unavailable.status, 503);
+	assert.ok(!(await unavailable.text()).includes('SECRET'));
+	assert.equal(calls, 0);
+	assert.equal((await handle(result.trackingNumber, url, async () => true)).status, 200);
+	assert.equal(calls, 1);
+});
+
 test('public lookup needs no identity and allowlists response fields', async () => {
 	const handle = createPublicTrackingHandler(async (number, carrier) => {
 		assert.equal(number, result.trackingNumber);

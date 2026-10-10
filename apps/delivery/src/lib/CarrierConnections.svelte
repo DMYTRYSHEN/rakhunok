@@ -33,7 +33,7 @@
 		connection.pending = true;
 		connection.error = '';
 		try {
-			const response = await fetch(`/api/v1/${connection.id}/credentials`, {
+			const response = await fetch(`${resolve('').replace(/\/$/, '')}/api/v1/${connection.id}/credentials`, {
 				method,
 				credentials: 'same-origin',
 				signal: controller.signal,

@@ -4,7 +4,7 @@
 	import { Package2, TriangleAlert, MapPin, ChartNoAxesColumn, Plug, Settings, Menu, X, LogOut, Users } from '@lucide/svelte';
 	import type { LayoutProps } from './$types';
 	import TrackingApiExample from '#lib/TrackingApiExample.svelte';
-	let { children }: LayoutProps = $props();
+	let { children, data }: LayoutProps = $props();
 	let moreDialog: HTMLDialogElement;
 	const pathname = $derived(page.url.pathname.replace(/\/$/, ''));
 	const items = [
@@ -57,7 +57,7 @@
 				<a href={item.href} aria-current={selectedItem === item ? 'page' : undefined} title={item.label}><item.icon size={19} strokeWidth={1.8} /><span>{item.label}</span></a>
 			{/each}
 		</nav>
-		<div class="delivery-business-account"><span>R</span><div>Особистий кабінет<small>Google</small></div><form method="POST" action={resolve('/logout')}><button type="submit">Вийти</button></form></div>
+		<div class="delivery-business-account"><span>R</span><div>{data.displayName}<small>Google</small></div><form method="POST" action={resolve('/logout')}><button type="submit">Вийти</button></form></div>
 	</aside>
 	<div class="delivery-business-content">
 		{#if selectedItem && (sectionKey === 'attention' || sectionKey === 'analytics' || pathname === new URL(resolve('/(business)/business/settings'), page.url.href).pathname)}
@@ -133,6 +133,8 @@
 	nav a[aria-current='page'] { background: var(--color-brand-100); color: var(--color-text-primary); }
 	.delivery-business-account { display: flex; align-items: center; gap: 10px; margin-top: auto; padding: 18px 8px 0; border-top: 1px solid var(--color-border-default); font-size: 11px; font-weight: 650; }
 	.delivery-business-account > span { display: grid; place-items: center; width: 32px; height: 32px; background: var(--color-brand-100); border-radius: 50%; }
+	.delivery-business-account > span, .delivery-business-account form { flex-shrink: 0; }
+	.delivery-business-account > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 	.delivery-business-account small { display: block; margin-top: 4px; font-size: 10px; font-weight: 500; color: var(--color-text-secondary); }
 	.delivery-business-content { min-width: 0; }
 	.section-empty { padding: 32px 24px; }

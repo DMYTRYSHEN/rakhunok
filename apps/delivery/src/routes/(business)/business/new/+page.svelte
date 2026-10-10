@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import ShippingPointsMap from '#lib/ShippingPointsMap.svelte';
+	import { cachedDirectory } from '#lib/directory-cache.ts';
 	import { locationCityNames, matchingLocationCity, pointDistance, recommendPoints } from '#lib/location-city.ts';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
@@ -116,12 +117,10 @@
 				let hasMore = true;
 				for (let page = 1; page <= 5 && hasMore; page += 1) {
 					const query = new URLSearchParams({ kind: 'cities', q: name, page: String(page) });
-					const result = await fetch(`${resolve('/api/v1/nova-poshta/directory')}?${query}`, { signal: AbortSignal.timeout(15000) });
-					if (!result.ok) throw new Error('Directory unavailable');
-					const directoryResult = await result.json();
+					const directoryResult = await cachedDirectory(`${resolve('/api/v1/nova-poshta/directory')}?${query}`, data.userId);
 					if (!current()) return;
 					if (!Array.isArray(directoryResult.data)) throw new Error('Invalid cities');
-					cities.push(...directoryResult.data); hasMore = directoryResult.hasMore === true;
+					cities.push(...directoryResult.data as City[]); hasMore = directoryResult.hasMore === true;
 				}
 				if (hasMore) continue;
 				const city = matchingLocationCity(cities, name, typeof payload.principalSubdivision === 'string' ? payload.principalSubdivision : '');
@@ -152,20 +151,14 @@
 		const routeSequence = routes.sender.sequence;
 		const selectedBefore = routes.sender.pointRef;
 		nearbyBusy = true; nearby = []; nearbyCity = cityRef; nearbyMessage = '';
-		const found: Warehouse[] = [];
 		try {
-			let hasMore = true;
-			for (let page = 1; page <= 30 && hasMore; page += 1) {
-				const params = new URLSearchParams({ kind: 'warehouses', cityRef, page: String(page) });
-				const response = await fetch(`${resolve('/api/v1/nova-poshta/directory')}?${params}`, { signal: AbortSignal.timeout(15000) });
-				if (!response.ok) throw new Error('Unavailable');
-				const payload = await response.json();
-				if (disposed || sequence !== nearbySequence || routes.sender.cityRef !== cityRef || routeSequence !== routes.sender.sequence) return;
-				if (!Array.isArray(payload.data)) throw new Error('Invalid directory');
-				found.push(...payload.data); hasMore = payload.hasMore === true;
-			}
-			nearby = recommendPoints(found, location, Math.max(...seats.map(seat => Number(seat.weight))));
-			nearbyMessage = !nearby.length ? 'Немає доступних пунктів з координатами для цієї ваги. Скористайтеся пошуком.' : hasMore ? 'Найближчі серед перших 600 пунктів міста. Довідник завантажено частково.' : 'Відстань по прямій, не пішохідний маршрут.';
+			const weight = Math.max(...seats.map(seat => Number(seat.weight)));
+			const params = new URLSearchParams({ kind: 'nearby', cityRef, latitude: String(location.latitude), longitude: String(location.longitude), weight: String(weight) });
+			const payload = await cachedDirectory(`${resolve('/api/v1/nova-poshta/directory')}?${params}`, data.userId, 60000);
+			if (disposed || sequence !== nearbySequence || routes.sender.cityRef !== cityRef || routeSequence !== routes.sender.sequence) return;
+			if (!Array.isArray(payload.data)) throw new Error('Invalid directory');
+			nearby = recommendPoints(payload.data as Warehouse[], location, weight);
+			nearbyMessage = !nearby.length ? 'Немає доступних пунктів у межах 1 км для цієї ваги. Скористайтеся пошуком.' : payload.hasMore ? 'Пункти в межах 1 км. Довідник завантажено частково.' : 'У межах 1 км по прямій, не пішохідний маршрут.';
 			if (autoSelect && nearby[0] && routes.sender.pointRef === selectedBefore) {
 				choosePoint('sender', nearby[0].ref, nearby);
 				locationMessage += ` Обрано: ${nearby[0].name}.`;
@@ -257,11 +250,9 @@
 		const params = new URLSearchParams({ kind, q: kind === 'cities' ? route.query.trim() : route.pointQuery.trim(), page: String(page) });
 		if (kind === 'warehouses') params.set('cityRef', route.cityRef);
 		try {
-			const response = await fetch(`${resolve('/api/v1/nova-poshta/directory')}?${params}`, { signal: AbortSignal.timeout(15000) });
-			if (!response.ok) throw new Error('Directory unavailable');
-			const payload = await response.json();
+			const payload = await cachedDirectory(`${resolve('/api/v1/nova-poshta/directory')}?${params}`, data.userId);
 			if (sequence !== route.sequence) return;
-			const rows: unknown = Array.isArray(payload) ? payload : payload[kind] ?? payload.items ?? payload.data;
+			const rows: unknown = payload.data;
 			if (!Array.isArray(rows)) throw new Error('Invalid directory');
 			if (kind === 'cities') {
 				route.cities = rows as City[];

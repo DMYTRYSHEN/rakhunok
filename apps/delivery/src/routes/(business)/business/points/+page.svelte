@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { cachedDirectory } from '#lib/directory-cache.ts';
+	import type { PageProps } from './$types';
+	let { data }: PageProps = $props();
 	import { Search, MapPin, ChevronLeft, ChevronRight, PackagePlus } from '@lucide/svelte';
 	import type { City, Warehouse } from '#lib/server/tracking/np-api.ts';
 	let query = $state('');
@@ -24,11 +27,9 @@
 			url.searchParams.set('q', city ? warehouseQuery : query);
 			url.searchParams.set('page', String(nextPage));
 			if (city) url.searchParams.set('cityRef', city.ref);
-			const response = await fetch(url);
-			const result = await response.json();
-			if (!response.ok) throw new Error(result.error?.message ?? 'Довідник недоступний.');
-			if (city) { selectedCity = city; warehouses = result.data; pageNumber = nextPage; hasMore = result.hasMore; }
-			else { cities = result.data; selectedCity = null; warehouses = []; pageNumber = nextPage; hasMore = result.hasMore; loadedQuery = query; }
+			const result = await cachedDirectory(`${url.pathname}${url.search}`, data.userId);
+			if (city) { selectedCity = city; warehouses = result.data as Warehouse[]; pageNumber = nextPage; hasMore = result.hasMore === true; }
+			else { cities = result.data as City[]; selectedCity = null; warehouses = []; pageNumber = nextPage; hasMore = result.hasMore === true; loadedQuery = query; }
 			if (!result.data.length) message = 'За цим запитом нічого не знайдено.';
 		} catch (caught) { message = caught instanceof Error ? caught.message : 'Довідник недоступний.'; }
 		finally { pending = false; }

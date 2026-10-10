@@ -1,4 +1,4 @@
-import * as env from '$app/env/private';
+import { trackingConfig } from './config.ts';
 import { createClient } from '@libsql/client';
 import { track } from './carriers.ts';
 import { TrackingStore } from './store.ts';
@@ -12,10 +12,11 @@ let instance: { store: TrackingStore; service: TrackingService; documents: NovaP
 
 export function trackingRuntime() {
 	if (instance) return instance;
-	if (!env.DELIVERY_TURSO_DATABASE_URL) throw new Error('Tracking database is not configured');
+	const config = trackingConfig();
+	if (!config.url) throw new Error('Tracking database is not configured');
 	const client = createClient({
-		url: env.DELIVERY_TURSO_DATABASE_URL,
-		authToken: env.DELIVERY_TURSO_AUTH_TOKEN
+		url: config.url,
+		authToken: config.authToken
 	});
 	const store = new TrackingStore(client);
 	const service = new TrackingService(store, async (carrier, number, ownerId) => {

@@ -2,13 +2,17 @@ import { PublicTrackingError } from './public-tracking.ts';
 import type { PublicTrackingResult } from './public-tracking.ts';
 
 export function createPublicTrackingHandler(lookup: (number: string, carrier?: string) => Promise<PublicTrackingResult>) {
-	return async (number: string, url: URL): Promise<Response> => {
+	return async (number: string, url: URL, allow?: () => Promise<boolean>): Promise<Response> => {
 		const headers = {
 			'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
 			'X-Robots-Tag': 'noindex, nofollow', 'Access-Control-Allow-Origin': '*'
 		};
 		try {
 			if (url.searchParams.getAll('carrier').length > 1) throw new PublicTrackingError();
+			if (allow && !await allow()) {
+				return Response.json({ error: { code: 'RATE_LIMITED', message: 'Tracking rate limit exceeded' } },
+					{ status: 429, headers: { ...headers, 'Retry-After': '60' } });
+			}
 			const result = await lookup(number, url.searchParams.get('carrier') ?? undefined);
 			const status = result.trackingState === 'rate_limited' ? 429 :
 				['provider_unavailable', 'access_denied'].includes(result.trackingState) ? 503 : 200;

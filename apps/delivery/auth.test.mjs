@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { authenticate, AuthError, signIn, signInWithGoogle, signOut, tokenFromRequest } from './src/lib/server/tracking/auth.ts';
+import { authenticate, authenticatedProfile, AuthError, signIn, signInWithGoogle, signOut, tokenFromRequest } from './src/lib/server/tracking/auth.ts';
 
 const config = { SUPABASE_URL: 'https://delivery-project.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_mock_key' };
 const user = { id: '12345678-1234-4234-8234-123456789abc', is_anonymous: false };
@@ -53,7 +53,7 @@ test('official user request returns personal id only, ignores all metadata and n
 		assert.equal(options.method, 'GET');
 		assert.equal(options.headers.apikey, config.SUPABASE_PUBLISHABLE_KEY);
 		assert.equal(options.headers.Authorization, 'Bearer opaque-token');
-		assert.equal(options.redirect, 'error');
+		assert.equal(options.redirect, 'manual');
 		assert.equal(options.credentials, 'omit');
 		assert.equal(options.cache, 'no-store');
 		assert.ok(options.signal instanceof AbortSignal);
@@ -64,6 +64,26 @@ test('official user request returns personal id only, ignores all metadata and n
 	assert.deepEqual(await authenticate(request(), config, transport), { id: user.id });
 	assert.deepEqual(await authenticate(request({ Cookie: 'delivery_session=opaque-token' }), config, transport), { id: user.id });
 	assert.equal(calls, 2);
+});
+
+test('verified profile exposes only a bounded display name without trusting metadata identity', async () => {
+	for (const [metadata, expected] of [
+		[{ full_name: '  Jane Doe  ', id: 'victim', role: 'admin' }, 'Jane Doe'],
+		[{ full_name: '', name: 'Jane' }, 'Jane'],
+		[{ full_name: 'a'.repeat(201), name: 'Jane' }, 'Jane'],
+		[{ full_name: 'Jane\nDoe' }, '\u041a\u043e\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0447'],
+		[null, '\u041a\u043e\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0447']
+	]) {
+		let calls = 0;
+		const profile = await authenticatedProfile(request(), config, async () => {
+			calls++;
+			return Response.json({ ...user, user_metadata: metadata });
+		});
+		assert.deepEqual(profile, { id: user.id, displayName: expected });
+		assert.equal(calls, 1);
+	}
+	await assert.rejects(authenticatedProfile(request(), config, async () =>
+		Response.json({ ...user, is_anonymous: true, user_metadata: { full_name: 'Jane' } })), safeError(401, 'AUTH_INVALID'));
 });
 
 test('only the configured project is contacted, never the request origin or a fallback', async () => {
@@ -110,7 +130,7 @@ test('password login uses official endpoint and returns only validated access to
 		assert.equal(options.headers.Authorization, undefined);
 		assert.equal(options.headers['Content-Type'], 'application/json');
 		assert.deepEqual(JSON.parse(options.body), { email: 'a@example.com', password: 'password-secret' });
-		assert.equal(options.redirect, 'error');
+		assert.equal(options.redirect, 'manual');
 		return Response.json({ access_token: 'opaque-token', expires_in: 3600, token_type: 'bearer', user, refresh_token: 'do-not-return' });
 	});
 	assert.deepEqual(result, { accessToken: 'opaque-token', expiresIn: 3600 });
@@ -135,7 +155,7 @@ test('Google login exchanges the credential and raw nonce through the configured
 		assert.equal(url, config.SUPABASE_URL + '/auth/v1/token?grant_type=id_token');
 		assert.deepEqual(JSON.parse(options.body), { provider: 'google', id_token: 'google-credential', nonce });
 		assert.equal(options.method, 'POST');
-		assert.equal(options.redirect, 'error');
+		assert.equal(options.redirect, 'manual');
 		return Response.json({ access_token: 'opaque-token', expires_in: 3600, token_type: 'bearer', user });
 	}), { accessToken: 'opaque-token', expiresIn: 3600 });
 	for (const invalid of ['', 'short', 'a'.repeat(44)]) {
@@ -147,13 +167,29 @@ test('Google login exchanges the credential and raw nonce through the configured
 	await assert.rejects(signInWithGoogle('google-credential', nonce, config, async () => Response.json({ access_token: 'opaque-token', expires_in: 3600, token_type: 'bearer', user: { ...user, is_anonymous: true } })), safeError(401, 'AUTH_INVALID'));
 });
 
+test('Google failures expose only safe stage categories without provider secrets', async () => {
+	const session = { access_token: 'opaque-token', expires_in: 3600, token_type: 'bearer', user };
+	for (const [detail, transport] of [
+		['transport', async () => { throw new Error('provider-secret'); }],
+		['response_status', async () => Response.json({}, { status: 503 })],
+		['response_json', async () => new Response('{', { headers: { 'Content-Type': 'application/json' } })],
+		['session', async () => Response.json({ ...session, token_type: 'other' })],
+		['identity', async () => Response.json({ ...session, user: {} })]
+	]) {
+		await assert.rejects(signInWithGoogle('google-credential', 'a'.repeat(43), config, transport), error => {
+			assert.equal(error.detail, detail);
+			return safeError(503, 'AUTH_UNAVAILABLE')(error);
+		});
+	}
+});
+
 test('logout revokes the current session only and creates no cookies', async () => {
 	assert.equal(await signOut('opaque-token', config, async (url, options) => {
 		assert.equal(url, config.SUPABASE_URL + '/auth/v1/logout?scope=local');
 		assert.equal(options.method, 'POST');
 		assert.equal(options.headers.Authorization, 'Bearer opaque-token');
 		assert.equal(options.headers.apikey, config.SUPABASE_PUBLISHABLE_KEY);
-		assert.equal(options.redirect, 'error');
+		assert.equal(options.redirect, 'manual');
 		assert.equal(options.body, undefined);
 		return new Response(null, { status: 204 });
 	}), undefined);

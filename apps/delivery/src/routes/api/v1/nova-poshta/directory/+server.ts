@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { authenticate, AuthError } from '#lib/server/tracking/auth.ts';
 import { authConfig } from '#lib/server/tracking/config.ts';
 import { novaPoshtaApi, NovaPoshtaError } from '#lib/server/tracking/np-api.ts';
+import { nearbyPoints } from '#lib/server/tracking/nearby-points.ts';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ request, url }) => {
@@ -11,6 +12,13 @@ export const GET: RequestHandler = async ({ request, url }) => {
 		const kind = url.searchParams.get('kind');
 		const search = url.searchParams.get('q') ?? '';
 		const page = Number(url.searchParams.get('page') ?? '1');
+		if (kind === 'nearby') {
+			const result = await nearbyPoints(url.searchParams.get('cityRef') ?? '', {
+				latitude: Number(url.searchParams.get('latitude')),
+				longitude: Number(url.searchParams.get('longitude'))
+			}, Number(url.searchParams.get('weight')), novaPoshtaApi);
+			return json(result, { headers });
+		}
 		if (kind !== 'cities' && kind !== 'warehouses') return json({ error: { message: 'Оберіть тип довідника.' } }, { status: 400, headers });
 		const result = kind === 'cities' ? await novaPoshtaApi.citiesPage(search, page) :
 			await novaPoshtaApi.warehousesPage(url.searchParams.get('cityRef') ?? '', search, page);

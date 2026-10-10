@@ -63,6 +63,11 @@ export async function migrateLocal(url = 'file:./tracking-local.db') {
 				await transaction.executeMultiple(await readFile(new URL('./migrations/008_customers.sql', import.meta.url), 'utf8'));
 				await transaction.execute({ sql: 'INSERT INTO tracking_migrations VALUES (?)', args: ['008_customers'] });
 			}
+			const directory = await transaction.execute({ sql: 'SELECT name FROM tracking_migrations WHERE name = ?', args: ['009_directory_points'] });
+			if (!directory.rows.length) {
+				await transaction.executeMultiple(await readFile(new URL('./migrations/009_directory_points.sql', import.meta.url), 'utf8'));
+				await transaction.execute({ sql: 'INSERT INTO tracking_migrations VALUES (?)', args: ['009_directory_points'] });
+			}
 			await transaction.commit();
 		} finally { transaction.close(); }
 	} finally {

@@ -4,6 +4,7 @@ export type AuthConfig = {
 };
 
 type AuthCode = 'AUTH_CONFIG' | 'AUTH_REQUIRED' | 'AUTH_INVALID' | 'AUTH_UNAVAILABLE';
+type AuthDetail = 'transport' | 'timeout' | 'response_url' | 'response_status' | 'response_type' | 'response_size' | 'response_body' | 'response_json' | 'session' | 'identity';
 
 const messages: Record<AuthCode, string> = {
 	AUTH_CONFIG: 'Authentication is not configured.',
@@ -15,11 +16,13 @@ const messages: Record<AuthCode, string> = {
 export class AuthError extends Error {
 	readonly status: 401 | 503;
 	readonly code: AuthCode;
+	readonly detail?: AuthDetail;
 
-	constructor(code: AuthCode) {
+	constructor(code: AuthCode, detail?: AuthDetail) {
 		super(messages[code]);
 		this.name = 'AuthError';
 		this.code = code;
+		this.detail = detail;
 		this.status = code === 'AUTH_CONFIG' || code === 'AUTH_UNAVAILABLE' ? 503 : 401;
 	}
 }
@@ -79,12 +82,12 @@ function record(value: unknown): value is Record<string, unknown> {
 }
 
 function identity(value: unknown): { id: string } {
-	if (!record(value)) throw new AuthError('AUTH_UNAVAILABLE');
+	if (!record(value)) throw new AuthError('AUTH_UNAVAILABLE', 'identity');
 	if (value.is_anonymous === true) throw new AuthError('AUTH_INVALID');
 	if (typeof value.id !== 'string' ||
 		!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.id) ||
 		(value.is_anonymous !== undefined && value.is_anonymous !== false)) {
-		throw new AuthError('AUTH_UNAVAILABLE');
+		throw new AuthError('AUTH_UNAVAILABLE', 'identity');
 	}
 	return { id: value.id };
 }
@@ -100,9 +103,10 @@ async function provider(
 	let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 	let response: Response | undefined;
 	let timer: ReturnType<typeof setTimeout> | undefined;
+	let stage: AuthDetail = 'transport';
 	const deadline = new Promise<never>((_resolve, reject) => {
 		timer = setTimeout(() => {
-			reject(new AuthError('AUTH_UNAVAILABLE'));
+			reject(new AuthError('AUTH_UNAVAILABLE', 'timeout'));
 			controller.abort();
 		}, TIMEOUT_MS);
 	});
@@ -110,29 +114,30 @@ async function provider(
 		response = await transport(`${configured.origin}/auth/v1/${path}`, {
 			...init,
 			headers: { apikey: configured.key, Accept: 'application/json', ...init.headers },
-			redirect: 'error',
+			redirect: 'manual',
 			credentials: 'omit',
 			cache: 'no-store',
 			signal: controller.signal
 		});
 		if (controller.signal.aborted) {
 			void response.body?.cancel().catch(() => {});
-			throw new AuthError('AUTH_UNAVAILABLE');
+			throw new AuthError('AUTH_UNAVAILABLE', 'timeout');
 		}
 		if (response.redirected || (response.url && response.url !== `${configured.origin}/auth/v1/${path}`)) {
-			throw new AuthError('AUTH_UNAVAILABLE');
+			throw new AuthError('AUTH_UNAVAILABLE', 'response_url');
 		}
 		if ([400, 401, 403, 422].includes(response.status)) throw new AuthError('AUTH_INVALID');
-		if (response.status !== (empty ? 204 : 200)) throw new AuthError('AUTH_UNAVAILABLE');
+		if (response.status !== (empty ? 204 : 200)) throw new AuthError('AUTH_UNAVAILABLE', 'response_status');
 		if (empty) return undefined;
 		if (!/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type') ?? '')) {
-			throw new AuthError('AUTH_UNAVAILABLE');
+			throw new AuthError('AUTH_UNAVAILABLE', 'response_type');
 		}
 		const length = response.headers.get('content-length');
 		if (length !== null && (!/^\d+$/.test(length) || Number(length) > MAX_RESPONSE_BYTES)) {
-			throw new AuthError('AUTH_UNAVAILABLE');
+			throw new AuthError('AUTH_UNAVAILABLE', 'response_size');
 		}
-		if (!response.body) throw new AuthError('AUTH_UNAVAILABLE');
+		if (!response.body) throw new AuthError('AUTH_UNAVAILABLE', 'response_body');
+		stage = 'response_body';
 		reader = response.body.getReader();
 		const chunks: Uint8Array[] = [];
 		let size = 0;
@@ -140,7 +145,7 @@ async function provider(
 			const chunk = await reader.read();
 			if (chunk.done) break;
 			size += chunk.value.byteLength;
-			if (size > MAX_RESPONSE_BYTES) throw new AuthError('AUTH_UNAVAILABLE');
+			if (size > MAX_RESPONSE_BYTES) throw new AuthError('AUTH_UNAVAILABLE', 'response_size');
 			chunks.push(chunk.value);
 		}
 		const bytes = new Uint8Array(size);
@@ -149,12 +154,13 @@ async function provider(
 			bytes.set(chunk, offset);
 			offset += chunk.byteLength;
 		}
+		stage = 'response_json';
 		return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown;
 	};
 	try {
 		return await Promise.race([operation(), deadline]);
 	} catch (error) {
-		throw error instanceof AuthError ? error : new AuthError('AUTH_UNAVAILABLE');
+		throw error instanceof AuthError ? error : new AuthError('AUTH_UNAVAILABLE', stage);
 	} finally {
 		clearTimeout(timer);
 		controller.abort();
@@ -163,17 +169,40 @@ async function provider(
 	}
 }
 
+async function verifiedUser(
+	request: Request,
+	config: AuthConfig,
+	transport: typeof fetch
+): Promise<Record<string, unknown>> {
+	const configured = settings(config);
+	const token = tokenFromRequest(request);
+	if (!token) throw new AuthError('AUTH_REQUIRED');
+	const user = await provider(configured, 'user', {
+		method: 'GET', headers: { Authorization: `Bearer ${token}` }
+	}, transport);
+	identity(user);
+	return user as Record<string, unknown>;
+}
+
 export async function authenticate(
 	request: Request,
 	config: AuthConfig,
 	transport: typeof fetch = fetch
 ): Promise<{ id: string }> {
-	const configured = settings(config);
-	const token = tokenFromRequest(request);
-	if (!token) throw new AuthError('AUTH_REQUIRED');
-	return identity(await provider(configured, 'user', {
-		method: 'GET', headers: { Authorization: `Bearer ${token}` }
-	}, transport));
+	return identity(await verifiedUser(request, config, transport));
+}
+
+export async function authenticatedProfile(
+	request: Request,
+	config: AuthConfig,
+	transport: typeof fetch = fetch
+): Promise<{ id: string; displayName: string }> {
+	const user = await verifiedUser(request, config, transport);
+	const metadata = record(user.user_metadata) ? user.user_metadata : {};
+	const displayName = [metadata.full_name, metadata.name].find(value =>
+		typeof value === 'string' && value.trim().length > 0 && value.trim().length <= 200 &&
+		!/[\u0000-\u001f\u007f]/.test(value));
+	return { ...identity(user), displayName: typeof displayName === 'string' ? displayName.trim() : 'Користувач' };
 }
 
 export async function signIn(
@@ -194,7 +223,7 @@ export async function signIn(
 	}, transport);
 	if (!record(result) || !validToken(result.access_token) || result.token_type !== 'bearer' ||
 		typeof result.expires_in !== 'number' || !Number.isSafeInteger(result.expires_in) ||
-		result.expires_in <= 0 || result.expires_in > 604800) throw new AuthError('AUTH_UNAVAILABLE');
+		result.expires_in <= 0 || result.expires_in > 604800) throw new AuthError('AUTH_UNAVAILABLE', 'session');
 	identity(result.user);
 	return { accessToken: result.access_token, expiresIn: result.expires_in };
 }
@@ -216,7 +245,7 @@ export async function signInWithGoogle(
 	}, transport);
 	if (!record(result) || !validToken(result.access_token) || result.token_type !== 'bearer' ||
 		typeof result.expires_in !== 'number' || !Number.isSafeInteger(result.expires_in) ||
-		result.expires_in <= 0 || result.expires_in > 604800) throw new AuthError('AUTH_UNAVAILABLE');
+		result.expires_in <= 0 || result.expires_in > 604800) throw new AuthError('AUTH_UNAVAILABLE', 'session');
 	identity(result.user);
 	return { accessToken: result.access_token, expiresIn: result.expires_in };
 }

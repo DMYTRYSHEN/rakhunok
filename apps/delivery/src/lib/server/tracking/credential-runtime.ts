@@ -1,4 +1,4 @@
-import * as env from '$app/env/private';
+import { trackingConfig } from './config.ts';
 import { createClient } from '@libsql/client';
 import { CredentialVault, CredentialVaultError } from './credential-vault.ts';
 
@@ -6,12 +6,13 @@ let store: CredentialVault | undefined;
 
 export function credentialRuntime(): { store: CredentialVault } {
 	if (!store) {
-		if (!env.DELIVERY_TURSO_DATABASE_URL) throw new CredentialVaultError();
+		const config = trackingConfig();
+		if (!config.url) throw new CredentialVaultError();
 		try {
 			store = new CredentialVault(createClient({
-				url: env.DELIVERY_TURSO_DATABASE_URL,
-				authToken: env.DELIVERY_TURSO_AUTH_TOKEN
-			}), () => env.DELIVERY_CREDENTIAL_ENCRYPTION_KEY);
+				url: config.url,
+				authToken: config.authToken
+			}), () => config.encryptionKey);
 		} catch {
 			throw new CredentialVaultError();
 		}

@@ -21,6 +21,8 @@ try {
 	const attemptId = '99999999-9999-9999-9999-999999999999';
 	const issuedId = '88888888-8888-8888-8888-888888888888';
 	points[0].category = 'Warehouse';
+	points.push({ ...points[0], ref: 'manual', name: 'Nearby branch', latitude: 50.452, longitude: 30.522 });
+	let nearbyRequests = 0;
 	let accountRequests = 0;
 	await page.route('**/api/v1/nova-poshta/account?**', route => {
 		accountRequests++;
@@ -28,7 +30,15 @@ try {
 	});
 	await page.route('https://api.bigdatacloud.net/**', route => route.fulfill({ json: { countryCode: 'UA', lookupSource: 'coordinates', city: city.name, locality: city.name, principalSubdivision: city.area } }));
 	await page.route('**/api/v1/nova-poshta/directory?**', route => {
-		const kind = new URL(route.request().url()).searchParams.get('kind');
+		const params = new URL(route.request().url()).searchParams;
+		const kind = params.get('kind');
+		if (kind === 'nearby') {
+			nearbyRequests++;
+			assert.equal(params.get('cityRef'), city.ref);
+			assert.equal(Number(params.get('latitude')), 50.45);
+			assert.equal(Number(params.get('longitude')), 30.52);
+			assert.ok(Number(params.get('weight')) > 0);
+		}
 		return route.fulfill({ json: { data: kind === 'cities' ? [city] : points, hasMore: false } });
 	});
 	await page.route('**/__gps_test', route => route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/src/app.css"></head><body><div id="app"></div><script type="module">
@@ -47,9 +57,15 @@ try {
 	assert.equal(await page.locator('#sender-city-query').inputValue(), city.name);
 	assert.match(await page.locator('.point-choice').first().innerText(), /Near locker/);
 	assert.equal(await page.locator('.point-choice').count(), 2);
+	assert.equal(nearbyRequests, 1);
+	await expect(page.locator('.point-choice').filter({ hasText: 'Far branch' })).toHaveCount(0);
 	await expect(page.locator('#sender-point')).toHaveValue('near');
 	await page.locator('.point-choice').last().click();
-	await expect(page.locator('#sender-point')).toHaveValue('far');
+	await expect(page.locator('#sender-point')).toHaveValue('manual');
+	await page.getByRole('button', { name: '\u041d\u0430\u0439\u0431\u043b\u0438\u0436\u0447\u0456 \u043f\u0443\u043d\u043a\u0442\u0438', exact: true }).click();
+	await expect(page.locator('.point-choice')).toHaveCount(2);
+	assert.equal(nearbyRequests, 1);
+	assert.ok(await page.evaluate(() => localStorage.getItem('delivery:directory:v1:gps-test')));
 	await page.locator('select[name="senderRef"]').selectOption(senderRef);
 	await expect(page.locator('select[name="contactRef"]')).toHaveValue(contactRef);
 	assert.equal(accountRequests, 1);
@@ -76,6 +92,7 @@ try {
 		assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 		await page.screenshot({ path: fileURLToPath(new URL(`../../../test-results/delivery-wizard-${width}.png`, import.meta.url)), fullPage: true });
 	}
+	if (!process.argv.includes('--gps-only')) {
 	let submissions = 0;
 	let release;
 	const hold = new Promise(resolve => { release = resolve; });
@@ -136,7 +153,8 @@ try {
 	await expect(settingsPage.locator('[name="contactRef"]')).toHaveValue(contactRef);
 	assert.deepEqual(errors, []);
 	await settingsPage.close();
-	console.log('PASS: GPS, manual override, account/contact selection, confirmation in submitted FormData, duplicate-click lock, persisted PDF links and unknown state at desktop/mobile; all provider writes mocked');
+	}
+	console.log(process.argv.includes('--gps-only') ? 'PASS: GPS nearby request, one-kilometre filtering, manual override and desktop/mobile layout; no provider writes' : 'PASS: GPS, manual override, account/contact selection, confirmation in submitted FormData, duplicate-click lock, persisted PDF links and unknown state at desktop/mobile; all provider writes mocked');
 } finally {
 	await browser.close();
 }

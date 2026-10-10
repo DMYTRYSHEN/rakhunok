@@ -45,7 +45,7 @@ export class NovaPoshtaApi {
 	private transport: typeof fetch;
 	private cache = new Map<string, { expires: number; data: unknown }>();
 
-	constructor(transport: typeof fetch = fetch) {
+	constructor(transport: typeof fetch = (input, init) => fetch(input, init)) {
 		this.transport = transport;
 	}
 
@@ -54,7 +54,7 @@ export class NovaPoshtaApi {
 		const timeout = setTimeout(() => controller.abort(), 8000);
 		try {
 			const response = await this.transport('https://api.novaposhta.ua/v2.0/json/', {
-				method: 'POST', redirect: 'error', signal: controller.signal,
+				method: 'POST', redirect: 'manual', signal: controller.signal,
 				headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
 				body: JSON.stringify({ ...(apiKey ? { apiKey } : {}), modelName, calledMethod, methodProperties })
 			});

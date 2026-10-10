@@ -14,7 +14,7 @@ export function pointDistance(point: Pick<Warehouse, 'latitude' | 'longitude'>, 
 export function recommendPoints(points: Warehouse[], location: { latitude: number; longitude: number }, weight: number): Warehouse[] {
 	if (!Number.isFinite(weight) || weight <= 0) return [];
 	return [...new Map(points.filter(point => point.status === 'Working' && ['Branch', 'Warehouse', 'Postomat'].includes(point.category) &&
-		(point.maxWeight === null || point.maxWeight === 0 || point.maxWeight >= weight) && Number.isFinite(pointDistance(point, location)))
+		(point.maxWeight === null || point.maxWeight === 0 || point.maxWeight >= weight) && pointDistance(point, location) <= 1)
 		.map(point => [point.ref, point])).values()].sort((first, second) => pointDistance(first, location) - pointDistance(second, location));
 }
 

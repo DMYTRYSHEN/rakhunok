@@ -11,7 +11,7 @@ test('city queries are bounded, cached and contain no carrier credential', async
 	const client = new NovaPoshtaApi(async (url, init) => {
 		calls++;
 		assert.equal(url, 'https://api.novaposhta.ua/v2.0/json/');
-		assert.equal(init.redirect, 'error');
+		assert.equal(init.redirect, 'manual');
 		assert.deepEqual(JSON.parse(init.body), { modelName: 'Address', calledMethod: 'getCities', methodProperties: { FindByString: 'Kyiv', Page: '1', Limit: '20' } });
 		return response([{ Ref: cityRef, Description: 'Kyiv', SecretField: 'excluded' }]);
 	});

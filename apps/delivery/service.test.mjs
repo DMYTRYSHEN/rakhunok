@@ -243,7 +243,7 @@ test('local migration is additive, repeatable and rejects remote or existing loc
 		await migrateLocal(url);
 		assert.equal((await client.execute('SELECT value FROM unrelated')).rows[0].value, 'preserved');
 		const tables = (await client.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'delivery_%'")).rows;
-		assert.deepEqual(tables.map(row => row.name).sort(), ['delivery_carrier_credentials', 'delivery_customers', 'delivery_events', 'delivery_np_documents', 'delivery_np_sender_defaults', 'delivery_shipments', 'delivery_shipping_drafts']);
+		assert.deepEqual(tables.map(row => row.name).sort(), ['delivery_carrier_credentials', 'delivery_customers', 'delivery_directory_points', 'delivery_events', 'delivery_np_documents', 'delivery_np_sender_defaults', 'delivery_shipments', 'delivery_shipping_drafts']);
 	} finally {
 		client.close();
 		global.gc?.();
