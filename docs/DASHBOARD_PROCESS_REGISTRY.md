@@ -1,5 +1,56 @@
 # Dashboard Process Registry
 
+- **Session-scoped readiness advice acknowledgment, local, 2026-10-12:**
+  Explicit latest approval covers presentation-only readiness recommendations,
+  accessible close and optional subtle motion. Affected surfaces are
+  DASH-STRUCTURE-001 / DASH-SETTINGS-001, with a read-only session identity
+  observer in DashboardPage; DASH-AUTH-001 authority and authentication storage
+  are unchanged. InvoiceReadinessNotice and readiness-notice-session own the
+  presentation state. Close or the original 8000 ms deadline acknowledges all
+  advisory recommendations for the user + merchant + Supabase session_id scope.
+  Issue replacement, empty/reloaded checks and component remount do not restart
+  that deadline or clear acknowledgment. SHA-256 scope keys in tab sessionStorage
+  retain only deadline/acknowledged values, not raw identifiers or credentials.
+  Reload in the same tab preserves state; another user, merchant or real auth
+  session has a distinct scope. Token refresh preserves scope. Sign-out clears
+  the active presentation scope; late auth/hash results cannot restore it.
+  Storage failure falls back to in-memory state (reload persistence unavailable).
+  Unknown session identity suppresses only optional advice; blockers/errors and
+  pending/retry remain available. Support/demo remain excluded. Motion is 180 ms
+  transform/opacity ease-out with 4 px displacement; reduced motion is zero.
+  Close has an accessible name/title, visible keyboard focus and 44 px target.
+  Evidence: 5 session/storage/auth observer tests, real Svelte Chromium browser
+  regression at 1280x900 and 390x844, and 13 classifier unit tests pass.
+  Browser coverage includes timeout, close/keyboard, replacement, retry, remount,
+  reload, new scopes, reduced motion, persistent blockers/errors/pending, links,
+  screenshots and no overflow/pageerrors. Svelte MCP notice review: zero issues;
+  subscription/timer effect suggestions retained for external lifecycle cleanup.
+  Root check: zero errors/warnings; complete local root build passed. Scoped
+  notice/session/test ESLint passes; DashboardPage has an existing unused page
+  import outside this change. Live authenticated acceptance was not performed.
+  No APIs, schema, migrations, RLS, payment defaults/payloads or Workers changed;
+  rhnk_main schema compatibility remains unverified, with no changed database
+  contract. All invoice/scenario authority remains LOCKED; delivery persistence
+  blocker remains unresolved. Explicit latest approval authorizes this advisory
+  commit and production Dashboard deployment only. Fresh complete root build and
+  exact Dashboard dry-run passed (Wrangler 4.129.0, 326 assets). Deployed only
+  rhnk-to-dashboard with keep-vars and unchanged API/SUPPORT bindings and routes.
+  Active version e3ea5023-1f2e-46c9-8a43-42633a80b54b is verified at 100%; provider
+  deployment timestamp is 2026-10-11T21:33:08.602Z (task date 2026-10-12).
+  Live readiness chunk SSHFchhB.js returns 200 and is byte-identical to fresh build,
+  SHA256 08ba94a1aea21759007753fd78c0a44dda2aadd4ef9f9cda77d1284a478b8327.
+  Read-only smoke: /, /dashboard, /app, /conf/, /pay, /pay/ and referenced assets
+  return 200 with correct MIME. /corex remains 404 without assets: full seven-route
+  acceptance FAILED (existing failure outside approved scope). No Corex repair.
+  Commit scope includes the previously uncommitted readiness classifier/notice
+  foundation, its small validation helper dependency and contact type fields,
+  only readiness wiring in DashboardPage, focused tests and this checkpoint.
+  Other accumulated changes remain uncommitted; no generated files or secrets
+  are included. No full validation gate or remote push requested/performed.
+  Status: DEPLOYED / LIVE ASSET IDENTITY VERIFIED / FULL ROUTE ACCEPTANCE FAILED
+  (EXISTING COREX 404). Live authenticated acceptance and rhnk_main compatibility
+  remain unverified. This deployment approval is consumed; locked invariants remain.
+
 This registry records Dashboard processes that have been analyzed and accepted. It is the
 authority for change boundaries under `src/lib/features/dashboard` and `src/routes/dashboard`.
 

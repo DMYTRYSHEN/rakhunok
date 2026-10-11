@@ -134,6 +134,9 @@ export type BusinessEntity = {
 	taxId: string;
 	bankName: string;
 	iban: string;
+	phone?: string;
+	contactEmail?: string;
+	website?: string;
 	isActive: boolean;
 };
 

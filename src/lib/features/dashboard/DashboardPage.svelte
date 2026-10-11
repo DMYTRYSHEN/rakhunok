@@ -12,12 +12,16 @@
 	import MerchantOnboarding from './auth/MerchantOnboarding.svelte';
 	import DashboardStateScreen from './auth/DashboardStateScreen.svelte';
 	import DashboardShell from './components/DashboardShell.svelte';
+	import { createSettingsRepository } from './business-settings/settings-repository';
+	import { invoiceReadiness, type InvoiceReadinessIssue } from './business-settings/invoice-readiness';
+	import InvoiceReadinessNotice from './business-settings/InvoiceReadinessNotice.svelte';
+	import { observeReadinessNoticeScope } from './business-settings/readiness-notice-session';
 	import { demoInvoiceEvents } from './data/invoice-events';
 	import { demoInvoices } from './data/invoices';
 	import { overviewSnapshot } from './data/overview';
 	import { demoPosBoard } from './data/pos';
 	import { selectExpiredPendingInvoices } from './notifications/invoice-attention';
-	import { getDashboardGateway } from './api/supabase-browser';
+	import { getDashboardGateway, getSupabaseBrowserClient } from './api/supabase-browser';
 	import {
 		DEFAULT_TABLE_ORDER_TTL_SECONDS,
 		type DashboardRealtimeResource,
@@ -111,6 +115,43 @@
 	}
 
 	let sessionState = $state<DashboardSessionState>(cachedSessionState ?? { status: 'loading' });
+	let readinessIssues = $state<InvoiceReadinessIssue[]>([]);
+	let readinessError = $state('');
+	let readinessPending = $state(false);
+	let readinessGeneration = 0;
+	let readinessScope = $state<string | null>(null);
+	const readinessOwner = $derived(sessionState.status === 'ready' && sessionState.user.id !== 'demo-user'
+		? { userId: sessionState.user.id, merchantId: sessionState.merchant.id } : null);
+
+	$effect(() => {
+		const owner = readinessOwner;
+		readinessScope = null;
+		if (!owner) return;
+		const client = getSupabaseBrowserClient();
+		if (!client) return;
+		return observeReadinessNoticeScope(client.auth, owner, (scope) => { readinessScope = scope; });
+	});
+
+	async function checkInvoiceReadiness() {
+		const request = ++readinessGeneration;
+		const scope = sessionState;
+		readinessIssues = [];
+		readinessError = '';
+		if (scope.status !== 'ready' || scope.user.id === 'demo-user' || !gateway) return;
+		readinessPending = true;
+		try {
+			const [structure, settings] = await Promise.all([
+				gateway.getBusinessStructure(scope.user.id),
+				createSettingsRepository().load({ userId: scope.user.id, merchantId: scope.merchant.id, demo: false })
+			]);
+			if (destroyed || request !== readinessGeneration || sessionState.status !== 'ready' || sessionState.user.id !== scope.user.id || sessionState.merchant.id !== scope.merchant.id) return;
+			readinessIssues = invoiceReadiness(structure.entities, settings.draft);
+		} catch (error) {
+			if (!destroyed && request === readinessGeneration && sessionState.status === 'ready' && sessionState.user.id === scope.user.id && sessionState.merchant.id === scope.merchant.id) readinessError = error instanceof Error ? error.message : 'Не вдалося перевірити готовність до платежів.';
+		} finally {
+			if (request === readinessGeneration) readinessPending = false;
+		}
+	}
 	let gateway = $state<ReturnType<typeof getDashboardGateway>>(null);
 	let invoices = $state<InvoiceRecord[]>([]);
 	let attentionInvoices = $state<InvoiceRecord[]>([]);
@@ -225,6 +266,7 @@
 			}
 		}
 		await Promise.all([loadInvoices(), loadAttentionInvoices()]);
+		await checkInvoiceReadiness();
 		startRealtimeSync();
 	}
 
@@ -676,6 +718,9 @@
 		onCancelAttentionInvoice={cancelInvoice}
 		onSignOut={signOut}
 	>
+		{#if sessionState.user.id !== 'demo-user'}
+			<InvoiceReadinessNotice scope={readinessScope} issues={readinessIssues} error={readinessError} pending={readinessPending} onCheck={() => void checkInvoiceReadiness()} />
+		{/if}
 		{#if view === 'overview' && contentLoading}
 			<DashboardStateScreen loading />
 		{:else if view === 'overview' && contentError}
