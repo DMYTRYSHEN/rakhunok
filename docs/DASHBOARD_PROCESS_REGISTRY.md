@@ -1,5 +1,58 @@
 # Dashboard Process Registry
 
+- **Floating readiness popup correction, local, 2026-10-12:**
+  Latest user approval covers presentation only for DASH-STRUCTURE-001 /
+  DASH-SETTINGS-001. Previous advice was a normal-flow block inside the inline
+  readiness section, not a floating popup; no cache explanation is established.
+  InvoiceReadinessNotice now renders optional advice in a separate nonmodal fixed
+  white panel, bottom/right 24 px on desktop and 16 px on mobile, 384 px desktop
+  width, responsive viewport bounds, 8 px radius, border/shadow and 44 px named X.
+  Persistent blockers/errors/pending remain inline and independent of advice.
+  Svelte global fly uses opacity/12 px translation, 180 ms ease-out; interrupted
+  transitions may reverse proportionally. Motion preference is read when the
+  transition starts; reduced motion has zero timed animation. Original 8000 ms
+  deadline, acknowledgment, owner/session scope and reload/remount semantics are
+  unchanged; no session keys were reset. Evidence: real Svelte Chromium regression
+  passes at 1280x900 and 390x844, checking computed fixed geometry, appearance,
+  actual browser animation keyframes, keyboard close, expiry, session persistence,
+  independent blockers/errors/pending and reduced motion. Desktop/mobile screenshots
+  in test-results/invoice-readiness-1280.png and invoice-readiness-390.png; integrated
+  browser preview at http://127.0.0.1:5192 also visually inspected with Ukrainian
+  fixture advice, fixed positioning, white background/shadow and no mobile overflow.
+  Five unchanged session tests and scoped ESLint pass; root check has zero errors /
+  warnings; complete root build passes. Full component Svelte MCP: zero issues;
+  effect suggestions retained for existing subscription/timer lifecycle cleanup.
+  Available local Dashboard at 5190 showed login, so authenticated real-data popup
+  acceptance was not performed; no user popup was dismissed/reset during inspection.
+  No DashboardPage, Auth, permissions, SQL, APIs, classifier or scenario change;
+  no database access/writes. rhnk_main compatibility remains unverified with no
+  changed database contract. Invoice/scenario locks and delivery blocker remain.
+  Latest explicit user confirmation approves committing this floating-popup
+  correction and deploying only rhnk-to-dashboard on rhnk.to. Fresh complete root
+  build and exact Dashboard dry-run passed (Wrangler 4.129.0, 326 assets).
+  Deployed only rhnk-to-dashboard with keep-vars, unchanged API/SUPPORT bindings,
+  exact /dashboard and wildcard /dashboard/* routes; no DAC7/API/Corex deployment.
+  Active version 0040b3a5-d857-4c23-a540-f09b242164bb is verified at 100%; provider
+  timestamp 2026-10-11T22:13:23.232078Z (task date 2026-10-12).
+  Live BdLgBO3z.js and DashboardPage.CiPzQSAs.css return 200 and match the complete
+  fresh build byte-for-byte. Fixed desktop/mobile CSS, white background, 8 px
+  radius, 12 px fly, 180 ms close and reduced-motion logic are verified in those
+  assets. JS SHA256 d1700ca3cc1b0b8abacff404cf7122afa6cd0ae414553b55d8578e7e87030de7;
+  CSS SHA256 d69282868b869c68143bdc852571787115a7922bf6ab6cddc412ae30856e5559.
+  Read-only smoke: /, /dashboard, /app, /conf/, /pay, /pay/ and their referenced
+  assets return 200 with expected MIME. /corex remains 404 with no assets; full
+  seven-route acceptance FAILED (existing out-of-scope failure), no Corex repair.
+  Production browser reload renders login; authenticated popup acceptance remains
+  unverified. No sign-in/logout, session reset or permanent business writes.
+  Commit scope: popup component, its focused browser test including optional
+  READINESS_PREVIEW harness, and only this registry checkpoint. No generated
+  build/log/screenshot files, secrets, unrelated registry recovery or other dirty
+  changes included. No full test gate repeated or remote push requested/performed.
+  Existing dirty changes and preview servers preserved. Status: DEPLOYED / LIVE
+  ASSET IDENTITY VERIFIED / AUTHENTICATED ACCEPTANCE PENDING / FULL ROUTE
+  ACCEPTANCE FAILED (EXISTING COREX 404). Deployment approval is consumed;
+  invoice/scenario locks and all other production approval boundaries remain.
+
 - **Session-scoped readiness advice acknowledgment, local, 2026-10-12:**
   Explicit latest approval covers presentation-only readiness recommendations,
   accessible close and optional subtle motion. Affected surfaces are

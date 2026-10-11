@@ -42,7 +42,7 @@ function check() {
 			resolveId(value) { if (value === '$app/paths') return '\0paths'; if (value === entry || value === fixture) return value; },
 			async load(path) {
 				if (path === '\0paths') return 'export const resolve = (path) => path;';
-				if (path === entry) return `import {mount} from 'svelte';import Fixture from ${JSON.stringify(fixture)};mount(Fixture,{target:document.querySelector('#fixture')});`;
+				if (path === entry) return `import {mount} from 'svelte';import Fixture from ${JSON.stringify(fixture)};mount(Fixture,{target:document.querySelector('#fixture'),intro:true});`;
 				if (path.endsWith('.svelte')) return compile(path === fixture ? wrapper : await readFile(path, 'utf8'), { filename: path, generate: 'client', css: 'injected' }).js.code;
 			}
 		}]
@@ -58,11 +58,23 @@ function check() {
 		response.writeHead(resource ? 200 : 404, { 'Content-Type': resource?.[0] ?? 'text/plain' });
 		response.end(resource?.[1] ?? 'Not found');
 	});
-	await new Promise(accept => server.listen(0, '127.0.0.1', accept));
+	await new Promise(accept => server.listen(process.env.READINESS_PREVIEW ? 5192 : 0, '127.0.0.1', accept));
+	if (process.env.READINESS_PREVIEW) {
+		console.log('Readiness component preview: http://127.0.0.1:5192');
+		await new Promise(() => {});
+	}
 	const browser = await chromium.launch({ headless: true });
 	try {
 		for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
 			const page = await browser.newPage({ viewport });
+			await page.addInitScript(() => {
+				globalThis.noticeAnimations = [];
+				const animate = Element.prototype.animate;
+				Element.prototype.animate = function (frames, options) {
+					if (this.classList.contains('readiness-advisories')) globalThis.noticeAnimations.push({ frames, duration: options.duration });
+					return animate.call(this, frames, options);
+				};
+			});
 			const errors = [];
 			page.on('pageerror', error => errors.push(error.message));
 			const clockTime = new Date('2026-10-11T12:00:00Z');
@@ -74,8 +86,24 @@ function check() {
 			]);
 			assert.equal(await page.locator('.readiness-blockers strong').count(), 2);
 			assert.deepEqual(await page.locator('.readiness-blockers').evaluate(element => ({ border: getComputedStyle(element).borderLeftWidth, background: getComputedStyle(element).backgroundColor })), { border: '4px', background: 'rgb(254, 242, 242)' });
+			const popup = page.getByRole('region', { name: 'Рекомендовано доповнити' });
+			assert.equal(await popup.evaluate(element => getComputedStyle(element).position), 'fixed');
+			assert.deepEqual(await popup.evaluate(element => {
+				const style = getComputedStyle(element);
+				return { background: style.backgroundColor, radius: style.borderRadius, font: style.fontSize, shadow: style.boxShadow !== 'none' };
+			}), { background: 'rgb(255, 255, 255)', radius: '8px', font: '14px', shadow: true });
+			await page.clock.runFor(64);
+			const entryDurations = await page.evaluate(() => globalThis.noticeAnimations.map(animation => animation.duration));
+			assert.ok(entryDurations.includes(180), JSON.stringify(entryDurations));
+			await page.clock.runFor(136);
+			const bounds = await popup.boundingBox();
+			const inset = viewport.width > 640 ? 24 : 16;
+			assert.equal(Math.round(viewport.width - bounds.x - bounds.width), inset);
+			assert.equal(Math.round(viewport.height - bounds.y - bounds.height), inset);
+			assert.ok(bounds.x >= 16 && bounds.y >= 64 && bounds.height <= 360);
+			assert.equal(await popup.getByRole('button', { name: 'Закрити рекомендації' }).isVisible(), true);
 			await page.screenshot({ path: `test-results/invoice-readiness-${viewport.width}.png`, fullPage: true });
-			await page.clock.runFor(7999);
+			await page.clock.runFor(7799);
 			assert.equal(await page.getByText('Seller contacts', { exact: true }).isVisible(), true);
 			await page.clock.runFor(1);
 			await page.evaluate(() => Promise.resolve());
@@ -103,6 +131,7 @@ function check() {
 			assert.equal(await page.locator('.readiness-advisories').count(), 0);
 			await page.evaluate(() => globalThis.setScope('new-session'));
 			await page.getByText('Optional phone', { exact: true }).waitFor();
+			assert.equal(await page.getByRole('heading', { name: 'Налаштування рахунків', exact: true }).count(), 0);
 			await page.clock.runFor(4000);
 			await page.evaluate(() => globalThis.setIssues([{ entityId: 'seller', label: 'Optional bank', section: 'structure', severity: 'advisory' }]));
 			await page.getByText('Optional bank', { exact: true }).waitFor();
@@ -115,7 +144,7 @@ function check() {
 			await button.click();
 			await page.clock.runFor(8000);
 			assert.equal(await button.isDisabled(), true);
-			assert.equal(await page.locator('section').isVisible(), true);
+			assert.equal(await page.getByRole('region', { name: 'Налаштування рахунків', exact: true }).isVisible(), true);
 			await page.evaluate(() => globalThis.finishCheck(true));
 			await page.getByRole('alert').waitFor();
 			await page.clock.runFor(60000);
@@ -138,20 +167,29 @@ function check() {
 			await page.locator('section').waitFor({ state: 'detached' });
 			await page.evaluate(() => globalThis.setScope('keyboard-close-session'));
 			await page.getByText('Unmount advice', { exact: true }).waitFor();
+			await page.clock.runFor(200);
 			const close = page.getByRole('button', { name: 'Закрити рекомендації' });
 			assert.equal(await close.getAttribute('title'), 'Закрити рекомендації');
 			assert.equal((await close.boundingBox()).width, 44);
 			await close.focus();
+			await page.evaluate(() => { globalThis.noticeAnimations = []; });
 			await close.press('Enter');
-			await page.clock.runFor(200);
+			await page.evaluate(() => Promise.resolve());
+			await page.clock.runFor(16);
+			const exitAnimations = await page.evaluate(() => globalThis.noticeAnimations);
+			assert.ok(exitAnimations.some(animation => animation.duration > 0 && animation.duration <= 180 && animation.frames.some(frame => Number(frame.opacity) < 1 && frame.transform)), JSON.stringify(exitAnimations));
+			await page.clock.runFor(74);
+			await page.screenshot({ path: `test-results/invoice-readiness-closing-${viewport.width}.png`, fullPage: true });
+			await page.clock.runFor(110);
 			await page.locator('section').waitFor({ state: 'detached' });
 			await page.reload();
 			await page.locator('.readiness-blockers').waitFor();
 			assert.equal(await page.locator('.readiness-advisories').count(), 0);
 			await page.emulateMedia({ reducedMotion: 'reduce' });
+			await page.evaluate(() => { globalThis.noticeAnimations = []; });
 			await page.evaluate(() => globalThis.setScope('reduced-motion-session'));
 			await page.locator('.readiness-advisories').waitFor();
-			assert.equal(await page.locator('.readiness-advisories').evaluate(element => element.getAnimations().length), 0);
+			assert.equal(await page.evaluate(() => globalThis.noticeAnimations.some(animation => animation.duration > 0)), false);
 			await page.getByRole('button', { name: 'Закрити рекомендації' }).click();
 			await page.locator('.readiness-advisories').waitFor({ state: 'detached' });
 			assert.equal(await page.locator('.readiness-blockers strong').count(), 2);
