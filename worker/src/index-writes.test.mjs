@@ -6,7 +6,6 @@ const env = { ASSETS: { fetch: async () => { throw new Error('Unexpected asset f
 const authorization = 'Bearer local-test-token';
 const endpoints = [
 	['PUT', '/api/v1/merchant/me'],
-	['POST', '/api/v1/merchant/onboarding'],
 	['POST', '/api/v1/orders'],
 	['PATCH', '/api/v1/orders/order-test']
 ];
@@ -91,7 +90,7 @@ for (const [method, path] of endpoints) {
 	});
 }
 
-for (const [method, path] of endpoints.slice(0, 2)) {
+for (const [method, path] of endpoints.slice(0, 1)) {
 	test(`${method} ${path}: awaits persisted representation and preserves write payload`, async () => {
 		let release;
 		let started;
@@ -107,7 +106,7 @@ for (const [method, path] of endpoints.slice(0, 2)) {
 		const payload = JSON.parse(calls[0].init.body);
 		assert.deepEqual(payload, {
 			business_name: 'Shop', business_type: 'fop', tax_id: '123', iban: 'UA123',
-			display_name: 'Shop', bank_name: 'А-Банк', onboarding_completed: true,
+			display_name: 'Shop', bank_name: method === 'PUT' ? 'А-Банк' : '', onboarding_completed: true,
 			updated_at: payload.updated_at
 		});
 		assert.ok(Number.isFinite(Date.parse(payload.updated_at)));
@@ -118,6 +117,37 @@ for (const [method, path] of endpoints.slice(0, 2)) {
 		const response = await result;
 		assert.equal(response.status, 200);
 		assert.deepEqual(await response.json(), { success: true, merchant });
+	});
+}
+
+test('onboarding route dispatches verified atomic handler with configured Supabase', async () => {
+	const owner = '00000000-0000-0000-0000-000000000001';
+	respond = (url) => url.includes('/auth/') ? Response.json({ id: owner }) : Response.json({
+		merchant: { id: '00000000-0000-0000-0000-000000000101', user_id: owner },
+		entity: { id: '00000000-0000-0000-0000-000000000201', user_id: owner }, created: true
+	});
+	const response = await routeWebRequest(request('POST', '/api/v1/merchant/onboarding', {
+		business_type: 'fop', tax_id: '1234567890', business_name: 'Shop', iban: 'UA663052990000026007123456789', bank_name: 'Wrong bank',
+		phone: '067 123-45-67', contact_email: ' Owner@Example.com ', website: 'example.com'
+	}), { ...env, SUPABASE_URL: 'https://configured.example', SUPABASE_ANON_KEY: 'synthetic-public-key' });
+	assert.equal(response.status, 200);
+	assert.equal(calls.length, 2);
+	assert.equal(calls[0].url, 'https://configured.example/auth/v1/user');
+	assert.equal(calls[1].url, 'https://configured.example/rest/v1/rpc/complete_merchant_onboarding');
+	const payload = JSON.parse(calls[1].init.body).p_input;
+	assert.equal(payload.phone, '+380671234567');
+	assert.equal(payload.contact_email, 'owner@example.com');
+	assert.equal(payload.website, 'https://example.com/');
+	assert.notEqual(payload.bank_name, 'Wrong bank');
+	assert.equal('phone_verified' in payload, false);
+	assert.equal('user_id' in payload, false);
+});
+
+for (const body of [{ phone: '123' }, { contact_email: 'wrong@' }, { website: 'javascript://example.com' }]) {
+	test(`onboarding rejects invalid contact ${JSON.stringify(body)} before IO`, async () => {
+		const response = await routeWebRequest(request('POST', '/api/v1/merchant/onboarding', body), env);
+		assert.equal(response.status, 422);
+		assert.equal(calls.length, 0);
 	});
 }
 
@@ -264,7 +294,10 @@ for (const [label, rpcError, status, message] of [
 		'Налаштуйте платіжні реквізити компанії в особистому кабінеті.'],
 	['incomplete payment settings', { code: '22023', message: 'Invoice payment settings are incomplete' }, 422,
 		'Реквізити отримувача заповнені некоректно. Перевірте назву, IBAN, податковий номер і призначення платежу'],
-	['unrelated RPC error', { code: '22023', message: 'Other private database error' }, 503, 'Service unavailable'],
+	['unrelated RPC error', { code: '22023', message: 'Other private database error' }, 422,
+		'Некоректні або неповні параметри рахунку. Перевірте налаштування в кабінеті.'],
+	['seller settings not configured', { code: '22023', message: 'Invoice seller settings are not configured' }, 422,
+		'Налаштуйте реквізити та правила продавця в особистому кабінеті.'],
 	['same message with another code', { code: '42501', message: 'Invoice payment settings are incomplete' }, 503, 'Service unavailable']
 ]) {
 	test(`POST orders: ${label}`, async () => {
@@ -343,7 +376,10 @@ test('PATCH leaves cached aliases unchanged until confirmed success, then invali
 	// Probe each alias through the non-caching order GET so none can re-prime another.
 	for (const key of [id, 'cache-short', 'cache-number']) {
 		const count = calls.length;
-		const result = await routeWebRequest(new Request(`https://example.com/api/v1/orders/${key}`), env);
+		const result = await routeWebRequest(new Request(`https://example.com/api/v1/orders/${key}`, {
+			headers: { Authorization: authorization }
+		}), env);
+		assert.equal(result.status, 200);
 		assert.equal((await result.json()).status, 'cancelled');
 		assert.equal(calls.length, count + 1, 'confirmed write must invalidate every local alias');
 	}

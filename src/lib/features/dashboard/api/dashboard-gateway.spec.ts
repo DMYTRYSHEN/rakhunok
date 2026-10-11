@@ -259,6 +259,7 @@ describe('dashboard gateway', () => {
 		}).onboardMerchant({
 			businessName: 'ФОП Тест',
 			businessType: 'fop',
+			vatStatus: 'vat',
 			taxId: '1234567890',
 			iban: 'ua12 3456 7890 1234 5678 9012 345',
 			displayName: 'Тест',
@@ -266,6 +267,10 @@ describe('dashboard gateway', () => {
 		});
 
 		expect(fetcher).toHaveBeenCalledTimes(1);
+		expect(fetcher).toHaveBeenCalledWith(
+			'https://api.example.com/api/v1/merchant/onboarding',
+			expect.objectContaining({ body: expect.stringContaining('"vat_status":"vat"') })
+		);
 		expect(fetcher).toHaveBeenCalledWith(
 			'https://api.example.com/api/v1/merchant/onboarding',
 			expect.objectContaining({
@@ -517,6 +522,82 @@ describe('dashboard gateway', () => {
 		expect(fetcher.mock.calls[2]?.[1]?.body).toBe('{"status":"cancelled"}');
 	});
 
+	it('preserves omitted contacts and writes explicit contact edits without changing ownership', async () => {
+		const saved = { data: [{ id: 'entity-1', user_id: 'user-1' }], error: null };
+		const insert = vi.fn<(payload: unknown) => ReturnType<typeof query>>(() => query(saved));
+		const updateBuilder = query(saved);
+		const update = vi.fn<(payload: unknown) => ReturnType<typeof query>>(() => updateBuilder);
+		const rpc = vi.fn(async () => ({ data: saved.data[0], error: null }));
+		const client = { from: vi.fn(() => ({ insert, update })), rpc } as unknown as SupabaseClient;
+		const gateway = createDashboardGateway(client);
+		const input = {
+			businessType: 'self_employed' as const,
+			businessName: 'Test', displayName: 'Test', taxId: '1234567890',
+			bankName: 'Bank', iban: 'UA663052990000026007123456789'
+		};
+		await gateway.createBusinessEntity('user-1', input);
+		expect(insert.mock.calls[0]?.[0]).not.toHaveProperty('phone');
+		expect(insert.mock.calls[0]?.[0]).not.toHaveProperty('contact_email');
+		expect(insert.mock.calls[0]?.[0]).not.toHaveProperty('website');
+		await gateway.createBusinessEntity('user-1', {
+			...input, phone: '+380671234567', contactEmail: ' owner@example.com ', website: 'https://example.com/'
+		});
+		expect(vi.mocked(client.rpc).mock.calls[0]?.[1]?.p_input).toMatchObject({
+			business_type: 'self_employed', phone: '+380671234567',
+			contact_email: 'owner@example.com', website: 'https://example.com/'
+		});
+		await gateway.updateBusinessEntity('user-1', 'entity-1', input);
+		expect(update.mock.calls[0]?.[0]).not.toHaveProperty('contact_email');
+		await gateway.updateBusinessEntity('user-1', 'entity-1', { ...input, phone: '', website: '' });
+		expect(vi.mocked(client.rpc).mock.calls[1]?.[1]?.p_input).toMatchObject({ phone: null, website: null });
+		expect(vi.mocked(client.rpc).mock.calls[1]?.[1]?.p_input).not.toHaveProperty('contact_email');
+		expect(insert).toHaveBeenCalledTimes(1);
+		expect(update).toHaveBeenCalledTimes(1);
+		expect(updateBuilder.eq).toHaveBeenCalledWith('user_id', 'user-1');
+		expect(updateBuilder.eq).toHaveBeenCalledWith('id', 'entity-1');
+	});
+
+	it.each([null, {}, { id: 'entity-1', user_id: 'other' },
+		[{ id: 'entity-1', user_id: 'user-1' }]])('rejects unconfirmed private contact RPC result %j', async (data) => {
+		const rpc = vi.fn(async () => ({ data, error: null }));
+		const client = { rpc } as unknown as SupabaseClient;
+		const input = { businessType: 'fop' as const, businessName: 'Test', displayName: 'Test',
+			taxId: '1234567890', bankName: 'Bank', iban: 'UA', phone: '+380671234567' };
+		const gateway = createDashboardGateway(client);
+		await expect(gateway.createBusinessEntity('user-1', input)).rejects.toThrow('підтвердити');
+		await expect(gateway.updateBusinessEntity('user-1', 'entity-1', input)).rejects.toThrow('підтвердити');
+	});
+
+	it('does not fall back to public columns after contact RPC failure', async () => {
+		const from = vi.fn();
+		const client = { from, rpc: vi.fn(async () => ({ data: null, error: new Error('missing RPC') })) } as unknown as SupabaseClient;
+		const gateway = createDashboardGateway(client);
+		const input = { businessType: 'fop' as const, businessName: 'Test', displayName: 'Test',
+			taxId: '1234567890', bankName: 'Bank', iban: 'UA', phone: '+380671234567' };
+		await expect(gateway.createBusinessEntity('user-1', input)).rejects.toThrow('підтвердити');
+		await expect(gateway.updateBusinessEntity('user-1', 'entity-1', input)).rejects.toThrow('підтвердити');
+		expect(from).not.toHaveBeenCalled();
+	});
+
+	it('reads private contact relation while accepting legacy rows and nullable contacts', async () => {
+		const row = {
+			id: 'entity-1', business_type: 'self_employed', business_name: 'Test',
+			display_name: 'Test', tax_id: '1234567890', bank_name: 'Bank', iban: 'UA', is_active: true
+		};
+		const client = { from: vi.fn((table: string) => query({
+			data: table === 'business_entities' ? [row, {
+				...row, id: 'entity-2', business_entity_contacts: {
+					phone: '+380671234567', contact_email: 'owner@example.com', website: null
+				}
+			}] : [], error: null
+		})) } as unknown as SupabaseClient;
+		const result = await createDashboardGateway(client).getBusinessStructure('user-1');
+		expect(result.entities[0]).toMatchObject({ phone: '', contactEmail: '', website: '' });
+		expect(result.entities[1]).toMatchObject({
+			businessType: 'self_employed', phone: '+380671234567', contactEmail: 'owner@example.com', website: ''
+		});
+	});
+
 	it('writes each structure mutation once and scopes deletes by user and immutable ID', async () => {
 		const inserts: unknown[] = [];
 		const deleteFilters: Array<[string, unknown]> = [];
@@ -531,6 +612,7 @@ describe('dashboard gateway', () => {
 					Promise.resolve({ data: null, error: null }).then(resolve)
 			};
 			const updateBuilder = {
+				select: vi.fn(() => query({ data: [{ id: 'entity-1', user_id: 'user-1' }], error: null })),
 				eq: vi.fn((column: string, value: unknown) => {
 					updateFilters.push([`${table}.${column}`, value]);
 					return updateBuilder;
@@ -539,9 +621,9 @@ describe('dashboard gateway', () => {
 					Promise.resolve({ data: null, error: null }).then(resolve)
 			};
 			return {
-				insert: vi.fn(async (payload: unknown) => {
+				insert: vi.fn((payload: unknown) => {
 					inserts.push([table, payload]);
-					return { error: null };
+					return query({ data: [{ id: 'entity-1', user_id: 'user-1' }], error: null });
 				}),
 				delete: vi.fn(() => deleteBuilder),
 				update: vi.fn(() => updateBuilder)
@@ -608,6 +690,26 @@ describe('dashboard gateway', () => {
 			['terminals.user_id', 'user-1'],
 			['terminals.id', 'terminal-1']
 		]);
+	});
+
+	it.each([null, [], [{ id: 'entity-1', user_id: 'other' }],
+		[{ id: 'entity-1', user_id: 'user-1' }, { id: 'entity-2', user_id: 'user-1' }], [{}]])
+	('rejects unconfirmed entity mutation result %j', async (data) => {
+		const builder = query({ data, error: null });
+		const client = { from: vi.fn(() => ({ insert: () => builder, update: () => builder })) } as unknown as SupabaseClient;
+		const gateway = createDashboardGateway(client);
+		const input = { businessType: 'fop' as const, businessName: 'Test', displayName: 'Test',
+			taxId: '1234567890', bankName: 'Bank', iban: 'UA663052990000026007123456789' };
+		await expect(gateway.createBusinessEntity('user-1', input)).rejects.toThrow('підтвердити');
+		await expect(gateway.updateBusinessEntity('user-1', 'entity-1', input)).rejects.toThrow('підтвердити');
+	});
+
+	it('rejects a different returned entity ID after update', async () => {
+		const builder = query({ data: [{ id: 'entity-2', user_id: 'user-1' }], error: null });
+		const client = { from: vi.fn(() => ({ update: () => builder })) } as unknown as SupabaseClient;
+		await expect(createDashboardGateway(client).updateBusinessEntity('user-1', 'entity-1', {
+			businessType: 'fop', businessName: 'Test', displayName: 'Test', taxId: '1234567890', bankName: 'Bank', iban: 'UA'
+		})).rejects.toThrow('підтвердити');
 	});
 
 	it('restores the authenticated merchant without loading overview data', async () => {

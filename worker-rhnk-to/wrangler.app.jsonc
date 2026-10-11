@@ -1,0 +1,10 @@
+{
+	"name": "rhnk-to-app", "account_id": "753ff9292511c16a281c5cfa8e105c63",
+	"main": "app.js", "compatibility_date": "2026-10-04",
+	"compatibility_flags": ["nodejs_compat"], "workers_dev": false, "preview_urls": false,
+	"assets": { "directory": "../apps/merchant-app/dist", "binding": "ASSETS", "run_worker_first": true, "not_found_handling": "single-page-application" },
+	"services": [{ "binding": "API", "service": "rhnk-to-web" }],
+	"vars": { "SUPABASE_URL": "https://mwaeazabpvbxqfrceogr.supabase.co", "SUPABASE_ANON_KEY": "sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk" },
+	"observability": { "enabled": true, "traces": { "enabled": true } },
+	"routes": [{ "pattern": "rhnk.to/app", "zone_name": "rhnk.to" }, { "pattern": "rhnk.to/app/*", "zone_name": "rhnk.to" }]
+}

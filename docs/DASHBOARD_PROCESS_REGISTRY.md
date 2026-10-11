@@ -1,5 +1,10 @@
 # Dashboard Process Registry
 
+This registry records Dashboard processes that have been analyzed and accepted. It is the
+authority for change boundaries under `src/lib/features/dashboard` and `src/routes/dashboard`.
+
+## DASH-AUTH-001 - Client Support Mode Plan, 2026-10-05
+
 - **Floating readiness popup correction, local, 2026-10-12:**
   Latest user approval covers presentation only for DASH-STRUCTURE-001 /
   DASH-SETTINGS-001. Previous advice was a normal-flow block inside the inline
@@ -104,8 +109,1144 @@
   (EXISTING COREX 404). Live authenticated acceptance and rhnk_main compatibility
   remain unverified. This deployment approval is consumed; locked invariants remain.
 
-This registry records Dashboard processes that have been analyzed and accepted. It is the
-authority for change boundaries under `src/lib/features/dashboard` and `src/routes/dashboard`.
+- **Task2 exact scenario UX approval and task1 + task2 Dashboard release, 2026-10-11:**
+  Explicit separate approval temporarily unlocks DASH-INVOICE-001 and
+  CROSS-APP-INVOICE-SCENARIOS-001 only to focus an editable "Сума рахунку" near
+  the keypad for fixed/table/delivery on mount, scenario switch, template apply
+  and preview Escape. Same amount binding; delivery edits base goods excluding
+  delivery fee; total remains base plus delivery. open_amount has no keypad or
+  autofocus. No API payload, numbering, POS, Pay, authority, defaults, template
+  semantics, database/schema/migration or Corex change is authorized.
+  Task1 + task2 deployment is approved only for rhnk-to-dashboard using full root
+  build and matching dry-run. Fresh local evidence: real Svelte Chromium test
+  passes at 1280x900 and 390x844 for mount, scenario/template changes, preview
+  Enter/Escape, zero selection, physical/onscreen decimal and backspace, quick
+  +100 and shared left/aside amount binding. Delivery base/fee/total arithmetic
+  and stable keypad geometry/no overflow pass; open_amount has no autofocus/keypad.
+  28 focused readiness/template/rules unit tests and 17 readiness-browser/local
+  authority snapshot regressions pass. Full-component Svelte MCP reports zero
+  issues; existing effects/bind:this suggestions reviewed without refactoring.
+  Root check reports zero errors/warnings. Removed unused preview svelte-ignore;
+  Chromium rerun passes. Scoped ESLint still reports the pre-existing support
+  receipt href without resolve(), outside this approved UX scope.
+  Fresh complete root build passed; installed Wrangler 4.129.0 exact Dashboard
+  dry-run read 325 assets and passed. Deployed only rhnk-to-dashboard with
+  keep-vars, preserving exact /dashboard and wildcard /dashboard/* routes and
+  API/SUPPORT bindings. Active version 9ab1e5c8-f05d-4a12-af2a-f24fb184030b,
+  verified at 100% by deployments list, 2026-10-11T20:23:43.216Z.
+  Live focus chunk DaJ9ZjRq.js: HTTP 200, byte-identical to fresh build,
+  SHA256 e6f0e5dde306469593d82a83a66c3394758f67fac9e8841d533bef4a5c81627b.
+  Live readiness chunk Dbz7WklJ.js: HTTP 200, byte-identical to fresh build,
+  SHA256 50e047117d8fc8ecccdecb864a5108c301795ce84818a045d7425bd63798bcb9.
+  Read-only smoke: /, /dashboard, /app, /conf/, /pay and /pay/ return 200;
+  their referenced JS/CSS assets return 200 with correct MIME. /corex remains
+  empty 404, so full seven-route acceptance FAILED. Smoke now checks MIME
+  independently of URL suffix, recognizes minified 8e3 and reports Corex failure
+  after chunk identity checks instead of silently exempting that route.
+  Live browser renders the expected Dashboard login screen; authenticated live
+  invoice creation/focus was not tested. Final root check: zero errors/warnings.
+  No remote database operations, API/Support/Corex Worker deployment, invoice
+  writes, commit or revert; existing dirty changes preserved. rhnk_main schema
+  compatibility remains unverified; no database-dependent contract changed.
+  Status: TASK1 + TASK2 DEPLOYED / LIVE ASSET IDENTITY VERIFIED / FULL ROUTE
+  ACCEPTANCE FAILED (EXISTING COREX 404). Exact temporary UX scope is CLOSED;
+  DASH-INVOICE-001 and CROSS-APP-INVOICE-SCENARIOS-001 are re-LOCKED.
+  Delivery Worker persistence blocker and all other locked invariants remain.
+
+- **Task1 only: persistent blocker emphasis and temporary completion advice, local, 2026-10-11:**
+  Explicit approval covers presentation only in invoice-readiness.ts,
+  InvoiceReadinessNotice.svelte and their scoped unit/real-component browser tests.
+  Affected advisory surfaces: DASH-STRUCTURE-001 and DASH-SETTINGS-001;
+  DASH-INVOICE-001 / CROSS-APP-INVOICE-SCENARIOS-001 authority remains LOCKED.
+  Local authority reference: 20260922140000_invoice_payment_snapshots.sql recipient
+  selection and validation, plus 20261005194910_support_fixed_invoice.sql delegation.
+  Readiness distinguishes blocker/advisory severity and exact missing/invalid fields.
+  Direct recipient name, UA + 27 digit IBAN (uppercase/literal-space normalization)
+  and 8/10 digit tax code are checked as authority does; finance-company uses its
+  own recipient instead of treating seller requisites as direct payment blockers.
+  Active seller, payment mode and seller settings/confirmed VAT remain blockers;
+  VAT is required in both modes. Phone, contact email, bank name and stricter
+  onboarding checksum/legal-form checks are completion advice, not RPC blockers.
+  Notice blockers have a red accent/background and bold exact-field links to
+  existing forms. Advisories disappear after 8000 ms, with cleanup on issue-list
+  replacement and component destruction. Errors/retry and pending stay visible;
+  expiry never displays a ready/success certificate. No inline form focus/highlight
+  was added: locked InvoiceCreate and task2 remain untouched pending separate exact
+  scenario/behavior approval. All four invoice scenario invariants stay LOCKED.
+  Evidence: 13/13 focused readiness tests; one real Svelte Chromium harness passes
+  at 1280/390 px, covering 7999/8000 ms expiry, persistent blockers/errors, pending
+  after optional expiry, retry, replacement timer and unmount/remount. Computed
+  emphasis styles, encoded links, screenshots and no overflow/pageerrors checked.
+  Full changed component Svelte MCP autofixer repeated: zero issues; generic timer
+  effect suggestions reviewed (time-based state needs an effect with cleanup).
+  Scoped four-file ESLint passes; root check has zero errors/warnings; full root
+  build passes. These are local fixture/compile checks, not live owner acceptance.
+  No complete authority proof: per-invoice rendered purpose/length, numbering,
+  authorization, terminal/scenario and other constraints are outside this advisory;
+  absence of notice blockers is not certification that every invoice can be issued.
+  No API/SQL/server validation/defaults/persistence changes, database access/write,
+  deployment, commit or revert. Existing dirty changes preserved. Separate rhnk_main
+  compatibility/live schema remains unverified; no database-dependent contract changed.
+  Historical status superseded by the exact task2 approval/release checkpoint above:
+  TASK1 + TASK2 DEPLOYED / EXACT UX SCOPE CLOSED / SCENARIOS RE-LOCKED.
+
+- **Exact approved onboarding release, 2026-10-11:**
+  Explicit user approval covered only the exact local migration
+  supabase/migrations/20261011150000_onboarding_explicit_vat_settings.sql on
+  shared DAC7 mwaeazabpvbxqfrceogr and rhnk-to-web/rhnk-to-dashboard deployment.
+  Affected: DASH-AUTH-001, DASH-STRUCTURE-001, DASH-SETTINGS-001,
+  DASH-INVOICE-001 and CROSS-APP-INVOICE-SCENARIOS-001 within previously
+  approved explicit VAT/new-client settings initialization only.
+  Fresh DAC7 identity, migration history, function definitions, contact types,
+  constraints, policies, grants and triggers were reviewed before application.
+  Exact SQL applied through MCP; server history records version 20261011143807,
+  name onboarding_explicit_vat_settings (not the excluded broad backfill).
+  Local file SHA256: 26b5f0935ada08e55293c2f6fe44ecdfd02c3d97a81d941c64d1743dbe9bd597.
+  Live/local onboarding body MD5: b2688f0b62c145a6f2ad17005708a24e.
+  Postflight confirms SECURITY INVOKER, empty search_path and unchanged ACL;
+  anon cannot execute, authenticated can execute. save_business_settings body
+  MD5 remains 7f27b131603b497bfcd452ea7d2704f7 with unchanged security/grants.
+  Both settings tables retain FORCE RLS, zero policies and no authenticated
+  SELECT/INSERT grants. Transactional negative checks passed for missing caller
+  identity, settings RPC identity rejection, protected settings table access,
+  anonymous onboarding and anonymous private contacts; all checks rolled back.
+  No persistent test business rows or real invoices were created.
+  Invoice authority was not modified by the exact applied SQL; postflight
+  create_authoritative_invoice body MD5 is 69838148d7f547ce5b02e41fe6ad63b3.
+  No preflight hash for that function was captured in this release, so this is
+  a postflight fingerprint, not a before/after hash certification.
+  RPC input jsonb/output jsonb and argument name are unchanged; no generated
+  TypeScript contract change is needed, and bulk type regeneration was omitted.
+  Fresh evidence: 58 focused onboarding HTTP/PGlite/snapshot/real-component
+  browser tests, 49 readiness/gateway tests and one notice browser test passed.
+  Root check passed with zero Svelte errors/warnings; complete root build and
+  both exact Wrangler dry-runs passed before deployment. Existing unrelated
+  scoped ESLint issues recorded below remain outside this release's scope.
+  Active Worker versions, verified at 100% with deployments list:
+  rhnk-to-web 02f9d194-c120-4e33-8e16-8c739d902a9a;
+  rhnk-to-dashboard b98212de-368c-4ebc-80c4-c1e7c06e835f.
+  Deployed only those two configs with keep-vars; secrets were not replaced.
+  Dashboard exact /dashboard and wildcard /dashboard/* routes were preserved.
+  Live smoke: /, /dashboard, /app, /conf/, /pay and /pay/ return HTTP 200
+  with their expected distinct JS/CSS assets, all checked HTTP 200 with correct
+  content types. /corex and /corex/ return empty HTTP 404: full seven-route
+  acceptance FAILED. No Corex Worker/route change is authorized or performed.
+  Live Dashboard reload rendered the expected login screen, with no pageerror,
+  failed HTTP response or horizontal overflow in the observed reload. Browser
+  events also reported Google popup blocking; real Google exchange and live
+  authenticated onboarding-to-first-invoice acceptance remain unverified.
+  Security advisor findings are identical pre/post excluding observed_at.
+  Existing findings remain, including mutable function search paths, executable
+  SECURITY DEFINER functions, RLS without policies and leaked-password protection.
+  References: https://supabase.com/docs/guides/database/database-linter and
+  https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection.
+  Performance preflight also reported FK indexes, RLS initplans, unused/duplicate
+  indexes and multiple policies; no unrelated remediation was attempted.
+  The narrow log query returned no entries, not proof of absent runtime errors.
+  Broad default_direct_invoice_settings remains absent/unapplied. rhnk_main
+  mvytjhaujcewqfyivwxf and other projects/Workers remain untouched; deferred
+  database compatibility is unverified. Delivery production blocker and all
+  scenario locks remain unchanged. Dirty user changes preserved; no commit.
+  Status: EXACT SQL AND TWO WORKERS ACTIVE / FULL SMOKE BLOCKED BY COREX 404 /
+  AUTHENTICATED LIVE ACCEPTANCE PENDING. Supersedes remote-approval-pending
+  statements in the historical local checkpoints below, not their exclusions.
+
+- **Field-specific readiness advisory, local correction, 2026-10-11:**
+  User requested exact missing fields instead of the blanket requisites/contacts
+  caption. DASH-STRUCTURE-001 and DASH-SETTINGS-001 advisory labels now distinguish
+  absent values from invalid formats for legal name, tax ID, IBAN, bank, phone
+  and contact email. All existing validation predicates and invoice scenario
+  authority remain unchanged; no settings or business data writes occur.
+  Additional explicit user approval authorized only the Dashboard deployment
+  after this local correction. Six focused readiness tests passed again,
+  including complete requisites with missing contacts and malformed populated
+  fields; the existing real-component notice browser test passed at 1280/390 px.
+  Fresh complete root npm run build and exact Dashboard Wrangler dry-run passed
+  using installed Wrangler 4.129.0, not an isolated build. The earlier root check
+  had zero errors/warnings; no runtime source was edited during this deployment.
+  Registry guard passed before deployment and after this evidence update.
+  Deployed only worker-rhnk-to/wrangler.dashboard.jsonc with keep-vars.
+  rhnk-to-dashboard version ba244e4c-4848-48d9-ad23-188000e089ec is active at 100%,
+  verified with deployments list; deployment 06dfa558-eb0f-4e49-af14-b9bfe8f6a0c5
+  was created at 2026-10-11T14:55:15.082098Z. Exact /dashboard and wildcard
+  /dashboard/* routes, API rhnk-to-web, SUPPORT rhnk-to-support and DAC7 vars
+  were preserved. No API/SQL/Corex deployment, database write or commit occurred;
+  unrelated dirty user changes were preserved. Other database targets were not
+  accessed; deferred rhnk_main compatibility remains unverified.
+  Compiled chunk _app/immutable/chunks/Co9Km2az.js contains the corrected labels;
+  its live /dashboard/_app/immutable/chunks/Co9Km2az.js response is HTTP 200 with
+  JavaScript content type and matches the fresh local build byte-for-byte.
+  Live /, /dashboard, /app, /conf/, /pay and /pay/ returned HTTP 200 with their
+  expected distinct JS/CSS assets, all HTTP 200 with correct content types.
+  Pre-existing /corex returned empty HTTP 404: full seven-route acceptance FAILED.
+  No unauthorized Corex repair was attempted. The shared Dashboard tab was only
+  read/reloaded: HTTP 200, expected login, no observed pageerrors, failed HTTP
+  responses or horizontal overflow. No login, logout or business mutation was
+  performed; the three reported sellers' actual missing fields remain unverified.
+  Integrated-browser request smoke hit Storage.getCookies protocol failure;
+  the completed route/asset smoke used a separate unauthenticated Playwright
+  context instead. All invoice scenario locks and delivery blockers are unchanged.
+  Status: DASHBOARD CORRECTION ACTIVE / FULL SMOKE BLOCKED BY COREX 404 /
+  AUTHENTICATED SELLER LABEL ACCEPTANCE PENDING.
+- **Existing-client readiness notice, local checkpoint, 2026-10-11:**
+  Read-only Dashboard advisory loads the current owner's business structure and
+  saved settings and links missing requisites, payment mode and explicit VAT to
+  existing forms with the affected entityId. No defaults, settings revisions,
+  contacts or issued invoices are changed; support and demo scopes are excluded.
+  The notice is a completion advisory, not certification of invoice readiness.
+  Its extracted real Svelte component passed Chromium checks at 1280 and 390 px:
+  encoded seller links, disabled pending action, surfaced read failure, retry,
+  disappearance after successful completion and no horizontal overflow/errors.
+  This fixture tests notice rendering, not live authenticated Dashboard requests.
+  Fresh evidence: 49 readiness/gateway unit tests, 58 onboarding HTTP/PGlite,
+  payment-snapshot and real onboarding browser regressions, plus one notice
+  browser test passed. Svelte autofixer has no remaining notice issues.
+  Full root build and rhnk-to-dashboard/rhnk-to-web dry-runs passed with 325
+  root asset files. Dry-runs do not verify remote runtime or service bindings.
+  Migration 20261011150000_onboarding_explicit_vat_settings remains prepared,
+  unapplied, pending separate exact DAC7 mwaeazabpvbxqfrceogr approval and fresh
+  schema/history reconciliation before coordinated SQL/API/UI activation.
+  No remote SQL, business writes, deployment or commit in this checkpoint.
+  Deferred rhnk_main compatibility remains unverified; scenario locks unchanged.
+
+- **Delivery Google reference inspection, 2026-10-07:** read-only inspection of
+  Dashboard's signInWithGoogleIdToken gateway and Google Identity Services nonce
+  helper confirmed ID-token exchange with a raw nonce and SHA-256 nonce sent to
+  Google. Delivery implements its own server exchange and environment settings;
+  no Dashboard authentication behavior, project, session storage or locked
+  invariant changed. Evidence: Delivery auth suite 14/14 passed; Delivery check
+  zero errors (eight existing settings warnings); local login loads and an
+  unauthenticated business request redirects to login. Status: REFERENCE ONLY;
+  remote Google configuration and real credential exchange remain unverified.
+
+- **Approved customer settings, templates and invoice scenarios, local checkpoint:**
+  User explicitly approved creation of fixed/open_amount/table/delivery invoices,
+  customer settings/templates and connecting implemented menus to customer data.
+  Affected: DASH-AUTH-001, DASH-SHELL-001, DASH-SETTINGS-001, DASH-INVOICE-001
+  and CROSS-APP-INVOICE-SCENARIOS-001 within that scope only. Operator JWT,
+  MFA, Auth-session binding, selected-customer isolation and transactional audit
+  remain required. Issued-invoice changes, cancellation, payment confirmation,
+  refunds, ledger/webhook replay, credentials and Auth/RLS changes remain excluded.
+  Customer template CRUD/default uses the injected context-bound repository and
+  four explicit HTTP actions, with exact before-state and refreshed list baselines.
+  Mocked browser verification passed create/update/default/delete, lost commit
+  response reconciliation, reload and desktop/mobile layout. Test selectors now
+  match actual create/update captions and the currency-bearing delivery label;
+  no invoice amount or scenario semantics changed in this checkpoint.
+  Mocked settings verification passed customer prefix/purpose readback and save;
+  all four invoice scenarios passed customer seller/purpose and receipt checks.
+  Cabinet/structure, revoked and expired context checks passed with unchanged
+  operator storage and no ordinary owner API calls. These are mocked browser
+  writes, not real customer invoices or proof of deployed SQL capability.
+  Evidence: 34 gateway/repository unit tests; 9 HTTP/PGlite tests; ten focused
+  browser cases across separate runs; npm run check: zero errors/warnings.
+  PGlite covers settings/templates authorization and audit but not the complete
+  fixed/scenario/settings/template dispatcher chain or multi-connection races.
+  Local candidates 20261005211649_support_invoice_scenarios,
+  20261005222427_support_business_settings and
+  20261005225205_support_checkout_templates remain PREPARED/LOCALLY TESTED ONLY.
+  They are not applied to shared DAC7 mwaeazabpvbxqfrceogr. Separate exact remote
+  approval, migration-history reconciliation and schema review are required.
+  rhnk_main mvytjhaujcewqfyivwxf is untouched and lacks the support baseline;
+  compatibility is not established. Full support parity remains IN PROGRESS.
+  Delivery production persistence remains blocked as recorded in its locked
+  process; browser success does not mark delivery production-ready.
+  No remote business writes, migration application, deployment or commit.
+- **Approved explicit VAT onboarding repair, local checkpoint, 2026-10-11:**
+  Exact approval: new clients explicitly choose vat or no-vat without a default;
+  initialize invoice readiness in the same onboarding transaction. Affected:
+  DASH-STRUCTURE-001, DASH-SETTINGS-001, DASH-INVOICE-001 and
+  CROSS-APP-INVOICE-SCENARIOS-001 within new-client initialization only.
+  Existing SECURITY INVOKER onboarding calls the owner-authorized settings RPC;
+  authenticated table grants, FORCE RLS and invoice authority remain unchanged.
+  Missing dependencies or seller settings failures roll back all onboarding rows.
+  Existing-merchant retries do not backfill or overwrite settings or revisions.
+  Worker, gateway and form carry the confirmed VAT value without inference.
+  Evidence: 57 focused Node HTTP/PGlite/regression tests and 45 gateway unit tests;
+  real-component Chromium acceptance covers both VAT choices on desktop/mobile,
+  empty-choice blocking, back navigation and failed-save retry preservation.
+  Local DB onboarding creates RHK-000001 for both VAT choices without a manual
+  settings save, with seller requisites, correct VAT purpose and nextNumber 2.
+  Candidate/migration function parity and unchanged invoice authority are tested.
+  Root check passed with zero errors/warnings; full root build and Dashboard/API
+  Wrangler dry-runs passed. Dry-run does not verify deployed runtime or bindings.
+  Scoped ESLint is not clean: existing team methods have two no-explicit-any
+  errors and the component brand link has a no-navigation-without-resolve error;
+  these locations are outside the explicit VAT repair and were not refactored.
+  Migration 20261011150000_onboarding_explicit_vat_settings is PREPARED AND
+  LOCALLY TESTED ONLY. No remote SQL, deployment, backfill or commit performed.
+  Fresh DAC7 mwaeazabpvbxqfrceogr history/schema reconciliation and separate
+  exact migration approval are required before activation, followed by coordinated
+  SQL/API/UI release and authenticated live first-invoice acceptance.
+  Do not apply the broad 20261011140000_default_direct_invoice_settings repair.
+  Deferred rhnk_main mvytjhaujcewqfyivwxf remains untouched; compatibility with
+  its schema, RPCs, policies, Storage and Realtime has not been established.
+  All other scenario locks and the delivery production blocker remain unchanged.
+  Status: LOCAL REPAIR VERIFIED / REMOTE ACTIVATION PENDING APPROVAL.
+- **Onboarding release integrity audit, 2026-10-11:**
+  Affected processes: DASH-STRUCTURE-001, DASH-SETTINGS-001, DASH-INVOICE-001
+  and CROSS-APP-INVOICE-SCENARIOS-001; runtime locks remain unchanged.
+  Approved target remains shared DAC7 mwaeazabpvbxqfrceogr. Read-only inspection
+  confirms live complete_merchant_onboarding is SECURITY INVOKER and does not
+  initialize settings. Live invoice authority still requires configured settings.
+  Both settings tables retain FORCE RLS, no policies and no authenticated
+  SELECT/INSERT/UPDATE grants. The modified local onboarding candidate inserts
+  directly into these RPC-only tables; a new PGlite diagnostic using the actual
+  business-settings candidate reproduces permission denied for business_settings
+  and confirms atomic rollback of merchant, entity and contacts.
+  Local 20261011140000_default_direct_invoice_settings is absent from DAC7's
+  migration history. It also backfills existing merchants/sellers and replaces
+  invoice authority across fixed/open_amount/table/delivery, coercing unconfigured
+  mode to direct and unknown VAT to no-vat without advancing settings revision.
+  This exceeds onboarding field completion and requires separate exact approval;
+  do not apply it or weaken settings grants to clear the permission error.
+  Evidence: 33 focused onboarding tests passed, including the defect-reproduction
+  test; root check passed with zero errors/warnings and OpenAPI 30/30 coverage.
+  Passing diagnostic tests do not establish payment readiness. Real authenticated
+  onboarding-to-first-invoice acceptance and full browser acceptance remain pending.
+  Security/performance advisors returned existing findings; this is not a clean
+  security certification. The selected log query returned no matching entries,
+  which is not evidence of absent failures. No remote writes, migration, build or
+  deployment occurred in this audit. Deferred rhnk_main is untouched and is not a
+  release target. Status: ANALYSIS COMPLETE / RELEASE BLOCKED pending a scoped
+  repair and its security, VAT/default and deployment approvals.
+- **Payment onboarding investigation, local evidence only:**
+  The candidate complete_merchant_onboarding in
+  supabase/candidates/merchant-onboarding.sql creates merchant/entity/contact,
+  but not business_settings or business_settings_sellers. Its existing-merchant
+  branch returns without repairing missing configuration. The Worker forwards
+  this single authenticated RPC and does not initialize settings afterward.
+  The invoice authority requires settings matching merchant AND owner, a valid
+  payment mode and matching seller configuration; legal requisites alone are
+  insufficient. Existing onboarding tests passed (29), but their minimal fixture
+  does not test payment readiness. This establishes a local initialization gap,
+  not the deployed function's behavior or this customer's failure root cause.
+  Prior DAC7 evidence already found revision-2 direct settings for the selected
+  customer; project, actor/merchant scope and configuration source must therefore
+  be reconciled before proposing a repair. No illustrative INSERT is approved
+  or applied; disabled logs remain unavailable and are not bypassed.
+
+- **Shared DAC7 invoice-detail activation, 2026-10-06:** the user's instruction
+  to proceed following the exact DAC7 read-only migration approval request was
+  applied only to this projection. Remote `20261005220946` maps to local
+  `20261005215606_support_invoice_detail_snapshot.sql`; do not bulk-push it again.
+  Preflight confirmed the existing summary function and all required order and
+  terminal columns. The comprehensive PGlite authorization/audit test passed again.
+  Postflight confirmed both private snapshot functions deny anon/authenticated
+  execution, retain empty search paths and SECURITY INVOKER, and the public RPC
+  signature and grants are unchanged. A mismatched owner/merchant was rejected
+  with 42501. The selected merchant's persisted invoice returned complete detail;
+  the real operator's live browser context successfully opened RHK-000001 after
+  reload, showing customer purpose, UAH 1,000, QR and canonical short/full links.
+  No invoice/payment mutation, deployment or identity substitution occurred.
+  Security advisors were rerun; existing project warnings remain, so this is not
+  a clean security certification. Logs remain unavailable. The public JSON RPC
+  contract requires no generated type change. Separate rhnk_main is untouched
+  and still requires the support baseline before this migration is compatible.
+  Status: APPLIED and verified for live read-only detail. Frozen pre-migration
+  sandbox contexts must be reopened. Four-scenario activation and full cabinet
+  parity remain pending; generic full-access requests do not unlock financial,
+  credential or authentication changes. This supersedes the pending activation
+  status in the checkpoint below.
+- **Read-only support invoice detail and links, 2026-10-06:** explicit approval
+  adds opening existing fixed/open_amount/table/delivery invoices and copying or
+  opening their canonical public links. Affected: DASH-AUTH-001, DASH-SHELL-001,
+  DASH-INVOICE-001; CROSS-APP-INVOICE-SCENARIOS-001 is otherwise still LOCKED.
+  The local candidate `20261005215606_support_invoice_detail_snapshot.sql`
+  extends the existing private snapshot, without a new RPC action or grants.
+  Details remain limited to the latest 100 selected-merchant orders. Sandbox
+  details are frozen at context creation; old snapshots without detail fail
+  closed. Live snapshots read persisted detail and resolve terminal codes only
+  through the selected customer's terminals. The operator JWT, Auth-session,
+  expiry, revocation and transactional audit boundaries remain unchanged.
+  The gateway rejects partial/malformed details and foreign/stale contexts;
+  summary placeholders are never promoted into authoritative detail facts.
+  Support navigation opens a freshly validated cabinet detail; no owner event
+  requests or Realtime subscriptions are started. Cancellation, statement sync,
+  synthetic bank-proof indicators and event timeline are absent in support.
+  Canonical link rules remain unchanged: six/twelve-character short IDs, UUID
+  fallback, terminal links and full `/pay/<uuid>`; no display-number-derived URL.
+  Copy failures are shown, links remain clickable, and URLs use the current
+  origin (localhost links are not externally reachable customer links).
+  Evidence: 28 gateway plus 9 canonical-link tests passed; comprehensive PGlite
+  authorization test passed with own/foreign orders, frozen/live details, grants
+  and audit failure; focused mocked cabinet browser test passed for desktop and
+  mobile list-to-detail, copy, reload, missing mutation controls, no ordinary API
+  requests and no payment writes. Svelte autofixer found no issues in the edited
+  interaction slice; full components are covered by the repository check below.
+  Candidate is PREPARED/LOCALLY TESTED ONLY, not applied to shared DAC7
+  `mwaeazabpvbxqfrceogr`; separate exact-scope approval and migration history/schema
+  review are required. No remote writes, real invoice creation/payment, deployment
+  or commit. Separate rhnk_main `mvytjhaujcewqfyivwxf` remains untouched and requires
+  the support baseline and schema compatibility review before this candidate.
+  Pending four-scenario activation is not a prerequisite for this read-only
+  projection. This supersedes the list-only link restriction below; full support
+  parity and remote detail verification remain IN PROGRESS.
+- **Read-only support invoice list, 2026-10-06:** user-approved viewing at
+  `/dashboard/invoices` now consumes the existing context-bound support snapshot.
+  Affected processes: DASH-AUTH-001, DASH-SHELL-001 and DASH-INVOICE-001.
+  The server projection is limited to the latest 100 orders for the selected
+  merchant; search, status/type/period filters and pagination operate on that
+  subset, not complete history. The ordinary 30-day initial filter is retained.
+  Support rows have no detail links, cancellation controls or discrepancy tab.
+  Existing new-invoice authorization is unchanged; detail/payment/cancellation
+  operations remain unavailable. The gateway checks merchant/context ownership,
+  expiry/disposal and snapshot row shape, preserving the original operator JWT.
+  List records adapt the limited projection with null/zero placeholders for
+  unavailable detail fields; these are not authoritative invoice-detail data.
+  Validation: 27 gateway tests passed; the focused mocked cabinet browser test
+  passed (customer row, search, mobile viewport, reload, no ordinary API calls
+  or elevate/prepare/commit operations); npm run check reported zero errors and
+  warnings. The real localhost support page displayed RHK-000001, UAH 1,000,
+  pending, with the customer's purpose. No real invoice was created or mutated
+  during these checks. A Tailwind class-normalization editor suggestion remains.
+  No SQL, grants, RLS, remote writes, deployment or commit. Shared DAC7 uses its
+  already-applied snapshot contract; separate rhnk_main remains untouched and
+  lacks the support baseline. This supersedes earlier list-unavailable notes
+  only. Full support cabinet parity remains IN PROGRESS.
+- **Local fixed-invoice failure diagnosis (2026-10-05):** the running local API
+  retained an older write allowlist. With a deliberately invalid JWT,
+  `invoice.fixed.create` returned local 403 while `settings.table_ttl` reached
+  upstream authentication and returned 401. After restarting the adapter, both
+  return 401 through the frontend proxy. `dev:support` now uses Node watch mode
+  to reload imported handler changes. Local adapter and handler tests: 10 passed,
+  including a fixed-prepare authentication-boundary regression. No real invoice
+  was submitted; the selected customer's support operations were empty and its
+  snapshot contained zero invoices. Reloading the real browser restored the live
+  customer form with the correct seller and IBAN and no visible alerts. The brief
+  adapter restart interrupted in-flight requests; those 503s were local downtime,
+  not evidence of a database failure. Fresh MFA is still required after the
+  five-minute write authorization expires; creation through commit is unverified.
+  Read-only DAC7 comparison confirms one active owned entity, bank, tax ID, IBAN,
+  phone and email; no terminals. Settings revision 2 contains direct acceptance,
+  no VAT, RHK numbering and the customer's purpose template. The support form
+  consumes structure, not the full settings document: its rules/profile preview,
+  template loading and local purpose prefill remain intentionally disconnected
+  from ordinary operator storage. Server authority uses the customer's settings
+  for the final number, recipient and purpose. Full customer settings/module UI
+  parity is NOT verified or implemented. Generic HTTP error text also remains.
+  No remote writes, schema changes, deployment or commit. RHNK compatibility is
+  unchanged: this local adapter explicitly targets DAC7 only. IN PROGRESS;
+  locked invoice semantics and production routes remain unchanged.
+- **Shared DAC7 activation (supersedes pending checkpoints below):** explicitly
+  approved and applied only to `mwaeazabpvbxqfrceogr`, without deployment or real
+  customer invoice creation. Remote versions map to the reviewed local candidates:
+  `20261005204259` = `20261005180732_support_cabinet_structure_snapshot.sql`;
+  `20261005204338` = `20261005183402_support_snapshot_contact_boundary.sql`;
+  `20261005204550` = `20261005185746_support_structure_operations.sql`;
+  `20261005204826` = `20261005194910_support_fixed_invoice.sql`.
+  Separately approved protection `20261005205009` maps to
+  `20261005204852_support_preserve_invoice_references.sql`: support cannot delete
+  entities or terminals referenced by orders. Checks run at commit under existing
+  parent-row locks, including references created after prepare. Ordinary owner
+  deletion and database FK semantics are unchanged. Local and remote migration
+  version prefixes differ; do not bulk-push these candidates again. Migration
+  history reconciliation remains pending before any CLI push.
+  The actual customer projection returns one owned FOP entity, PrivatBank and no
+  terminals. The operator is enabled with can_write; all four support tables have
+  RLS and no direct anon/authenticated SELECT. The public entrypoint is invoker,
+  anonymous execution is denied, and all historical dispatchers plus the private
+  owner invoice helper deny both client roles. Empty search paths are verified.
+  Remote unauthenticated bootstrap and mismatched customer/merchant reads fail
+  with 42501; both deletion guards are installed. Gateway receipts now accept
+  exactly six or twelve alphanumeric characters, preserving DAC7's existing
+  six-character generator and public links. Gateway tests: 21 passed; invoice
+  tests: 16 passed, including historical-reference protection and audit rollback;
+  comprehensive support authorization test passed. Touched-file diagnostics clear.
+  Types regenerated via MCP; public support_dispatch still accepts text/JSON and
+  returns JSON, so no generated-type file replacement was needed. Security advisors
+  still report RLS-without-policy informational findings and search-path, executable
+  definer-function and leaked-password-protection warnings elsewhere in the project;
+  this is not a clean database security certification. Logs remain unavailable.
+  Browser is at `/dashboard/support` requesting the operator's authenticator code.
+  Fresh live-context UI verification and real customer writes remain unverified;
+  MFA is not bypassed. Active capabilities are snapshot/settings, bounded structure
+  operations and fixed invoice creation, not all twenty visible modules. Other
+  invoice scenarios, list/detail/cancel and wider cabinet integrations remain
+  incomplete. Separate rhnk_main is untouched and still lacks the support baseline.
+  No business-data writes, deployment or commit. Status remains IN PROGRESS.
+- **Shared DAC7 activation preflight (read-only remote, local compatibility fix):**
+  migration history still contains only the applied support baseline; structure,
+  contact-boundary, structure-operation and fixed-invoice candidates remain pending.
+  The selected customer has one active owned entity, one settings row and one
+  matching seller configuration: FOP, PrivatBank, direct payment mode, no VAT,
+  nonempty IBAN/tax ID and RHK numbering. Missing UI data is therefore not evidence
+  of absent customer configuration. The latest inspected context was sandbox with
+  a frozen snapshot lacking structure; reopen it after activation. No customer
+  credentials or operator identity replacement is necessary.
+  All 169 authority-body lines match after trimming line indentation; the exact
+  DAC7 body hash `fc9a9a2a228173ee8ab2bc4644352e4c` is now accepted alongside
+  the original local hash, without general SQL whitespace normalization. The
+  sixteen-test PGlite suite passes using that exact hash and rejects an altered
+  auth.uid declaration before migration. Original-format regression also passed
+  immediately after the guard edit. Diagnostics report no touched-file errors.
+  Advisory output contains existing security/performance warning categories and
+  support-related informational RLS/index findings; this is not a clean security
+  certification. Logs were unavailable because the MCP logs tool was disabled.
+  Remote PostgreSQL concurrency, complete cabinet integration and actual customer
+  invoice creation remain unverified. Separate rhnk_main is untouched and lacks
+  the support baseline. No remote writes, deployment or commit occurred. Each
+  activation remains subject to separate approval; status remains IN PROGRESS.
+- **Missing seller correction (fixed support form, local):** reproduced in the
+  real localhost customer context: missing structure rendered the hardcoded
+  `ФОП ДМИТРИШЕН · А-Банк` fallback, not a loaded customer or operator entity.
+  Support mode now renders an explicit missing-requisites state and hides the
+  unverified default legal/tax profile. The customer banner is not used as a
+  substitute legal seller. The actual customer tab confirms the fallback is gone;
+  focused cabinet and invoice browser regressions pass, including missing structure,
+  unchanged operator storage and customer receipt creation. Svelte MCP checked the
+  changed conditional fragment with no issues. Actual customer seller data remains
+  unavailable until the separately approved structure snapshot activation.
+  No remote write or deployment occurred; status remains IN PROGRESS.
+- **Fixed invoice creation checkpoint (DASH-AUTH-001 / DASH-SHELL-001 /
+  CROSS-APP-INVOICE-SCENARIOS-001, local only):** supersedes the disabled-creation
+  checkpoint below. The dedicated gateway supports only `invoice.fixed.create`
+  in a bound live customer context, with fresh MFA, elevation, canonical preparation,
+  explicit confirmation, before-state conflicts, transactional audit and exact
+  operation reconciliation after a lost response. The original operator JWT is
+  retained; no ordinary owner API fallback or customer impersonation is used.
+  Candidate `20261005194910_support_fixed_invoice.sql` moves the reviewed invoice
+  authority into a private owner-parameterized function and retains the public
+  owner wrapper using auth.uid(). A normalized full-body MD5 guard rejects unknown
+  authority definitions before migration. Existing numbering and payment snapshot
+  semantics remain covered by the sixteen-test invoice regression. The form shows
+  only customer snapshot sellers and persisted receipt requisites, reference,
+  purpose and payment link. Twenty gateway tests and nineteen combined mocked
+  browser/HTTP tests pass. Browser coverage checks both sandbox-disabled creation
+  and live creation with a lost response, one commit, unchanged operator storage
+  and no ordinary customer API calls. Root check reports zero errors/warnings.
+  These results are local fixtures/PGlite, not real-customer write verification.
+  All structure dependencies and this invoice candidate remain unapplied to shared
+  DAC7; activation requires separate approval and target schema/history review.
+  Separate rhnk_main remains incompatible without the support baseline. Remaining
+  risks include real PostgreSQL concurrency/constraints, scenarioConfig validation,
+  full-component Svelte MCP review and invoice list/detail/cancel integration.
+  No remote write, deployment or commit occurred. Status: IN PROGRESS within the
+  approved implementation scope; wider cabinet modules remain incomplete.
+- **Fixed invoice route checkpoint (DASH-AUTH-001 / DASH-SHELL-001 /
+  CROSS-APP-INVOICE-SCENARIOS-001, partial local repair):** within the approved
+  fixed-scenario support integration scope, `/dashboard/invoices/new?type=fixed`
+  now mounts the existing form. Recipient data comes only from the bound support
+  snapshot; an absent structure projection is reported explicitly. Operator
+  default-entity storage, ordinary invoice rules, proformas, templates and the
+  ordinary payment-settings preview are not loaded in this support form. Other
+  scenario routes remain guarded. The owner flow and authoritative invoice SQL
+  are unchanged. Support creation is explicitly disabled, not implemented:
+  there is no bounded invoice prepare/commit operation or support detail flow yet.
+  The existing owner RPC requires the owner's auth.uid(); impersonating that
+  identity is not an acceptable integration. Nineteen gateway tests pass and the
+  focused mocked cabinet browser regression verifies the fixed route, customer
+  seller, disabled creation, unchanged operator storage/JWT and zero ordinary API
+  requests. Root check passes with zero Svelte errors/warnings. Svelte MCP checked
+  the isolation fragment only; full-component review remains pending. The real
+  localhost tab displays the form and missing-server-capability message, not real
+  customer creation. Structure candidates remain unapplied to shared DAC7;
+  rhnk_main remains incompatible without its missing support baseline. No new SQL,
+  remote write, deployment or commit occurred. Status: IN PROGRESS; this checkpoint
+  does not establish a working invoice-creation service or change payment semantics.
+- **Structure write checkpoint (DASH-AUTH-001 / DASH-SHELL-001, local only):**
+  supersedes the Overview/Settings-only functional limitation below. Structure now
+  uses the dedicated support gateway for merchant rename and entity/terminal CRUD,
+  preserving original operator identity and isolating the operator's default-entity
+  localStorage. Candidate `20261005185746_support_structure_operations.sql` adds
+  seven explicitly bounded actions, canonical prepare/confirm/commit, before-state
+  conflict checks, transactional audit and sandbox-only overlays. Successful
+  elevation advertises exactly TTL plus these seven actions after inherited
+  authorization. No ordinary owner API fallback or payment authority is added.
+  The comprehensive PGlite regression passes, including structure commit rejection
+  after can_write revocation, stale MFA, expired elevation, cancellation and operation
+  expiry, without persisting the attempted rename. Full mocked Auth/RPC browser
+  regression passes all ten scenarios; the dedicated HTTP boundary passes eight
+  tests. These results do not establish real customer end-to-end readiness.
+  The structure snapshot, contact-boundary and structure-operation candidates remain
+  unapplied to shared DAC7. Separate rhnk_main lacks the support baseline and is not
+  compatible with these candidates alone. Remaining risks: production constraint
+  fidelity in SQL fixtures, terminal reference/deletion semantics, concurrent writes,
+  merchant display-name parity, direct-RPC contact validation, local-only account
+  controls and static integration examples. Svelte MCP review remains pending.
+  Other cabinet modules remain incomplete despite all twenty visible menu links.
+  No remote writes, deployment or commit occurred. Status: IN PROGRESS within the
+  separately approved full-cabinet implementation scope.
+- **Full menu checkpoint (DASH-SHELL-001):** all twenty existing navigation links,
+  including invoice scenarios and business settings, are now rendered in support
+  mode. This supersedes the two-link navigation checkpoint below. The focused
+  mocked Auth/RPC cabinet browser test passes with exact href coverage and existing
+  isolation assertions. The open local customer-context tab confirms the expanded
+  menu. Page-level support guards and shortcut restrictions remain unchanged:
+  only Overview and Settings have functional support integration. Other links do
+  not grant customer authority; DAC7 is a separate application, not a support
+  capability. No remote migration, customer write or deployment occurred.
+- **Settings and contact-boundary checkpoint (DASH-AUTH-001 / DASH-SHELL-001):**
+  supersedes the earlier overview-only navigation checkpoint. Support now exposes
+  Overview and Settings, with the table TTL loaded through the bound support gateway.
+  Changes require elevation, canonical preparation and explicit workspace-specific
+  confirmation; an uncertain commit is checked by exact operation ID and digest,
+  never automatically replayed. Operator identity is unchanged, ordinary settings
+  caches are not written, and concurrent saves/context disposal fence pending work.
+  Fourteen gateway tests and all nine mocked Auth/RPC browser scenarios pass.
+  Root `npm run check` passes with zero Svelte errors/warnings. These browser tests
+  do not prove real customer end-to-end readiness or grant new server capabilities.
+  Candidate `20261005183402_support_snapshot_contact_boundary.sql` closes a
+  reproduced frozen-sandbox contact leak following contact ownership transfer or
+  deletion. The authorized dispatcher revalidates contact-bearing snapshot entities
+  under row locks in the same transaction; rejection rolls back operation/audit
+  changes. Direct authenticated access to the renamed implementation is revoked.
+  The comprehensive PGlite regression passes, including snapshot/recovery denial,
+  elevation rollback and direct-call denial. Real Postgres concurrency is unverified.
+  Read-only shared DAC7 inspection confirmed contact entity PK, terminal code
+  uniqueness and terminal entity FK `ON DELETE SET NULL`; no remote writes occurred.
+  Both structure and contact-boundary candidates remain unapplied; the immutable
+  applied base was not edited. Separate rhnk_main still lacks the support baseline.
+  Structure writes, remaining cabinet integrations and full navigation remain
+  incomplete. No deployment occurred. Status: IN PROGRESS within approved scope.
+- **Structure read checkpoint (DASH-AUTH-001, prepared only):** the dedicated
+  support gateway now implements `getBusinessStructure` from the bound snapshot,
+  retaining the original operator identity and pending-response fencing. Candidate
+  `20261005180732_support_cabinet_structure_snapshot.sql` supplies entity requisites,
+  separately stored contacts and terminal fields without changing the applied base
+  migration. Live reads reject foreign entity/contact ownership and foreign terminal
+  references. Gateway validation rejects missing fields, invalid enums, duplicate IDs
+  and unknown entity references; a database null association maps to an empty UI
+  selection, never an invented entity. Nine gateway tests and the comprehensive
+  PGlite authorization/audit/TTL regression pass; touched TypeScript diagnostics are
+  clear. Sandbox structure remains frozen and existing entity/terminal ownership
+  rechecks remain active. Revalidation of contact ownership after sandbox creation,
+  real Postgres concurrency and populated UI integration remain unverified; resolve
+  these before remote promotion. Structure writes and navigation are not enabled.
+  Candidate is NOT applied to shared DAC7, and no deployment occurred. Existing
+  sandbox contexts without `structure` fail closed and will require reopening after
+  promotion. Separate rhnk_main still lacks the dependency baseline and cannot accept
+  this candidate alone. Status: IN PROGRESS within the approved full-cabinet scope.
+- **Approved full-cabinet implementation scope, 2026-10-05:** user explicitly
+  confirmed the proposed expansion with "так": onboarding, business/requisites,
+  terminals/settings, invoice list/detail/create/cancel for `fixed`, `open_amount`,
+  `table`, `delivery`, POS, team/invitations and API-key management. Temporarily
+  reopen DASH-AUTH-001 ownership invariant 2 and DASH-SHELL-001 for server-authorized
+  support routing across these screens, plus the named structure/settings/POS and
+  CROSS-APP-INVOICE-SCENARIOS-001 integration boundaries. Preserve ordinary owner
+  flows, stored scenario/amount/terminal/expiry authority and the existing delivery
+  readiness caveat. Actor SDK identity remains the operator; no customer JWT or
+  service-role browser access. Confirmation of funds, mark-paid, receipt fabrication,
+  ledger credit and webhook replay remain excluded. Export is not unlocked.
+  Owners: support-cabinet.ts, DashboardPage/shell and affected customer components,
+  dedicated support HTTP boundary and versioned support SQL. Validate cross-customer
+  isolation, MFA/session revocation, audit atomicity, idempotency, pending-request
+  fencing and ordinary invoice regression before claiming readiness. Shared DAC7
+  is the selected target; new remote migrations and deployment require separate
+  approval after local validation. No new runtime capability is active merely because
+  this scope is approved. Status: UNLOCKED for this bounded implementation only.
+- **Support navigation repair (DASH-AUTH-001 / DASH-SHELL-001):** the shell and
+  overview advertised ordinary routes despite the overview-only support adapter.
+  Support navigation now exposes only overview; ordinary-route keyboard shortcuts,
+  new-invoice and all-invoices links are withheld in support mode. Direct unsupported
+  URLs still fail closed before child mounting and offer a return to customer overview
+  instead of the generic Dashboard failure heading. Ordinary navigation is unchanged.
+  Focused mocked cabinet browser regression passes, including return navigation,
+  unchanged administrator identity, zero ordinary business requests and exit recovery.
+  No additional support capability, database grant, invoice authority or deployment
+  is authorized by this repair. Full customer-screen integration remains incomplete.
+- **Approved remote support setup (supersedes earlier absence/ungranted findings):**
+  user explicitly requested support schema/RPC/operator setup in the selected shared
+  project `mwaeazabpvbxqfrceogr` and confirmed full implemented support access for the
+  identified operator. Migration `20261005172522_support_customer_context.sql` was
+  applied after dependency/history checks and eight passing SQL/HTTP tests. Recorded
+  SQL matches local source; filename and test references match the remote version.
+  Operator `4917dc24-e6d9-4870-b40d-a504504d4a5b` was verified against the active,
+  confirmed account and granted `enabled=true`, `can_write=true`. These are bounded
+  support permissions, not global superadmin or payment permissions. Four private
+  RLS tables, eight indexes, fifteen constraints and restricted function/table grants
+  were verified. Anonymous RPC, missing-session RPC and direct table reads are denied.
+  Advisors show only four new informational no-policy findings for private tables;
+  existing warnings are unchanged. Public RPC types were regenerated and inspected.
+  No customer contexts, operations, customer mutations, Auth changes or deployments
+  were performed. Real operator MFA/customer E2E remains unverified; shared cabinet
+  still adapts overview only. The separate rhnk_main database remains untouched and
+  lacks the dependency baseline, so this migration must not be applied there alone.
+- **Approved local MFA repair checkpoint:** pending TOTP factors are reused instead
+  of creating another `Dashboard Support` factor; multiple factors can be selected.
+  Same-actor/session Auth notifications preserve the entered code and enrollment QR,
+  while identity changes still reset state. The six-digit HTML pattern is now a
+  literal Svelte string; the previous interpolated attribute blocked form submission.
+  Invalid-code feedback and retry are distinct from support bootstrap 403/503 failures;
+  successful MFA alone does not unlock customer search. Nine isolated browser scenarios
+  pass, including new/pending/multiple-factor MFA, wrong-code retry, bootstrap denial,
+  cabinet isolation, revocation and expiry. Mock Auth responses expose their API-version
+  header through CORS so the real browser SDK can parse typed errors. Root `npm run check`
+  passes with zero Svelte errors/warnings; Svelte autofixer reports no issues/suggestions.
+  These checks use synthetic Auth/RPC responses, not the operator's Google Authenticator
+  or real customer data. MFA remains required. Lost-QR recovery, direct-connect UX and
+  real backend integration remain incomplete. No real factors, remote schema, grants,
+  customer data or deployments were changed during this repair.
+- **Read-only usability/error review:** actual support page shows only MFA enrollment,
+  hiding customer search until fresh MFA and successful bootstrap. Auth logs in the
+  2026-10-05 16:25-16:40 UTC window report `mfa_factor_name_conflict` (HTTP 422,
+  `/factors`): enrollment always uses `Dashboard Support`, while initialization only
+  selects verified factors. Pending enrollment/QR is not recovered across reload.
+  The entry route also resets on every SIGNED_IN, unlike the cabinet's same-session
+  fencing, which can discard enrollment state. Support schema/RPC absence was
+  reconfirmed read-only. Search is exact email/UID, not a browsable customer list;
+  entry requires opening context then a separate cabinet button. Only overview is
+  adapted in the shared cabinet; ordinary invoice creation/settings remain gated.
+  No runtime repair, factor deletion, remote grant or migration followed this review.
+- **Explicit single-database selection:** user selected `mwaeazabpvbxqfrceogr`
+  for local support and rejected provisioning a local database, another project or
+  paid branch. This supersedes the earlier separate-project support assumption,
+  not unrelated rhnk.to provisioning rules. Frontend public URL matches this project.
+  `npm run dev:support` now starts the original-JWT HTTP adapter on loopback 8791;
+  no service-role access, authority changes or remote writes were introduced.
+  Eight focused HTTP/adapter tests pass. Read-only metadata and migration-history
+  checks confirm support schema/RPC/migration are absent on this target. Remote
+  migration, operator grant and publication still require separate approval.
+- **Latest product direction:** user confirmed that support should enter the existing
+  customer Dashboard, reuse its screens and business flows, show a persistent target
+  banner and exit back to the administrator. A separate per-feature support console
+  is not the intended primary workflow. Preserve the administrator's SDK identity;
+  never obtain customer credentials or impersonate a customer JWT. Confirmation of
+  incoming funds remains excluded. No production activation follows from this checkpoint.
+- **Integration approval boundary:** user explicitly approved the named local exception
+  to DASH-AUTH-001 invariant 2 and DASH-SHELL-001 with "супер продовжуй" after the
+  ownership, shell, cache/request fencing and Realtime risks were stated. Original
+  SDK user remains the administrator; merchant.userId is the server-authorized customer.
+  Owners: DashboardPage.svelte, components/DashboardShell.svelte, support-cabinet.ts
+  and the support entry route. Ordinary invoice semantics, payment authority,
+  remote SQL/grants and deployment remain outside this exception.
+- **Shared-cabinet local checkpoint:** support entry sets only a sessionStorage mode
+  marker and performs a full-document navigation. Server bootstrap/snapshot authorize
+  the target; there is no owner-gateway fallback. Overview reuses the existing screen
+  without invented aggregate metrics. Other views are gated before child mounting.
+  Persistent banner shows customer/workspace/expiry and exit. Support data is not cached;
+  transport aborts and stale-response fencing protect teardown. Support has no ordinary
+  Realtime subscriptions. Expiry clears data locally; server revocation is detected on
+  subsequent reads, visibility changes or 15-second revalidation, not instant push.
+  SDK session identity uses actor plus session_id, allowing repeated SIGNED_IN for the
+  same session. Exit clears data first; failed server end keeps a retryable closed view.
+  Gateway unit suites: 50 tests pass. Mocked browser suite: six scenarios pass, including
+  reload, unsupported creation/POS paths (even demo=1), expiry, revoked snapshot, failed
+  end/retry, unchanged administrator auth storage and zero ordinary business requests.
+  Desktop/mobile widths 1366/375 have no horizontal overflow. No real-client test yet.
+- **Current integration checkpoint (supersedes historical checkpoints below):**
+  actual `/dashboard/support` Svelte route uses the existing administrator SDK
+  session, TOTP MFA, exact email/UID search, expiring customer context, reload
+  recovery, read-only data and exit. Dedicated support HTTP handler forwards only
+  the original actor JWT to an explicitly configured project RPC. Dashboard
+  service-binding routing fails closed; local Vite routing preserves the support
+  path to loopback port 8791 without falling through to the ordinary API.
+  Real loopback backend is now configured for the explicitly selected shared project;
+  remote support schema is now applied; no production SUPPORT binding is configured.
+- **Applied database boundary:** migration
+  `supabase/migrations/20261005172522_support_customer_context.sql` creates private
+  operators, contexts, operations and audit plus an explicitly authorized dispatcher. It checks
+  active role, actor/account/session, AAL2, fresh MFA for search/open, target ownership,
+  context expiry/revocation and strict inputs. Successful actions are audited in
+  their transaction. Live settings invalidate on missing/transferred seller references;
+  stored sandbox entities/terminals recheck ownership before data release.
+  Sandbox is a private snapshot with isolated table-TTL editing, not executable
+  invoice reproduction.
+- **Bounded transactional settings checkpoint:** approved table lifetime scope now
+  has `settings.table_ttl` preparation/commit/cancel in the private dispatcher and
+  explicit review/acknowledgement in the actual UI. Current can_write, fresh MFA,
+  five-minute context elevation, two-minute server-hashed preparation, expected
+  value/existence CAS, idempotent result and atomic audit protect the write. Live
+  changes only `merchant_settings.table_order_ttl_seconds`; sandbox changes only
+  its private snapshot. Values match the existing four Dashboard options. Existing
+  orders, other invoice scenarios, ordinary settings gateway and invoice authority
+  are unchanged. Exit cancels preparations. No remote operation was executed.
+- **Evidence and limits:** PGlite authorization/rollback/isolation tests and HTTP
+  tests pass, including bounded upstream JSON and stream cancellation. Mocked
+  browser tests exercise the actual route, original SDK session, search/open,
+  reload, same-actor sign-in reset, exit, forbidden handling and desktop/mobile
+  layout. They do not prove real GoTrue/PostgREST integration. Denial auditing,
+  rate limits, retention cleanup, other transactional writes, reports, full MFA browser
+  coverage and production validation remain pending. No full-service readiness claim.
+  TTL SQL tests additionally cover write permission/MFA, canonical confirmation,
+  audit rollback, replay, stale/insert conflicts, cancel, expiry and sandbox isolation.
+  Browser fixtures cover explicit confirmation, status-only checks after a lost commit
+  response, prepared/committed reload recovery, reads after write permission/fresh MFA
+  loss, and deterministic conflict handling. Audited `operation` reads return the latest
+  context operation or a specific ID without business mutation or renewed elevation;
+  enabled actor, exact auth session, active context and current ownership remain required.
+  SQL tests cover stale MFA/elevation, revoked can_write, cancellation/expiry and rejection
+  for disabled operators, wrong sessions/contexts, lost ownership and expired/revoked
+  contexts. HTTP and direct-RPC tests reject payment confirmation, mark-paid, receipt,
+  ledger-credit and webhook-replay actions; the write allowlist remains TTL-only.
+  Administrator identity is retained for customer-context support, never impersonated.
+  Multi-tab/in-flight operation races remain a release gate;
+  value CAS cannot detect ABA and real concurrent PostgreSQL is not yet verified.
+- **Target assessment:** shared DAC7 dependencies and migration history were verified
+  before applying the support migration and granting the confirmed operator access.
+  Deferred rhnk_main has no public/support baseline and cannot accept this feature
+  migration alone; it remains untouched. No customer business mutations were made.
+  No Axiom, remote deployment or change to ordinary invoice/POS authority.
+  `DASH-AUTH-001` integration and named scenario/settings implementation approval
+  remain bounded; existing locks and delivery blockers remain in force.
+- **Current status:** schema/RPC and bounded operator permissions are active in shared
+  DAC7; local integration remains partial with real MFA/customer E2E pending.
+  Not ready for requested conditional publication.
+
+### Historical Support Checkpoints
+
+- **Executable local checkpoint:** separate loopback support server/UI now implements
+  synthetic sandbox/live simulation, four invoice scenarios, approved settings,
+  expiring sessions, server-owned operation preparation/hash, confirmation,
+  idempotency, revision conflicts, atomic local file/audit replacement and exit.
+  Demo actor/elevation are not verified auth/MFA. No existing Dashboard routes,
+  SDK lifecycle, gateways or production invoice handlers were changed.
+  Browser demonstration and automated Chromium desktop/mobile checks passed,
+  including isolation, cancellation, settings, reload, audit and exit.
+  See [local tool](../worker-rhnk-to/SUPPORT_LOCAL.md).
+  Real customer integration and database security/compatibility remain pending;
+  shared DAC7 and deferred rhnk_main were not contacted or changed. No remote
+  migration, role grant, deployment or Axiom integration. Existing runtime locks
+  and delivery blockers remain. Older kernel-only checkpoints below are historical.
+- **Named support scope approval:** user answered "так дозволяємо" to the explicit
+  question listing `fixed`, `open_amount`, `table`, `delivery` and payment
+  requisites/numbering/lifetime settings. Bounded support implementation is approved
+  for these operations in sandbox/live; established invoice authority and ordinary
+  creation/POS semantics must remain unchanged. No remote SQL, role grant or deploy.
+- **Local operation policy:** separate operation-bound confirmation validator and
+  four tests added; all thirteen support tests pass. No mutation handler imports it.
+  Trusted persisted confirmation, canonical payload hashing, atomic consumption,
+  revision enforcement and database audit remain integration requirements.
+  Existing invoice runtime remains locked; this approval is not an unrelated refactor
+  or reinterpretation of stored scenarios and does not resolve delivery blockers.
+- **Revised product scope:** user requested sandbox and real-business workspaces,
+  including invoice creation/settings changes, plus exit. The revised plan specifies
+  read-only live entry, separate MFA-confirmed operation capabilities, per-action
+  confirmation/idempotency/revision checks, durable audit and pending-write handling
+  on exit. Existing local kernel remains read-only. No live mutation enabled.
+- **Auth integration approval:** user explicitly approved the previously described
+  `DASH-AUTH-001` support-context/gateway integration while preserving SDK session
+  lifecycle. This is a bounded implementation approval, not an existing runtime
+  change, remote migration, role grant or deployment. Shell/structure and named
+  invoice scenario changes are not silently unlocked by the two-workspace request.
+- **Local execution checkpoint:** independent `worker-rhnk-to/support-core.js` and
+  its adapter contract/tests added after the user's execution request. No existing
+  Dashboard auth, gateway, Worker router or invoice code imports it. Nine synthetic
+  support tests plus fifteen neighboring regression tests pass. Real identity,
+  transactional storage, HTTP boundary and UI remain unimplemented; no support
+  account is verified or granted. This is a local kernel, not a deployed service.
+- **Final status:** local kernel tested; bounded auth integration approved but not
+  implemented. Existing runtime locks remain; no shell/structure or named invoice
+  scenario unlock. No Axiom integration.
+- Plan: [Client Support Mode](CLIENT_SUPPORT_MODE_PLAN.md). Release 1 is a separate
+  server-authorized, MFA-confirmed, expiring read-only target context with durable
+  database audit; customer sessions and normal SDK auth are never replaced.
+- Initial administrator candidate is `4917dc24-e6d9-4870-b40d-a504504d4a5b`;
+  project identity, account eligibility and MFA remain unverified; no role granted.
+- Evidence: Dashboard gateway has Worker and direct Supabase/RPC paths; POS has a
+  separate creation path. Worker-only write blocking or hidden UI controls cannot
+  establish a read-only support boundary. Dedicated allowlisted reads, no customer
+  Realtime in release 1, and target-scoped cache/request fencing are proposed.
+- Risks: confused actor/target identity, stale authorization, unaudited data reads,
+  direct-client escape paths and shared-data test environments. Planned checks cover
+  unauthorized/expired/revoked access, target/resource tampering, audit failures,
+  no customer mutations, cache isolation and ordinary Dashboard auth regression.
+- Reproduction is a later isolated, ordinary-test-user workflow, not production
+  impersonation. All four invoice scenario locks remain intact. Schema, role grants,
+  auth integration and deployment require their respective scoped approvals.
+- Shared DAC7 and deferred rhnk_main require separate compatibility/migration
+  assessments. Neither target was changed or verified for this proposed schema.
+  No SQL, runtime code, external telemetry or infrastructure was created.
+
+## Invoice Settings / DASH-AUTH-001 - New Merchant Support Diagnosis, 2026-10-05
+
+- **Final status:** `ANALYSIS ONLY`; existing settings, authentication and
+  `CROSS-APP-INVOICE-SCENARIOS-001` locks remain unchanged. No runtime unlock.
+- Read-only scope: client `e0ca2c0e-4261-4865-8483-544f7304df7d`, merchant
+  `9c595f51-663b-4aaa-8701-8332bb691915`, approved shared DAC7
+  `mwaeazabpvbxqfrceogr`. Deferred rhnk_main was not targeted or assessed for a
+  migration: no schema change or migration was prepared, applied or proposed here.
+- User-filtered gateway logs show onboarding success at 12:09:04 UTC; six invoice
+  RPC failures from 12:10:53 through 12:44:11 UTC; settings saves succeeded at
+  12:11:30 and 12:49:49 UTC. Matching Postgres timestamps report
+  `Invoice payment settings are not configured`. The live invoice RPC raises
+  this error for a missing owner-scoped settings row or an unsupported payment mode.
+  The live onboarding function does not reference business_settings, unlike the
+  separate explicit settings save path. Registration requisites alone are not
+  evidence of configured invoice rules.
+- At 13:24:13 UTC, settings revision 2 has direct mode and the correct owner;
+  seller ownership matches, VAT is no-vat, numbering is 1 with padding 6, and
+  purpose is nonblank. The active entity has a recipient name and valid IBAN/tax
+  formats. No orders exist for this merchant. Historical config is unavailable:
+  no settings timestamps/history were found, and request bodies were not inspected.
+  The mode saved in revision 1 and exact cause after that save remain unverified.
+  Expanded purpose validation and a fresh authenticated creation were not exercised.
+- Existing advisors flag settings tables without RLS policies and authenticated
+  SECURITY DEFINER RPC access. These findings do not prove this error's cause;
+  the RPC ownership guards must not be removed or converted incidentally.
+- Support access recommendation only: server-authorized, MFA-confirmed, expiring
+  read-only view-as-user mode retaining separate admin actor and target identity,
+  an explicit banner/exit and audited reason/actions. No client service-role key,
+  password reset, minted client session or user_metadata-based admin permission.
+  Support writes and all authentication/schema/deployment work require approval.
+- Evidence: owner-filtered live logs, live function guard inspection, read-only
+  settings/entity/order diagnostics and relevant existing advisor reports.
+  No client data, invoices, auth state, SQL objects or Workers were changed.
+
+## DASH-POS-001 / CROSS-APP-INVOICE-SCENARIOS-001 - RHNK POS Readiness, 2026-10-05
+
+- **Final status:** `LOCKED` after explicit approval of the isolated Dashboard/POS
+  repair, Dashboard deployment and exact invoice correction (user: "так і деплой").
+- Scope: `worker-rhnk-to/dashboard.js`, focused tests and Dashboard Worker config.
+  POS requests pending, but the shared creation RPC persists table invoices as preparing.
+  The isolated wrapper confirms pending only for successful pending-requested creation
+  with a persisted table invoice, assigned terminal and positive persisted amount.
+  Owner JWT and existing RLS authorize a conditional preparing-only, unexpired PATCH.
+  Amount, merchant, entity, terminal and expiry must match the creation response.
+  Dashboard cancellation continues unchanged; App cancellation boundaries are unchanged.
+- Only `rhnk-to-dashboard` deployed, version `38e2a91c-59fa-4ca9-8ac5-77590f8dd89f`.
+  Existing domains, other Workers and shared SQL/schema/RLS were not deployed or changed.
+  Approved shared DAC7 `mwaeazabpvbxqfrceogr` remains in use; deferred rhnk_main is
+  not targeted. No migration was prepared or applied.
+- Exact approved invoice `1ef3273d-1c98-4088-9a67-ada9eb35b8cc` changed preparing to
+  pending at `2026-10-05T10:00:15.753602Z` through an identity-, amount-, expiry- and
+  status-conditional UPDATE. Amount 777 UAH, terminal and configured expiry
+  `2026-10-05T14:43:03.581Z` are unchanged. Browser Pay verification showed waiting
+  for payment, 777 UAH, live TTL and enabled payment button; no payment was submitted.
+- Validation: 16 focused Dashboard/App/terminal/isolation tests passed, diagnostics
+  clean, root `npm run build` and matching Wrangler 4.129.0 dry-run passed.
+  Live `/`, `/dashboard`, `/dashboard/pos`, `/app`, `/conf/`, `/pay`, `/pay/` and
+  sampled referenced JS/CSS returned 200. Separate unchanged `/corex` returned 404;
+  this is disclosed, not repaired or described as a passing all-product smoke test.
+- Residual risk: creation and readiness remain two operations; readiness failure returns
+  503 and can leave a preparing invoice. Shared checkout detail cache may retain preparing
+  for 60 seconds. A fresh authenticated POS creation was not performed by the agent;
+  routing and readiness were exercised with the real Dashboard router and mocked bindings.
+
+## CROSS-APP-INVOICE-SCENARIOS-001 - RHNK App Ready Invoice, 2026-10-05
+
+- **Final status:** `LOCKED` after the explicitly approved rhnk.to App table
+  readiness repair and correction of invoice `2d7266b8-d729-489f-a1fc-f28f949ecb03`.
+- Scope: isolated `worker-rhnk-to/app.js`, its tests and App Worker configuration.
+  Ready manual table creation confirms pending after authoritative snapshot creation.
+  Owner JWT and existing RLS authorize a conditional preparing-only, unexpired update.
+  Amount, merchant, entity, terminal and expiry must match before success is returned.
+  Concurrent cancellation cannot be overwritten by this readiness transition.
+- App-prefixed cancellation is rejected; Dashboard POS is unchanged. This route boundary
+  is not a new global database permission rule: existing authenticated API access remains.
+- Shared DAC7 `mwaeazabpvbxqfrceogr` remains the approved database. Deferred rhnk_main
+  is not targeted. No SQL function, schema, policy or migration is changed by this repair.
+- Residual risk: creation and readiness are two operations. Failure returns 503 and may
+  leave a preparing invoice; no retry or replacement cancellation is performed silently.
+  Existing shared detail cache can retain preparing for up to 60 seconds.
+- Evidence: nine focused App/terminal/isolation tests passed; editor diagnostics clean;
+  isolated App dry-run passed. Published only rhnk-to-app version
+  `3d0e1ec6-e732-4331-9ec4-b08c62995e63`, retaining existing App assets.
+  Existing orders RLS verifies merchant ownership for updates.
+- Approved one-row correction confirmed pending, unchanged 45 UAH, entity, terminal and
+  expiry. Live terminal lookup returns that pending invoice. Browser direct link shows
+  the 45 UAH payment view and enabled payment-entry button, not the preparing view.
+  No live invoice creation or real payment was exercised. Shared SQL is unchanged.
+- Follow-up: invoice `86049577-53f4-40ad-981b-415da4afa840` created via rhnk.to App
+  at 09:21:17 UTC remained preparing after the 09:20:47 deployment. Database logs
+  show successful create RPC but no readiness PATCH. Exact caller payload/path is
+  unavailable, so optional-status omission is not claimed as proven root cause.
+  Readiness now uses persisted table type, assigned terminal and positive amount,
+  rather than optional client fields; the create route also accepts a trailing slash.
+  Conditional status/expiry and owner RLS checks remain intact.
+- Follow-up published only to `rhnk-to-app`: version
+  `1816d5ca-43e1-4747-b6bb-fd951b88fdd4`. Eleven focused tests and isolated
+  Wrangler dry-run passed. No assets changed during this publication.
+  With separate explicit approval, the exact invoice above was conditionally
+  changed from preparing to pending in DAC7 (`mwaeazabpvbxqfrceogr`);
+  amount 78, merchant/entity/terminal, creation time and expiry were preserved.
+  Browser verification showed pending payment with the enabled 78 UAH payment
+  button. No payment or fresh authenticated invoice creation was exercised;
+  automatic readiness for the next live creation remains an acceptance-test gap.
+
+## CROSS-APP-INVOICE-SCENARIOS-001 - RHNK Terminal Lookup, 2026-10-05
+
+- **Final status:** `LOCKED`; user explicitly approved restoring active invoice lookup
+  for the table/tag entry on `rhnk.to` without changing existing domains.
+- Scope: new `worker-rhnk-to/terminal-selection.js` and isolated `rhnk-to-terminal`
+  configuration. Only public and App-prefixed terminal-selection routes are owned.
+  Dashboard, App creation, Pay payment logic and existing Workers are unchanged.
+- Lookup filters terminal identity, active terminal, pending/preparing status and the
+  invoice's own future/null expiry before selecting the newest creation time and ID.
+  Historical expired/cancelled orders cannot mask an eligible order. Stored amounts,
+  statuses and expiry remain authoritative; no persistence writes occur.
+- Database compatibility: explicitly uses approved shared DAC7 project
+  `mwaeazabpvbxqfrceogr`, not deferred `rhnk_main`. Anonymous scoped REST reads of
+  terminals/orders succeeded. No schema, grant, RLS or migration change was made.
+- Evidence: five focused contract/isolation tests and isolated Wrangler dry-run passed.
+  Live read before deployment found tag `57g66j` active, order
+  `b4257f7b-b1de-4db2-8b40-8fbc5d3be266` preparing, amount 66 UAH,
+  expires_at `2026-10-05T09:35:25.235+00:00` (not expired at observation).
+- Residual risks: public reads retain existing database RLS; this is not a database
+  security audit. Actual payment and concurrent rollover are not exercised live.
+- Published only `rhnk-to-terminal`, version
+  `9167a7d7-2529-4f3c-b937-051203df4c2c`. Both terminal routes returned HTTP 200
+  JSON/no-store with the expected active order; canonical detail matched its ID,
+  preparing status, amount and expiry. Live tag rendered the preparing view instead
+  of the unavailable error. No old-domain Worker or database was modified.
+
+## CROSS-APP-INVOICE-SCENARIOS-001 - Approved Pay Entry Repair, 2026-10-04
+
+- **Final status:** `LOCKED` for `fixed`, `open_amount`, `table`, and `delivery`.
+- Explicit user approval covered restoring the existing `/tag` terminal-selection contract,
+  repairing prefetch and redirect validation, checking current HTTPS cache validity, and
+  correcting the 13 Pay type errors. The temporary unlock was limited to shared Pay entry;
+  no new invoice scenario or amount, status, recipient, terminal identity, persisted order,
+  public-link, backend API, database, or authentication contract was authorized.
+- Implementation scope: Pay checkout store, BankSheet native link, API redirect/abort handling,
+  optional order short_id typing, and their local regression tests. Terminal preflight awaits
+  the existing code-scoped selection and rechecks payment context before initiation. A failed
+  or mismatched selection clears local authority. Terminal entry cannot bypass this preflight
+  through a prefetched native link. Prefetch results are fenced by session, order, bank,
+  amount, location, cancellation and current payability; stale results cannot replace a new bank.
+- Separate asset repairs retain the source snow model but remove it from QR release output.
+  The green logo favicon uses a bundled no-inline asset, retaining strict scoped build guards.
+- Evidence: full Pay suite 246/246; Pay typecheck 0 errors / 1 existing carousel ARIA warning;
+  root check 0 errors / 0 warnings with OpenAPI coverage 30/30; build guard regressions 12/12.
+  Root unit suite passed 62 files / 768 tests; editor diagnostics found no errors in touched code.
+  Shared root and Pay production builds, isolated Dashboard/Corex builds and QR site build passed.
+  Both isolated guards passed (11 entry assets, 258 generated files, 20 routes).
+  Official Svelte autofixer found no issues in the changed native-link slice and root layout.
+- Eleven affected Worker dry-runs passed: worker shared/checkout/dashboard/corex production
+  environments, Dashboard/Corex isolated configurations, QR configuration, and rakhunok
+  web/dashboard/corex/checkout configurations. Dry-run validates packaging, not remote runtime.
+- Residual risks: no live bank payment or new browser payment acceptance is claimed; the
+  existing delivery persistence blocker remains and delivery is not production-ready.
+  No deployment, database change, real payment, or commit was performed in this repair scope.
+  Any deployment or adjacent invoice behavior change requires separate explicit approval.
+
+## DASH-STRUCTURE-001 - Local Onboarding Repair, 2026-10-04
+
+- URL follow-up, 2026-10-04: user confirms `/dashboard/` works and approves locally
+  aligning the bare address. Test-origin GET/HEAD `/dashboard` now returns a no-store
+  307 to `/dashboard/`, preserving query parameters. Focused router tests pass 9/9;
+  API, POST, nested routes and production-origin shell behavior remain unchanged.
+  This is a local change, not deployed. It cannot intercept an old Landing bundle's
+  client-side-only transition; that remains separate from HTTP URL normalization.
+- Completed-owner browser acceptance, 2026-10-04: user selected their Google account;
+  Dashboard opens Rakhunok without onboarding. Full document reload restores the same
+  business, 6 active terminals, 7 attention invoices and unchanged recent invoice list.
+  Scoped `/dashboard/_app/env.js` loads; no login/configuration-required/onboarding view
+  or horizontal mobile overflow. No business mutations. Global logout revocation remains
+  unverified. Personalized Google button does not force its displayed account according
+  to official GIS documentation; no Google auth implementation change was made.
+- Account-switch follow-up, 2026-10-04: onboarding now forwards the existing Dashboard
+  signOut callback; pending operations disable competing form actions, failure preserves
+  input and allows retry. Deterministic component browser test passed on desktop/mobile;
+  root check reports 0 errors/warnings. Auth lifecycle and DASH-AUTH-001 remain unchanged.
+- Configuration diagnosis: Landing SPA navigation retains root `/_app/env.js` with empty
+  public configuration, making the Dashboard gateway unavailable. Direct Dashboard entry
+  loads configured `/dashboard/_app/env.js` and restores the existing onboarding session.
+  Added a Dashboard document-entry guard (focused test passed), but live navigation from
+  the independently deployed old Landing bundle does not load this new layout. Therefore
+  the cross-app failure remains open: Landing links need document navigation and a separately
+  approved Landing deployment. No Landing/main Worker or production deployment performed.
+- Dashboard-only follow-up version `e1c540e1-c455-4aae-9593-29a34bcb3583` deployed to
+  letsrealtalk.com after fresh full root build and matching dry-run (11 entries/295 files).
+  Seven-route HTTP/JS/CSS smoke passed. Direct mobile onboarding is 390px without overflow.
+  Live account switch renders Google login, but its global logout request recorded
+  `net::ERR_ABORTED`; server-session revocation and completed-owner login remain unverified.
+  No business submission was made. Structure status remains ANALYZING.
+- Hosted rollout evidence, 2026-10-04: explicit user selection approved the bounded shared
+  migration and dedicated test onboarding service. Applied DAC7 migration
+  `20261004141105 merchant_onboarding_private_contacts`; metadata assertions were also recorded
+  by the migration tool as `20261004141122` and `20261004141135`. Subsequent read-only catalog
+  verification confirms invoker RPCs, empty search_path, no anon execute/contact grants,
+  authenticated owner-only contact policy, and unchanged public recipient policies.
+  Existing owner counts remain 1 merchant/3 entities; new owner remains 0/0; contacts remain 0.
+- Dedicated internal Worker `letsrealtalk-onboarding` version
+  `2d3bfcd3-0c7b-4721-bf78-290b5dcdfe0b` has no public route/workers.dev/preview URL.
+  Dashboard version `b2ad0739-1149-46cd-a6c0-a93eabe9e756` forwards only exact test-origin
+  POST `/dashboard/api/v1/merchant/onboarding`; missing/failed service never falls back.
+  Ordinary API remains bound to rahunok. Initial Dashboard upload exposed root asset 404s;
+  repaired shell asset URLs and scoped asset forwarding, then repeated tests/dry-run/deploy.
+- Fresh root check: 0 errors/warnings; full root build passed. Service and Dashboard target
+  dry-runs passed, shared guard verified 11 entries/295 files. Focused service/handler/SQL/router
+  gate passed 37/37; final asset/router gate passed 8/8. Live smoke verified HTTP 200 and
+  referenced JS/CSS for `/`, `/dashboard`, `/app`, `/conf/`, `/pay`, `/pay/`, `/corex`.
+  Unauthenticated onboarding returns 401. Browser shows new two-step/four-form onboarding;
+  mobile width 390 has scrollWidth 390. No business submission was made.
+  Real user-entered creation, authenticated contacts save/reload/clear/cross-owner checks and
+  first-creation concurrency remain pending. Status remains ANALYZING; no production deployment.
+- Historical preparation-only/unapplied/no-deployment statements below describe earlier
+  checkpoints and are superseded by the explicit approval and hosted evidence above.
+- Latest explicit approval, 2026-10-04: deploy the updated Dashboard to letsrealtalk.com
+  and verify it. In a separate scope decision the user approved applying the reviewed private
+  contact/onboarding migration to shared DAC7 and connecting only onboarding to its new handler.
+  This supersedes the earlier isolated-only migration and no-deployment restriction below.
+  Preserve existing customer businesses, public recipient access and all other API/payment routes.
+  No rakhunok.com deployment or synthetic customer fixture writes are authorized. Real new-owner
+  business setup requires user-entered details and confirmation. Review metadata before migration,
+  validate schema afterward, then run focused tests, root build and matching target dry-run.
+  Keep the isolated runner's shared-project rejection. Application rollback must retain contact data.
+- Status: `ANALYZING`; user approved local implementation and subsequently conditionally
+  approved the proposed schema/RPC and Worker rollout only if payment and onboarding remain safe.
+- Latest decision supersedes conditional remote permission: preparation only with an isolated
+  database. Shared DAC7 (mwaeazabpvbxqfrceogr) must not receive this migration or test writes;
+  no Worker deployment is authorized. Two dedicated accounts will be entered through the browser.
+- Subsequent user instruction permits cautious checks on the current database. Read-only checks
+  confirm corrected roles: f527f6c9-3eb6-4de4-adbe-f64bd41eae6f has Auth but no merchant/entities;
+  4917dc24-e6d9-4870-b40d-a504504d4a5b has one completed active merchant and three active entities.
+  Contacts and both RPCs remain absent. No shared migration/test writes or deployment performed;
+  cautious checks are not interpreted as approval for schema migration or synthetic fixture writes.
+  Browser Dashboard is signed out; real JWT acceptance requires direct user login.
+- Follow-up approval: remove the recorded blockers without harming existing business-dependent
+  invoice behavior. Local contact privacy repair and regression diagnosis are approved.
+  CROSS-APP-INVOICE-SCENARIOS-001 has a temporary narrow compatibility scope for fixed,
+  open_amount, table and delivery: verify selected seller identity/legal-form propagation and
+  correct only a demonstrated mismatch. Existing recipient snapshots, amounts, status, terminal
+  identity, expiry and public links must not change; delivery activation remains excluded.
+  No broad auth, policy removal, grant rewrite or unrelated payment refactor is authorized.
+- Exact original registry recovered from HEAD blob `34a3c49a6bb3230a57d3878adeec741e5bcc32f4`;
+  zero-byte backup preserved before this separate analysis addition.
+- Local scope: verified owner-bound onboarding, explicit legal/contact validation, transactional
+  initialization candidate, safe retries without overwriting existing businesses, and confirmed
+  entity mutation results. Candidate SQL remains unapplied. The latest approval permits the new
+  owner-only contact relation, not removal of existing public policies or broad grant changes.
+  Authentication remains locked. No hosted mutation or deployment performed.
+- Preserve all `DASH-AUTH-001` invariants, browser SDK, owner-only restore and existing ready shell.
+  Membership activation, shared auth lifecycle changes, and legacy merchant update remain separate.
+- `CROSS-APP-INVOICE-SCENARIOS-001` compatibility inspection is complete locally; its runtime
+  invariants remain LOCKED. No payment runtime, VAT rules, terminal creation, existing recipient
+  snapshots, amounts, TTL or public links were changed. Delivery activation remains excluded.
+- Plan and evidence: [registry recovery and readiness plan](DASHBOARD_PROCESS_REGISTRY_RECOVERY.md).
+- Local evidence: 24 onboarding handler tests, 45 gateway tests, 5 synthetic PGlite transaction/RLS
+  tests, 2 registry guard tests and two actual-component desktop/mobile browser tests pass.
+  Root `npm run check` passes with 0 errors/warnings; legal-form UI and changed markup validated.
+- Entity mutations require one returned owner-bound row; zero/multiple/malformed/wrong IDs fail.
+  Existing onboarding retries return `created: false` without overwrite or missing-entity backfill.
+- Existing empty structure shows a legal-seller empty state beside the current explicit create action;
+  browser verification confirms no mutation on render. No forced onboarding or automatic backfill.
+- Historical combined gate was 187/191. Four failing expectations were repaired without payment
+  runtime changes: authenticate the protected cache GET, configure the initiate bank fixture,
+  assert committed empty logos, and exercise D1 rather than an unused Supabase catalog mock.
+  The final combined gate passes 193/193, including the added matrix within
+  the 15/15 snapshot suite: four legal forms by four scenarios, selected recipient fields,
+  unchanged amounts/terminal/expiry, and immutable earlier recipient snapshots.
+- Hosted metadata confirms owner-bound write policies, but both tables also allow public SELECT
+  of active rows. New entity contacts would inherit that read access under current table grants.
+  The unsafe public-column candidate was removed. Contacts now live only in the unapplied
+  business_entity_contacts relation with owner-only RLS and no anon access. Existing public
+  entity policies and recipient columns stay unchanged. The updated fixture includes public active
+  entity reads and proves public recipient access, private contact denial and cross-owner rejection.
+  Contact create/edit uses one SECURITY INVOKER RPC transaction; omission preserves, null clears,
+  and contact failure rolls back entity writes. Missing/malformed RPC results fail without fallback.
+- InvoiceCreate maps every non-FOP entity to TOV invoice rules, including self_employed and ngo.
+  Its submitted entityId independently selects the authoritative recipient; the matrix confirms
+  server snapshots for all four legal forms. Browser-local purpose/VAT suggestions were not changed
+  or certified as correct for every legal form. Real hosted first-action acceptance remains pending.
+- Acceptance pending: safe hosted schema/RPC rollout after these blockers, actual PostgreSQL concurrency,
+  real authenticated new/existing-owner round trips, richer resumable setup guidance and
+  delayed auth/account-switch reproduction. The contact relation must precede the gateway's embedded
+  relation query; otherwise structure reads fail. Candidate CREATE TABLE is deliberately single-use,
+  not reapply-safe: review target metadata and migration history before applying it. Preserve contacts
+  on application rollback. Do not mark this analysis LOCKED or deployment-ready.
+- Root release build passes. Scoped ESLint still reports two unchanged no-explicit-any violations
+  in gateway team-member/invitation methods; this repair does not alter those separate processes.
+  Both letsrealtalk test-domain target dry-runs pass packaging after a fresh root build, without
+  upload. API env.production omits the non-inherited D1 binding; Dashboard API targets rahunok,
+  not letsrealtalk-web. No binding/routing correction was made or runtime readiness inferred.
+- Isolated acceptance preparation: contact owner FK index verified by 5/5 candidate DB tests;
+  real-JWT runner safety/cleanup tests pass 3/3 and runner ESLint passes. Hosted acceptance is
+  not executed. The runner uses the local actual handler and fresh PostgREST reads, not a full
+  Dashboard reload or deployed Worker. Unknown commit outcomes still require isolated fixture
+  reconciliation. [Isolated acceptance runbook](ONBOARDING_ISOLATED_ACCEPTANCE.md) records gates.
+  No full-repository lint/e2e gate or release-ready assessment is claimed.
 
 ## Change Control
 
@@ -387,6 +1528,39 @@ changes do not bypass these rules.
   HTTP 200; deployed Merchant JS/CSS matched the local build. Unauthenticated
   `/app/api/v1/orders` returned 401. The separate `rhnk-web` API and its local
   validation/error-mapping changes were not deployed; no live invoice was created.
+
+#### Merchant App Short-Screen Invoice Presentation - 2026-10-05
+
+#### Merchant App Numberless Terminal Creation Probe - 2026-10-05
+
+- **Status:** `LOCKED` after the user explicitly approved a frontend-only `table`
+  probe: hide the manual table-number field and enable creation for the selected
+  terminal with a positive amount. No number is invented for nonnumeric codes;
+  existing numeric codes retain their metadata. Terminal identity, terminal-owned
+  company, active-order guard and server error feedback remain unchanged.
+- Evidence: focused synthetic creation browser test passes for text/numeric codes,
+  fixed/open payloads and failure feedback; App check has zero errors/warnings and
+  production build passes. No live invoice was created by the assistant.
+- Residual: current checked-in Worker/RPC still require a table number and may
+  reject this probe. No API, RPC, schema, remote write or deployment was approved
+  or performed. User live acceptance remains pending.
+
+#### Merchant App Short-Screen Invoice Presentation Evidence - 2026-10-05
+
+- **Status:** `LOCKED` after the explicitly approved local rendering refinement for
+  `fixed`, `open_amount`, `table`, and `delivery`. Scope is short-screen invoice
+  spacing and action layout only; amount authority, statuses, QR routes, handlers,
+  persisted orders and public links are unchanged.
+- Evidence: 13 invoice component contract tests pass; responsive browser regression
+  passes in light/dark themes across mobile and desktop, including no-scroll details
+  at 375x667, visible 44px actions, QR navigation and keyboard focus. App check reports
+  zero errors/warnings. Browser fixtures are synthetic, not live payment verification.
+- Residuals: table input removal is not implemented. Worker requires a valid integer
+  table_number before RPC, so frontend-only removal would break nonnumeric terminals.
+  Separate Worker API/RPC compatibility scope requires approval; no schema, API,
+  authentication, database, commit or deployment changes were made here.
+- The creation browser test separately timed out locating the existing table input;
+  the App source is unchanged. That setup failure is not claimed as resolved.
 
 #### Merchant App Invoice Dialog Refinement - 2026-09-25
 
@@ -1661,6 +2835,26 @@ reinterpret explicit null expiry, or derive TABLE identity without `terminal_id`
   gaps remain. `delivery` is not production-ready while the earlier persistence blocker remains.
   Earlier read-only audit findings below remain historical evidence, not an implementation claim.
   Updated integration contract: `docs/openapi2.yaml`; original `docs/openapi.yaml` unchanged.
+
+### RHNK.to Shared-Database Deployment Review (2026-10-05)
+
+- **Status:** `ANALYZING`; user-approved deployment scope only. Process locks remain unchanged.
+- Related owners: `DASH-AUTH-001`, `DASH-SHELL-001`, `BANK-CATALOG-READ-001`,
+  `DASH-TELEGRAM-INVOICE-001`, and `CROSS-APP-INVOICE-SCENARIOS-001`.
+- New `worker-rhnk-to` targets reuse existing handler source but bind only new private
+  `rhnk-to-web` and `rhnk-to-corex-api` Workers. Existing Workers are not modified.
+  D1/R2/KV sharing was separately approved; storage data is not copied or modified.
+  Dashboard uses the full root build matching its asset-rewrite contract. No auth,
+  invoice scenario, amount, status, persistence, RLS or webhook behavior is changed.
+- User explicitly selected old shared Supabase `mwaeazabpvbxqfrceogr` for this launch.
+  New project `mvytjhaujcewqfyivwxf` remains unchanged and migration is deferred.
+- Account and Active zone were verified; existing private backends have no server-secret
+  bindings. Google new-origin approval, Telegram frontend origin/redirect, authenticated
+  flows and privileged server operations remain unverified. Generated links keep the
+  old domain. Conf shared authenticated-write exposure and delivery blocker remain.
+- Local adapter tests cover static prefix isolation and isolated Corex assets/API dispatch.
+  Build/dry-run/deployment evidence is recorded in `worker-rhnk-to/README.md`; no payment
+  readiness or lock-unlock approval is implied.
 
 ### Main OpenAPI And Worker Contract Audit
 

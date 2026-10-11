@@ -83,6 +83,9 @@ type BusinessEntityRow = {
 	tax_id: string;
 	bank_name: string;
 	iban: string;
+	phone?: string | null;
+	contact_email?: string | null;
+	website?: string | null;
 	is_active: boolean;
 };
 
@@ -293,6 +296,9 @@ function mapPosTerminal(row: TerminalRow): PosTerminal {
 }
 
 function mapBusinessEntity(row: BusinessEntityRow): BusinessEntity {
+	const contacts = (row as BusinessEntityRow & {
+		business_entity_contacts?: { phone?: string | null; contact_email?: string | null; website?: string | null } | null;
+	}).business_entity_contacts;
 	return {
 		id: row.id,
 		businessType: row.business_type,
@@ -301,7 +307,18 @@ function mapBusinessEntity(row: BusinessEntityRow): BusinessEntity {
 		taxId: row.tax_id,
 		bankName: row.bank_name,
 		iban: row.iban,
+		phone: contacts?.phone ?? '',
+		contactEmail: contacts?.contact_email ?? '',
+		website: contacts?.website ?? '',
 		isActive: row.is_active
+	};
+}
+
+function businessEntityContacts(input: BusinessEntityInput) {
+	return {
+		...(input.phone !== undefined ? { phone: input.phone.trim() || null } : {}),
+		...(input.contactEmail !== undefined ? { contact_email: input.contactEmail.trim() || null } : {}),
+		...(input.website !== undefined ? { website: input.website.trim() || null } : {})
 	};
 }
 
@@ -581,10 +598,14 @@ export function createDashboardGateway(
 				body: JSON.stringify({
 					business_name: input.businessName,
 					business_type: input.businessType,
+					vat_status: input.vatStatus,
 					tax_id: input.taxId,
 					iban: input.iban.replace(/\s+/g, '').toUpperCase(),
 					display_name: input.displayName || input.businessName,
-					bank_name: input.bankName
+					bank_name: input.bankName,
+					phone: input.phone,
+					contact_email: input.contactEmail,
+					website: input.website
 				})
 			});
 		},
@@ -721,7 +742,7 @@ export function createDashboardGateway(
 			const [entityResult, terminalResult] = await Promise.all([
 				client
 					.from('business_entities')
-					.select('*')
+					.select('*, business_entity_contacts(phone, contact_email, website)')
 					.eq('user_id', userId)
 					.order('created_at', { ascending: false }),
 				client
@@ -747,6 +768,19 @@ export function createDashboardGateway(
 		},
 
 		async createBusinessEntity(userId, input) {
+			if (Object.keys(businessEntityContacts(input)).length) {
+				const result = await client.rpc('save_business_entity', {
+					p_entity_id: null,
+					p_input: {
+						business_type: input.businessType, business_name: input.businessName,
+						display_name: input.displayName, tax_id: input.taxId,
+						bank_name: input.bankName, iban: input.iban, ...businessEntityContacts(input)
+					}
+				});
+				if (result.error || !result.data?.id || result.data.user_id !== userId)
+					throw new Error('Не вдалося підтвердити створення юридичної особи.');
+				return;
+			}
 			const result = await client.from('business_entities').insert({
 				user_id: userId,
 				business_type: input.businessType,
@@ -755,12 +789,28 @@ export function createDashboardGateway(
 				tax_id: input.taxId,
 				bank_name: input.bankName,
 				iban: input.iban,
+				...businessEntityContacts(input),
 				is_active: true
-			});
-			if (result.error) throw new Error('Не вдалося створити юридичну особу.');
+			}).select('id, user_id');
+			if (result.error || !Array.isArray(result.data) || result.data.length !== 1 ||
+				!result.data[0]?.id || result.data[0].user_id !== userId)
+				throw new Error('Не вдалося підтвердити створення юридичної особи.');
 		},
 
 		async updateBusinessEntity(userId, entityId, input) {
+			if (Object.keys(businessEntityContacts(input)).length) {
+				const result = await client.rpc('save_business_entity', {
+					p_entity_id: entityId,
+					p_input: {
+						business_type: input.businessType, business_name: input.businessName,
+						display_name: input.displayName, tax_id: input.taxId,
+						bank_name: input.bankName, iban: input.iban, ...businessEntityContacts(input)
+					}
+				});
+				if (result.error || result.data?.id !== entityId || result.data.user_id !== userId)
+					throw new Error('Не вдалося підтвердити оновлення юридичної особи.');
+				return;
+			}
 			const result = await client
 				.from('business_entities')
 				.update({
@@ -769,11 +819,15 @@ export function createDashboardGateway(
 					display_name: input.displayName,
 					tax_id: input.taxId,
 					bank_name: input.bankName,
-					iban: input.iban
+					iban: input.iban,
+					...businessEntityContacts(input)
 				})
 				.eq('user_id', userId)
-				.eq('id', entityId);
-			if (result.error) throw new Error('Не вдалося оновити юридичну особу.');
+				.eq('id', entityId)
+				.select('id, user_id');
+			if (result.error || !Array.isArray(result.data) || result.data.length !== 1 ||
+				result.data[0]?.id !== entityId || result.data[0].user_id !== userId)
+				throw new Error('Не вдалося підтвердити оновлення юридичної особи.');
 		},
 
 		async deleteBusinessEntity(userId, entityId) {

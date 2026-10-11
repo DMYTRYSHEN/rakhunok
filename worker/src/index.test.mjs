@@ -220,7 +220,12 @@ test('routeWebRequest handles POST /api/v1/checkout/:id/initiate', async () => {
 		})
 	});
 
-	const response = await routeWebRequest(request, { ASSETS: { fetch: async () => new Response('mock') } });
+	const response = await routeWebRequest(request, {
+		ASSETS: { fetch: async () => new Response('mock') },
+		BANK_CATALOG_DB: { prepare: () => ({ all: async () => ({ results: [{
+			payload_json: JSON.stringify({ id: 'monobank', code: 'MONO', name: 'Monobank', universal_link: 'https://mbnk.app/qr/{payload}' })
+		}] }) }) }
+	});
 	assert.equal(response.status, 200);
 
 	const body = await response.json();
@@ -392,24 +397,20 @@ test('routeWebRequest handles banks catalog and logos', async () => {
 	);
 	assert.equal(logosRes.status, 200);
 	const logos = await logosRes.json();
-	assert.ok(logos.MONO);
-	assert.ok(logos.PBAN);
+	assert.deepEqual(logos, {});
 });
 
-test('routeWebRequest reads the bank catalog from Supabase without mutating it', async () => {
+test('routeWebRequest reads the bank catalog from D1 without mutating it', async () => {
 	const { routeWebRequest } = await import('./index.ts');
 	const requests = [];
-	globalThis.fetch = async (input, init = {}) => {
-		requests.push({ input: String(input), init });
-		return Response.json([
-			{ id: 'grant', code: 'GRNT', name: 'Банк Грант', active: true }
-		]);
-	};
-
 	const env = {
 		ASSETS: { fetch: async () => new Response('mock') },
-		SUPABASE_URL: 'https://catalog.supabase.co',
-		SUPABASE_ANON_KEY: 'publishable-test-key'
+		BANK_CATALOG_DB: { prepare: (sql) => {
+			requests.push(sql);
+			return { all: async () => ({ results: [{
+				payload_json: JSON.stringify({ id: 'grant', code: 'GRNT', name: 'Банк Грант', active: true })
+			}] }) };
+		} }
 	};
 	const response = await routeWebRequest(
 		new Request('https://letsrealtalk.com/api/v1/banks/grnt'),
@@ -419,30 +420,23 @@ test('routeWebRequest reads the bank catalog from Supabase without mutating it',
 	assert.equal(response.status, 200);
 	assert.equal((await response.json()).id, 'grant');
 	assert.equal(requests.length, 1);
-	assert.equal(
-		requests[0].input,
-		'https://catalog.supabase.co/rest/v1/banklink?select=*&order=name.asc'
-	);
-	assert.equal(requests[0].init.method, 'GET');
-	assert.equal(requests[0].init.headers.apikey, 'publishable-test-key');
-	assert.equal(requests[0].init.body, undefined);
+	assert.equal(requests[0], 'SELECT payload_json FROM conf_banks WHERE active = 1');
 });
 
-test('routeWebRequest preserves the fallback bank catalog when Supabase is unavailable or invalid', async () => {
+test('routeWebRequest preserves the fallback bank catalog when D1 is unavailable or invalid', async () => {
 	const { routeWebRequest } = await import('./index.ts');
-	const env = {
-		ASSETS: { fetch: async () => new Response('mock') },
-		SUPABASE_URL: 'https://catalog.supabase.co',
-		SUPABASE_ANON_KEY: 'publishable-test-key'
-	};
-	const upstreamResponses = [
-		new Response('unavailable', { status: 500 }),
-		Response.json([]),
-		Response.json([{ id: 'broken', code: '', name: 'Broken Bank' }])
+	const upstreamReads = [
+		async () => { throw new Error('unavailable'); },
+		async () => ({ results: [] }),
+		async () => ({ results: [{ payload_json: '{' }] }),
+		async () => ({ results: [{ payload_json: JSON.stringify({ id: 'broken', code: '', name: 'Broken Bank' }) }] })
 	];
 
-	for (const upstreamResponse of upstreamResponses) {
-		globalThis.fetch = async () => upstreamResponse;
+	for (const all of upstreamReads) {
+		const env = {
+			ASSETS: { fetch: async () => new Response('mock') },
+			BANK_CATALOG_DB: { prepare: () => ({ all }) }
+		};
 		const response = await routeWebRequest(
 			new Request('https://letsrealtalk.com/api/v1/banks/pban'),
 			env

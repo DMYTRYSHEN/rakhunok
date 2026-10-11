@@ -35,6 +35,7 @@
 
 	let {
 		children,
+		supportBanner,
 		merchantName,
 		activeSection = 'overview',
 		demo = false,
@@ -44,6 +45,7 @@
 		onSignOut
 	}: {
 		children: Snippet;
+		supportBanner?: Snippet;
 		merchantName: string;
 		activeSection?:
 			| 'overview'
@@ -179,6 +181,7 @@
 			const destination = destinations[event.key.toLowerCase()];
 			if (!destination) return;
 			event.preventDefault();
+			if (supportBanner && destination !== '/dashboard') return;
 			void goto(resolve(`${destination}${demo ? '?demo=1' : ''}` as '/'));
 		};
 		document.addEventListener('keydown', handleShortcut);
@@ -523,7 +526,7 @@
 				>
 				<span class="min-w-0 flex-1">
 					<span class="block truncate text-xs font-bold">{merchantName}</span>
-					<span class="mt-0.5 block text-[0.6875rem] text-zinc-500">Власник</span>
+					<span class="mt-0.5 block text-[0.6875rem] text-zinc-500">{supportBanner ? 'Техпідтримка' : 'Власник'}</span>
 				</span>
 				<HugeiconsIcon icon={Logout01Icon} size={16} className="text-zinc-500" aria-hidden="true" />
 			</button>
@@ -534,8 +537,10 @@
 	</aside>
 
 	<div data-testid="dashboard-content" class="min-h-screen {isPosMode ? '' : 'lg:pl-[17.5rem]'}">
+		<div class="sticky top-0 z-30">
+			{@render supportBanner?.()}
 		<header
-			class="sticky top-0 z-30 flex h-18 items-center justify-between border-b border-zinc-200 bg-white/95 px-4 backdrop-blur-md sm:px-6 lg:px-8"
+			class="flex h-18 items-center justify-between border-b border-zinc-200 bg-white/95 px-4 backdrop-blur-md sm:px-6 lg:px-8"
 		>
 			<div class="flex min-w-0 items-center gap-3">
 				<button
@@ -661,6 +666,7 @@
 				</div>
 			</div>
 		</header>
+		</div>
 
 		<main class="mx-auto w-full max-w-[92rem] px-4 py-7 sm:px-6 lg:px-8 lg:py-9">
 			{@render children()}

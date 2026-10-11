@@ -7,11 +7,17 @@
 
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
+	import { ArrowLeft } from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import DashboardLogin from './auth/DashboardLogin.svelte';
 	import MerchantOnboarding from './auth/MerchantOnboarding.svelte';
 	import DashboardStateScreen from './auth/DashboardStateScreen.svelte';
 	import DashboardShell from './components/DashboardShell.svelte';
+	import SupportCabinetBanner from './components/SupportCabinetBanner.svelte';
+	import { createSupportCabinet, SUPPORT_CABINET_MARKER, type SupportContext } from './api/support-cabinet';
+	import type { BusinessDraft } from './business-settings/business-settings';
 	import { createSettingsRepository } from './business-settings/settings-repository';
 	import { invoiceReadiness, type InvoiceReadinessIssue } from './business-settings/invoice-readiness';
 	import InvoiceReadinessNotice from './business-settings/InvoiceReadinessNotice.svelte';
@@ -32,6 +38,7 @@
 		BusinessStructureData,
 		InvoiceEvent,
 		InvoiceRecord,
+		PersistedInvoiceType,
 		PosBoard as PosBoardData,
 		TerminalInput
 	} from './types';
@@ -114,13 +121,14 @@
 		return loaders[view]();
 	}
 
-	let sessionState = $state<DashboardSessionState>(cachedSessionState ?? { status: 'loading' });
+	let sessionState = $state<DashboardSessionState>({ status: 'loading' });
+	let supportMode = $state(false);
 	let readinessIssues = $state<InvoiceReadinessIssue[]>([]);
 	let readinessError = $state('');
 	let readinessPending = $state(false);
 	let readinessGeneration = 0;
 	let readinessScope = $state<string | null>(null);
-	const readinessOwner = $derived(sessionState.status === 'ready' && sessionState.user.id !== 'demo-user'
+	const readinessOwner = $derived(!supportMode && sessionState.status === 'ready' && sessionState.user.id !== 'demo-user'
 		? { userId: sessionState.user.id, merchantId: sessionState.merchant.id } : null);
 
 	$effect(() => {
@@ -137,7 +145,7 @@
 		const scope = sessionState;
 		readinessIssues = [];
 		readinessError = '';
-		if (scope.status !== 'ready' || scope.user.id === 'demo-user' || !gateway) return;
+		if (supportMode || scope.status !== 'ready' || scope.user.id === 'demo-user' || !gateway) return;
 		readinessPending = true;
 		try {
 			const [structure, settings] = await Promise.all([
@@ -150,6 +158,171 @@
 			if (!destroyed && request === readinessGeneration && sessionState.status === 'ready' && sessionState.user.id === scope.user.id && sessionState.merchant.id === scope.merchant.id) readinessError = error instanceof Error ? error.message : 'Не вдалося перевірити готовність до платежів.';
 		} finally {
 			if (request === readinessGeneration) readinessPending = false;
+		}
+	}
+	let supportContext = $state<SupportContext | null>(null);
+	let supportName = $state('');
+	let supportRemaining = $state(0);
+	let supportExiting = $state(false);
+	let supportError = $state('');
+	let supportInvoiceAvailable = $state(false);
+	let supportInvoiceScenarios = $state<PersistedInvoiceType[]>([]);
+	let supportInvoiceSettings = $state<BusinessDraft | null>(null);
+	let supportCabinet: ReturnType<typeof createSupportCabinet> | null = null;
+	let supportSettingsRepository = $state<ReturnType<typeof createSupportCabinet>['settingsRepository'] | null>(null);
+	let supportTemplateRepository = $state<ReturnType<typeof createSupportCabinet>['templateRepository'] | null>(null);
+	let supportController = new AbortController();
+	let supportRefreshPending = false;
+	let supportStopped = false;
+	let supportSettingsSaving = false;
+
+	function clearSupportData() {
+		supportSettingsRepository = null;
+		supportTemplateRepository = null;
+		supportInvoiceAvailable = false;
+		supportInvoiceScenarios = [];
+		supportInvoiceSettings = null;
+		cachedSessionState = null;
+		cachedTableOrderTtlSeconds = DEFAULT_TABLE_ORDER_TTL_SECONDS;
+		invoices = [];
+		attentionInvoices = [];
+		invoiceEvents = [];
+		posBoard = { terminals: [], activeOrders: [] };
+		structureData = { entities: [], terminals: [] };
+		tableOrderTtlSeconds = DEFAULT_TABLE_ORDER_TTL_SECONDS;
+		stopRealtimeSync();
+		pendingRealtimeResources.clear();
+	}
+
+	function stopSupport(message: string) {
+		supportStopped = true;
+		supportCabinet?.dispose();
+		supportController.abort();
+		clearSupportData();
+		supportContext = null;
+		supportName = '';
+		supportRemaining = 0;
+		sessionState = { status: 'error', message };
+	}
+
+	async function supportRpc<Result>(action: string, input: Record<string, unknown> = {}): Promise<Result> {
+		const signal = supportController.signal;
+		const session = await getSupabaseBrowserClient()?.auth.getSession();
+		if (!session?.data.session || session.error || signal.aborted) throw new Error('Потрібен вхід адміністратора.');
+		const response = await fetch(`/dashboard/api/support/${action}`, {
+			method: 'POST', cache: 'no-store', signal: AbortSignal.any([signal, AbortSignal.timeout(20000)]),
+			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.data.session.access_token}` },
+			body: JSON.stringify(input)
+		});
+		if (!response.ok) throw new Error('Доступ до клієнта не підтверджено або сервер підтримки недоступний.');
+		const result: Result = await response.json();
+		if (signal.aborted || destroyed) throw new DOMException('Stale request', 'AbortError');
+		return result;
+	}
+
+	async function restoreSupport() {
+		if (supportRefreshPending || supportSettingsSaving || supportStopped || destroyed) return;
+		supportRefreshPending = true;
+		try {
+			if (!supportCabinet) {
+				const result = await getSupabaseBrowserClient()?.auth.getSession();
+				const actor = result?.data.session?.user;
+				if (!actor || result?.error || destroyed || supportStopped) throw new Error('Потрібен вхід адміністратора.');
+				supportCabinet = createSupportCabinet(supportRpc, { id: actor.id, email: actor.email ?? null, fullName: null }, Date.now,
+					async (change) => window.confirm([
+						supportName,
+						change.context.workspace === 'live' ? 'Змінити реальні налаштування клієнта?' : 'Змінити налаштування пісочниці?',
+						`Час активності столика: ${(change.previousSeconds ?? DEFAULT_TABLE_ORDER_TTL_SECONDS) / 60} хв → ${change.nextSeconds / 60} хв`
+					].join('\n')),
+					async (change) => window.confirm([
+						supportName,
+						change.context.workspace === 'live' ? 'Змінити реальні дані клієнта?' : 'Змінити дані пісочниці?',
+						({
+							'settings.business.save': 'Зберегти налаштування та правила рахунків клієнта',
+							'templates.create': 'Створити шаблон клієнта',
+							'templates.update': 'Оновити шаблон клієнта',
+							'templates.delete': 'Видалити шаблон клієнта',
+							'templates.default': 'Обрати шаблон клієнта за замовчуванням',
+							'structure.merchant.rename': 'Назва бізнесу',
+							'structure.entity.create': 'Створення юридичної особи',
+							'structure.entity.update': 'Зміна реквізитів',
+							'structure.entity.delete': 'Видалення юридичної особи',
+							'structure.terminal.create': 'Створення робочого місця',
+							'structure.terminal.update': 'Зміна робочого місця',
+							'structure.terminal.delete': 'Видалення робочого місця',
+							'invoice.fixed.create': 'Створити реальний рахунок клієнта',
+							'invoice.create': 'Створити реальний рахунок клієнта'
+						} as Record<string, string>)[change.action],
+						...Object.entries(change.fields).filter(([key]) => key !== 'before').map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value, null, 2) : value}`)
+					].join('\n')));
+				const repository = supportCabinet.settingsRepository;
+				const templates = supportCabinet.templateRepository;
+				async function templateMutation<Result>(operation: () => Promise<Result>): Promise<Result> {
+					if (supportRefreshPending || supportSettingsSaving || supportStopped) throw new Error('Дочекайтеся оновлення доступу.');
+					supportSettingsSaving = true;
+					try { return await operation(); }
+					finally { supportSettingsSaving = false; }
+				}
+				supportTemplateRepository = {
+					list: (scope) => templates.list(scope),
+					create: (scope, input) => templateMutation(() => templates.create(scope, input)),
+					update: (scope, id, input) => templateMutation(() => templates.update(scope, id, input)),
+					remove: (scope, id) => templateMutation(() => templates.remove(scope, id)),
+					setDefault: (scope, id) => templateMutation(() => templates.setDefault(scope, id))
+				};
+				supportSettingsRepository = {
+					load: (scope) => repository.load(scope),
+					async save(scope, draft, baseline, revision) {
+						if (supportRefreshPending || supportSettingsSaving || supportStopped) throw new Error('Дочекайтеся оновлення доступу.');
+						supportSettingsSaving = true;
+						try { return await repository.save(scope, draft, baseline, revision); }
+						finally { supportSettingsSaving = false; }
+					}
+				};
+			}
+			const state = await supportCabinet.gateway.restore();
+			if (destroyed || supportStopped || state.status !== 'ready' || !state.support) return;
+			const settings = await supportCabinet.gateway.getMerchantSettings(state.merchant.id);
+			const structure = ['structure', 'invoice-rules', 'payment-methods', 'checkout-templates'].includes(view)
+				? await supportCabinet.gateway.getBusinessStructure(state.user.id)
+				: view === 'invoice-create' ? await supportCabinet.getInvoiceCreateStructure() : null;
+			const invoiceScenarios = view === 'invoice-create' ? await supportCabinet.getInvoiceScenarios() : [];
+			const invoiceSettings = view === 'invoice-create' ? await supportCabinet.getInvoiceSettings() : null;
+			const customerInvoices = view === 'invoices' ? await supportCabinet.gateway.listInvoices(state.merchant.id) : null;
+			const customerInvoice = view === 'invoice' && invoiceId
+				? await supportCabinet.gateway.getInvoice(state.merchant.id, invoiceId) : null;
+			if (destroyed || supportStopped) return;
+			if (customerInvoices) invoices = customerInvoices;
+			if (view === 'invoice') invoices = customerInvoice ? [customerInvoice] : [];
+			supportInvoiceScenarios = invoiceScenarios;
+			supportInvoiceAvailable = invoiceScenarios.length > 0;
+			supportInvoiceSettings = invoiceSettings;
+			if (structure) structureData = structure;
+			else if (view === 'invoice-create') structureData = { entities: [], terminals: [] };
+			tableOrderTtlSeconds = settings.tableOrderTtlSeconds;
+			gateway = supportCabinet.gateway;
+			supportContext = state.support;
+			supportName = state.merchant.displayName;
+			supportRemaining = Math.max(0, Math.ceil((Date.parse(state.support.expiresAt) - Date.now()) / 1000));
+			sessionState = state;
+		} catch (error) {
+			if (!destroyed && !supportStopped) stopSupport(error instanceof Error ? error.message : 'Доступ не підтверджено.');
+		} finally { supportRefreshPending = false; }
+	}
+
+	async function exitSupport() {
+		if (supportExiting) return;
+		supportExiting = true;
+		supportError = '';
+		stopSupport('Завершення доступу до клієнта.');
+		supportController = new AbortController();
+		try {
+			if (supportCabinet) await supportCabinet.end();
+			sessionStorage.removeItem(SUPPORT_CABINET_MARKER);
+			window.location.replace('/dashboard/support');
+		} catch {
+			supportError = 'Не вдалося підтвердити вихід на сервері. Дані очищено; повторіть вихід.';
+			supportExiting = false;
 		}
 	}
 	let gateway = $state<ReturnType<typeof getDashboardGateway>>(null);
@@ -175,6 +348,7 @@
 	let selectedInvoice = $derived(invoices.find((invoice) => invoice.id === invoiceId));
 
 	async function restore(showLoading = sessionState.status !== 'ready') {
+		if (supportMode) { await restoreSupport(); return; }
 		if (showLoading) sessionState = { status: 'loading' };
 
 		if (new URLSearchParams(window.location.search).get('demo') === '1') {
@@ -495,6 +669,7 @@
 	}
 
 	async function signOut() {
+		if (supportMode) { await exitSupport(); return; }
 		stopRealtimeSync();
 		cachedSessionState = null;
 		cachedTableOrderTtlSeconds = DEFAULT_TABLE_ORDER_TTL_SECONDS;
@@ -515,7 +690,19 @@
 
 	async function createInvoice(input: import('./types').InvoiceCreateInput) {
 		if (!gateway) throw new Error('Dashboard API недоступний.');
-		return gateway.createInvoice(input);
+		if (supportMode && (supportRefreshPending || supportSettingsSaving || supportStopped)) {
+			throw new Error('Дочекайтеся перевірки доступу до клієнта.');
+		}
+		supportSettingsSaving = supportMode;
+		try {
+			const result = await gateway.createInvoice(input);
+			if (supportMode) {
+				const supportReceipt = supportCabinet?.getCreatedInvoice();
+				if (destroyed || supportStopped || !supportReceipt || supportReceipt.id !== result.id) throw new Error('Контекст підтримки завершено.');
+				return { ...result, supportReceipt };
+			}
+			return result;
+		} finally { supportSettingsSaving = false; }
 	}
 
 	async function loadTelegramInvoices() {
@@ -586,11 +773,18 @@
 			return;
 		}
 		if (!gateway) throw new Error('Dashboard API недоступний.');
-		await gateway.saveMerchantSettings(sessionState.merchant.id, {
-			tableOrderTtlSeconds: nextTableOrderTtlSeconds
-		});
-		tableOrderTtlSeconds = nextTableOrderTtlSeconds;
-		cachedTableOrderTtlSeconds = nextTableOrderTtlSeconds;
+		if (supportMode && (supportRefreshPending || supportSettingsSaving || supportStopped)) {
+			throw new Error('Триває перевірка доступу. Повторіть збереження.');
+		}
+		supportSettingsSaving = supportMode;
+		try {
+			await gateway.saveMerchantSettings(sessionState.merchant.id, {
+				tableOrderTtlSeconds: nextTableOrderTtlSeconds
+			});
+			if (destroyed || (supportMode && supportStopped)) return;
+			tableOrderTtlSeconds = nextTableOrderTtlSeconds;
+			if (!supportMode) cachedTableOrderTtlSeconds = nextTableOrderTtlSeconds;
+		} finally { supportSettingsSaving = false; }
 	}
 
 	async function markPosOrderPaid(orderId: string) {
@@ -605,50 +799,101 @@
 		await refreshPosBoard();
 	}
 
+	async function structureMutation(mutate: () => Promise<void>) {
+		if (supportMode && (supportRefreshPending || supportSettingsSaving || supportStopped)) {
+			throw new Error('Триває перевірка доступу. Повторіть збереження.');
+		}
+		supportSettingsSaving = supportMode;
+		try { await mutate(); } finally { supportSettingsSaving = false; }
+	}
+
 	async function updateMerchantName(name: string) {
 		if (!gateway || sessionState.status !== 'ready') throw new Error('Dashboard API недоступний.');
-		await gateway.updateMerchantName(sessionState.merchant.id, name);
+		const merchantId = sessionState.merchant.id;
+		await structureMutation(() => gateway!.updateMerchantName(merchantId, name));
 		await restore();
 	}
 
 	async function createBusinessEntity(input: BusinessEntityInput) {
 		if (!gateway || sessionState.status !== 'ready') throw new Error('Dashboard API недоступний.');
-		await gateway.createBusinessEntity(sessionState.user.id, input);
+		const userId = sessionState.user.id;
+		await structureMutation(() => gateway!.createBusinessEntity(userId, input));
 		await refreshStructure();
 	}
 
 	async function updateBusinessEntity(entityId: string, input: BusinessEntityInput) {
 		if (!gateway || sessionState.status !== 'ready') throw new Error('Dashboard API недоступний.');
-		await gateway.updateBusinessEntity(sessionState.user.id, entityId, input);
+		const userId = sessionState.user.id;
+		await structureMutation(() => gateway!.updateBusinessEntity(userId, entityId, input));
 		await refreshStructure();
 	}
 
 	async function deleteBusinessEntity(entityId: string) {
 		if (!gateway || sessionState.status !== 'ready') throw new Error('Dashboard API недоступний.');
-		await gateway.deleteBusinessEntity(sessionState.user.id, entityId);
+		const userId = sessionState.user.id;
+		await structureMutation(() => gateway!.deleteBusinessEntity(userId, entityId));
 		await refreshStructure();
 	}
 
 	async function createTerminal(input: TerminalInput) {
 		if (!gateway || sessionState.status !== 'ready') throw new Error('Dashboard API недоступний.');
-		await gateway.createTerminal(sessionState.user.id, input);
+		const userId = sessionState.user.id;
+		await structureMutation(() => gateway!.createTerminal(userId, input));
 		await refreshStructure();
 	}
 
 	async function updateTerminal(terminalId: string, input: TerminalInput) {
 		if (!gateway || sessionState.status !== 'ready') throw new Error('Dashboard API недоступний.');
-		await gateway.updateTerminal(sessionState.user.id, terminalId, input);
+		const userId = sessionState.user.id;
+		await structureMutation(() => gateway!.updateTerminal(userId, terminalId, input));
 		await refreshStructure();
 	}
 
 	async function deleteTerminal(terminalId: string) {
 		if (!gateway || sessionState.status !== 'ready') throw new Error('Dashboard API недоступний.');
-		await gateway.deleteTerminal(sessionState.user.id, terminalId);
+		const userId = sessionState.user.id;
+		await structureMutation(() => gateway!.deleteTerminal(userId, terminalId));
 		await refreshStructure();
 	}
 
 	onMount(() => {
 		destroyed = false;
+		supportMode = sessionStorage.getItem(SUPPORT_CABINET_MARKER) === '1';
+		if (supportMode) {
+			clearSupportData();
+			let authIdentity: string | undefined;
+			const auth = getSupabaseBrowserClient()?.auth.onAuthStateChange((event, session) => {
+				let identity: string | undefined;
+				try {
+					const payload = JSON.parse(atob(session!.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+					if (typeof payload.session_id === 'string') identity = `${session!.user.id}:${payload.session_id}`;
+				} catch { identity = undefined; }
+				if (event === 'SIGNED_OUT' || !identity || (authIdentity && identity !== authIdentity)) {
+					stopSupport('Сесію адміністратора змінено. Поверніться до підтримки.');
+				}
+				authIdentity ??= identity;
+			});
+			void restoreSupport();
+			const expiry = setInterval(() => {
+				if (!supportContext || supportStopped) return;
+				supportRemaining = Math.max(0, Math.ceil((Date.parse(supportContext.expiresAt) - Date.now()) / 1000));
+				if (!supportRemaining) stopSupport('Строк доступу до кабінету клієнта завершився.');
+			}, 1000);
+			const validation = setInterval(() => { void restoreSupport(); }, 15000);
+			const revalidate = () => { if (!document.hidden) void restoreSupport(); };
+			document.addEventListener('visibilitychange', revalidate);
+			return () => {
+				destroyed = true;
+				supportCabinet?.dispose();
+				supportController.abort();
+				clearSupportData();
+				clearInterval(expiry);
+				clearInterval(validation);
+				auth?.data.subscription.unsubscribe();
+				document.removeEventListener('visibilitychange', revalidate);
+			};
+		}
+		sessionState = cachedSessionState ?? { status: 'loading' };
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 		void preloadActiveView();
 		startAuthSync();
@@ -663,6 +908,7 @@
 	});
 
 	$effect(() => {
+		if (supportMode) return;
 		const currentInvoiceId = invoiceId;
 		if (currentInvoiceId === lastInvoiceId) return;
 		lastInvoiceId = currentInvoiceId;
@@ -674,6 +920,12 @@
 	});
 </script>
 
+{#snippet supportBanner()}
+	<SupportCabinetBanner context={supportContext} name={supportName} remaining={supportRemaining} busy={supportExiting} error={supportError} onExit={() => void exitSupport()} />
+{/snippet}
+
+{#if supportMode && sessionState.status !== 'ready'}{@render supportBanner()}{/if}
+
 {#if sessionState.status === 'loading'}
 	<DashboardStateScreen loading />
 {:else if sessionState.status === 'configuration-required'}
@@ -681,11 +933,12 @@
 {:else if sessionState.status === 'guest'}
 	<DashboardLogin onGoogleLogin={loginWithGoogle} />
 {:else if sessionState.status === 'onboarding'}
-	<MerchantOnboarding user={sessionState.user} onComplete={completeOnboarding} />
+	<MerchantOnboarding user={sessionState.user} onComplete={completeOnboarding} onSignOut={signOut} />
 {:else if sessionState.status === 'error'}
 	<DashboardStateScreen message={sessionState.message} onRetry={restore} />
 {:else}
 	<DashboardShell
+		supportBanner={supportMode ? supportBanner : undefined}
 		merchantName={sessionState.snapshot.merchantName}
 		activeSection={view === 'overview'
 			? 'overview'
@@ -718,10 +971,19 @@
 		onCancelAttentionInvoice={cancelInvoice}
 		onSignOut={signOut}
 	>
-		{#if sessionState.user.id !== 'demo-user'}
+		{#if !supportMode && sessionState.user.id !== 'demo-user'}
 			<InvoiceReadinessNotice scope={readinessScope} issues={readinessIssues} error={readinessError} pending={readinessPending} onCheck={() => void checkInvoiceReadiness()} />
 		{/if}
-		{#if view === 'overview' && contentLoading}
+		{#if supportMode && (!supportSettingsRepository || !['overview', 'settings', 'structure', 'invoice-create', 'invoices', 'invoice', 'invoice-rules', 'payment-methods', 'checkout-templates'].includes(view))}
+			<section class="mx-auto max-w-lg py-12 text-center" aria-labelledby="support-section-title">
+				<h1 id="support-section-title" class="text-xl font-semibold">Розділ недоступний у режимі підтримки</h1>
+				<p class="mt-3 text-sm text-zinc-600">Цей розділ ще не підключено до захищеного режиму підтримки. Дії клієнта заблоковано.</p>
+				<a href={resolve('/dashboard')} class="mt-6 inline-flex min-h-10 items-center gap-2 rounded-md bg-zinc-950 px-4 py-2 text-sm font-bold text-white">
+					<ArrowLeft size={16} aria-hidden="true" />
+					До огляду клієнта
+				</a>
+			</section>
+		{:else if view === 'overview' && contentLoading}
 			<DashboardStateScreen loading />
 		{:else if view === 'overview' && contentError}
 			<DashboardStateScreen message={contentError} onRetry={restore} />
@@ -732,6 +994,7 @@
 				<module.default
 					snapshot={sessionState.snapshot}
 					demo={sessionState.user.id === 'demo-user'}
+					{supportMode}
 				/>
 			{/await}
 		{:else if contentLoading}
@@ -769,7 +1032,8 @@
 			{:then module}
 				<module.default
 					{invoices}
-					onCancel={cancelInvoice}
+					{supportMode}
+					onCancel={supportMode ? undefined : cancelInvoice}
 					onInvoicePaid={(invoiceId, bankCode) => {
 						const inv = invoices.find((i) => i.id === invoiceId);
 						if (inv) {
@@ -787,10 +1051,13 @@
 				<DashboardStateScreen loading />
 			{:then module}
 				<module.default
-					terminals={posBoard.terminals}
+					{supportMode}
+					supportSettings={supportInvoiceSettings}
+					{supportInvoiceScenarios}
+					terminals={supportMode ? structureData.terminals : posBoard.terminals}
 					entities={structureData.entities}
 					businessContext={{ userId: sessionState.user.id, merchantId: sessionState.merchant.id, name: sessionState.merchant.displayName }}
-					onCreate={createInvoice}
+					onCreate={supportMode && !supportInvoiceAvailable ? undefined : createInvoice}
 					demo={sessionState.user.id === 'demo-user'}
 				/>
 			{/await}
@@ -800,20 +1067,22 @@
 			{/await}
 		{:else if view === 'invoice-rules'}
 			{#await loadBusinessSettingsWorkspace() then module}
-				{#key `${sessionState.user.id}:${sessionState.merchant.id}`}
-					<module.default merchant={sessionState.merchant} entities={structureData.entities} userId={sessionState.user.id} demo={sessionState.user.id === 'demo-user'} view="invoice-rules" />
+				{#key `${sessionState.user.id}:${sessionState.merchant.id}:${supportContext?.id ?? ''}`}
+					<module.default merchant={sessionState.merchant} entities={structureData.entities} userId={sessionState.user.id} demo={sessionState.user.id === 'demo-user'} repository={supportMode ? supportSettingsRepository! : undefined} supportWorkspace={supportContext?.workspace ?? null} view="invoice-rules" />
 				{/key}
 			{/await}
 		{:else if view === 'payment-methods'}
 			{#await loadBusinessSettingsWorkspace() then module}
-				{#key `${sessionState.user.id}:${sessionState.merchant.id}`}
-					<module.default merchant={sessionState.merchant} entities={structureData.entities} userId={sessionState.user.id} demo={sessionState.user.id === 'demo-user'} view="payment-methods" />
+				{#key `${sessionState.user.id}:${sessionState.merchant.id}:${supportContext?.id ?? ''}`}
+					<module.default merchant={sessionState.merchant} entities={structureData.entities} userId={sessionState.user.id} demo={sessionState.user.id === 'demo-user'} repository={supportMode ? supportSettingsRepository! : undefined} supportWorkspace={supportContext?.workspace ?? null} view="payment-methods" />
 				{/key}
 			{/await}
-			<details class="mx-auto max-w-7xl rounded-xl border border-zinc-200 p-5">
+			{#if !supportMode}
+			<details open class="mx-auto max-w-7xl rounded-xl border border-zinc-200 p-5">
 				<summary class="cursor-pointer font-bold">Картки та гаманці · інтеграції ще не активовані</summary>
 				<div class="mt-6">{#await loadPaymentMethodsSettings() then module}<module.default entities={structureData.entities} />{/await}</div>
 			</details>
+			{/if}
 		{:else if view === 'public-page'}
 			{#await loadPublicPageSettings() then module}
 				{#key `${sessionState.user.id}:${sessionState.merchant.id}`}
@@ -842,11 +1111,11 @@
 			{#await loadPaymentSandbox() then module}<module.default />{/await}
 		{:else if view === 'structure'}
 			{#await loadBusinessSettingsWorkspace() then module}
-				{#key `${sessionState.user.id}:${sessionState.merchant.id}`}
-					<module.default merchant={sessionState.merchant} entities={structureData.entities} userId={sessionState.user.id} demo={sessionState.user.id === 'demo-user'} view="structure" />
+				{#key `${sessionState.user.id}:${sessionState.merchant.id}:${supportContext?.id ?? ''}`}
+					<module.default merchant={sessionState.merchant} entities={structureData.entities} userId={sessionState.user.id} demo={sessionState.user.id === 'demo-user'} repository={supportMode ? supportSettingsRepository! : undefined} supportWorkspace={supportContext?.workspace ?? null} view="structure" />
 				{/key}
 			{/await}
-			<details class="mx-auto max-w-7xl rounded-xl border border-zinc-200 p-5">
+			<details open class="mx-auto max-w-7xl rounded-xl border border-zinc-200 p-5">
 				<summary class="cursor-pointer font-bold">Юридичні реквізити та робочі місця · керування записами</summary>
 				<div class="mt-6">
 			{#await loadBusinessStructure()}
@@ -856,6 +1125,7 @@
 					merchant={sessionState.merchant}
 					initialEntities={structureData.entities}
 					initialTerminals={structureData.terminals}
+					{supportMode}
 					onUpdateMerchantName={updateMerchantName}
 					onCreateEntity={createBusinessEntity}
 					onUpdateEntity={updateBusinessEntity}
@@ -869,8 +1139,8 @@
 			</details>
 		{:else if view === 'checkout-templates'}
 			{#await loadBusinessSettingsWorkspace() then module}
-				{#key `${sessionState.user.id}:${sessionState.merchant.id}`}
-					<module.default merchant={sessionState.merchant} entities={structureData.entities} userId={sessionState.user.id} demo={sessionState.user.id === 'demo-user'} view="checkout-templates" />
+				{#key `${sessionState.user.id}:${sessionState.merchant.id}:${supportContext?.id ?? ''}`}
+					<module.default merchant={sessionState.merchant} entities={structureData.entities} userId={sessionState.user.id} demo={sessionState.user.id === 'demo-user'} repository={supportMode ? supportSettingsRepository! : undefined} templateRepository={supportMode ? supportTemplateRepository! : undefined} supportWorkspace={supportContext?.workspace ?? null} view="checkout-templates" />
 				{/key}
 			{/await}
 		{:else if selectedInvoice}
@@ -879,11 +1149,12 @@
 			{:then module}
 				<module.default
 					invoice={selectedInvoice}
+					{supportMode}
 					events={invoiceEvents}
 					{eventsLoading}
 					{eventsError}
-					onEventsRetry={() => loadInvoiceEvents(selectedInvoice.id)}
-					onCancel={cancelInvoice}
+					onEventsRetry={supportMode ? undefined : () => loadInvoiceEvents(selectedInvoice.id)}
+					onCancel={supportMode ? undefined : cancelInvoice}
 					demo={sessionState.user.id === 'demo-user'}
 				/>
 			{/await}

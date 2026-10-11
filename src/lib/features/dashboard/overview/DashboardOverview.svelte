@@ -5,7 +5,7 @@
 	import MetricCard from '../components/MetricCard.svelte';
 	import RecentInvoices from '../components/RecentInvoices.svelte';
 
-	let { snapshot, demo = false }: { snapshot: OverviewSnapshot; demo?: boolean } = $props();
+	let { snapshot, demo = false, supportMode = false }: { snapshot: OverviewSnapshot; demo?: boolean; supportMode?: boolean } = $props();
 </script>
 
 <div class="space-y-6">
@@ -15,13 +15,13 @@
 			<h1 class="mt-2 text-2xl font-semibold text-zinc-950 sm:text-3xl">Фінансовий огляд</h1>
 			<p class="mt-2 text-sm text-zinc-500">Платежі та операційний стан бізнесу сьогодні.</p>
 		</div>
-		<a
+		{#if !supportMode}<a
 			href={resolve(demo ? '/dashboard/invoices/new?demo=1' : '/dashboard/invoices/new')}
 			class="inline-flex h-10 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
 		>
 			<Plus size={16} aria-hidden="true" />
 			Новий рахунок
-		</a>
+		</a>{/if}
 	</section>
 
 	{#if demo}
@@ -45,5 +45,5 @@
 		{/each}
 	</section>
 
-	<RecentInvoices invoices={snapshot.recentInvoices} {demo} />
+	<RecentInvoices invoices={snapshot.recentInvoices} {demo} {supportMode} />
 </div>

@@ -13,6 +13,7 @@ import {
 import { handleInvoiceImageGet } from './invoice-image.ts';
 import { handleMerchantApiKey } from './merchant-api-key.ts';
 import { handleBankLogoProxy } from './bank-logo-proxy.ts';
+import { handleMerchantOnboarding } from './merchant-onboarding.ts';
 
 interface Env extends TelegramInvoiceEnv, MerchantTelegramInvoiceEnv {
 	ASSETS: Fetcher;
@@ -87,19 +88,30 @@ async function persistedRpcRow(response: Response): Promise<Record<string, unkno
 	if (!response.ok) {
 		if (response.status === 400) {
 			const error: unknown = await response.clone().json().catch(() => null);
-			if (
-				error && typeof error === 'object' && !Array.isArray(error) &&
-				'code' in error && 'message' in error &&
-				error.code === '22023' && error.message === 'Invoice payment settings are not configured'
-			) {
-				return jsonResponse({ error: 'Налаштуйте платіжні реквізити компанії в особистому кабінеті.' }, 422);
-			}
-			if (
-				error && typeof error === 'object' && !Array.isArray(error) &&
-				'code' in error && 'message' in error &&
-				error.code === '22023' && error.message === 'Invoice payment settings are incomplete'
-			) {
-				return jsonResponse({ error: 'Реквізити отримувача заповнені некоректно. Перевірте назву, IBAN, податковий номер і призначення платежу' }, 422);
+			if (error && typeof error === 'object' && !Array.isArray(error) && 'code' in error && error.code === '22023') {
+				const message = 'message' in error && typeof error.message === 'string' ? error.message : '';
+				if (message === 'Invoice payment settings are not configured') {
+					return jsonResponse({ error: 'Налаштуйте платіжні реквізити компанії в особистому кабінеті.' }, 422);
+				}
+				if (message === 'Invoice payment settings are incomplete') {
+					return jsonResponse({ error: 'Реквізити отримувача заповнені некоректно. Перевірте назву, IBAN, податковий номер і призначення платежу' }, 422);
+				}
+				if (message === 'Invoice seller settings are not configured') {
+					return jsonResponse({ error: 'Налаштуйте реквізити та правила продавця в особистому кабінеті.' }, 422);
+				}
+				if (message === 'Invoice VAT status is not configured') {
+					return jsonResponse({ error: 'Вкажіть статус платника ПДВ продавця в особистому кабінеті.' }, 422);
+				}
+				if (message === 'Invalid invoice terminal or seller') {
+					return jsonResponse({ error: 'Не обрано продавця або робоче місце для рахунку.' }, 422);
+				}
+				if (message === 'Invalid invoice input') {
+					return jsonResponse({ error: 'Некоректні параметри або сума рахунку.' }, 422);
+				}
+				if (message === 'Invalid support invoice fields') {
+					return jsonResponse({ error: 'Некоректні поля створення рахунку.' }, 422);
+				}
+				return jsonResponse({ error: 'Некоректні або неповні параметри рахунку. Перевірте налаштування в кабінеті.' }, 422);
 			}
 		}
 		return persistenceError(response.status);
@@ -683,42 +695,10 @@ export async function routeWebRequest(request: Request, env: Env, ctx: Execution
 
 	if (url.pathname === '/api/v1/merchant/onboarding') {
 		if (request.method === 'POST') {
-			const authHeader = bearerHeader(request);
-			if (!authHeader) return persistenceError(401);
-			try {
-				const body = (await request.json()) as Record<string, unknown>;
-				const supabaseUrl = 'https://mwaeazabpvbxqfrceogr.supabase.co';
-				const supabaseAnonKey = 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk';
-				const merchantPayload = {
-					business_name: String(body.business_name || body.name || 'ФОП ДМИТРИШЕН').trim(),
-					business_type: String(body.business_type || 'fop'),
-					tax_id: String(body.tax_id || '11212121212').trim(),
-					iban: String(body.iban || 'UA12345678987654321345562').replace(/\s+/g, '').toUpperCase(),
-					display_name: String(body.display_name || body.business_name || 'BARCODE').trim(),
-					bank_name: String(body.bank_name || 'А-Банк').trim(),
-					onboarding_completed: true,
-					updated_at: new Date().toISOString()
-				};
-				try {
-					const res = await fetch(`${supabaseUrl}/rest/v1/merchants`, {
-						method: 'POST',
-						headers: {
-							apikey: supabaseAnonKey,
-							Authorization: authHeader,
-							'Content-Type': 'application/json',
-							Prefer: 'resolution=merge-duplicates,return=representation'
-						},
-						body: JSON.stringify(merchantPayload)
-					});
-					const merchant = await persistedRow(res);
-					if (merchant instanceof Response) return merchant;
-					return jsonResponse({ success: true, merchant });
-				} catch {
-					return persistenceError();
-				}
-			} catch {
-				return jsonResponse({ error: 'Invalid JSON payload' }, 400);
-			}
+			return handleMerchantOnboarding(request, {
+				url: env.SUPABASE_URL || 'https://mwaeazabpvbxqfrceogr.supabase.co',
+				publishableKey: env.SUPABASE_ANON_KEY || 'sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk'
+			});
 		}
 	}
 

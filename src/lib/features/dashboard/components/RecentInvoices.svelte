@@ -5,7 +5,7 @@
 	import { formatInvoiceDate, formatMoney } from '../utils/format';
 	import StatusBadge from './StatusBadge.svelte';
 
-	let { invoices, demo = false }: { invoices: InvoiceSummary[]; demo?: boolean } = $props();
+	let { invoices, demo = false, supportMode = false }: { invoices: InvoiceSummary[]; demo?: boolean; supportMode?: boolean } = $props();
 </script>
 
 <section
@@ -22,13 +22,13 @@
 			</div>
 			<p class="mt-1 text-xs text-zinc-500">Моніторинг оплат у реальному часі</p>
 		</div>
-		<a
+		{#if !supportMode}<a
 			href={resolve(demo ? '/dashboard/invoices?demo=1' : '/dashboard/invoices')}
 			class="inline-flex h-9 items-center gap-2 rounded-md border border-zinc-200 px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-50"
 		>
 			Усі рахунки
 			<ArrowRight size={14} aria-hidden="true" />
-		</a>
+		</a>{/if}
 	</header>
 
 	{#if invoices.length === 0}

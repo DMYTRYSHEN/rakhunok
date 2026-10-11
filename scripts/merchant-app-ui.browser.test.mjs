@@ -8,7 +8,7 @@ const fixture = `
 const user = { id: 'synthetic-user', email: 'cashier@example.test', identities: [] };
 const merchant = { id: 'synthetic-merchant', name: 'Studio Market' };
 const entities = [{ id: 'entity', name: 'Studio Market long company name for responsive verification' }, { id: 'second-entity', name: 'Second Company' }];
-const terminals = [{ id: 'terminal', name: 'Terrace long terminal name', code: 'T01', type: 'table', entityId: 'entity' }];
+const terminals = [{ id: 'terminal', name: 'Terrace long terminal name', code: '57g66j', type: 'table', entityId: 'entity' }];
 if (new URL(location.href).searchParams.has('creation-check')) terminals.push({ id: 'numeric-terminal', name: 'Numeric terminal', code: '7', type: 'table', entityId: 'entity' });
 const orders = [{ id: 'fixture-order', amount: 1234.56, status: 'paid', createdAt: new Date().toISOString(), orderNumber: 'TEST-001', type: 'fixed', shareUrl: '/pay/fixture-order' }];
 if (new URL(location.href).searchParams.has('invoice-dialogs')) orders.push(...[
@@ -22,6 +22,7 @@ export async function getAuthGateway() { return {
 }; }
 export async function getMerchantDataGateway() { return {
   getStructure: async () => ({entities, terminals}), listOrders: async () => orders,
+  getTableOrderTtlSeconds: async () => 900,
   subscribeOrders: () => () => {}, createOrder: async input => {
     (window.__createdOrders ??= []).push(input);
     if (!window.__allowSyntheticCreation) throw new Error('Synthetic preview: creation disabled');
@@ -45,7 +46,7 @@ test('Merchant App creation preserves scenario payloads and displays failures', 
     await page.goto(`${origin}/app/?creation-check`);
     await page.getByRole('combobox', {name:'Компанія',exact:true}).selectOption('second-entity');
     for (const [scenario, type, terminalId, tableNumber] of [
-      ['Стіл', 'table', 'terminal', 30],
+      ['Стіл', 'table', 'terminal', 57],
       ['Стіл', 'table', 'numeric-terminal', 7],
       ['Фіксована', 'fixed', undefined, undefined],
       ['Вільна сума', 'open_amount', undefined, undefined]
@@ -53,14 +54,7 @@ test('Merchant App creation preserves scenario payloads and displays failures', 
       await page.getByRole('radio', {name:scenario,exact:true}).click();
       if (terminalId) {
         await page.locator('.table-select select').selectOption(terminalId);
-        if (terminalId === 'terminal') {
-          const input = page.getByRole('textbox', {name:'Номер столу',exact:true});
-          for (const invalid of ['', '30chairs', '1.5', '-1', '2147483648']) {
-            await input.fill(invalid);
-            assert.equal(await page.locator('.dock-pay-btn').isDisabled(), true);
-          }
-          await input.fill('30');
-        } else assert.equal(await page.locator('.table-number-field').count(), 0);
+        assert.equal(await page.locator('.table-number-field').count(), 0);
       }
       if (type !== 'open_amount') {
         await page.getByRole('button', {name:'Очистити суму',exact:true}).click();
@@ -76,6 +70,14 @@ test('Merchant App creation preserves scenario payloads and displays failures', 
       assert.equal(payload.terminalId, terminalId);
       assert.equal(payload.tableNumber, tableNumber);
       assert.equal(payload.merchantId, 'synthetic-merchant');
+      if (terminalId) {
+        const code = terminalId === 'terminal' ? '57g66j' : '7';
+        assert.equal(payload.orderNumber, code);
+        assert.equal(payload.title, `POS Стіл (${code})`);
+        assert.equal(payload.status, 'pending');
+        assert.ok(Math.abs(Date.parse(payload.expiresAt) - Date.now() - 900000) < 10000);
+        assert.equal(payload.description, undefined);
+      }
       await page.keyboard.press('Escape');
       await page.locator('.liquid-card').waitFor({state:'detached'});
     }
@@ -116,13 +118,8 @@ test('Merchant App responsive navigation, themes, amounts and payment preview', 
     assert.equal(await page.locator('.header-company select').count(), 0);
     assert.match(await page.locator('.header-company strong').textContent(), /^Studio Market/);
     await page.getByRole('button', {name:'1',exact:true}).click();
-    assert.equal(await page.locator('.dock-pay-btn').isDisabled(), true);
     const tableNumberInput = page.getByRole('textbox', {name:'Номер столу',exact:true});
-    assert.equal(await tableNumberInput.inputValue(), '');
-    await tableNumberInput.fill('30chairs');
-    assert.equal(await tableNumberInput.getAttribute('aria-invalid'), 'true');
-    assert.equal(await page.locator('.dock-pay-btn').isDisabled(), true);
-    await tableNumberInput.fill('30');
+    assert.equal(await tableNumberInput.count(), 0);
     assert.equal(await page.getByRole('button', {name:'Створити рахунок',exact:true}).isEnabled(), true);
     await page.getByRole('radio', {name:'Фіксована',exact:true}).click();
     assert.equal(await tableNumberInput.count(), 0);
@@ -383,7 +380,6 @@ test('Merchant App responsive navigation, themes, amounts and payment preview', 
         for (const scenario of ['Фіксована','Стіл','Вільна сума']) {
           await page.getByRole('button', {name:'Каса',exact:true}).click();
           await page.getByRole('radio', {name:scenario,exact:true}).click();
-          if (scenario === 'Стіл') await page.getByRole('textbox', {name:'Номер столу',exact:true}).fill('30');
           if (scenario !== 'Вільна сума') {
             await page.getByRole('button', {name:'Очистити суму',exact:true}).click();
             for (const digit of ['1','2','5','0']) await page.getByRole('button', {name:digit,exact:true}).click();
@@ -401,6 +397,13 @@ test('Merchant App responsive navigation, themes, amounts and payment preview', 
         for (let orderIndex = 0; orderIndex < 4; orderIndex++) {
           await rows.nth(orderIndex).click();
           const dialog = await verifyInvoiceDialog(viewport, 'Рахунок');
+          if (viewport.width === 375 && viewport.height === 667) {
+            const details = await dialog.locator('.invoice-details').evaluate(element => ({
+              visible: element.clientHeight,
+              content: element.scrollHeight
+            }));
+            assert.equal(details.content <= details.visible + 1, true, `Invoice fits without scrolling: ${JSON.stringify({theme, orderIndex, details})}`);
+          }
           const qr = dialog.locator('.qr-wrapper');
           if (await qr.count()) {
             await qr.scrollIntoViewIfNeeded();

@@ -55,5 +55,5 @@ export async function getMerchantDataGateway(): Promise<MerchantDataGateway | nu
 	if (dataGateway !== undefined) return dataGateway;
 	const client = getBrowserClient();
 	if (!client) return (dataGateway = null);
-	return (dataGateway = createMerchantDataGateway(client, fetch, import.meta.env.DEV ? '' : '/app'));
+	return (dataGateway = createMerchantDataGateway(client, fetch, '/app'));
 }

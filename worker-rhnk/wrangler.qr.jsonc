@@ -1,0 +1,13 @@
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "rhnk-qr",
+	"main": "../apps/qr/src/index.ts",
+	"compatibility_date": "2026-08-28",
+	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": false,
+	"observability": { "enabled": false },
+	"routes": [
+		{ "pattern": "qr.rhnk.pp.ua", "custom_domain": true },
+		{ "pattern": "qr.rhnk.pp.ua/*", "zone_name": "rhnk.pp.ua" }
+	]
+}

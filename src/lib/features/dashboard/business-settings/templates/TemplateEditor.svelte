@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { CheckoutTemplate, TemplateCreateInput } from '../../types';
-	import { createTemplate, updateTemplate } from '../../templates/template-repository';
+	import { templateRepository, type TemplateRepository } from '../../templates/template-repository';
 	import CheckoutConfigEditor from '../../templates/CheckoutConfigEditor.svelte';
 	import CheckoutTemplatePreview from './CheckoutTemplatePreview.svelte';
 	import {
@@ -20,12 +20,14 @@
 	let {
 		merchantId,
 		demo = false,
+		repository = templateRepository,
 		template = null,
 		onSave,
 		onCancel
 	}: {
 		merchantId: string;
 		demo?: boolean;
+		repository?: TemplateRepository;
 		template?: CheckoutTemplate | null;
 		onSave: (t: CheckoutTemplate) => void;
 		onCancel: () => void;
@@ -148,9 +150,9 @@
 
 			let saved: CheckoutTemplate;
 			if (template) {
-				saved = await updateTemplate(merchantId, template.id, input, demo);
+				saved = await repository.update({ merchantId, demo }, template.id, input);
 			} else {
-				saved = await createTemplate(merchantId, input, demo);
+				saved = await repository.create({ merchantId, demo }, input);
 			}
 			onSave(saved);
 		} catch (err: unknown) {

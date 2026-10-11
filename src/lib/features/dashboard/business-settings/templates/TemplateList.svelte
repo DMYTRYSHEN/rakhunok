@@ -2,14 +2,17 @@
 	import { onMount } from 'svelte';
 	import type { CheckoutTemplate } from '../../types';
 	import {
-		listTemplates,
-		deleteTemplate,
-		setDefaultTemplate
+		templateRepository,
+		type TemplateRepository
 	} from '../../templates/template-repository';
 	import { getScenarioCapability } from '../../templates/scenario-capabilities';
 	import TemplateEditor from './TemplateEditor.svelte';
 
-	let { merchantId, demo = false }: { merchantId: string; demo?: boolean } = $props();
+	let { merchantId, demo = false, repository = templateRepository }: {
+		merchantId: string;
+		demo?: boolean;
+		repository?: TemplateRepository;
+	} = $props();
 
 	let templates = $state<CheckoutTemplate[]>([]);
 	let loading = $state(true);
@@ -38,7 +41,7 @@
 		loading = true;
 		error = null;
 		try {
-			templates = await listTemplates(merchantId, demo);
+			templates = await repository.list({ merchantId, demo });
 		} catch (cause: unknown) {
 			error = cause instanceof Error ? cause.message : 'Не вдалося завантажити шаблони.';
 		} finally {
@@ -61,8 +64,8 @@
 		mutationId = id;
 		error = null;
 		try {
-			await deleteTemplate(merchantId, id, demo);
-			templates = templates.filter((t) => t.id !== id);
+			await repository.remove({ merchantId, demo }, id);
+			await load();
 		} catch (cause: unknown) {
 			error = cause instanceof Error ? cause.message : 'Не вдалося видалити шаблон.';
 		} finally {
@@ -75,7 +78,7 @@
 		mutationId = id;
 		error = null;
 		try {
-			await setDefaultTemplate(merchantId, id, demo);
+			await repository.setDefault({ merchantId, demo }, id);
 			await load();
 		} catch (cause: unknown) {
 			error =
@@ -85,7 +88,7 @@
 		}
 	}
 
-	function onEditorSave(saved: CheckoutTemplate) {
+	async function onEditorSave(saved: CheckoutTemplate) {
 		templates = [
 			saved,
 			...templates
@@ -94,6 +97,7 @@
 		];
 		editorOpen = false;
 		editingTemplate = null;
+		await load();
 	}
 </script>
 
@@ -220,6 +224,7 @@
 	<TemplateEditor
 		{merchantId}
 		{demo}
+		{repository}
 		template={editingTemplate}
 		onSave={onEditorSave}
 		onCancel={() => (editorOpen = false)}

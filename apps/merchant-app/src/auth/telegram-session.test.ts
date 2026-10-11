@@ -29,7 +29,7 @@ describe('Telegram supported Supabase sessions', () => {
 		await expect(startTelegramSession(client, 'signin', 'https://letsrealtalk.com', 'true')).rejects.toThrow('provider unavailable');
 		expect(auth.linkIdentity).not.toHaveBeenCalled();
 	});
-	it.each(['https://rakhunok.com', 'http://localhost:5176', 'http://10.10.10.242:5176', 'https://letsrealtalk.com.evil.test', 'https://rhnk.pp.ua.evil.test', 'http://rhnk.pp.ua'])('rejects unapproved origin %s before I/O', async (origin) => {
+	it.each(['https://rakhunok.com', 'http://localhost:5176', 'http://10.10.10.242:5176', 'https://letsrealtalk.com.evil.test', 'https://rhnk.pp.ua.evil.test', 'http://rhnk.pp.ua', 'https://rhnk.to.evil.test', 'http://rhnk.to'])('rejects unapproved origin %s before I/O', async (origin) => {
 		const { client, auth } = fixture();
 		await expect(startTelegramSession(client, 'signin', origin, 'true')).rejects.toThrow();
 		expect(auth.getSession).not.toHaveBeenCalled();
@@ -43,13 +43,14 @@ describe('Telegram supported Supabase sessions', () => {
 		expect(auth.signInWithOAuth).toHaveBeenCalledWith({ provider: 'custom:telegram', options: { redirectTo: 'https://letsrealtalk.com/app/', scopes: 'openid profile' } });
 		expect(auth.linkIdentity).not.toHaveBeenCalled();
 	});
-	it('returns new-domain sign-in and linking to the new-domain App', async () => {
+	it.each(['https://rhnk.pp.ua', 'https://rhnk.to'])('returns sign-in and linking to the approved App %s', async (origin) => {
 		const { client, auth } = fixture();
-		await startTelegramSession(client, 'signin', 'https://rhnk.pp.ua', 'true');
-		expect(auth.signInWithOAuth).toHaveBeenCalledWith({ provider: 'custom:telegram', options: { redirectTo: 'https://rhnk.pp.ua/app/', scopes: 'openid profile' } });
+		await startTelegramSession(client, 'signin', origin, 'true');
+		expect(auth.signInWithOAuth).toHaveBeenCalledWith({ provider: 'custom:telegram', options: { redirectTo: `${origin}/app/`, scopes: 'openid profile' } });
 		const linked = fixture({ user: { email: 'synthetic@example.test', is_anonymous: false } });
-		await startTelegramSession(linked.client, 'link', 'https://rhnk.pp.ua', 'true');
-		expect(linked.auth.linkIdentity).toHaveBeenCalledWith({ provider: 'custom:telegram', options: { redirectTo: 'https://rhnk.pp.ua/app/', scopes: 'openid profile' } });
+		await startTelegramSession(linked.client, 'link', origin, 'true');
+		expect(linked.auth.linkIdentity).toHaveBeenCalledWith({ provider: 'custom:telegram', options: { redirectTo: `${origin}/app/`, scopes: 'openid profile' } });
+		expect(linked.auth.signInWithOAuth).not.toHaveBeenCalled();
 	});
 	it('links existing account instead of replacing session', async () => {
 		const { client, auth } = fixture({ user: { email: 'synthetic@example.test', is_anonymous: false } });

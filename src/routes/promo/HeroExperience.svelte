@@ -41,7 +41,10 @@
 		{ name: 'Консультанти й фрилансери', icon: BriefcaseBusiness, photo: 'consulting', alt: 'Робоча зустріч із документами', line: 'Ваш досвід має цінність.', purpose: 'Консультація', amount: '1 500,00', story: 'Зустріч завершується конкретними рішеннями. Фахівець надсилає рахунок за послугу.' },
 		{ name: 'Готелі й садиби', icon: BedDouble, photo: 'hotel', alt: 'Територія готелю', line: 'Місце для нових спогадів.', purpose: 'Проживання · одна доба', amount: '2 200,00', story: 'Гість погоджує дати та умови. Адміністратор надсилає рахунок; підтвердження бронювання залишається окремим процесом.' }
 	].map((business, index) => ({ ...business, image: `/images/landing/editorial-${business.photo}.jpg`, merchant: business.name, demo: `local-${index}`, detail: business.purpose, benefit: 'Отримувач, послуга та погоджена сума перед очима клієнта.' }));
-	const businesses = [...scenarios, ...additionalBusinesses];
+	const businesses = [...scenarios, ...additionalBusinesses].map((business) => ({
+		...business,
+		image: business.image.replace('/images/landing/', '/images/landing/graded/').replace(/\.jpg$/, '.webp')
+	}));
 	const current = $derived(businesses[selected]);
 	$effect(() => {
 		if (!modalOpen) return;
@@ -179,7 +182,7 @@
 	.experience-media { position: absolute; inset: 0; overflow: hidden; z-index: -2; }
 	.experience-media img { width: 100%; height: 100%; position: absolute; inset: 0; object-fit: cover; object-position: center 48%; opacity: 0; transform: scale(1.025); transition: opacity 420ms ease, transform 900ms ease; }
 	.experience-media img.visible { opacity: 1; transform: scale(1); }
-	.experience::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgb(10 22 18 / 72%), rgb(10 22 18 / 18%) 65%), linear-gradient(0deg, rgb(10 22 18 / 62%), transparent 45%); }
+	.experience::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgb(18 18 18 / 72%), rgb(18 18 18 / 18%) 65%), linear-gradient(0deg, rgb(18 18 18 / 62%), transparent 45%); }
 	.experience-content { max-width: 1280px; margin: auto; min-height: 640px; padding: 42px 40px 22px; display: flex; flex-direction: column; justify-content: space-between; gap: 40px; box-sizing: border-box; }
 	.eyebrow { margin: 0 0 8px; font-size: 11px; font-weight: 700; }
 	.experience h1 { margin: 0; color: white; font-size: 96px; font-weight: 600; line-height: 1.08; }
@@ -223,7 +226,7 @@
 	.modal-close { position: sticky; top: 16px; margin: 16px 16px -56px auto; z-index: 2; display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: white; color: #172b24; cursor: pointer; box-shadow: 0 2px 12px #0002; }
 	.story-cover { position: relative; min-height: 380px; display: flex; align-items: end; isolation: isolate; padding: 44px; box-sizing: border-box; color: white; }
 	.story-cover > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
-	.story-cover::before { content: ''; position: absolute; inset: 0; background: linear-gradient(0deg, #102319e8, #10231900); z-index: -1; }
+	.story-cover::before { content: ''; position: absolute; inset: 0; background: linear-gradient(0deg, #121212e8, #12121200); z-index: -1; }
 	.story-cover h2 { font-size: 40px; line-height: 1.15; max-width: 650px; margin: 12px 0; text-wrap: balance; }
 	.story-cover p:last-child { max-width: 570px; font-size: 15px; line-height: 1.65; margin: 0; }
 	.story-body { padding: 44px; display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 56px; }
@@ -264,7 +267,7 @@
 	.business-tile { position: relative; border: 0; padding: 0; overflow: hidden; border-radius: 4px; background: #172b24; color: white; aspect-ratio: 4 / 5; font: inherit; text-align: left; cursor: pointer; }
 	.business-tile img { width: 100%; height: 100%; object-fit: cover; transition: transform 300ms; }
 	.business-tile:hover img { transform: scale(1.04); }
-	.tile-caption { position: absolute; inset: auto 0 0; display: flex; align-items: center; gap: 10px; padding: 40px 16px 20px; background: linear-gradient(transparent, #102319e8); }
+	.tile-caption { position: absolute; inset: auto 0 0; display: flex; align-items: center; gap: 10px; padding: 40px 16px 20px; background: linear-gradient(transparent, #121212e8); }
 	.tile-caption strong { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
 	@keyframes reveal { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 	@media (min-width: 1600px) { .experience-content { min-height: 710px; } }
@@ -272,7 +275,7 @@
 		.experience-content { padding: 30px 20px 20px; min-height: 680px; gap: 30px; }
 		.experience h1 { font-size: 62px; }
 		.experience-media img { object-position: 62% center; }
-		.experience::before { background: linear-gradient(90deg, rgb(10 22 18 / 78%), rgb(10 22 18 / 25%)), linear-gradient(0deg, rgb(10 22 18 / 55%), transparent); }
+		.experience::before { background: linear-gradient(90deg, rgb(18 18 18 / 78%), rgb(18 18 18 / 25%)), linear-gradient(0deg, rgb(18 18 18 / 55%), transparent); }
 		.experience-message { min-height: 114px; max-width: 340px; }
 		.statement { font-size: 25px; }
 		.description { font-size: 13px; max-width: 290px; }

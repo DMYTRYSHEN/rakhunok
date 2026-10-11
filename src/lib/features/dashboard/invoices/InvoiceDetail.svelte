@@ -32,6 +32,7 @@
 		eventsError = null,
 		onEventsRetry,
 		onCancel,
+		supportMode = false,
 		demo = false
 	}: {
 		invoice: InvoiceRecord;
@@ -39,10 +40,12 @@
 		eventsLoading?: boolean;
 		eventsError?: string | null;
 		onEventsRetry?: () => void;
-		onCancel: (invoiceId: string) => Promise<void>;
+		onCancel?: (invoiceId: string) => Promise<void>;
+		supportMode?: boolean;
 		demo?: boolean;
 	} = $props();
 	let copiedPath = $state<string | null>(null);
+	let copyError = $state<string | null>(null);
 	let cancelling = $state(false);
 	let cancelError = $state<string | null>(null);
 	let shareLinks = $derived(getInvoiceShareLinks(invoice));
@@ -66,7 +69,7 @@
 	};
 
 	async function forceSyncStatement() {
-		if (isCheckingWebhook) return;
+		if (supportMode || isCheckingWebhook) return;
 		isCheckingWebhook = true;
 		webhookCheckMessage = null;
 		await new Promise((r) => setTimeout(r, 900));
@@ -80,15 +83,20 @@
 
 	async function copyLink(path: string) {
 		if (!browser) return;
-		await navigator.clipboard.writeText(`${window.location.origin}${path}`);
-		copiedPath = path;
-		window.setTimeout(() => {
-			if (copiedPath === path) copiedPath = null;
-		}, 1500);
+		copyError = null;
+		try {
+			await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+			copiedPath = path;
+			window.setTimeout(() => {
+				if (copiedPath === path) copiedPath = null;
+			}, 1500);
+		} catch {
+			copyError = 'Не вдалося скопіювати посилання. Скористайтеся посиланням нижче.';
+		}
 	}
 
 	async function cancelInvoice() {
-		if (demo || cancelling || !cancellation.eligible || !confirm('Скасувати цей рахунок?')) return;
+		if (supportMode || !onCancel || demo || cancelling || !cancellation.eligible || !confirm('Скасувати цей рахунок?')) return;
 		cancelling = true;
 		cancelError = null;
 		try {
@@ -104,6 +112,7 @@
 <div class="space-y-6">
 	<a
 		href={resolve(demo ? '/dashboard/invoices?demo=1' : '/dashboard/invoices')}
+		data-sveltekit-reload={supportMode}
 		class="inline-flex items-center gap-2 text-sm font-bold text-zinc-500 hover:text-zinc-950"
 	>
 		<ArrowLeft size={16} /> До рахунків
@@ -115,7 +124,7 @@
 			<div class="mt-3"><StatusBadge status={invoice.status} /></div>
 		</div>
 		<div class="flex flex-wrap gap-2">
-			{#if cancellation.eligible}
+			{#if !supportMode && cancellation.eligible}
 				<button
 					type="button"
 					disabled={demo || cancelling}
@@ -213,12 +222,13 @@
 			</div>
 			<div class="border-t border-white/10 pt-5">
 				<h2 class="text-sm font-bold">Поділитися посиланням</h2>
+				{#if copyError}<p class="mt-2 text-sm text-red-300" role="alert">{copyError}</p>{/if}
 				<div class="mt-3 space-y-3">
 					{#each shareLinks as link (link.path)}
 						<div>
 							<p class="text-xs text-zinc-400">{link.label}</p>
 							<div class="mt-1 flex items-center gap-2">
-								<p class="min-w-0 flex-1 truncate font-mono text-xs text-[#c9ff4a]">{link.path}</p>
+								<a href={resolve(link.path as '/')} target="_blank" rel="noreferrer" class="min-w-0 flex-1 break-all font-mono text-xs text-[#c9ff4a] underline">{browser ? window.location.origin : ''}{link.path}</a>
 								<button
 									type="button"
 									aria-label={`Скопіювати: ${link.label}`}
@@ -235,6 +245,7 @@
 		</aside>
 	</div>
 
+	{#if !supportMode}
 	<!-- BANK WEBHOOK & SETTLEMENT PROOF CARD -->
 	<section
 		class="rounded-lg border border-zinc-200 bg-white p-5 sm:p-6 shadow-sm"
@@ -354,4 +365,5 @@
 	</section>
 
 	<InvoiceTimeline {events} loading={eventsLoading} error={eventsError} onRetry={onEventsRetry} />
+	{/if}
 </div>

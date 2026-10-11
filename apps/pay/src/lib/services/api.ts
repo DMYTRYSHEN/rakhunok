@@ -123,17 +123,40 @@ export async function fetchBanksCatalog(
   return banks;
 }
 
-function isSafeBankRedirect(value: unknown): value is string {
+function isSafeBankRedirect(value: unknown, secondary = false): value is string {
   if (typeof value !== 'string' || !value || /[\s\u0000-\u001f\u007f\\]/u.test(value)) return false;
   if (!/^[a-z][a-z0-9+.-]*:\/\/[^/?#]+/i.test(value)) return false;
 
   try {
     const url = new URL(value);
     if (!url.hostname || url.username || url.password || /^[^:]+:\/\/[^/?#]*@/.test(value)) return false;
-    // Allow https, valid custom schemes (e.g. p24:, izibank:, monobank:), and intent:
-    if (['http:', 'https:', 'intent:'].includes(url.protocol)) return true;
-    // Allow any custom app scheme as long as it's not javascript/data
-    if (url.protocol && !['javascript:', 'data:', 'vbscript:', 'file:'].includes(url.protocol)) return true;
+    if (url.protocol === 'https:') return true;
+    const qrPath = /^\/qr\/[a-zA-Z0-9_-]+$/;
+    if (url.protocol === 'mono:') {
+      return secondary && url.hostname === 'bank.gov.ua' && qrPath.test(url.pathname) && !url.search && !url.hash;
+    }
+    if (['izibank:', 'novapay-mobile:'].includes(url.protocol)) {
+      return url.hostname === 'bank.gov.ua' && qrPath.test(url.pathname) && !url.search && !url.hash;
+    }
+    if (url.protocol === 'intent:') {
+      if (url.hostname !== 'bank.gov.ua' || !qrPath.test(url.pathname) || url.search) return false;
+      const parts = url.hash.match(/^#Intent;(.+);end$/)?.[1].split(';');
+      if (!parts) return false;
+      const entries = parts.map((part): [string, string] => {
+        const separator = part.indexOf('=');
+        return [part.slice(0, separator), separator < 0 ? '' : part.slice(separator + 1)];
+      });
+      if (entries.some(([key, entry]) => !entry || !['scheme', 'package', 'S.browser_fallback_url'].includes(key))) return false;
+      const params = new Map(entries);
+      if (params.size !== entries.length || params.get('scheme') !== 'https') return false;
+      const packageName = params.get('package');
+      if (!['com.ftband.mono', 'ua.izibank.app', 'ua.novapay.novapaymobile'].includes(packageName || '')) return false;
+      const fallback = params.get('S.browser_fallback_url');
+      if (packageName === 'com.ftband.mono') {
+        return Boolean(fallback && decodeURIComponent(fallback) === `https://mbnk.app${url.pathname}`);
+      }
+      return !fallback || isSafeBankRedirect(decodeURIComponent(fallback)) && new URL(decodeURIComponent(fallback)).protocol === 'https:';
+    }
     return false;
   } catch {
     return false;
@@ -151,6 +174,7 @@ export async function initiateBankPayment(
     apiBase?: string;
     fetchImpl?: typeof fetch;
     merchantName?: string;
+    signal?: AbortSignal;
     merchantIban?: string;
     merchantTaxId?: string;
     purpose?: string;
@@ -161,8 +185,12 @@ export async function initiateBankPayment(
   const apiBase = options.apiBase ?? getApiBase();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const abort = () => controller.abort();
+  options.signal?.addEventListener('abort', abort, { once: true });
+  if (options.signal?.aborted) controller.abort();
 
   try {
+    if (controller.signal.aborted) return { success: false, error: 'Payment initiation cancelled' };
     const res = await fetchImpl(`${apiBase}/api/v1/checkout/${encodeURIComponent(orderId)}/initiate`, {
       method: 'POST',
       cache: 'no-store',
@@ -191,7 +219,7 @@ export async function initiateBankPayment(
     if (!isSafeBankRedirect(data.redirect_url)) {
       return { success: false, error: 'Invalid payment redirect URL' };
     }
-    if (data.fallback_url != null && !isSafeBankRedirect(data.fallback_url)) {
+    if (data.fallback_url != null && !isSafeBankRedirect(data.fallback_url, true)) {
       return { success: false, error: 'Invalid payment fallback URL' };
     }
     if (typeof data.nbu_payload_base64 === 'string' && !data.nbu_raw_string) {
@@ -208,6 +236,7 @@ export async function initiateBankPayment(
   } catch {
     return { success: false, error: controller.signal.aborted ? 'Payment initiation timed out' : 'Payment initiation request failed' };
   } finally {
+    options.signal?.removeEventListener('abort', abort);
     clearTimeout(timeoutId);
   }
 }

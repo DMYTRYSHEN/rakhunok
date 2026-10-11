@@ -29,6 +29,7 @@
 	import { hasTelegramIdentity, telegramCallbackError, telegramSessionAvailable } from './auth/telegram-session';
 	import type { TelegramStatus } from './auth/telegram-login';
 	import { MerchantApiError, type BusinessEntity, type MerchantDataGateway, type OrderSummary, type Terminal } from './data/merchant-data-gateway';
+	import { buildPosOrderInput } from './data/pos-order-input';
 	import { evaluateAmount, formatAmount } from './lib/calculator';
 	import type { VoiceCommand } from './lib/voice-command-parser';
 	import { applyPwaUpdate, isStandalone, promptInstall } from './platform/pwa';
@@ -69,7 +70,6 @@
 	let terminals = $state<Terminal[]>([]);
 	let selectedEntityId = $state('');
 	let selectedTerminalId = $state('');
-	let tableNumbers = $state<Record<string, string>>({});
 	let qrSwipeStartX = $state<number | null>(null);
 	let orders = $state<OrderSummary[]>([]);
 	let historyPeriod = $state<HistoryPeriod>('today');
@@ -112,9 +112,6 @@
 	const amountCharacters = $derived(formattedDisplay.split(''));
 	const previousCharacters = $derived(previousDisplay.padStart(formattedDisplay.length, ' ').slice(-formattedDisplay.length).split(''));
 	const selectedTerminal = $derived(terminals.find((terminal) => terminal.id === selectedTerminalId));
-	const numericTerminalCode = $derived(Boolean(selectedTerminal && /^\d+$/.test(selectedTerminal.code) && Number(selectedTerminal.code) <= 2147483647));
-	const tableNumberInput = $derived(numericTerminalCode ? selectedTerminal!.code : tableNumbers[selectedTerminalId] ?? '');
-	const tableNumber = $derived(/^\d+$/.test(tableNumberInput) && Number(tableNumberInput) <= 2147483647 ? Number(tableNumberInput) : undefined);
 	const selectedEntity = $derived(entities.find((entity) => entity.id === selectedEntityId));
 	const selectedTerminalIndex = $derived(terminals.findIndex((terminal) => terminal.id === selectedTerminalId));
 	const scenarioIndex = $derived(scenario === 'fixed' ? 0 : scenario === 'table' ? 1 : 2);
@@ -124,7 +121,7 @@
 			: undefined
 	);
 	const canPreview = $derived(
-		!pendingTerminalOrder && (scenario === 'table' ? Boolean(selectedTerminal) && tableNumber !== undefined && amount > 0 : Boolean(selectedEntity) && (scenario === 'open' || amount > 0))
+		!pendingTerminalOrder && (scenario === 'table' ? Boolean(selectedTerminal) && amount > 0 : Boolean(selectedEntity) && (scenario === 'open' || amount > 0))
 	);
 	const merchantName = $derived(authState.status === 'ready' ? authState.merchant.name : 'Моя каса');
 	const filteredOrders = $derived(orders.filter((order) => isOrderInPeriod(order, historyPeriod)));
@@ -414,7 +411,6 @@
 		terminals = [];
 		selectedEntityId = '';
 		selectedTerminalId = '';
-		tableNumbers = {};
 		orders = [];
 		historyPeriod = 'today';
 		structureLoading = false;
@@ -788,11 +784,8 @@
 	}
 
 	async function submitOrder(orderAmount: number, title?: string) {
-		if (scenario === 'table' && tableNumber === undefined) {
-			orderCreateError = 'Вкажіть цілий номер столу від 0 до 2147483647.';
-			return false;
-		}
 		if (!merchantDataGateway || authState.status !== 'ready' || orderCreating) return;
+		if (scenario === 'table' && pendingTerminalOrder) return false;
 		const gateway = merchantDataGateway;
 		const expectedUserId = authState.user.id;
 		const merchantId = authState.merchant.id;
@@ -808,17 +801,18 @@
 		orderCreateError = '';
 		const orderNumber = `APP-${Date.now().toString().slice(-8)}`;
 		try {
-			const order = await gateway.createOrder({
+			const tableOrderTtlSeconds = terminal?.type === 'table'
+				? await gateway.getTableOrderTtlSeconds(merchantId) : undefined;
+			if (!isCurrentSession()) return false;
+			const input = terminal ? buildPosOrderInput(merchantId, terminal, orderAmount, new Date(), tableOrderTtlSeconds) : {
 				type: scenario === 'open' ? 'open_amount' : scenario,
 				amount: orderAmount,
 				orderNumber,
-				title: title || (scenario === 'table' && terminal ? terminal.name : `Рахунок ${orderNumber}`),
+				title: title || `Рахунок ${orderNumber}`,
 				merchantId,
-				entityId,
-				terminalId: terminal?.id,
-				description: scenario === 'table' && terminal ? `Оплата через ${terminal.name}` : undefined,
-				tableNumber: scenario === 'table' ? tableNumber : undefined
-			}, expectedUserId, isCurrentSession);
+				entityId
+			} satisfies import('./data/merchant-data-gateway').CreateOrderInput;
+			const order = await gateway.createOrder(input, expectedUserId, isCurrentSession);
 			// Keep the dispatched outcome; only suppress writes into a newer session.
 			if (!sessionFence.isCurrent(generation)) return true;
 			orders = [order, ...orders.filter((existing) => existing.id !== order.id)];
@@ -949,12 +943,6 @@
 				</label>
 				{#if pendingTerminalOrder}
 					<div class="pending-terminal-warning">На цій точці вже є активний рахунок.</div>
-				{:else if selectedTerminal && !numericTerminalCode}
-					<label class="table-number-field">
-						<span>Номер столу</span>
-						<input aria-label="Номер столу" inputmode="numeric" pattern="[0-9]+" maxlength="10" value={tableNumberInput} aria-invalid={tableNumberInput !== '' && tableNumber === undefined} aria-describedby={tableNumber === undefined ? 'table-number-help' : undefined} oninput={(event) => { tableNumbers[selectedTerminalId] = event.currentTarget.value; orderCreateError = ''; }} />
-					</label>
-					{#if tableNumber === undefined}<p id="table-number-help" class="table-number-help">Вкажіть цілий номер столу від 0 до 2147483647.</p>{/if}
 				{/if}
 				{#if structureError}<button class="structure-error" type="button" onclick={retryStructure}>{structureError} Повторити</button>{/if}
 			{/if}

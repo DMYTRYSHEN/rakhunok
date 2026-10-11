@@ -1,6 +1,6 @@
 {
   "contract": "docs/openapi.yaml",
-  "generatedAt": "2026-10-01T10:46:34.289Z",
+  "generatedAt": "2026-10-11T21:59:58.819Z",
   "summary": {
     "openApiOperations": 30,
     "implementedOperations": 30,

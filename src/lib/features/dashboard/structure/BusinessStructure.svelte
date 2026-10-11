@@ -24,6 +24,7 @@
 		PosTerminal,
 		TerminalInput
 	} from '../types';
+	import { normalizePhone, normalizeWebsite, validContactEmail } from '../auth/onboarding';
 
 	type Section = 'entities' | 'accounts' | 'terminals';
 	type EntityDraft = {
@@ -48,6 +49,7 @@
 		merchant,
 		initialEntities,
 		initialTerminals,
+		supportMode = false,
 		onUpdateMerchantName,
 		onCreateEntity,
 		onUpdateEntity,
@@ -59,6 +61,7 @@
 		merchant: DashboardMerchant;
 		initialEntities: BusinessEntity[];
 		initialTerminals: PosTerminal[];
+		supportMode?: boolean;
 		onUpdateMerchantName: (name: string) => Promise<void>;
 		onCreateEntity: (input: BusinessEntityInput) => Promise<void>;
 		onUpdateEntity: (entityId: string, input: BusinessEntityInput) => Promise<void>;
@@ -87,6 +90,9 @@
 	let entityType = $state<BusinessEntity['businessType']>('fop');
 	let entityBank = $state('');
 	let entityIban = $state('');
+	let entityPhone = $state('');
+	let entityEmail = $state('');
+	let entityWebsite = $state('');
 	let accountBank = $state('monobank');
 	let accountIban = $state('');
 	let terminalName = $state('');
@@ -122,14 +128,14 @@
 
 	function selectDefaultEntity(id: string) {
 		selectedEntityId = id;
-		if (typeof window !== 'undefined') {
+		if (!supportMode && typeof window !== 'undefined') {
 			localStorage.setItem('rahunok_default_entity_id', id);
 		}
 	}
 
 	$effect(() => {
 		const savedDefaultId =
-			typeof window !== 'undefined' ? localStorage.getItem('rahunok_default_entity_id') : null;
+			!supportMode && typeof window !== 'undefined' ? localStorage.getItem('rahunok_default_entity_id') : null;
 		const currentEntityId = untrack(() => selectedEntityId) || savedDefaultId;
 		const activeId = initialEntities.some((entity) => entity.id === currentEntityId)
 			? currentEntityId!
@@ -138,7 +144,7 @@
 				'');
 
 		selectedEntityId = activeId;
-		if (activeId && typeof window !== 'undefined' && !savedDefaultId) {
+		if (!supportMode && activeId && typeof window !== 'undefined' && !savedDefaultId) {
 			localStorage.setItem('rahunok_default_entity_id', activeId);
 		}
 
@@ -171,6 +177,9 @@
 		edrpou = '';
 		entityBank = '';
 		entityIban = '';
+		entityPhone = '';
+		entityEmail = '';
+		entityWebsite = '';
 		accountIban = '';
 		terminalName = '';
 		terminalCode = '';
@@ -186,6 +195,9 @@
 		edrpou = entity.taxId;
 		entityBank = entity.bankName;
 		entityIban = entity.iban;
+		entityPhone = entity.phone ?? '';
+		entityEmail = entity.contactEmail ?? '';
+		entityWebsite = entity.website ?? '';
 		editor = 'entity';
 	}
 
@@ -210,6 +222,16 @@
 			!/^UA[A-Z0-9]{27}$/.test(entityIban.replace(/\s+/g, '').toUpperCase())
 		)
 			return;
+		const phone = entityPhone.trim() ? normalizePhone(entityPhone) : '';
+		const contactEmail = entityEmail.trim();
+		const website = normalizeWebsite(entityWebsite);
+		if (phone === null || (contactEmail && !validContactEmail(contactEmail)) || website === null) {
+			actionError = phone === null
+				? 'Вкажіть коректний номер телефону.'
+				: website === null ? 'Вкажіть коректний вебсайт.' : 'Вкажіть коректний email.';
+			return;
+		}
+		const previousEntity = initialEntities.find((entity) => entity.id === editingId);
 		pending = true;
 		actionError = null;
 		try {
@@ -219,7 +241,10 @@
 				displayName: entityName.trim(),
 				taxId: edrpou.trim(),
 				bankName: entityBank.trim(),
-				iban: entityIban.replace(/\s+/g, '').toUpperCase()
+				iban: entityIban.replace(/\s+/g, '').toUpperCase(),
+				...(phone || previousEntity?.phone ? { phone } : {}),
+				...(contactEmail || previousEntity?.contactEmail ? { contactEmail } : {}),
+				...(website || previousEntity?.website ? { website } : {})
 			};
 			if (editingId) await onUpdateEntity(editingId, input);
 			else await onCreateEntity(input);
@@ -432,6 +457,9 @@
 						>
 					</div>
 					<div class="grid gap-3 sm:grid-cols-2">
+						{#if entities.length === 0}
+							<p role="status" class="py-6 text-sm text-zinc-500">Юридичного продавця ще немає.</p>
+						{/if}
 						{#each entities as entity (entity.id)}
 							<article
 								class:border-blue-500={entity.id === selectedEntityId}
@@ -762,7 +790,7 @@
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="structure-editor-title"
-			class="w-full rounded-t-xl bg-white p-5 shadow-xl sm:max-w-lg sm:rounded-lg sm:p-6"
+			class="max-h-[90dvh] w-full overflow-y-auto rounded-t-xl bg-white p-5 shadow-xl sm:max-w-lg sm:rounded-lg sm:p-6"
 		>
 			<div class="flex items-start justify-between gap-4">
 				<div>
@@ -835,6 +863,37 @@
 							class="h-12 w-full rounded-md border border-zinc-200 px-3 font-mono text-sm uppercase outline-none focus:border-blue-600"
 						/></label
 					>
+					<label
+						><span class="mb-2 block text-xs font-bold text-zinc-600">Телефон (необов’язково)</span><input
+							type="tel"
+							autocomplete="tel"
+							bind:value={entityPhone}
+							placeholder="+380 67 123 45 67"
+							class="h-12 w-full rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-blue-600"
+						/></label
+					>
+					<label
+						><span class="mb-2 block text-xs font-bold text-zinc-600">Email (необов’язково)</span><input
+							type="email"
+							autocomplete="email"
+							bind:value={entityEmail}
+							placeholder="hello@example.com"
+							class="h-12 w-full rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-blue-600"
+						/></label
+					>
+					<label class="sm:col-span-2"
+						><span class="mb-2 block text-xs font-bold text-zinc-600">Вебсайт (необов’язково)</span><input
+							type="text"
+							inputmode="url"
+							autocomplete="url"
+							bind:value={entityWebsite}
+							placeholder="example.com"
+							class="h-12 w-full rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-blue-600"
+						/></label
+					>
+					{#if actionError}
+						<p role="alert" class="text-sm text-red-700 sm:col-span-2">{actionError}</p>
+					{/if}
 				{:else if editor === 'account'}
 					<label
 						><span class="mb-2 block text-xs font-bold text-zinc-600">Банк</span><select

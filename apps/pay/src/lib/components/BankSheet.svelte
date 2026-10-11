@@ -415,18 +415,18 @@
 
           <!-- Pay Button -->
       <section class="action-area">
-        {#if checkout.prefetchedDeepLink?.redirect_url && checkout.prefetchedDeepLink.redirect_url.startsWith('https://')}
+        {#if checkout.currentPrefetchedDeepLink?.redirect_url.startsWith('https://')}
           <a
-            href={checkout.prefetchedDeepLink.redirect_url}
+            href={checkout.currentPrefetchedDeepLink.redirect_url}
             target="_blank"
             rel="external noopener noreferrer"
             data-sveltekit-reload
             class="pay-btn"
             class:processing={checkout.isProcessingPayment}
             onclick={(e) => {
-                if (!checkout.isPayable()) {
+                if (checkout.isProcessingPayment || !checkout.currentPrefetchedDeepLink || !checkout.isPayable()) {
                     e.preventDefault();
-                    checkout.executePay(); // This will throw the correct 'Expired' error UI
+                  void checkout.executePay();
                     return;
                 }
                 checkout.handleSynchronousPayTransition();

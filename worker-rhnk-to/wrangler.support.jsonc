@@ -1,0 +1,15 @@
+{
+	"name": "rhnk-to-support",
+	"account_id": "753ff9292511c16a281c5cfa8e105c63",
+	"main": "support.js",
+	"compatibility_date": "2026-10-06",
+	"workers_dev": false,
+	"preview_urls": false,
+	"vars": {
+		"SUPPORT_ORIGIN": "https://rhnk.to",
+		"SUPPORT_PROJECT_REF": "mwaeazabpvbxqfrceogr",
+		"SUPABASE_URL": "https://mwaeazabpvbxqfrceogr.supabase.co",
+		"SUPABASE_PUBLISHABLE_KEY": "sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk"
+	},
+	"observability": { "enabled": true, "traces": { "enabled": true } }
+}

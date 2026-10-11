@@ -1,8 +1,8 @@
-﻿import { spawnSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { existsSync } from 'fs';
 
 function run(command, args) {
-	console.log(\n>  );
+	console.log(`n> `);
 	const result = spawnSync(command, args, { stdio: 'inherit', shell: true });
 	if (result.status !== 0) throw new Error('Failed with code ' + result.status);
 }
@@ -14,7 +14,8 @@ const configs = [
     'worker-rhnk/wrangler.corex.jsonc',
     'worker-rhnk/wrangler.app.jsonc',
     'worker-rhnk/wrangler.checkout.jsonc',
-    'worker-rhnk/wrangler.conf.jsonc'
+    'worker-rhnk/wrangler.conf.jsonc',
+    'worker-rhnk/wrangler.qr.jsonc'
 ];
 
 for (const conf of configs) {

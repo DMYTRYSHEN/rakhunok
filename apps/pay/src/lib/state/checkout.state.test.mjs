@@ -106,6 +106,39 @@ function harness({ dev = false, url = 'https://checkout.invalid/pay/?id=order-a'
 }
 
 const terminalA = '11111111-1111-4111-8111-111111111111';
+test('late previous-bank prefetch cannot replace the selected bank URL', async () => {
+  const h = harness();
+  h.store.banks = [{ code: 'BANK_A', feePct: 0 }, { code: 'BANK_B', feePct: 0 }];
+  const first = deferred(); const second = deferred();
+  h.mocks.initiate = (_id, bank) => bank === 'BANK_A' ? first.promise : second.promise;
+  h.store.selectBank(0); h.store.selectBank(1);
+  assert.equal(h.calls.initiate[0][3].signal.aborted, true);
+  second.resolve({ success: true, redirect_url: 'https://bank-b.invalid/pay' });
+  await Promise.resolve(); await Promise.resolve();
+  first.resolve({ success: true, redirect_url: 'https://bank-a.invalid/pay' });
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(h.store.currentPrefetchedDeepLink.redirect_url, 'https://bank-b.invalid/pay');
+  await h.store.executePay();
+  assert.equal(h.calls.launch[0][0], 'https://bank-b.invalid/pay');
+  assert.equal(h.calls.initiate.length, 2);
+});
+
+test('prefetch cache is revoked by amount, order, bank and navigation changes', async () => {
+  for (const change of [h => { h.store.order.base_amount = 200; },
+    h => { h.store.orderId = 'other'; }, h => { h.store.banks = [{ code: 'OTHER' }]; },
+    h => { h.window.location = new URL('https://checkout.invalid/pay/?id=other'); }]) {
+    const h = harness(); h.store.selectBank(0);
+    await Promise.resolve(); await Promise.resolve();
+    assert.ok(h.store.currentPrefetchedDeepLink);
+    change(h);
+    assert.equal(h.store.currentPrefetchedDeepLink, null);
+  }
+});
+
+test('demo and invalid invoices never initiate prefetch', () => {
+  const h = harness(); h.store.order.status = 'paid'; h.store.selectBank(0);
+  assert.equal(h.calls.initiate.length, 0);
+});
 test('URL amount is validated and applies only to reusable pending open amount invoices', async () => {
   for (const [value, expected] of [
     ['12.34', '12,34'], ['0.01', '0,01'], ['9999999', '9999999'],

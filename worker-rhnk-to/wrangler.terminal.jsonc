@@ -1,0 +1,14 @@
+{
+  "name": "rhnk-to-terminal", "account_id": "753ff9292511c16a281c5cfa8e105c63",
+  "main": "terminal-selection.js", "compatibility_date": "2026-10-05",
+  "workers_dev": false, "preview_urls": false,
+  "vars": {
+    "SUPABASE_URL": "https://mwaeazabpvbxqfrceogr.supabase.co",
+    "SUPABASE_ANON_KEY": "sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk"
+  },
+  "observability": { "enabled": true, "traces": { "enabled": true } },
+  "routes": [
+    { "pattern": "rhnk.to/api/v1/checkout/terminal/*", "zone_name": "rhnk.to" },
+    { "pattern": "rhnk.to/app/api/v1/checkout/terminal/*", "zone_name": "rhnk.to" }
+  ]
+}

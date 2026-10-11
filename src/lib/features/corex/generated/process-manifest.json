@@ -1958,7 +1958,8 @@
 			"publicRoutes": ["letsrealtalk.com/dashboard*"],
 			"bindings": [
 				{ "name": "API", "type": "service", "target": "rahunok" },
-				{ "name": "ASSETS", "type": "assets", "target": "../build" }
+				{ "name": "ASSETS", "type": "assets", "target": "../build" },
+				{ "name": "ONBOARDING", "type": "service", "target": "letsrealtalk-onboarding" }
 			],
 			"routes": [
 				{
@@ -1976,6 +1977,27 @@
 					"source": "worker/src/dashboard.ts"
 				},
 				{
+					"method": "GET",
+					"path": "/dashboard",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "HEAD",
+					"path": "/dashboard",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/dashboard",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
 					"method": "ANY",
 					"path": "/dashboard/_app",
 					"match": "exact",
@@ -1983,7 +2005,49 @@
 					"source": "worker/src/dashboard.ts"
 				},
 				{
+					"method": "GET",
+					"path": "/dashboard/_app",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "HEAD",
+					"path": "/dashboard/_app",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/dashboard/_app",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
 					"method": "ANY",
+					"path": "/dashboard/_app/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/dashboard/_app/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "HEAD",
+					"path": "/dashboard/_app/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "POST",
 					"path": "/dashboard/_app/",
 					"match": "prefix",
 					"status": "implemented",
@@ -2011,7 +2075,21 @@
 					"source": "worker/src/dashboard.ts"
 				},
 				{
-					"method": "ANY",
+					"method": "GET",
+					"path": "/dashboard/api/sandbox/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "HEAD",
+					"path": "/dashboard/api/sandbox/",
+					"match": "prefix",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "POST",
 					"path": "/dashboard/api/sandbox/",
 					"match": "prefix",
 					"status": "implemented",
@@ -2020,6 +2098,27 @@
 				{
 					"method": "POST",
 					"path": "/dashboard/api/sandbox/simulate",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "GET",
+					"path": "/dashboard/api/v1/merchant/onboarding",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "HEAD",
+					"path": "/dashboard/api/v1/merchant/onboarding",
+					"match": "exact",
+					"status": "implemented",
+					"source": "worker/src/dashboard.ts"
+				},
+				{
+					"method": "POST",
+					"path": "/dashboard/api/v1/merchant/onboarding",
 					"match": "exact",
 					"status": "implemented",
 					"source": "worker/src/dashboard.ts"

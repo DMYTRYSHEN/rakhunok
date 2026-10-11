@@ -113,6 +113,7 @@ export interface LoyaltyCard {
 
 export interface Order {
   id: string;
+  short_id?: string;
   order_number: string;
   title?: string;
   description?: string | null;

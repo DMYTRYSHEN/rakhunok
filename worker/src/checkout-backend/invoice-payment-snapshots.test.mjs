@@ -134,6 +134,7 @@ before(async () => {
 		grant select on public.merchants, public.business_entities to authenticated;
 	`);
 	await db.exec(settingsSql);
+	await db.exec("alter table public.business_entities add column business_type text not null default 'tov'");
 	await db.exec(shortIdSql);
 	await db.exec(purposeTokensSql);
 	await db.exec(snapshotSql);
@@ -159,9 +160,137 @@ before(async () => {
 		financePurposeTemplate: '{business_purpose}',
 		sellers: { [ids.entity]: seller }
 	});
+	await db.exec(`reset role;
+		alter table auth.users add column email text, add column deleted_at timestamptz, add column banned_until timestamptz;
+		create table auth.sessions(id uuid primary key,user_id uuid,aal text,not_after timestamptz);
+		create table auth.mfa_amr_claims(session_id uuid,authentication_method text,updated_at timestamptz);
+		create function auth.jwt() returns jsonb language sql as $$ select current_setting('request.jwt.claims',true)::jsonb $$;
+		alter table public.merchants add column is_active boolean default true, add column onboarding_completed boolean default true;
+		alter table public.business_entities add column bank_name text default 'Customer Bank';
+		alter table public.terminals add column name text, add column code text, add column type text;
+		create table public.business_entity_contacts(entity_id uuid primary key,user_id uuid,phone text,contact_email text,website text);
+		create table public.merchant_settings(merchant_id uuid primary key,table_order_ttl_seconds integer);
+	`);
+	for (const migration of ['20261005172522_support_customer_context.sql', '20261005180732_support_cabinet_structure_snapshot.sql',
+		'20261005183402_support_snapshot_contact_boundary.sql', '20261005185746_support_structure_operations.sql',
+		'20261005194910_support_fixed_invoice.sql', '20261005204852_support_preserve_invoice_references.sql',
+		'20261005211649_support_invoice_scenarios.sql']) {
+		const migrationSql = await readFile(new URL(`../../../supabase/migrations/${migration}`, import.meta.url), 'utf8');
+		if (migration === '20261005194910_support_fixed_invoice.sql') {
+			const authority = (await db.query(`select pg_get_functiondef(oid) as definition, prosrc as body
+				from pg_proc where oid = 'public.create_authoritative_invoice(uuid,uuid,text,text,text,numeric,numeric,integer,uuid,jsonb,timestamptz)'::regprocedure`)).rows[0];
+			const remoteBody = authority.body.replace(/\r\n/g, '\n').replace(/\t/g, '  ');
+			assert.equal((await db.query('select md5($1) as hash', [remoteBody])).rows[0].hash, 'fc9a9a2a228173ee8ab2bc4644352e4c');
+			await db.exec(authority.definition.replace(authority.body, () => remoteBody.replace('actor uuid := auth.uid();', 'actor uuid := null;')));
+			await assert.rejects(db.exec(migrationSql), /Unexpected invoice authority definition/);
+			await db.exec('rollback');
+			await db.exec(authority.definition.replace(authority.body, () => remoteBody));
+		}
+		await db.exec(migrationSql);
+	}
 });
 
 after(() => db.close());
+
+test('support creates customer invoices with unchanged actor, audit, conflict checks and idempotency', async () => {
+	const sessionId = '40000000-0000-4000-8000-000000000001';
+	await db.exec('reset role');
+	await db.query('insert into auth.users(id,email) values ($1,$2)', [ids.other, 'operator@example.test']);
+	await db.query('insert into auth.sessions values ($1,$2,\'aal2\',null)', [sessionId, ids.other]);
+	await db.query("insert into auth.mfa_amr_claims values ($1,'totp',clock_timestamp())", [sessionId]);
+	await db.query('insert into support_private.operators(user_id,enabled,can_write) values ($1,true,true)', [ids.other]);
+	await db.query("select set_config('request.jwt.claims',$1,false)", [JSON.stringify({ sub: ids.other, session_id: sessionId, role: 'authenticated', aal: 'aal2', exp: Math.floor(Date.now()/1000)+3600 })]);
+	await identity(ids.other);
+	const call = async (action, input = {}) => (await db.query('select public.support_dispatch($1,$2::jsonb) as result', [action, JSON.stringify(input)])).rows[0].result;
+	const context = await call('open', { targetId: ids.user, merchantId: ids.merchant, workspace: 'live', reason: 'Help customer create invoice' });
+	assert.equal((await call('snapshot', { sessionId: context.id })).data.invoiceCreation.fixed, true);
+	await call('elevate', { sessionId: context.id });
+	const fields = { entityId: ids.entity, title: 'Support invoice', description: '', amount: 120, scenarioConfig: {} };
+	const prepare = () => call('prepare', { sessionId: context.id, action: 'invoice.fixed.create', fields });
+	const commit = operation => call('commit', { sessionId: context.id, operationId: operation.operationId, digest: operation.digest, acknowledgement: 'CHANGE_LIVE_BUSINESS' });
+	await assert.rejects(call('prepare', { sessionId: context.id, action: 'invoice.fixed.create', fields: { ...fields, entityId: ids.other } }), /seller/);
+	await assert.rejects(db.query('select checkout_private.create_invoice_for_owner($1,$2,$3,\'fixed\',\'test\',null,100)', [ids.user,ids.merchant,ids.entity]), /permission denied/);
+	const prepared = await prepare();
+	const result = await commit(prepared);
+	assert.equal(result.invoice.recipientName, 'ТОВ Продавець');
+	assert.equal(result.invoice.amount, 120);
+	assert.deepEqual(await commit(prepared), result);
+	assert.equal((await db.query('select auth.uid() as actor')).rows[0].actor, ids.other);
+	await db.exec('reset role');
+	assert.equal((await db.query('select count(*)::int as count from public.orders where id=$1 and merchant_id=$2', [result.invoice.id,ids.merchant])).rows[0].count, 1);
+	assert.equal((await db.query("select actor_id from support_private.audit where operation_id=$1 and action='commit'", [prepared.operationId])).rows[0].actor_id, ids.other);
+	await identity(ids.other);
+	for (const kind of ['entity', 'terminal']) {
+		const itemId = '50000000-0000-4000-8000-000000000001';
+		await db.exec('reset role; begin');
+		try {
+			if (kind === 'entity') {
+				await db.query(`insert into public.business_entities(id,user_id,business_name,tax_id,iban)
+					values ($1,$2,'Historical seller','12345678','UA663052990000026007123456789')`, [itemId, ids.user]);
+			} else {
+				await db.query(`insert into public.terminals(id,entity_id,user_id,name,code,type)
+					values ($1,$2,$3,'Historical terminal','HISTORY','kasa')`, [itemId, ids.entity, ids.user]);
+			}
+			await identity(ids.other);
+			const deletion = await call('prepare', { sessionId: context.id, action: `structure.${kind}.delete`, fields: { id: itemId } });
+			await db.exec('reset role');
+			await db.query(`update public.orders set ${kind}_id=$1 where id=$2`, [itemId, result.invoice.id]);
+			await identity(ids.other);
+			await db.exec('savepoint protected_delete');
+			await assert.rejects(commit(deletion), /Support invoice reference protected/);
+			await db.exec('rollback to savepoint protected_delete; reset role');
+			assert.equal((await db.query(`select ${kind}_id as reference from public.orders where id=$1`, [result.invoice.id])).rows[0].reference, itemId);
+			assert.equal((await db.query('select state from support_private.operations where id=$1', [deletion.operationId])).rows[0].state, 'prepared');
+			assert.equal((await db.query("select count(*)::int as count from support_private.audit where operation_id=$1 and action='commit'", [deletion.operationId])).rows[0].count, 0);
+		} finally {
+			await db.exec('rollback');
+			await identity(ids.other);
+		}
+	}
+	const stale = await prepare();
+	for (const type of ['fixed', 'open_amount', 'table', 'delivery']) {
+		const terminalId = '60000000-0000-4000-8000-000000000001';
+		if (type === 'table') {
+			await db.exec('reset role');
+			await db.query(`insert into public.terminals(id,entity_id,user_id,name,code,type)
+				values ($1,$2,$3,'Table 7','7','table')`, [terminalId, ids.entity, ids.user]);
+			await identity(ids.other);
+		}
+		const scenarioFields = { ...fields, type, amount: type === 'open_amount' ? 0 : 120,
+			deliveryFee: type === 'delivery' ? 20 : 0, terminalId: type === 'table' ? terminalId : null,
+			tableNumber: type === 'table' ? 7 : null };
+		assert.equal((await call('snapshot', { sessionId: context.id })).data.invoiceCreation[type], true);
+		const operation = await call('prepare', { sessionId: context.id, action: 'invoice.create', fields: scenarioFields });
+		const created = await commit(operation);
+		assert.equal(created.invoice.amount, scenarioFields.amount + scenarioFields.deliveryFee);
+		assert.deepEqual(await commit(operation), created);
+		await db.exec('reset role');
+		const saved = (await db.query('select * from public.orders where id=$1', [created.invoice.id])).rows[0];
+		assert.equal(saved.type, type);
+		assert.equal(saved.terminal_id, scenarioFields.terminalId);
+		assert.equal(saved.table_number, scenarioFields.tableNumber);
+		assert.equal(saved.description, null);
+		assert.equal((await db.query("select actor_id from support_private.audit where operation_id=$1 and action='commit'", [operation.operationId])).rows[0].actor_id, ids.other);
+		await identity(ids.other);
+		await assert.rejects(call('prepare', { sessionId: context.id, action: 'invoice.create', fields: { ...scenarioFields, entityId: ids.other } }), /seller/);
+	}
+	await db.exec("reset role; update public.business_entities set bank_name='Changed bank'; set role authenticated");
+	await assert.rejects(commit(stale), /conflict/);
+	const revoked = await prepare();
+	await db.exec('reset role; update support_private.operators set can_write=false; set role authenticated');
+	await assert.rejects(commit(revoked), /forbidden/);
+	await call('end', { sessionId: context.id });
+	await db.exec('reset role; update support_private.operators set can_write=true; set role authenticated');
+	const sandbox = await call('open', { targetId: ids.user, merchantId: ids.merchant, workspace: 'sandbox', reason: 'Check sandbox isolation' });
+	await call('elevate', { sessionId: sandbox.id });
+	await assert.rejects(call('prepare', { sessionId: sandbox.id, action: 'invoice.fixed.create', fields }), /forbidden/);
+	await call('end', { sessionId: sandbox.id });
+	await db.exec('reset role; delete from public.orders');
+	await identity();
+	await db.query("update public.business_settings_sellers set config=jsonb_set(config,'{nextNumber}','7'::jsonb)").catch(async () => {
+		await db.exec("reset role; update public.business_settings_sellers set config=jsonb_set(config,'{nextNumber}','7'::jsonb)");
+	});
+});
 
 test('merchant key RPC denies unknown keys and isolates list access', async () => {
 	await db.exec('reset role; set role service_role');
@@ -201,6 +330,51 @@ test('concurrent creation reserves distinct invoice numbers', async () => {
 		numbers,
 		Array.from({ length: 8 }, (_, index) => numbers[0] + index)
 	);
+});
+
+test('selected seller snapshots remain correct across four legal forms and four scenarios', async () => {
+	await identity();
+	const original = await createInvoice();
+	await db.exec('reset role; begin');
+	try {
+		for (const businessType of ['fop', 'tov', 'self_employed', 'ngo']) {
+			await db.exec('reset role');
+			const taxId = ['fop', 'self_employed'].includes(businessType) ? '9876543210' : '87654321';
+			const name = `Selected ${businessType}`;
+			const iban = 'UA663052990000026007123456789';
+			await db.query('update public.business_entities set business_type=$1, business_name=$2, tax_id=$3, iban=$4 where id=$5',
+				[businessType, name, taxId, iban, ids.entity]);
+			const terminalId = '40000000-0000-0000-0000-000000000002';
+			await db.query('insert into public.terminals values ($1, $2, $3, true) on conflict (id) do nothing',
+				[terminalId, ids.entity, ids.user]);
+			await identity();
+			for (const type of ['fixed', 'open_amount', 'table', 'delivery']) {
+				const expiresAt = '2026-10-05T12:30:00.000Z';
+				const row = await createScenarioInvoice(type, {
+					baseAmount: type === 'open_amount' ? 0 : 10,
+					deliveryFee: type === 'delivery' ? 3 : 0,
+					tableNumber: type === 'table' ? 4 : null,
+					terminalId: type === 'table' ? terminalId : null,
+					expiresAt: type === 'table' ? expiresAt : null
+				});
+				assert.equal(row.entity_id, ids.entity);
+				assert.equal(row.type, type);
+				assert.equal(row.payment_recipient_name, name);
+				assert.equal(row.payment_recipient_tax_id, taxId);
+				assert.equal(row.payment_recipient_iban, iban);
+				assert.equal(Number(row.total_amount), type === 'open_amount' ? 0 : type === 'delivery' ? 13 : 10);
+				assert.equal(row.terminal_id, type === 'table' ? terminalId : null);
+				assert.equal(row.expires_at ? new Date(row.expires_at).toISOString() : null, type === 'table' ? expiresAt : null);
+			}
+			await db.exec('reset role');
+			const stored = (await db.query('select * from public.orders where id=$1', [original.id])).rows[0];
+			assert.equal(stored.payment_recipient_name, original.payment_recipient_name);
+			assert.equal(stored.payment_recipient_iban, original.payment_recipient_iban);
+			assert.equal(stored.payment_recipient_tax_id, original.payment_recipient_tax_id);
+		}
+	} finally {
+		await db.exec('rollback; reset role');
+	}
 });
 
 test('all approved invoice scenarios receive authoritative payment snapshots', async () => {

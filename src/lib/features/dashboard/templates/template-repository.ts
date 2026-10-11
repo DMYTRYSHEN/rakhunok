@@ -114,7 +114,7 @@ export function validateTemplateInput(input: TemplateCreateInput): TemplateCreat
 	};
 }
 
-function decodeTemplate(value: unknown, merchantId: string): CheckoutTemplate {
+export function decodeTemplate(value: unknown, merchantId: string): CheckoutTemplate {
 	if (!value || typeof value !== 'object' || Array.isArray(value))
 		throw new Error('Некоректна відповідь сховища шаблонів.');
 	const row = value as Record<string, unknown>;
@@ -298,7 +298,9 @@ export function createTemplateRepository(
 	};
 }
 
-const repository = createTemplateRepository();
+export type TemplateRepository = ReturnType<typeof createTemplateRepository>;
+export const templateRepository = createTemplateRepository();
+const repository = templateRepository;
 export const listTemplates = (merchantId: string, demo = false) =>
 	repository.list({ merchantId, demo });
 export const createTemplate = (merchantId: string, input: TemplateCreateInput, demo = false) =>

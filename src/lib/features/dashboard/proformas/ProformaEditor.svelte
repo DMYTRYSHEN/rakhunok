@@ -15,6 +15,7 @@
 		Eye,
 		FileText,
 		Folder,
+		FileUp,
 		GripVertical,
 		Landmark,
 		MinusCircle,
@@ -47,6 +48,7 @@
 		formatProformaMoney
 	} from './proforma-calc';
 	import ProformaPreviewModal from './ProformaPreviewModal.svelte';
+	import ImportFileModal from './ImportFileModal.svelte';
 	import ProformaActModal from './ProformaActModal.svelte';
 	import {
 		loadBankConnections,
@@ -102,6 +104,7 @@
 	let paymentMethodModalOpen = $state(false);
 	let recurrenceModalOpen = $state(false);
 	let projectModalOpen = $state(false);
+	let importModalOpen = $state(false);
 	let notesOpen = $state(Boolean(draft.notes));
 	let editPurposeOpen = $state(false);
 	let saving = $state(false);
@@ -207,6 +210,10 @@
 		const item = draft.items[index];
 		if (!item || item.type === 'heading') return;
 		item.total = calculateLineTotal(item.price, item.quantity, item.discountPercent);
+	}
+
+	function handleImportedItems(importedItems: ProformaItem[]) {
+		draft.items = [...draft.items, ...importedItems];
 	}
 
 	function addItem() {
@@ -718,14 +725,24 @@
 					</button>
 				</div>
 
-				<button
-					type="button"
-					onclick={() => alert('Каталог товарів та послуг у розробці')}
-					class="flex items-center gap-2 text-xs font-semibold text-zinc-600 hover:text-zinc-950 transition"
-				>
-					<Folder size={15} />
-					Обрати з каталогу
-				</button>
+				<div class="flex items-center gap-4">
+					<button
+						type="button"
+						onclick={() => (importModalOpen = true)}
+						class="flex items-center gap-2 text-xs font-semibold text-zinc-600 hover:text-zinc-950 transition"
+					>
+						<FileUp size={15} />
+						Завантажити з файлу
+					</button>
+					<button
+						type="button"
+						onclick={() => alert('Каталог товарів та послуг у розробці')}
+						class="flex items-center gap-2 text-xs font-semibold text-zinc-600 hover:text-zinc-950 transition"
+					>
+						<Folder size={15} />
+						Обрати з каталогу
+					</button>
+				</div>
 			</div>
 		</div>
 	</section>
@@ -1046,6 +1063,8 @@
 
 	<!-- Preview Modal -->
 	<ProformaPreviewModal bind:open={previewOpen} {draft} {totals} />
+
+	<ImportFileModal bind:open={importModalOpen} onImport={handleImportedItems} />
 
 	<!-- Act Modal -->
 	{#if actModalOpen}

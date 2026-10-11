@@ -16,7 +16,7 @@ export function telegramCallbackError(href: string): string {
 }
 
 export function telegramSessionAvailable(origin: string, enabled: string | undefined): boolean {
-	return enabled === 'true' && (origin === 'https://letsrealtalk.com' || origin === 'https://rhnk.pp.ua');
+	return enabled === 'true' && (origin === 'https://letsrealtalk.com' || origin === 'https://rhnk.pp.ua' || origin === 'https://rhnk.to');
 }
 
 /** Supabase owns OAuth state, identity verification, callback and session persistence. */

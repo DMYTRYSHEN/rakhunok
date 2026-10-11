@@ -167,6 +167,20 @@ export default defineConfig(({ mode }) => ({
 				changeOrigin: true,
 				secure: true
 			},
+			'^/dashboard/api/support(?:/|\\?|$)': {
+				target: 'http://127.0.0.1:8791',
+				configure: (proxy) => {
+					proxy.on('error', (_error, _req, res) => {
+						if ('writeHead' in res && !res.headersSent && !res.writableEnded) {
+							res.writeHead(503, {
+								'Content-Type': 'application/json',
+								'Cache-Control': 'no-store'
+							});
+							res.end(JSON.stringify({ error: 'SUPPORT_UNAVAILABLE' }));
+						}
+					});
+				}
+			},
 			'/dashboard/api': {
 				target: 'http://127.0.0.1:8787',
 				rewrite: (path) => path.slice('/dashboard'.length),

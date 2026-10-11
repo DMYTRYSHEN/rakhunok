@@ -1,0 +1,11 @@
+{
+	"name": "rhnk-to-conf", "account_id": "753ff9292511c16a281c5cfa8e105c63",
+	"main": "../worker/src/conf.ts", "compatibility_date": "2026-10-04",
+	"compatibility_flags": ["nodejs_compat"], "workers_dev": false, "preview_urls": false,
+	"assets": { "directory": "../apps/conf/dist", "binding": "ASSETS", "run_worker_first": true, "not_found_handling": "single-page-application" },
+	"services": [{ "binding": "API", "service": "rhnk-to-web" }],
+	"d1_databases": [{ "binding": "BANK_CATALOG_DB", "database_name": "letsrealtalk-conf-snapshots", "database_id": "2e5d61b8-d603-420e-8a17-231cd5c9340f" }],
+	"vars": { "CONF_SUPABASE_URL": "https://mwaeazabpvbxqfrceogr.supabase.co", "CONF_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk", "CONF_BANK_SYNC_ADMIN_IDS": "*" },
+	"observability": { "enabled": true, "traces": { "enabled": true } },
+	"routes": [{ "pattern": "rhnk.to/conf", "zone_name": "rhnk.to" }, { "pattern": "rhnk.to/conf/*", "zone_name": "rhnk.to" }]
+}

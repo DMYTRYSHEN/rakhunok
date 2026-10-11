@@ -12,7 +12,7 @@ import {
 } from '../services/terminal-authority.js';
 import type { TerminalSelection } from '../services/terminal-authority.js';
 import { executeTurnstile } from '../services/turnstile.js';
-import type { Bank } from '../types/bank.js';
+import type { Bank, BankPaymentInitiateResult } from '../types/bank.js';
 import type {
 	DeliveryDetails,
 	FiscalReceipt,
@@ -154,7 +154,8 @@ class CheckoutStore {
 	banks = $state<Bank[]>(DEFAULT_BANKS);
 	selectedBankIndex = $state<number>(0);
 	isProcessingPayment = $state<boolean>(false);
-	prefetchedDeepLink = $state<{ redirect_url: string; fallback_url: string } | null>(null);
+	prefetchedDeepLink = $state<(BankPaymentInitiateResult & { redirect_url: string }) | null>(null);
+	private prefetchContext = $state<{ session: number; order: Order; orderId: string; bank: string; amount: number; location: string } | null>(null);
 	private prefetchAbortController: AbortController | null = null;
 	statusPollingInterval: ReturnType<typeof setInterval> | null = null;
 	private session = 0;
@@ -592,27 +593,43 @@ class CheckoutStore {
 
 	private prefetchBankDeepLink(): void {
 		this.prefetchedDeepLink = null;
+		this.prefetchContext = null;
 		if (this.prefetchAbortController) {
 			this.prefetchAbortController.abort();
 		}
-		this.prefetchAbortController = new AbortController();
-
-		const orderId = this.order?.id || this.orderId;
+		if (!this.isPayable() || this.terminalMode) return;
+		const controller = new AbortController();
+		this.prefetchAbortController = controller;
+		const order = this.order;
+		if (!order) return;
+		const orderId = this.orderId;
 		const bankCode = this.selectedBank?.code || 'UNJS';
 		const amount = this.payTotalAmount;
-		
-		if (!orderId) return;
+		const context = { session: this.session, order, orderId, bank: bankCode, amount, location: window.location.href };
 
 		initiateBankPayment(orderId, bankCode, amount, {
 			os: detectOS(),
-			signal: this.prefetchAbortController.signal
+			signal: controller.signal
 		})
 			.then(result => {
-				if (result.success && result.redirect_url) {
-					this.prefetchedDeepLink = result;
+				if (!controller.signal.aborted && this.matchesPrefetchContext(context) && result.success === true && result.redirect_url) {
+					this.prefetchContext = context;
+					this.prefetchedDeepLink = { ...result, redirect_url: result.redirect_url };
 				}
 			})
 			.catch(() => { /* ignore */ });
+	}
+
+	private matchesPrefetchContext(context: NonNullable<typeof this.prefetchContext>): boolean {
+		return context.session === this.session && context.order === this.order &&
+			context.orderId === this.orderId && context.bank === (this.selectedBank?.code || 'UNJS') &&
+			context.amount === this.payTotalAmount && context.location === window.location.href &&
+			!this.terminalMode && this.isPayable();
+	}
+
+	get currentPrefetchedDeepLink() {
+		return this.prefetchContext && this.matchesPrefetchContext(this.prefetchContext)
+			? this.prefetchedDeepLink : null;
 	}
 
 	chooseAnotherBank(): void {
@@ -822,6 +839,9 @@ class CheckoutStore {
 	}
 
 	private clearTerminalOrder(error = false): void {
+		this.prefetchAbortController?.abort();
+		this.prefetchedDeepLink = null;
+		this.prefetchContext = null;
 		this.paymentAttempt++;
 		this.stopPolling?.();
 		this.isProcessingPayment = false;
@@ -918,6 +938,9 @@ class CheckoutStore {
 
 	async init(): Promise<void> {
 		if (typeof window === 'undefined') return;
+		this.prefetchAbortController?.abort();
+		this.prefetchedDeepLink = null;
+		this.prefetchContext = null;
 		this.disposeTerminal();
 		this.terminalMode = isTerminalPath(window.location.pathname);
 		const session = ++this.session;
@@ -1922,25 +1945,29 @@ class CheckoutStore {
 			const token = await executeTurnstile('pay');
 			if (!unchanged()) return;
 			if (this.terminalMode) {
-				const selection = readTerminalSelection();
-				if (!selection || !matchesTerminalOrder(selection, orderId, amount)) {
-					throw new Error('Термінальна сесія не збігається. Спробуйте оновити сторінку.');
+				try {
+					const selection = await readTerminalSelection(terminalCode(window.location.pathname));
+					if (!unchanged()) return;
+					if (!matchesTerminalOrder(selection, order)) {
+						this.clearTerminalOrder(true);
+						return;
+					}
+					this.terminalSelection = selection;
+				} catch {
+					if (unchanged()) this.clearTerminalOrder(true);
+					return;
 				}
 			}
 
 			// If prefetched and valid, use it
-			let result = this.prefetchedDeepLink;
-			if (!result) {
-				const clientOS = detectOS();
-				result = await initiateBankPayment(orderId, bankCode, amount, {
-					os: clientOS,
-					turnstileToken: token,
-					recaptchaToken: token
-				});
-				if (!unchanged()) return;
-				if (result.success !== true || !result.redirect_url)
-					throw new Error(result.error || 'Невідома помилка під час ініціалізації');
-			}
+			const result = this.currentPrefetchedDeepLink || await initiateBankPayment(orderId, bankCode, amount, {
+				os: detectOS(),
+				turnstileToken: token,
+				recaptchaToken: token
+			});
+			if (!unchanged()) return;
+			if (result.success !== true || !result.redirect_url)
+				throw new Error(result.error || 'Невідома помилка під час ініціалізації');
 			
 			// We only launch it programmatically if it's NOT handled natively by an <a> tag
 			// We can know if it was handled natively if this method was called with a flag

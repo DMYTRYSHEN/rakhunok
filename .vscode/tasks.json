@@ -161,6 +161,193 @@
 			"isBackground": true,
 			"problemMatcher": [],
 			"group": "build"
+		},
+		{
+			"label": "Landing local 5173",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"D:/svetle/corex",
+				"run",
+				"dev",
+				"--",
+				"--host",
+				"127.0.0.1",
+				"--port",
+				"5173",
+				"--strictPort"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Client Support local demo",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"D:/svetle/corex/worker-rhnk-to/support-local-server.mjs"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Support Dashboard local UI",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"D:/svetle/corex",
+				"run",
+				"dev",
+				"--",
+				"--host",
+				"127.0.0.1",
+				"--port",
+				"5190",
+				"--strictPort"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Dashboard local 5173",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"D:/svetle/corex",
+				"run",
+				"dev",
+				"--",
+				"--host",
+				"127.0.0.1",
+				"--port",
+				"5173",
+				"--strictPort"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Support local API 8791",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"D:/svetle/corex",
+				"run",
+				"dev:support"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Delivery local UI",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"D:/svetle/corex/apps/delivery",
+				"run",
+				"dev",
+				"--",
+				"--host",
+				"127.0.0.1",
+				"--port",
+				"5185",
+				"--strictPort"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Delivery local 5173",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"D:/svetle/corex/apps/delivery",
+				"run",
+				"dev",
+				"--",
+				"--host",
+				"127.0.0.1",
+				"--port",
+				"5173",
+				"--strictPort"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Delivery demo 5173",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"D:/svetle/corex/apps/delivery",
+				"run",
+				"dev",
+				"--",
+				"--host",
+				"127.0.0.1",
+				"--port",
+				"5173",
+				"--strictPort"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Delivery local auth 5173",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"D:/svetle/corex/apps/delivery",
+				"run",
+				"dev:dashboard-auth"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Delivery local 5173",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"D:/svetle/corex/apps/delivery",
+				"run",
+				"dev:dashboard-auth"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Delivery local shared Auth 5173",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"D:/svetle/corex/apps/delivery",
+				"run",
+				"dev:dashboard-auth"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
 		}
 	]
 }

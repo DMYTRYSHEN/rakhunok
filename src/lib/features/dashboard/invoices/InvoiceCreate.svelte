@@ -22,7 +22,7 @@
 		Utensils,
 		X
 	} from '@lucide/svelte';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import type { Component } from 'svelte';
 	import {
 		defaultInvoiceRules,
@@ -40,7 +40,7 @@
 	import CheckoutConfigEditor from '../templates/CheckoutConfigEditor.svelte';
 	import { formatMoney } from '../utils/format';
 	import InvoiceBusinessPreview from '../business-settings/InvoiceBusinessPreview.svelte';
-	import { settingsHref } from '../business-settings/business-settings';
+	import { businessInvoicePreview, settingsHref, type BusinessDraft } from '../business-settings/business-settings';
 	import { listProformas, saveProforma } from '../proformas/proforma-repository';
 	import type { ProformaDraft } from '../proformas/types';
 
@@ -48,6 +48,7 @@
 	import { buildTemplateInvoiceScenario } from '../templates/template-invoice';
 	import { canCreateCheckoutLink } from '../templates/scenario-capabilities';
 	import type { CheckoutTemplate } from '../types';
+	import type { SupportInvoiceReceipt } from '../api/support-cabinet';
 
 	type Scenario = {
 		id: InvoiceType;
@@ -61,12 +62,18 @@
 		entities = [],
 		businessContext,
 		onCreate,
+		supportMode = false,
+		supportSettings = null,
+		supportInvoiceScenarios = [],
 		demo = false
 	}: {
 		terminals: PosTerminal[];
 		entities?: BusinessEntity[];
 		businessContext?: { userId: string; merchantId: string; name: string };
-		onCreate?: (input: InvoiceCreateInput) => Promise<{ id: string }>;
+		onCreate?: (input: InvoiceCreateInput) => Promise<{ id: string; supportReceipt?: SupportInvoiceReceipt }>;
+		supportMode?: boolean;
+		supportSettings?: BusinessDraft | null;
+		supportInvoiceScenarios?: InvoiceType[];
 		demo?: boolean;
 	} = $props();
 
@@ -138,7 +145,31 @@
 	let previewOpen = $state(false);
 	let submitting = $state(false);
 	let submitError = $state<string | null>(null);
+	let supportReceipt = $state<SupportInvoiceReceipt | null>(null);
 	let appliedScenarioParam = $state<string | null>(null);
+	let amountInput = $state<HTMLInputElement | null>(null);
+	let keypadAmountInput = $state<HTMLInputElement | null>(null);
+	let submitButton = $state<HTMLButtonElement | null>(null);
+
+	function focusAmountInput() {
+		if (scenario === 'open_amount') return;
+		const target = ['fixed', 'table', 'delivery'].includes(scenario) ? keypadAmountInput : amountInput;
+		if (target) {
+			target.focus();
+			if (amount === '0') {
+				target.select();
+			}
+		}
+	}
+
+	function handleInputEnter(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			if (canPreview) {
+				previewOpen = true;
+			}
+		}
+	}
 
 	let selectedEntityId = $state<string>('');
 
@@ -147,7 +178,7 @@
 		if (selectedEntityId && entities.some((e) => e.id === selectedEntityId)) return;
 
 		const savedId =
-			typeof window !== 'undefined' ? localStorage.getItem('rahunok_default_entity_id') : null;
+			!supportMode && typeof window !== 'undefined' ? localStorage.getItem('rahunok_default_entity_id') : null;
 		if (savedId && entities.some((e) => e.id === savedId)) {
 			selectedEntityId = savedId;
 		} else {
@@ -179,7 +210,13 @@
 		}
 	});
 
-	const terminals = $derived([...initialTerminals, ...localTerminals]);
+	const terminals = $derived(supportMode
+		? initialTerminals.filter((terminal) => terminal.isActive && terminal.entityId === selectedEntity?.id)
+		: [...initialTerminals, ...localTerminals]);
+	const customerPreview = $derived(supportMode && supportSettings && selectedEntity &&
+		Object.hasOwn(supportSettings.sellers, selectedEntity.id)
+		? businessInvoicePreview(supportSettings, selectedEntity) : null);
+	const customerPurpose = $derived(customerPreview?.businessPurpose ?? '');
 	const selectedScenario = $derived(scenarios.find((item) => item.id === scenario) ?? scenarios[0]);
 	const numericAmount = $derived(Number.parseFloat(amount) || 0);
 	const total = $derived(
@@ -205,12 +242,53 @@
 	const canCreateFromTemplate = $derived(
 		!selectedTemplate || canCreateCheckoutLink(selectedTemplate.scenario_type, demo)
 	);
+	const canSubmitInvoice = $derived(
+		Boolean(onCreate) &&
+			!(
+				supportMode &&
+				(!selectedEntity?.isActive ||
+					!customerPreview ||
+					!supportInvoiceScenarios.includes(scenario) ||
+					(scenario !== 'open_amount' && total <= 0) ||
+					numericAmount < 0 ||
+					Boolean(supportReceipt))
+			) &&
+			!submitting &&
+			scenario !== 'recurring' &&
+			scenario !== 'rtp' &&
+			canCreateFromTemplate
+	);
+
+	function handlePreviewKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			previewOpen = false;
+			void tick().then(() => focusAmountInput());
+		} else if (event.key === 'Enter') {
+			event.preventDefault();
+			if (canSubmitInvoice && !submitting) {
+				void createInvoice();
+			}
+		}
+	}
+
+	$effect(() => {
+		if (previewOpen) {
+			void tick().then(() => {
+				submitButton?.focus();
+			});
+		}
+	});
 
 	$effect(() => {
 		if (!terminalId && initialTerminals[0]) terminalId = initialTerminals[0].id;
 	});
 
 	$effect(() => {
+		if (supportMode) {
+			title = customerPurpose;
+			return;
+		}
 		if (!referenceOverridden) reference = generatedReference;
 		if (!purposeOverridden) title = generatedPurpose;
 	});
@@ -219,7 +297,7 @@
 
 	$effect(() => {
 		const proformaId = page.url.searchParams.get('proformaId');
-		if (!proformaId) return;
+		if (supportMode || !proformaId) return;
 
 		const mId = businessContext?.merchantId || 'default-merchant';
 		void listProformas(mId, demo).then((proformas) => {
@@ -243,6 +321,7 @@
 
 	$effect(() => {
 		const requestedScenario = page.url.searchParams.get('type');
+		if (supportMode && requestedScenario && !supportInvoiceScenarios.includes(requestedScenario as InvoiceType)) return;
 		if (requestedScenario === appliedScenarioParam) return;
 		appliedScenarioParam = requestedScenario;
 		if (scenarios.some((item) => item.id === requestedScenario)) {
@@ -251,10 +330,14 @@
 	});
 
 	onMount(() => {
-		invoiceRules = loadInvoiceRules();
+		if (!supportMode) invoiceRules = loadInvoiceRules();
+		if (scenario !== 'open_amount') {
+			void tick().then(() => focusAmountInput());
+		}
 	});
 
 	$effect(() => {
+		if (supportMode) return;
 		const merchantId = businessContext?.merchantId;
 		const isDemo = demo;
 		if (!merchantId) {
@@ -295,9 +378,13 @@
 		amount = '0';
 		deliveryFee = '0';
 		minimumAmount = '0';
+		if (invoiceScenario.type !== 'open_amount') {
+			void tick().then(() => focusAmountInput());
+		}
 	}
 
 	function chooseScenario(nextScenario: InvoiceType) {
+		if (supportMode && !supportInvoiceScenarios.includes(nextScenario)) return;
 		selectedTemplateId = '';
 		scenario = nextScenario;
 		amount = '0';
@@ -325,6 +412,10 @@
 			cta_text: defaults.cta_text ?? 'Перейти до оплати',
 			theme: defaults.theme ?? 'dark'
 		};
+
+		if (nextScenario !== 'open_amount') {
+			void tick().then(() => focusAmountInput());
+		}
 	}
 
 	function restoreGeneratedFields() {
@@ -348,6 +439,7 @@
 	}
 
 	function createLocalTerminal() {
+		if (supportMode) return;
 		const name = terminalName.trim();
 		const code = terminalCode.trim().toLocaleLowerCase('uk-UA').replace(/\s+/g, '-');
 		if (!name || !code) return;
@@ -368,6 +460,11 @@
 
 	async function createInvoice() {
 		if (!onCreate || submitting || scenario === 'recurring' || scenario === 'rtp') return;
+		if (supportMode && (!supportInvoiceScenarios.includes(scenario) || (scenario === 'table' && !selectedTerminal))) return;
+		if (supportMode && !customerPreview) {
+			submitError = 'Платіжний профіль клієнта недоступний.';
+			return;
+		}
 		if (!canCreateFromTemplate) {
 			submitError =
 				'Цей сценарій доступний для налаштування та прев’ю, але ще не створює платіжні посилання.';
@@ -384,7 +481,7 @@
 				merchantId: businessContext.merchantId,
 				type: scenario,
 				reference: reference.trim(),
-				title: title.trim() || reference.trim(),
+				title: title.trim() || (supportMode ? 'Фіксований рахунок' : reference.trim()),
 				description:
 					scenario === 'delivery' ? `${deliveryCity}, ${deliveryBranch}` : memo.trim() || undefined,
 				amount: numericAmount,
@@ -397,6 +494,14 @@
 				entityId: selectedEntity?.id,
 				scenario_config: finalConfig
 			});
+
+			if (supportMode) {
+				if (!result.supportReceipt) throw new Error('Результат створення не підтверджено.');
+				supportReceipt = result.supportReceipt;
+				previewOpen = false;
+				submitting = false;
+				return;
+			}
 
 			if (linkedProforma) {
 				const mId = businessContext?.merchantId || 'default-merchant';
@@ -443,6 +548,28 @@
 		</span>
 	</header>
 
+	{#if supportMode && !onCreate}
+		<p role="status" class="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+			Створення рахунків недоступне: потрібні активований сервер підтримки та доступ до реального кабінету клієнта.
+			{#if entities.length === 0}Реквізити клієнта недоступні: потрібне підключення серверного знімка структури бізнесу.{/if}
+		</p>
+	{/if}
+	{#if supportReceipt}
+		<section aria-label="Створений рахунок" class="mb-6 border-y border-emerald-200 py-5">
+			<h2 class="text-xl font-bold" role="status">Рахунок {supportReceipt.reference} створено</h2>
+			<dl class="mt-4 grid gap-3 text-sm sm:grid-cols-[auto_1fr]">
+				<dt>Сума</dt><dd>{formatMoney(supportReceipt.amount)}</dd>
+				<dt>Отримувач</dt><dd>{supportReceipt.recipientName}</dd>
+				<dt>IBAN</dt><dd class="break-all font-mono">{supportReceipt.recipientIban}</dd>
+				<dt>ЄДРПОУ / РНОКПП</dt><dd>{supportReceipt.recipientTaxId}</dd>
+				<dt>Призначення</dt><dd class="break-words">{supportReceipt.purpose}</dd>
+			</dl>
+			<a class="mt-4 inline-flex items-center gap-2 font-bold text-blue-700" href={`/pay/${supportReceipt.shortId}`} target="_blank" rel="noopener noreferrer">
+				<QrCode size={18} aria-hidden="true" /> Відкрити платіжне посилання
+			</a>
+		</section>
+	{/if}
+
 	{#if linkedProforma}
 		<div
 			class="mb-7 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50/90 p-4 text-blue-950 shadow-sm"
@@ -477,7 +604,7 @@
 				class="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-2"
 				aria-label="Бізнес-сценарій оплати"
 			>
-				{#each scenarios as item (item.id)}
+				{#each scenarios.filter((item) => !supportMode || supportInvoiceScenarios.includes(item.id)) as item (item.id)}
 					{@const Icon = item.icon}
 					<button
 						type="button"
@@ -564,7 +691,7 @@
 								class="flex h-12 items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3"
 							>
 								<Building2 size={17} class="text-zinc-500" aria-hidden="true" />
-								<span class="text-sm font-semibold text-zinc-800"> ФОП ДМИТРИШЕН · А-Банк </span>
+								<span class="text-sm font-semibold text-zinc-800">{supportMode ? 'Реквізити клієнта недоступні' : 'ФОП ДМИТРИШЕН · А-Банк'}</span>
 							</div>
 						{/if}
 
@@ -601,7 +728,7 @@
 					{#if selectedEntity && businessContext}
 						<div class="min-w-0 sm:col-span-2">
 							{#key `${businessContext.userId}:${businessContext.merchantId}`}
-								<InvoiceBusinessPreview entity={selectedEntity} context={businessContext} {demo} />
+								{#if !supportMode}<InvoiceBusinessPreview entity={selectedEntity} context={businessContext} {demo} />{/if}
 							{/key}
 						</div>
 					{/if}
@@ -610,7 +737,10 @@
 						<span class="mb-2 block text-xs font-bold text-zinc-600">Номер рахунку</span>
 						<input
 							bind:value={reference}
+							disabled={supportMode}
+							placeholder={supportMode ? 'Номер присвоїть сервер' : undefined}
 							oninput={() => (referenceOverridden = true)}
+							onkeydown={handleInputEnter}
 							class="h-12 w-full rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-blue-600"
 						/>
 					</label>
@@ -620,10 +750,12 @@
 						<input
 							bind:value={title}
 							oninput={() => (purposeOverridden = true)}
+							onkeydown={handleInputEnter}
 							class="h-12 w-full rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-blue-600"
 						/>
 					</label>
 
+					{#if !supportMode}
 					<div
 						class="flex flex-col gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-950 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between"
 					>
@@ -642,6 +774,7 @@
 							><RotateCcw size={14} aria-hidden="true" /> Відновити за правилами</button
 						>
 					</div>
+					{/if}
 
 					<label
 						class={scenario === 'fixed' || scenario === 'recurring' || scenario === 'rtp'
@@ -653,8 +786,24 @@
 						>
 						<div class="relative">
 							<input
+								bind:this={amountInput}
 								bind:value={amount}
 								inputmode="decimal"
+								onfocus={() => {
+									if (amount === '0') amountInput?.select();
+								}}
+								onclick={() => {
+									if (amount === '0') amountInput?.select();
+								}}
+								oninput={() => {
+									if (amount.includes(',')) {
+										amount = amount.replace(',', '.');
+									}
+									if (/^0\d+/.test(amount)) {
+										amount = amount.replace(/^0+/, '');
+									}
+								}}
+								onkeydown={handleInputEnter}
 								class="h-12 w-full rounded-md border border-zinc-200 px-3 pr-10 text-sm font-bold tabular-nums outline-none focus:border-blue-600"
 							/><span class="absolute top-3.5 right-3 text-sm text-zinc-400">₴</span>
 						</div>
@@ -667,6 +816,12 @@
 								<input
 									bind:value={minimumAmount}
 									inputmode="decimal"
+									oninput={() => {
+										if (minimumAmount.includes(',')) {
+											minimumAmount = minimumAmount.replace(',', '.');
+										}
+									}}
+									onkeydown={handleInputEnter}
 									class="h-12 w-full rounded-md border border-zinc-200 px-3 pr-10 text-sm outline-none focus:border-blue-600"
 								/><span class="absolute top-3.5 right-3 text-sm text-zinc-400">₴</span>
 							</div>
@@ -695,6 +850,7 @@
 								bind:value={recurrenceCount}
 								inputmode="numeric"
 								placeholder="Без обмеження"
+								onkeydown={handleInputEnter}
 								class="h-12 w-full rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-blue-600"
 							/></label
 						>
@@ -714,6 +870,7 @@
 								bind:value={rtpCustomerId}
 								autocomplete="off"
 								placeholder="Наприклад, customer_1049"
+								onkeydown={handleInputEnter}
 								class="h-12 w-full rounded-md border border-zinc-200 px-3 font-mono text-sm outline-none focus:border-blue-600"
 							/></label
 						>
@@ -756,6 +913,21 @@
 								<input
 									bind:value={deliveryFee}
 									inputmode="decimal"
+									onfocus={(e) => {
+										if (deliveryFee === '0') (e.currentTarget as HTMLInputElement).select();
+									}}
+									onclick={(e) => {
+										if (deliveryFee === '0') (e.currentTarget as HTMLInputElement).select();
+									}}
+									oninput={() => {
+										if (deliveryFee.includes(',')) {
+											deliveryFee = deliveryFee.replace(',', '.');
+										}
+										if (/^0\d+/.test(deliveryFee)) {
+											deliveryFee = deliveryFee.replace(/^0+/, '');
+										}
+									}}
+									onkeydown={handleInputEnter}
 									class="h-12 w-full rounded-md border border-zinc-200 px-3 pr-10 text-sm outline-none focus:border-blue-600"
 								/><span class="absolute top-3.5 right-3 text-sm text-zinc-400">₴</span>
 							</div></label
@@ -763,6 +935,7 @@
 						<label
 							><span class="mb-2 block text-xs font-bold text-zinc-600">Місто</span><input
 								bind:value={deliveryCity}
+								onkeydown={handleInputEnter}
 								class="h-12 w-full rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-blue-600"
 							/></label
 						>
@@ -777,6 +950,7 @@
 									aria-hidden="true"
 								/><input
 									bind:value={deliveryBranch}
+									onkeydown={handleInputEnter}
 									class="h-12 w-full rounded-md border border-zinc-200 pr-3 pl-10 text-sm outline-none focus:border-blue-600"
 								/>
 							</div></label
@@ -841,9 +1015,36 @@
 			class="h-fit overflow-hidden rounded-lg border border-zinc-200 bg-white xl:sticky xl:top-24"
 		>
 			<div class="border-b border-zinc-200 p-5">
+				{#if scenario === 'fixed' || scenario === 'table' || scenario === 'delivery'}
+					<label class="block">
+						<span class="text-xs font-bold text-zinc-500 uppercase">Сума рахунку</span>
+						<div class="relative mt-3">
+							<input
+								bind:this={keypadAmountInput}
+								bind:value={amount}
+								inputmode="decimal"
+								aria-label="Сума рахунку"
+								aria-describedby={scenario === 'delivery' ? 'invoice-goods-amount' : undefined}
+								onfocus={(event) => { if (amount === '0') event.currentTarget.select(); }}
+								onclick={(event) => { if (amount === '0') event.currentTarget.select(); }}
+								oninput={() => {
+									if (amount.includes(',')) amount = amount.replace(',', '.');
+									if (/^0\d+/.test(amount)) amount = amount.replace(/^0+/, '');
+								}}
+								onkeydown={handleInputEnter}
+								class="h-12 w-full min-w-0 rounded-md border border-zinc-200 px-3 pr-10 text-2xl font-bold tabular-nums outline-none focus:border-blue-600"
+							/><span class="absolute top-3.5 right-3 text-sm text-zinc-400">₴</span>
+						</div>
+					</label>
+					{#if scenario === 'delivery'}
+						<p id="invoice-goods-amount" class="mt-2 text-xs text-zinc-500">Вартість товарів без доставки</p>
+					{/if}
+					<p class="mt-3 text-xs font-bold text-zinc-500">Сума до сплати</p>
+				{:else}
 				<p class="text-xs font-bold tracking-[0.12em] text-zinc-500 uppercase">Сума рахунку</p>
+				{/if}
 				<div class="mt-3 flex items-baseline justify-between gap-3">
-					<strong class="text-4xl font-extrabold tabular-nums">{formatMoney(total)}</strong>
+					<strong class="min-w-0 break-all text-4xl font-extrabold tabular-nums">{formatMoney(total)}</strong>
 				</div>
 				{#if scenario === 'open_amount'}<p class="mt-2 text-xs text-zinc-500">
 						Клієнт зможе змінити суму від {formatMoney(Number.parseFloat(minimumAmount) || 0)}.
@@ -984,6 +1185,8 @@
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="invoice-preview-title"
+			tabindex="-1"
+			onkeydown={handlePreviewKeydown}
 			class="w-full rounded-t-xl bg-white p-5 shadow-xl sm:max-w-md sm:rounded-lg sm:p-6"
 		>
 			<div class="flex items-start justify-between">
@@ -991,11 +1194,14 @@
 					<p class="text-xs font-bold tracking-[0.12em] text-blue-700 uppercase">
 						Попередній перегляд
 					</p>
-					<h2 id="invoice-preview-title" class="mt-1 text-xl font-extrabold">{reference}</h2>
+					<h2 id="invoice-preview-title" class="mt-1 text-xl font-extrabold">{supportMode ? 'Рахунок клієнта' : reference}</h2>
 				</div>
 				<button
 					type="button"
-					onclick={() => (previewOpen = false)}
+					onclick={() => {
+						previewOpen = false;
+						void tick().then(() => focusAmountInput());
+					}}
 					class="grid size-10 place-items-center rounded-md border border-zinc-200"
 					aria-label="Закрити"><X size={18} aria-hidden="true" /></button
 				>
@@ -1009,7 +1215,7 @@
 						class="mt-4 w-full rounded-md border border-zinc-800 bg-zinc-900 p-3 text-left text-xs"
 					>
 						<div class="text-zinc-400">
-							Отримувач: <span class="font-bold text-white">{selectedEntity.businessName}</span>
+							{supportMode ? 'Продавець' : 'Отримувач'}: <span class="font-bold text-white">{selectedEntity.businessName}</span>
 						</div>
 						<div class="mt-1 text-zinc-400">
 							IBAN: <span class="font-mono text-zinc-200">{selectedEntity.iban}</span>
@@ -1030,12 +1236,9 @@
 			{:else if submitError}<p class="mt-5 text-sm text-red-700" role="alert">{submitError}</p>{/if}
 			<button
 				type="button"
+				bind:this={submitButton}
 				onclick={createInvoice}
-				disabled={!onCreate ||
-					submitting ||
-					scenario === 'recurring' ||
-					scenario === 'rtp' ||
-					!canCreateFromTemplate}
+				disabled={!canSubmitInvoice}
 				class="mt-4 h-12 w-full rounded-md bg-blue-600 text-sm font-extrabold text-white disabled:bg-zinc-200 disabled:text-zinc-500"
 				>{submitting ? 'Створюємо…' : 'Створити рахунок і QR'}</button
 			>

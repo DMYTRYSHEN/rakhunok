@@ -20,7 +20,9 @@ test('serves isolated assets before the dashboard shell, preserving the request 
 			const response = await routeDashboardRequest(request, {
 				ASSETS: {
 					fetch: (received) => {
-						assert.equal(received, request);
+						assert.equal(new URL(received.url).pathname, new URL(request.url).pathname.slice('/dashboard'.length));
+						assert.equal(new URL(received.url).search, new URL(request.url).search);
+						assert.equal(received.method, request.method);
 						return asset;
 					}
 				},
@@ -80,6 +82,80 @@ test('preserves API method, query, body and authorization without touching asset
 		}
 	});
 	assert.equal(response.status, 200);
+});
+
+test('shell keeps root route base but scopes every bootstrap asset to Dashboard', async () => {
+	const response = await routeDashboardRequest(new Request('https://letsrealtalk.com/dashboard/'), {
+		ASSETS: { fetch: async () => new Response('<link href="/_app/style.css"><script>base: ""; import("/_app/start.js")</script>') }
+	});
+	const html = await response.text();
+	assert.ok(html.includes('href="/dashboard/_app/style.css"'));
+	assert.ok(html.includes('import("/dashboard/_app/start.js")'));
+	assert.ok(html.includes('base: ""'));
+	assert.equal(response.headers.get('Cache-Control'), 'no-store');
+});
+
+test('canonicalizes only test Dashboard GET and HEAD without touching bindings', async () => {
+	for (const method of ['GET', 'HEAD']) {
+		const response = await routeDashboardRequest(
+			new Request('https://letsrealtalk.com/dashboard?source=landing&next=%2Fdashboard%2Fstructure', { method }),
+			{ ASSETS: { fetch: () => assert.fail('Redirect must not fetch assets') },
+				API: { fetch: () => assert.fail('Redirect must not reach API') } }
+		);
+		assert.equal(response.status, 307);
+		assert.equal(response.headers.get('Location'),
+			'https://letsrealtalk.com/dashboard/?source=landing&next=%2Fdashboard%2Fstructure');
+		assert.equal(response.headers.get('Cache-Control'), 'no-store');
+		assert.equal(await response.text(), '');
+	}
+	for (const [url, method] of [
+		['https://letsrealtalk.com/dashboard/', 'GET'],
+		['https://letsrealtalk.com/dashboard', 'POST'],
+		['https://rakhunok.com/dashboard', 'GET'],
+		['https://letsrealtalk.com/dashboard/structure', 'GET']
+	]) {
+		const { env, assetPaths } = createEnv();
+		const response = await routeDashboardRequest(new Request(url, { method }), env);
+		assert.equal(response.status, 200);
+		assert.equal(response.headers.has('Location'), false);
+		assert.deepEqual(assetPaths, ['/200']);
+	}
+});
+
+test('isolates test onboarding and never falls back after dispatch or missing binding', async () => {
+	const request = () => new Request('https://letsrealtalk.com/dashboard/api/v1/merchant/onboarding?source=dashboard', {
+		method: 'POST', headers: { Authorization: 'Bearer caller' }, body: '{"input":true}'
+	});
+	const env = {
+		ASSETS: { fetch: () => assert.fail('No asset access') },
+		API: { fetch: () => assert.fail('No ordinary API fallback') }
+	};
+	assert.equal((await routeDashboardRequest(request(), env)).status, 503);
+	assert.equal((await routeDashboardRequest(request(), {
+		...env, ONBOARDING: { fetch: () => { throw new Error('unavailable'); } }
+	})).status, 503);
+	const response = await routeDashboardRequest(request(), {
+		...env, ONBOARDING: { async fetch(proxied) {
+			assert.equal(proxied.url, 'https://letsrealtalk.com/api/v1/merchant/onboarding?source=dashboard');
+			assert.equal(proxied.headers.get('Authorization'), 'Bearer caller');
+			assert.equal(proxied.method, 'POST');
+			assert.equal(await proxied.text(), '{"input":true}');
+			return Response.json({ created: false });
+		} }
+	});
+	assert.equal(response.status, 200);
+	for (const method of ['GET', 'PUT', 'OPTIONS']) {
+		assert.equal((await routeDashboardRequest(new Request(request().url, { method }), env)).status, 405);
+	}
+	for (const url of [
+		'https://example.com/dashboard/api/v1/merchant/onboarding',
+		'https://letsrealtalk.com/dashboard/api/v1/merchant/onboarding/other',
+		'https://letsrealtalk.com/dashboard/api/merchant/onboarding'
+	]) {
+		const { env: ordinary, apiPaths } = createEnv();
+		await routeDashboardRequest(new Request(url, { method: 'POST' }), ordinary);
+		assert.equal(apiPaths.length, 1);
+	}
 });
 
 function createEnv() {

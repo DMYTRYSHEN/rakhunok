@@ -21,18 +21,25 @@
 		type SellerDraft
 	} from './business-settings';
 	import TemplateList from './templates/TemplateList.svelte';
+	import type { TemplateRepository } from '../templates/template-repository';
 
 	let {
 		merchant,
 		entities,
 		userId,
 		demo = false,
+		repository = createSettingsRepository(),
+		templateRepository,
+		supportWorkspace = null,
 		view
 	}: {
 		merchant: DashboardMerchant;
 		entities: BusinessEntity[];
 		userId: string;
 		demo?: boolean;
+		repository?: ReturnType<typeof createSettingsRepository>;
+		templateRepository?: TemplateRepository;
+		supportWorkspace?: 'sandbox' | 'live' | null;
 		view: BusinessSettingsView;
 	} = $props();
 	const uid = $props.id();
@@ -62,7 +69,6 @@
 	let revision = $state(0);
 	let busy = $state(false);
 	let generation = 0;
-	const repository = createSettingsRepository();
 	let storageConflict = $state(false);
 	let dirty = $state(false);
 	let feedback = $state('');
@@ -192,7 +198,9 @@
 			revision = snapshot.revision;
 			dirty = false;
 			error = '';
-			feedback = demo
+			feedback = supportWorkspace === 'sandbox'
+				? `Налаштування збережено лише в пісочниці. Версія ${revision}. Дані клієнта не змінено.`
+				: demo
 				? 'Усі чернетки збережено лише в цьому браузері. Робочі платежі не змінено.'
 				: `Усі налаштування збережено в базі однією транзакцією. Версія ${revision}. Робочі платежі не змінено.`;
 		} catch (cause) {
@@ -379,7 +387,11 @@
 			>
 		</div>
 	{:else if view === 'checkout-templates'}
-		<TemplateList merchantId={merchant.id} {demo} />
+		{#if supportWorkspace && !templateRepository}
+			<p role="alert">Шаблони клієнта недоступні в цьому контексті підтримки.</p>
+		{:else}
+			<TemplateList merchantId={merchant.id} {demo} repository={templateRepository} />
+		{/if}
 	{:else}
 		<form
 			onsubmit={(event) => {

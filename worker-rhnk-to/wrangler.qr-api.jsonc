@@ -1,0 +1,6 @@
+{
+	"name": "rhnk-to-qr-api", "account_id": "753ff9292511c16a281c5cfa8e105c63",
+	"main": "../apps/qr/src/index.ts", "compatibility_date": "2026-10-04", "workers_dev": false, "preview_urls": false,
+	"observability": { "enabled": true, "traces": { "enabled": true } },
+	"routes": [{ "pattern": "qr.rhnk.to", "custom_domain": true }]
+}

@@ -1,0 +1,27 @@
+{
+	"name": "rhnk-to-main",
+	"account_id": "753ff9292511c16a281c5cfa8e105c63",
+	"main": "./static.ts",
+	"compatibility_date": "2026-10-04",
+	"workers_dev": false,
+	"preview_urls": false,
+	"assets": {
+		"directory": "../apps/main/dist",
+		"binding": "ASSETS",
+		"run_worker_first": true,
+		"not_found_handling": "single-page-application"
+	},
+	"vars": {
+		"BASE_PATH": "/main"
+	},
+	"observability": {
+		"enabled": true,
+		"traces": {
+			"enabled": true
+		}
+	},
+	"routes": [
+		{ "pattern": "rhnk.to/main", "zone_name": "rhnk.to" },
+		{ "pattern": "rhnk.to/main/*", "zone_name": "rhnk.to" }
+	]
+}

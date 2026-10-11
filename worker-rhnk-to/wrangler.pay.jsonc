@@ -1,0 +1,17 @@
+{
+	"name": "rhnk-to-pay", "account_id": "753ff9292511c16a281c5cfa8e105c63",
+	"main": "../worker/src/checkout.js", "compatibility_date": "2026-10-04",
+	"compatibility_flags": ["nodejs_compat"], "workers_dev": false, "preview_urls": false,
+	"assets": { "directory": "../apps/pay/dist", "binding": "ASSETS", "run_worker_first": true },
+	"services": [{ "binding": "API", "service": "rhnk-to-web" }],
+	"d1_databases": [{ "binding": "BANK_CATALOG_DB", "database_name": "letsrealtalk-conf-snapshots", "database_id": "2e5d61b8-d603-420e-8a17-231cd5c9340f" }],
+	"observability": { "enabled": true, "traces": { "enabled": true } },
+	"routes": [
+		{ "pattern": "rhnk.to/pay", "zone_name": "rhnk.to" }, { "pattern": "rhnk.to/pay/*", "zone_name": "rhnk.to" },
+		{ "pattern": "rhnk.to/checkout*", "zone_name": "rhnk.to" }, { "pattern": "rhnk.to/o/*", "zone_name": "rhnk.to" },
+		{ "pattern": "rhnk.to/t/*", "zone_name": "rhnk.to" }, { "pattern": "rhnk.to/tag/*", "zone_name": "rhnk.to" },
+		{ "pattern": "rhnk.to/pos/*", "zone_name": "rhnk.to" }, { "pattern": "rhnk.to/api/v1/checkout*", "zone_name": "rhnk.to" },
+		{ "pattern": "rhnk.to/api/v1/banks*", "zone_name": "rhnk.to" }, { "pattern": "rhnk.to/api/v1/logos*", "zone_name": "rhnk.to" },
+		{ "pattern": "rhnk.to/api/v1/bank-logo*", "zone_name": "rhnk.to" }
+	]
+}

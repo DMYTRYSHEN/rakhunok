@@ -38,7 +38,9 @@ export type CreateOrderInput = {
 	entityId?: string;
 	terminalId?: string;
 	description?: string;
-	tableNumber?: number;
+	tableNumber?: number | null;
+	status?: 'pending';
+	expiresAt?: string | null;
 };
 
 type EntityRow = {
@@ -112,7 +114,9 @@ export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeo
 					terminal_id: input.terminalId,
 					description: input.description,
 					amount: input.amount,
-					table_number: input.tableNumber
+					table_number: input.tableNumber,
+					status: input.status,
+					expires_at: input.expiresAt
 				})
 			}, expectedUserId, isCurrent);
 			const payload = (await response.json()) as { order: OrderRow };
@@ -166,6 +170,17 @@ export function createMerchantDataGateway(client: SupabaseClient, fetcher: typeo
 					entityId: terminal.entity_id
 				}))
 			};
+		},
+
+		async getTableOrderTtlSeconds(merchantId: string): Promise<number> {
+			try {
+				const result = await client.from('merchant_settings')
+					.select('table_order_ttl_seconds').eq('merchant_id', merchantId).maybeSingle();
+				if (result.error) return 1800;
+				return result.data?.table_order_ttl_seconds ?? 1800;
+			} catch {
+				return 1800;
+			}
 		},
 
 		async listOrders(merchantId: string, createdAfter?: string): Promise<OrderSummary[]> {

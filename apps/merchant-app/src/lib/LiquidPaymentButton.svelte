@@ -1357,6 +1357,24 @@
 	.action-btn { min-width: 0; overflow-wrap: anywhere; }
 	.action-btn > span { display: flex; flex-shrink: 0; }
 	.cancel-btn { background: transparent; border-color: transparent; }
+	@media (max-height: 740px) {
+		.invoice-dialog-header { min-height: 52px; padding: 4px 12px 4px 16px; }
+		.invoice-details { gap: 2px; padding: 4px 16px; }
+		.payment-state { margin: 0; padding: 2px 8px; min-height: 28px; border-radius: 8px; font-size: 12px; }
+		.payment-state-mark { width: 20px; height: 20px; background: transparent; }
+		.creation-eyebrow { margin: 0; font-size: 12px; line-height: 1.3; }
+		.creation-amount { margin: 0; font-size: 30px; line-height: 1.2; }
+		.qr-wrapper { margin: 4px auto; padding: 6px; }
+		.qr-wrapper :global(.payment-qr-frame) { width: min(208px, 54vw, 28svh); }
+		.qr-entry-heading span { font-size: 11px; line-height: 1.25; }
+		.order-reference { margin: 0; font-size: 11px; gap: 4px 8px; }
+		.payment-instruction { margin: 0; font-size: 12px; }
+		.invoice-actions { padding: 6px 12px max(6px, env(safe-area-inset-bottom)); }
+		.order-actions-grid { gap: 6px; }
+		.order-actions-grid .share-btn { grid-column: auto; }
+		.action-btn { min-height: 44px; padding: 6px; font-size: 12px; }
+		.cancel-btn { min-height: 44px; margin-top: 4px; padding: 6px; }
+	}
 	@media (min-width: 768px) { .card-drag-zone { display: none; } .invoice-dialog-header { padding-top: 8px; } }
 	@media (max-width: 374px) { .layer-creation-content { padding-inline: 16px; } .invoice-dialog-header { padding-left: 16px; } .creation-amount { font-size: 30px; } }
 	button:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; }

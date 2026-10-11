@@ -1,0 +1,17 @@
+{
+	"$schema": "../worker/node_modules/wrangler/config-schema.json",
+	"name": "rhnk-to-web", "account_id": "753ff9292511c16a281c5cfa8e105c63",
+	"main": "../worker/src/index.ts", "compatibility_date": "2026-10-04",
+	"compatibility_flags": ["nodejs_compat"], "workers_dev": false, "preview_urls": false,
+	"routes": [],
+	"assets": { "directory": "../build", "binding": "ASSETS", "run_worker_first": true, "not_found_handling": "single-page-application" },
+	"vars": {
+		"PUBLIC_DOMAIN": "https://rhnk.to", "TELEGRAM_INVOICE_PUBLIC_ORIGIN": "https://rhnk.to",
+		"MERCHANT_API_KEYS_ENABLED": "false",
+		"SUPABASE_URL": "https://mwaeazabpvbxqfrceogr.supabase.co",
+		"SUPABASE_ANON_KEY": "sb_publishable_BOyIBn3I0As0hP_0NutVtg_9ddFdyDk"
+	},
+	"d1_databases": [{ "binding": "BANK_CATALOG_DB", "database_name": "letsrealtalk-conf-snapshots", "database_id": "2e5d61b8-d603-420e-8a17-231cd5c9340f" }],
+	"r2_buckets": [{ "binding": "BANK_LOGOS_BUCKET", "bucket_name": "rhnk-bank-logos" }],
+	"observability": { "enabled": true, "traces": { "enabled": true } }
+}

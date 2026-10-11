@@ -13,11 +13,13 @@
 		invoices,
 		onCancel,
 		onInvoicePaid,
+		supportMode = false,
 		demo = false
 	}: {
 		invoices: InvoiceRecord[];
 		onCancel?: (invoiceId: string) => Promise<void>;
 		onInvoicePaid?: (invoiceId: string, bankCode: string) => void;
+		supportMode?: boolean;
 		demo?: boolean;
 	} = $props();
 	let activeTab = $state<'invoices' | 'discrepancies'>('invoices');
@@ -68,7 +70,7 @@
 		<div>
 			<p class="text-xs font-bold tracking-[0.12em] text-blue-700 uppercase">Платіжний журнал</p>
 			<h1 class="mt-2 text-2xl font-semibold sm:text-3xl">Рахунки</h1>
-			<p class="mt-2 text-sm text-zinc-500">Пошук і контроль усіх платежів бізнесу.</p>
+			<p class="mt-2 text-sm text-zinc-500">{supportMode ? 'До 100 останніх рахунків клієнта · лише перегляд' : 'Пошук і контроль усіх платежів бізнесу.'}</p>
 		</div>
 		<div class="flex gap-2">
 			<button
@@ -98,6 +100,7 @@
 		>
 			Усі рахунки ({invoices.length})
 		</button>
+		{#if !supportMode}
 		<button
 			type="button"
 			onclick={() => (activeTab = 'discrepancies')}
@@ -110,9 +113,10 @@
 				{demoDiscrepancies.filter((d) => d.status === 'unresolved').length}
 			</span>
 		</button>
+		{/if}
 	</div>
 
-	{#if activeTab === 'discrepancies'}
+	{#if !supportMode && activeTab === 'discrepancies'}
 		<DiscrepancyDispatcher {invoices} {onInvoicePaid} />
 	{:else}
 	<section class="rounded-lg border border-zinc-200 bg-white" aria-label="Реєстр рахунків">
@@ -189,6 +193,7 @@
 					<div class="min-w-0">
 						<a
 							href={resolve(detailHref(invoice.id))}
+							data-sveltekit-reload={supportMode}
 							class="block truncate text-sm font-bold text-zinc-900 active:text-blue-700"
 							>{invoice.title}</a
 						>
@@ -199,7 +204,7 @@
 					</p>
 					<p class="text-xs text-zinc-500">{formatInvoiceDate(invoice.createdAt)}</p>
 					<div class="justify-self-end"><StatusBadge status={invoice.status} /></div>
-					{#if cancellation.eligible}
+					{#if !supportMode && cancellation.eligible}
 						<button
 							type="button"
 							disabled={demo || !onCancel || Boolean(cancellingId)}
@@ -236,7 +241,7 @@
 						{@const cancellation = cancellationFor(invoice)}
 						<tr class="group hover:bg-zinc-50">
 							<td class="px-5 py-4">
-								<a href={resolve(detailHref(invoice.id))} class="block">
+								<a href={resolve(detailHref(invoice.id))} data-sveltekit-reload={supportMode} class="block">
 									<span class="block text-sm font-bold group-hover:text-blue-700"
 										>{invoice.reference}</span
 									>
@@ -251,7 +256,7 @@
 								>{formatMoney(invoice.amount)}</td
 							>
 							<td class="px-5 py-4 text-right">
-								{#if cancellation.eligible}
+								{#if !supportMode && cancellation.eligible}
 									<button
 										type="button"
 										disabled={demo || !onCancel || Boolean(cancellingId)}

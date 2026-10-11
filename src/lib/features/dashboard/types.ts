@@ -23,11 +23,15 @@ export type DashboardUser = {
 
 export type MerchantOnboardingInput = {
 	businessName: string;
-	businessType: 'fop' | 'tov';
+	businessType: 'fop' | 'tov' | 'self_employed' | 'ngo';
+	vatStatus: 'vat' | 'no-vat';
 	taxId: string;
 	iban: string;
 	displayName: string;
 	bankName: string;
+	phone?: string;
+	contactEmail?: string;
+	website?: string;
 };
 
 export type { CheckoutScenarioConfig as ScenarioConfig } from '$lib/features/shared/checkout-scenario-config';
@@ -175,6 +179,7 @@ export type DashboardSessionState =
 	| {
 			status: 'ready';
 			user: DashboardUser;
+			support?: import('./api/support-cabinet').SupportContext;
 			merchant: DashboardMerchant;
 			snapshot: OverviewSnapshot;
 	  }

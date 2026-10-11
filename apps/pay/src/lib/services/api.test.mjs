@@ -43,6 +43,26 @@ function assertFailed(result) {
   }
 }
 
+test('payment pre-aborted caller signal performs no request', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  const result = await initiateBankPayment('order-7', 'TASB', 100, {
+    signal: controller.signal,
+    fetchImpl: () => assert.fail('Cancelled request must not start')
+  });
+  assertFailed(result);
+});
+
+test('payment caller abort reaches the active fetch signal', async () => {
+  const controller = new AbortController();
+  const result = await payment(async (_url, init) => {
+    controller.abort();
+    assert.equal(init.signal.aborted, true);
+    throw new DOMException('Cancelled', 'AbortError');
+  }, { signal: controller.signal });
+  assertFailed(result);
+});
+
 test('selects the local Worker only for localhost development', () => {
   assert.equal(getApiBase({ hostname: 'localhost', port: '59692' }), 'http://localhost:8787');
   assert.equal(getApiBase({ hostname: 'localhost', port: '8787' }), '');

@@ -10,13 +10,18 @@
 		"apps/conf",
 		"apps/qr",
 		"apps/platform",
-		"apps/dac7"
+		"apps/dac7",
+		"apps/main"
 	],
 	"engines": {
 		"node": ">=22.13 <23 || >=24"
 	},
 	"scripts": {
 		"dev": "vite dev",
+		"dev:main": "npm --prefix apps/main run dev",
+		"build:main": "npm --prefix apps/main run build",
+		"deploy:main": "npm run build:main && npm --prefix worker exec wrangler -- deploy --config ../worker-rhnk-to/wrangler.main.jsonc",
+		"dev:support": "node --watch worker-rhnk-to/support-api-local-server.mjs",
 		"dev:worker": "npm --prefix worker run dev",
 		"dev:app": "npm --prefix apps/merchant-app run dev",
 		"dev:pay": "npm --prefix apps/pay run dev",
@@ -47,7 +52,8 @@
 		"test:conf": "npm --prefix apps/conf run test",
 		"test:qr": "npm --prefix apps/qr run test",
 		"generate:processes": "node --experimental-strip-types scripts/generate-process-manifest.ts",
-		"build": "npm run generate:processes && vite build && npm run build:docs",
+		"build:photos": "node scripts/prepare-landing-photos.mjs",
+		"build": "npm run build:photos && npm run generate:processes && vite build && npm run build:docs",
 		"build:dashboard:isolated": "npm run generate:processes && vite build --mode dashboard-isolated && node scripts/assert-dashboard-isolated-build.mjs",
 		"check:dashboard:isolated": "npm --prefix worker run check:dashboard:isolated",
 		"deploy:dashboard:isolated": "npm run build:dashboard:isolated && npm run check:dashboard:isolated && npm --prefix worker run deploy:dashboard:isolated",
@@ -56,7 +62,7 @@
 		"preview": "vite preview",
 		"audit:openapi": "node --experimental-strip-types scripts/audit-openapi-coverage.ts",
 		"prepare": "svelte-kit sync || echo ''",
-		"check": "npm run audit:openapi && npm run generate:processes && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check": "node scripts/assert-dashboard-process-registry.mjs && npm run audit:openapi && npm run generate:processes && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "npm run lint:format && npm run lint:eslint",
 		"lint:format": "prettier --check .",
@@ -88,6 +94,7 @@
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@tailwindcss/vite": "^4.3.0",
 		"@types/node": "^22",
+		"@types/papaparse": "^5.5.2",
 		"@types/qrcode": "^1.5.6",
 		"@types/three": "^0.186.0",
 		"eslint": "^10.4.1",
@@ -117,9 +124,11 @@
 		"@supabase/supabase-js": "^2.112.4",
 		"@xyflow/svelte": "^1.6.5",
 		"mermaid": "^11.17.2",
+		"papaparse": "^5.7.0",
 		"qrcode": "^1.5.4",
 		"three": "^0.186.1",
-		"webgl-fluid": "^0.4.0"
+		"webgl-fluid": "^0.4.0",
+		"xlsx": "^0.18.5"
 	},
 	"optionalDependencies": {
 		"@cloudflare/workerd-windows-64": "^1.20260921.1"

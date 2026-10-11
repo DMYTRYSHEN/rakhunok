@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RHNK | Підтримка клієнта</title>
+  <link rel="stylesheet" href="/support-local.css">
+  <script src="/support-local.js" defer></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/">RHNK<span>HELPDESK</span></a><span class="local-tag">Локально · синтетичні дані</span></header>
+  <main>
+    <div class="heading"><div><p class="eyebrow">Клієнтські операції</p><h1>Режим підтримки клієнта</h1></div><span class="identity">Адміністратор · demo identity</span></div>
+    <div id="notice" role="status" aria-live="polite"></div>
+    <section id="entry">
+      <div class="section-title"><h2>Клієнт</h2><span>01 / Локальний стенд</span></div>
+      <div class="customer"><img src="/business.webp" alt="" width="88" height="88"><div><h3>Demo Atelier</h3><p>Demo Merchant · синтетичний бізнес</p><span class="status">Активний</span></div></div>
+      <form id="open-form" class="entry-form">
+        <fieldset><legend>Середовище</legend><div class="segments"><label><input type="radio" name="workspace" value="sandbox" checked>Sandbox</label><label><input type="radio" name="workspace" value="live">Live · симуляція</label></div></fieldset>
+        <label>Причина звернення<select name="reason"><option value="INVOICE_CONFIGURATION">Налаштування рахунків</option><option value="INVOICE_CREATION">Створення рахунку</option><option value="CLIENT_REPRODUCTION">Відтворення помилки</option></select></label>
+        <button class="primary" type="submit">Увійти в підтримку</button>
+      </form>
+      <p class="boundary">Реальний бізнес не підключений. MFA, роль адміністратора та платіжні інтеграції тут демонстраційні.</p>
+    </section>
+    <section id="workspace" hidden>
+      <div id="support-banner" class="support-banner"><div><strong id="workspace-label"></strong><span id="session-detail"></span></div><div class="banner-actions"><span id="timer"></span><button id="exit" type="button">Вийти з підтримки</button></div></div>
+      <div class="business-heading"><div><h2>Demo Atelier</h2><p>Demo Merchant · <span id="revision"></span></p></div><div class="access"><span id="access-label"></span><button id="elevate" type="button">Дозволити локальні записи</button></div></div>
+      <nav class="tabs" aria-label="Розділи підтримки"><button data-tab="invoices" class="selected" type="button">Рахунки <span id="invoice-count">0</span></button><button data-tab="settings" type="button">Налаштування</button><button data-tab="audit" type="button">Аудит</button></nav>
+      <section id="invoices-panel" class="panel">
+        <div class="section-title"><h3>Рахунки</h3><button id="new-invoice" class="primary" type="button">Створити рахунок</button></div>
+        <div class="table-scroll"><table><thead><tr><th>Номер / призначення</th><th>Сценарій</th><th>Сума</th><th>Статус</th><th>Діє до</th></tr></thead><tbody id="invoices"></tbody></table></div>
+      </section>
+      <section id="settings-panel" class="panel" hidden>
+        <div class="section-title"><h3>Платіжні правила</h3><span id="settings-revision"></span></div>
+        <form id="settings-form" class="settings-grid">
+          <label class="wide">Платіжний IBAN<input name="paymentRequisites" required pattern="UA[0-9]{27}" maxlength="29"></label>
+          <label>Префікс рахунку<input name="prefix" required pattern="[A-Z0-9\-]{1,12}" maxlength="12"></label>
+          <label>Наступний номер<input name="nextNumber" type="number" min="1" max="999999999" required></label>
+          <label>Строк дії, хвилини<input name="lifetime" type="number" min="1" max="10080" required></label>
+          <div class="wide"><button id="save-settings" class="primary" type="submit">Переглянути зміни</button></div>
+        </form>
+      </section>
+      <section id="audit-panel" class="panel" hidden><div class="section-title"><h3>Журнал підтримки</h3><button id="refresh" type="button">Оновити</button></div><div class="table-scroll"><table><thead><tr><th>Час</th><th>Дія</th><th>Результат</th><th>Операція / сесія</th></tr></thead><tbody id="audit"></tbody></table></div></section>
+      <div class="session-footer"><span id="session-id"></span><span>Локальний файловий журнал · без Axiom</span></div>
+    </section>
+  </main>
+  <dialog id="invoice-dialog"><form id="invoice-form"><div class="dialog-heading"><h2>Новий рахунок</h2><button class="icon" type="button" id="close-invoice" aria-label="Закрити" title="Закрити">×</button></div>
+    <label>Сценарій<select name="scenario"><option value="fixed">Фіксована сума</option><option value="open_amount">Відкрита сума</option><option value="table">Стіл</option><option value="delivery">Доставка</option></select></label>
+    <label>Призначення<input name="title" required maxlength="120" value="Тестовий рахунок"></label>
+    <label id="amount-label">Сума, UAH<input name="amount" type="number" required min="0.01" max="1000000" step="0.01" value="45"></label>
+    <label id="reference-label" hidden>Стіл / адреса доставки<input name="reference" maxlength="120"></label>
+    <div class="dialog-actions"><button type="button" id="cancel-invoice">Скасувати</button><button class="primary" type="submit">Переглянути рахунок</button></div>
+  </form></dialog>
+  <dialog id="confirm-dialog"><div class="dialog-heading"><h2 id="confirm-title">Підтвердження операції</h2><button class="icon" type="button" id="close-confirm" aria-label="Скасувати" title="Скасувати">×</button></div><div id="confirmation-summary"></div><p id="confirmation-id" class="code"></p><label class="acknowledgement"><input id="acknowledged" type="checkbox">Підтверджую запис у вибраному локальному середовищі</label><div class="dialog-actions"><button id="cancel-confirm" type="button">Скасувати</button><button id="commit" type="button" class="primary" disabled>Підтвердити запис</button></div></dialog>
+  <dialog id="elevation-dialog"><div class="dialog-heading"><h2>Live · локальна симуляція</h2></div><p>Дозволити створення рахунків і зміну налаштувань для Demo Atelier?</p><p class="boundary">Це не справжня MFA. Робоча база не підключена.</p><div class="dialog-actions"><button id="cancel-elevation" type="button">Скасувати</button><button id="approve-elevation" class="primary" type="button">Дозволити в симуляції</button></div></dialog>
+</body>
+</html>

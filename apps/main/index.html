@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="uk" class="light">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>RAHUNOK — Екосистема одинадцяти модулів</title>
+		<meta name="description" content="Презентація повної платіжної екосистеми RAHUNOK / COREX у світлій темі Джонатана Айва." />
+		<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'><circle cx='12' cy='12' r='10'/></svg>" />
+		<script src="https://cdn.tailwindcss.com"></script>
+		<style>
+			@import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap');
+			body {
+				font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", sans-serif;
+				background-color: #fbfbfd;
+				color: #1d1d1f;
+			}
+			::selection {
+				background-color: #000000;
+				color: #ffffff;
+			}
+			::-webkit-scrollbar { width: 6px; height: 6px; }
+			::-webkit-scrollbar-track { background: transparent; }
+			::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.12); border-radius: 9999px; }
+			::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.25); }
+		</style>
+	</head>
+	<body class="bg-[#fbfbfd] text-[#1d1d1f] antialiased min-h-screen">
+		<div id="app"></div>
+
+		<!-- Vite entry point -->
+		<script type="module" src="/src/main.ts"></script>
+
+		<!-- Standalone fallback in case index.html is opened directly via file:// or without Vite -->
+		<script>
+			window.addEventListener('DOMContentLoaded', () => {
+				setTimeout(() => {
+					const appEl = document.getElementById('app');
+					if (!appEl || appEl.children.length === 0) {
+						renderStandaloneFallback(appEl);
+					}
+				}, 600);
+			});
+
+			function renderStandaloneFallback(root) {
+				if (!root || root.children.length > 0) return;
+
+				const services = [
+					{
+						index: '01',
+						id: 'landing',
+						title: 'RAHUNOK',
+						tagline: 'Перше знайомство без компромісів',
+						category: 'Головні портали',
+						metric: '0.8%',
+						metricLabel: 'Комісія замість 2%',
+						essence: 'Бездоганна вітрина фінтех-інновацій. Прямі розрахунки без застарілих банківських посередників.',
+						paths: { prod: 'https://rhnk.to/', staging: 'https://rhnk.pp.ua/', local: 'http://localhost:5173/' }
+					},
+					{
+						index: '02',
+						id: 'dashboard',
+						title: 'Merchant Dashboard',
+						tagline: 'Створення рахунку в два дотики',
+						category: 'Інструменти бізнесу',
+						metric: '2 × Enter',
+						metricLabel: 'Клавіатурний UX без мишки',
+						essence: 'Простір, де все підпорядковано швидкості: ввів суму, двічі натиснув Enter — рахунок створено.',
+						paths: { prod: 'https://rhnk.to/dashboard', staging: 'https://rhnk.pp.ua/dashboard', local: 'http://localhost:5173/dashboard' }
+					},
+					{
+						index: '03',
+						id: 'pay',
+						title: 'Pay Checkout',
+						tagline: 'Чиста швидкість розрахунку',
+						category: 'Платіжний досвід',
+						metric: '< 5 мс',
+						metricLabel: 'Відгук із Cloudflare Edge KV',
+						essence: 'Швидкість має значення. Сторінка чекауту з’являється швидше, ніж користувач кліпне оком.',
+						paths: { prod: 'https://rhnk.to/pay', staging: 'https://rhnk.pp.ua/pay', local: 'http://localhost:5174/' }
+					},
+					{
+						index: '04',
+						id: 'merchant-app',
+						title: 'Merchant POS App',
+						tagline: 'Каса, що живе у вашій кишені',
+						category: 'Інструменти бізнесу',
+						metric: '0 грн',
+						metricLabel: 'Витрат на оренду POS-обладнання',
+						essence: 'Фізичний банківський термінал більше не потрібен. Лише смартфон і природний жест пальця.',
+						paths: { prod: 'https://rhnk.to/app', staging: 'https://rhnk.pp.ua/app', local: 'http://localhost:5176/' }
+					},
+					{
+						index: '05',
+						id: 'corex',
+						title: 'Corex Engine',
+						tagline: 'Невидима симфонія бізнес-процесів',
+						category: 'Процесне ядро',
+						metric: '100%',
+						metricLabel: 'Імутабельність аудиту подій',
+						essence: 'Кожна операція — це чіткий математичний граф станів. Безпечний, передбачуваний, незламний.',
+						paths: { prod: 'https://rhnk.to/corex', staging: 'https://rhnk.pp.ua/corex', local: 'http://localhost:5173/corex' }
+					},
+					{
+						index: '06',
+						id: 'delivery',
+						title: 'Delivery Hub',
+						tagline: 'Логістика як природне продовження чека',
+						category: 'Логістика & B2B',
+						metric: '1 км',
+						metricLabel: 'Точність GPS-підбору поштоматів',
+						essence: 'Вибір відділення та розрахунок вартості доставки прямо під час оплати рахунку.',
+						paths: { prod: 'https://rhnk.to/delivery', staging: 'https://rhnk.pp.ua/delivery', local: 'http://localhost:5181/' }
+					},
+					{
+						index: '07',
+						id: 'qr',
+						title: 'QR Studio',
+						tagline: 'Геометрія точного зчитування',
+						category: 'Платіжний досвід',
+						metric: 'QR 003',
+						metricLabel: 'Національний стандарт НБУ',
+						essence: 'Фізичний код, який ніколи не застаріває. Змінюйте суму — наклейка на столі залишається.',
+						paths: { prod: 'https://rhnk.to/qr', staging: 'https://rhnk.pp.ua/qr', local: 'http://localhost:5180/' }
+					},
+					{
+						index: '08',
+						id: 'support',
+						title: 'Support Console',
+						tagline: 'Емпатія на рівні інженерії',
+						category: 'Інструменти бізнесу',
+						metric: '0 ризику',
+						metricLabel: 'Ізольований тестовий контекст',
+						essence: 'Бачити систему очима клієнта. Безпечне моделювання помилок без доступу до приватних паролів.',
+						paths: { prod: 'https://rhnk.to/dashboard/support', staging: 'https://rhnk.pp.ua/dashboard/support', local: 'http://localhost:5173/dashboard/support' }
+					},
+					{
+						index: '09',
+						id: 'platform',
+						title: 'Platform DAC7',
+						tagline: 'Масштаб без регуляторного тертя',
+						category: 'Логістика & B2B',
+						metric: 'DAC7',
+						metricLabel: 'Директива європейської звітності',
+						essence: 'Податкова прозорість європейського рівня для маркетплейсів, агрегаторів та платформ.',
+						paths: { prod: 'https://rhnk.to/platform', staging: 'https://rhnk.pp.ua/platform', local: 'http://localhost:5178/' }
+					},
+					{
+						index: '10',
+						id: 'conf',
+						title: 'Bank Connectors',
+						tagline: 'Нерозривний зв’язок із банками',
+						category: 'Головні портали',
+						metric: 'Live Sync',
+						metricLabel: 'Синхронізація виписок через Open API',
+						essence: 'Прямий пульс банківських рахунків. Кожна гривня зіставляється з рахунком у реальному часі.',
+						paths: { prod: 'https://rhnk.to/conf', staging: 'https://rhnk.pp.ua/conf', local: 'http://localhost:5179/' }
+					},
+					{
+						index: '11',
+						id: 'worker-api',
+						title: 'API Gateway',
+						tagline: 'Фундамент, на якому стоїть усе',
+						category: 'Головні портали',
+						metric: '30+ API',
+						metricLabel: 'Типізованих OpenAPI операцій',
+						essence: 'Глобальна мережа, що обробляє запити біля самого користувача. Надійно. Миттєво. Без збоїв.',
+						paths: { prod: 'https://rhnk.to/api/v1/health', staging: 'https://rhnk.pp.ua/api/v1/health', local: 'http://localhost:8787/api/v1/health' }
+					},
+					{
+						index: '12',
+						id: 'unified-mobile-app',
+						title: 'RAHUNOK One',
+						tagline: 'Майбутнє, що розгортається без встановлення',
+						category: 'Платіжний досвід',
+						metric: '0 сек',
+						metricLabel: 'До першої оплати через App Clips & A2A',
+						essence: 'Apple App Clips та Android Instant Apps запускаються за 0 секунд при скануванні QR чи дотику NFC, а Open Banking проводить пряме списання A2A без посередників.',
+						paths: { prod: 'https://rhnk.to/app', staging: 'https://rhnk.pp.ua/app', local: 'http://localhost:5176/' }
+					},
+					{
+						index: '13',
+						id: 'ai-mcp',
+						title: 'RAHUNOK AI MCP',
+						tagline: 'Природна мова для керування фінансами',
+						category: 'Процесне ядро',
+						metric: 'MCP 1.0',
+						metricLabel: 'Офіційний протокол для автономних ШІ',
+						essence: 'ШІ-агенти отримують офіційний фінансовий протокол. Керування рахунками, виписками та доставкою з Claude, Cursor чи ChatGPT без витоку ключів.',
+						paths: { prod: 'https://rhnk.to/api/mcp', staging: 'https://rhnk.pp.ua/api/mcp', local: 'http://localhost:8787/mcp' }
+					},
+					{
+						index: '14',
+						id: 'audit-logs',
+						title: 'Audit Logs & Telemetry',
+						tagline: 'Абсолютна прозорість кожного байту',
+						category: 'Головні портали',
+						metric: '100% Audit',
+						metricLabel: 'Імутабельність запису кожної дії',
+						essence: 'Імутабельний криптографічний аудит-лог кожної дії. Повна відповідність вимогам банківського нагляду НБУ та внутрішньої безпеки.',
+						paths: { prod: 'https://rhnk.to/dashboard/logs', staging: 'https://rhnk.pp.ua/dashboard/logs', local: 'http://localhost:5173/dashboard/logs' }
+					},
+					{
+						index: '15',
+						id: 'billing-ledger',
+						title: 'Billing & Operations Ledger',
+						tagline: 'Бездоганна математика тарифів та виплат',
+						category: 'Інструменти бізнесу',
+						metric: '0.01 грн',
+						metricLabel: 'Точність обліку операцій у Real-time',
+						essence: 'Автоматичний розрахунок комісій до копійки в реальному часі. Баланс мерчанта, списання за доставку, сплит-виплати та юридичні акти.',
+						paths: { prod: 'https://rhnk.to/dashboard/billing', staging: 'https://rhnk.pp.ua/dashboard/billing', local: 'http://localhost:5173/dashboard/billing' }
+					}
+				];
+
+				let currentEnv = 'prod';
+				let currentIdx = 0;
+
+				function render() {
+					const s = services[currentIdx];
+					const url = s.paths[currentEnv];
+
+					root.innerHTML = `
+						<div class="max-w-6xl mx-auto px-6 sm:px-12 py-12 sm:py-20 flex flex-col justify-between min-h-screen">
+							<header class="flex items-center justify-between pb-8 border-b border-black/[0.05]">
+								<div class="flex items-center gap-3">
+									<div class="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold text-xs">R</div>
+									<span class="text-sm font-semibold tracking-tight">RAHUNOK</span>
+								</div>
+								<div class="inline-flex p-1 rounded-full bg-[#f5f5f7] border border-black/[0.04]">
+									<button onclick="setEnv('prod')" class="px-3 py-1 rounded-full text-[11px] font-medium ${currentEnv === 'prod' ? 'bg-white text-black shadow-sm font-semibold' : 'text-[#86868b]'}">rhnk.to</button>
+									<button onclick="setEnv('staging')" class="px-3 py-1 rounded-full text-[11px] font-medium ${currentEnv === 'staging' ? 'bg-white text-black shadow-sm font-semibold' : 'text-[#86868b]'}">rhnk.pp.ua</button>
+									<button onclick="setEnv('local')" class="px-3 py-1 rounded-full text-[11px] font-medium ${currentEnv === 'local' ? 'bg-white text-black shadow-sm font-semibold' : 'text-[#86868b]'}">localhost</button>
+								</div>
+							</header>
+
+							<main class="my-auto py-12">
+								<div class="flex items-baseline justify-between border-b border-black/[0.05] pb-6 mb-12">
+									<div class="flex items-center gap-3">
+										<span class="text-5xl sm:text-6xl font-light text-[#86868b]/30 font-mono tracking-tighter">${s.index}</span>
+										<div class="h-8 w-px bg-black/[0.08]"></div>
+										<div class="text-[11px] uppercase tracking-widest text-[#86868b] font-medium">${s.category}</div>
+									</div>
+									<div class="flex items-center gap-1.5">
+										${services.map((item, i) => `
+											<button onclick="setSlide(${i})" class="h-1.5 rounded-full transition-all duration-300 ${currentIdx === i ? 'w-8 bg-black' : 'w-1.5 bg-black/15'}"></button>
+										`).join('')}
+									</div>
+								</div>
+
+								<div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+									<div class="lg:col-span-7 space-y-6">
+										<h1 class="text-4xl sm:text-6xl font-semibold tracking-tight text-[#1d1d1f] leading-tight">${s.title}</h1>
+										<p class="text-xl sm:text-2xl text-[#86868b] font-light leading-snug">${s.tagline}</p>
+										<p class="text-base sm:text-lg text-[#1d1d1f]/80 font-normal leading-relaxed pt-2">${s.essence}</p>
+										<div class="pt-6 flex items-center gap-4">
+											<a href="${url}" target="_blank" rel="noopener noreferrer" class="px-8 py-4 rounded-full bg-black text-white hover:bg-black/90 font-medium text-sm transition shadow-md">
+												Відкрити ${s.title} ↗
+											</a>
+											<button onclick="navigator.clipboard.writeText('${url}'); alert('Скопійовано: ${url}')" class="px-5 py-4 rounded-full bg-white border border-black/[0.08] text-xs font-mono text-[#86868b]">
+												${url}
+											</button>
+										</div>
+									</div>
+
+									<div class="lg:col-span-5 bg-white rounded-3xl p-8 border border-black/[0.05] shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-6">
+										<div>
+											<div class="text-5xl sm:text-6xl font-light tracking-tight text-[#1d1d1f]">${s.metric}</div>
+											<div class="text-xs uppercase tracking-wider text-[#86868b] font-medium mt-1">${s.metricLabel}</div>
+										</div>
+										<div class="h-px bg-black/[0.05]"></div>
+										<div class="flex items-center justify-between pt-2">
+											<button onclick="prev()" class="w-10 h-10 rounded-full border border-black/[0.08] bg-white flex items-center justify-center font-bold">←</button>
+											<span class="text-xs text-[#86868b] font-light">Стрілки ← → або Пробіл</span>
+											<button onclick="next()" class="w-10 h-10 rounded-full border border-black/[0.08] bg-white flex items-center justify-center font-bold">→</button>
+										</div>
+									</div>
+								</div>
+							</main>
+
+							<footer class="pt-8 border-t border-black/[0.04] flex items-center justify-between text-xs text-[#86868b] font-light">
+								<div>RAHUNOK · Продумано до найдрібніших деталей в Україні.</div>
+								<div>НБУ QR 003 · RLS Security</div>
+							</footer>
+						</div>
+					`;
+				}
+
+				window.setEnv = (env) => { currentEnv = env; render(); };
+				window.setSlide = (idx) => { currentIdx = idx; render(); };
+				window.next = () => { currentIdx = (currentIdx + 1) % services.length; render(); };
+				window.prev = () => { currentIdx = (currentIdx - 1 + services.length) % services.length; render(); };
+
+				document.addEventListener('keydown', (e) => {
+					if (e.key === 'ArrowRight' || e.key === 'Space') { e.preventDefault(); window.next(); }
+					else if (e.key === 'ArrowLeft') { e.preventDefault(); window.prev(); }
+				});
+
+				render();
+			}
+		</script>
+	</body>
+</html>
