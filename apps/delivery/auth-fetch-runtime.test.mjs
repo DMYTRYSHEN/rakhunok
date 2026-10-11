@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-test('Workers accepts authentication and directory transports without external requests', async () => {
+test('Workers accepts authentication, directory and tracking transports without external requests', async () => {
 	const directory = await mkdtemp(join(tmpdir(), 'delivery-fetch-runtime-'));
 	try {
 		await writeFile(join(directory, 'auth.js'), stripTypeScriptTypes(await readFile(new URL('./src/lib/server/tracking/auth.ts', import.meta.url), 'utf8')));
@@ -19,8 +19,19 @@ test('Workers accepts authentication and directory transports without external r
 		await writeFile(join(directory, 'probe.js'), `
 import { signInWithGoogle } from './auth.js';
 import { NovaPoshtaApi } from './np-api.js';
+import { track } from './carriers.js';
 export default {
   async test() {
+    for (const carrier of ['nova_poshta', 'ukrposhta']) {
+      const result = await track(carrier, '20400000000000', { UKRPOSHTA_TRACKING_TOKEN: 'mock-token' });
+      if (result.trackingState !== 'rate_limited' || result.retryAfterSeconds !== 30) {
+        throw new Error(carrier + ' transport failed: ' + result.trackingState);
+      }
+      const redirected = await track(carrier, '20400000000001', { UKRPOSHTA_TRACKING_TOKEN: 'mock-token' });
+      if (redirected.trackingState !== 'provider_unavailable') throw new Error('Tracking followed redirect');
+      const active = await track(carrier, '20400000000002', { UKRPOSHTA_TRACKING_TOKEN: 'mock-token' });
+      if (active.trackingState !== 'active' || active.deliveryStatus !== 'ready_for_pickup') throw new Error(carrier + ' status lookup failed');
+    }
     const session = await signInWithGoogle('mock.google.token', 'a'.repeat(43), {
       SUPABASE_URL:'https://provider.invalid', SUPABASE_PUBLISHABLE_KEY:'sb_publishable_mock_key'
     });
@@ -49,8 +60,21 @@ export default {
   }
 };`);
 		await writeFile(join(directory, 'provider.js'), `export default {async fetch(request) {
+  if (request.url === 'https://www.ukrposhta.ua/status-tracking/0.0.1/statuses/with-not-found') {
+    const numbers = await request.json();
+    if (numbers[0] === '20400000000002') return Response.json({ found: { [numbers[0]]: [{ barcode: numbers[0], event: 21700, date: '2026-10-07T12:00:00', step: 1 }] }, notFound: [] });
+    return numbers[0] === '20400000000001'
+      ? new Response(null, {status:302,headers:{Location:'https://redirect.invalid'}})
+      : new Response(null, {status:429,headers:{'Retry-After':'30'}});
+  }
   if (request.url === 'https://api.novaposhta.ua/v2.0/json/') {
     const body = await request.json();
+    if (body.modelName === 'TrackingDocumentGeneral') {
+      if (body.methodProperties.Documents[0].DocumentNumber === '20400000000002') return Response.json({ success: true, data: [{ Number: '20400000000002', StatusCode: '7' }], errors: [], errorCodes: [] });
+      return body.methodProperties.Documents[0].DocumentNumber === '20400000000001'
+        ? new Response(null, {status:302,headers:{Location:'https://redirect.invalid'}})
+        : new Response(null, {status:429,headers:{'Retry-After':'30'}});
+    }
     if (body.apiKey || body.modelName !== 'Address') throw new Error('Unexpected directory request');
     if (body.methodProperties.FindByString === 'Redirect') return new Response(null, {status:302,headers:{Location:'https://redirect.invalid'}});
     const cityRef = '11111111-1111-1111-1111-111111111111';

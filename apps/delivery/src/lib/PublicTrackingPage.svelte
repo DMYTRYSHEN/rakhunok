@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { ArrowLeft, Copy, RefreshCw, CircleCheck, Package2, CircleAlert, Clock3 } from '@lucide/svelte';
 	import TrackingHeader from '#lib/TrackingHeader.svelte';
+	import TrackingRoute from '#lib/TrackingRoute.svelte';
 	import { statusLabels, stateLabels, carrierLabels, formatTime } from '#lib/tracking-labels.ts';
 	import type { PublicTrackingResult } from '#lib/server/tracking/public-tracking.ts';
 	let { tracking }: { tracking: PublicTrackingResult } = $props();
@@ -21,9 +22,12 @@
 		<a class="detail-back" href={resolve('/(public)')}><ArrowLeft size={16} /> Новий пошук</a>
 		<section class="detail-status" aria-labelledby="shipment-number">
 			<div class="shipment-heading"><span class="carrier-mark" class:np={tracking.carrier === 'nova_poshta'}><Package2 size={20} /></span><div><p class="carrier">{carrierLabels[tracking.carrier]}</p><p class="eyebrow">Відправлення</p></div></div>
-			<div class="detail-number"><h1 id="shipment-number">{tracking.trackingNumber}</h1><button class="icon-button" title="Копіювати номер" aria-label="Копіювати номер" onclick={copyNumber}><Copy size={18} /></button></div>
+			<div class="detail-number tracking-query"><h1 id="shipment-number">{tracking.trackingNumber}</h1><button class="icon-button" title="Копіювати номер" aria-label="Копіювати номер" onclick={copyNumber}><Copy size={18} /></button></div>
 			<div class="delivery-state" class:delivered class:unconfirmed={!confirmed}><span class="status-symbol">{#if delivered}<CircleCheck size={28} />{:else if confirmed}<Package2 size={28} />{:else}<CircleAlert size={28} />{/if}</span><div><p class="eyebrow">Статус доставки</p><h2>{confirmed ? statusLabels[tracking.deliveryStatus] : stateLabels[tracking.trackingState]}</h2></div></div>
 			{#if !confirmed}<p class="notice">Статус доставки не підтверджено. Спробуйте повторити перевірку пізніше.</p>{/if}
+			{#key `${tracking.trackingNumber}:${tracking.checkedAt}`}
+				<TrackingRoute {tracking} />
+			{/key}
 			<div class="verification"><div class="checked"><Clock3 size={17} /><div><span>Остання перевірка</span><time datetime={tracking.checkedAt}>{formatTime(tracking.checkedAt)}</time></div></div><a class="retry" href={`${resolve('/(public)/[trackingNumber]', { trackingNumber: tracking.trackingNumber })}?carrier=${tracking.carrier}`} data-sveltekit-reload><RefreshCw size={17} /> Перевірити знову</a></div>
 			<p class="feedback" role="status">{feedback}</p>
 		</section>

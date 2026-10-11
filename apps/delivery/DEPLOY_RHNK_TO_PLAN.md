@@ -1,11 +1,67 @@
 # Delivery Deployment Plan: rhnk.to
 
-Date: 2026-10-10
-Status: isolated Delivery directory transport fix deployed; historical releases below.
+Date: 2026-10-12
+Status: isolated Delivery login referrer-policy fix deployed; historical releases below.
 The user approved preparation and deployment conditional on working flows and
 no impact on other services. Migrations 001 through 008 were separately approved
 and applied to the exact delivery-rhnk Turso database. The subsequent point
 accumulation request authorized migration 009 and the conditional isolated release.
+
+## Login Referrer Policy Release: 2026-10-12
+
+- User separately approved this production deployment. Cloudflare confirmed
+   version 70934f9c-7730-4044-8e86-653bbc0c345f on rhnk-to-delivery, with only
+   rhnk.to/delivery and rhnk.to/delivery/* routes. Previous version for a
+   separately approved rollback: 5a6700f6-30f6-4fec-ab7b-75be7668dc08.
+- The login document now sets meta referrer=same-origin. Native browser POST
+   under a no-referrer document policy sends Origin: null, which production
+   SvelteKit rejects. A tracking document can retain that policy through SPA
+   navigation. The local regression verifies the login override restores Origin
+   without disabling CSRF, changing nonce checks or changing token validation.
+- Validation on localhost:5173: native login form reaches its action under a
+   no-referrer response header, with external requests blocked. The installed
+   SvelteKit production CSRF predicate rejects null, missing and foreign origins.
+   SvelteKit dev skips this guard, so dev HTTP status alone is not proof of CSRF.
+   All 23 auth/login-route tests passed. Svelte check: zero errors and eight
+   existing settings warnings; the modified head passed Svelte autofixer.
+- Fresh production build and guarded dry-run passed: 100 asset files,
+   904.68 KiB Worker upload, 186.19 KiB gzip. Startup time: 14 ms.
+- No database, provider configuration or sibling Worker changes. Existing
+   Delivery secrets were resupplied without intentional rotation. Production
+   application tests were not performed under the localhost:5173-only restriction;
+   real production Google sign-in remains unverified.
+
+## Public Tracking Motion And Transport Release: 2026-10-12
+
+- The user explicitly approved implementation and deployment of the public
+   tracking search-to-route scenario. Cloudflare confirmed version
+   5a6700f6-30f6-4fec-ab7b-75be7668dc08 on rhnk-to-delivery, with only
+   rhnk.to/delivery and rhnk.to/delivery/* routes. Previous deployed version
+   for a separately approved rollback: 79103e94-444f-4473-97cc-a4b8c8cd3192.
+- Public search and tracking results share a View Transition, with a pending
+   indicator and staggered delivery-stage reveal. The schematic highlights
+   only the current carrier status; it does not invent history, coordinates,
+   timestamps or completion of earlier stages. No Three.js or 3D scene was added.
+- Keyboard and reduced-motion navigation skip motion; browsers without the
+   View Transition API retain normal navigation. Transitions are restricted
+   to public search and tracking routes, excluding login and business routes.
+   Existing wizard and modal motion respects the same input preferences.
+- Nova Poshta and Ukrposhta tracking now use redirect: manual because native
+   Workers rejects redirect: error. Redirect responses remain rejected without
+   following them. Native Workers tests verify success, rate limits and 302
+   rejection against an internal mock provider, without external requests.
+- Validation: all 35 focused tracking/native transport tests and all eight
+   localhost:5173 live-route browser scenarios passed. The local GPS, wizard
+   and modal regression passed; its known Vite HMR WebSocket warning remains.
+   Svelte check reported zero errors and eight existing settings accessibility
+   warnings. Svelte autofixer reported no issues in the modified UI slices.
+- Production build and guarded dry-run passed: 100 asset files, 904.61 KiB
+   Worker upload, 186.17 KiB gzip. Cloudflare reported startup time of 18 ms.
+- No database migration, auth change or sibling Worker deployment was made.
+   Existing Delivery secrets were resupplied without intentional rotation.
+   Production application requests were not performed because testing remains
+   restricted to localhost:5173. Deployment is confirmed by Cloudflare;
+   production carrier availability and end-to-end rendering remain unverified.
 
 ## Browser-Only Point Catalog: Deployed, 2026-10-10
 

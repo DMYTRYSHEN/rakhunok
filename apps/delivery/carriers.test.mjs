@@ -16,7 +16,7 @@ test('NP uses documented JSON model, minimal documents and optional API key', as
 			calls++;
 			assert.equal(url, 'https://api.novaposhta.ua/v2.0/json/');
 			assert.equal(options.method, 'POST');
-			assert.equal(options.redirect, 'error');
+			assert.equal(options.redirect, 'manual');
 			assert.ok(options.signal instanceof AbortSignal);
 			assert.deepEqual(JSON.parse(options.body), {
 				...(key ? { apiKey: key } : {}), modelName: 'TrackingDocumentGeneral',
@@ -40,7 +40,7 @@ test('UP requires token and uses documented read-only history/notFound request',
 		assert.equal(url, 'https://www.ukrposhta.ua/status-tracking/0.0.1/statuses/with-not-found');
 		assert.equal(options.headers.Authorization, 'Bearer mock-token');
 		assert.equal(options.method, 'POST');
-		assert.equal(options.redirect, 'error');
+		assert.equal(options.redirect, 'manual');
 		assert.deepEqual(JSON.parse(options.body), [number]);
 		return Response.json(up([upEvent(10100)]));
 	});

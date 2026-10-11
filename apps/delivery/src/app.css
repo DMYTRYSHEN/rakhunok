@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+:root { --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --motion-press: 160ms; --motion-enter: 200ms; }
+
+.tracking-query { view-transition-name: tracking-query; }
+.query-pending { position: relative; overflow: hidden; }
+.query-pending::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: #267260; transform-origin: left; }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion-input='keyboard']) .query-pending::after { animation: tracking-request 1.2s ease-in-out infinite; }
+  ::view-transition-group(tracking-query) { animation-duration: 360ms; animation-timing-function: var(--ease-out); }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 180ms; }
+}
+@keyframes tracking-request { 0% { transform: translateX(-100%) scaleX(.35); } 100% { transform: translateX(100%) scaleX(.35); } }
+
 .tracking-page { min-height: 100dvh; background: #fff; color: #222; --color-border-default: #e8e8e8; --color-text-secondary: #666; }
 .tracking-header { max-width: 1240px; min-height: 88px; margin: auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--color-border-default); }
 .wordmark { display: inline-flex; align-items: center; gap: 11px; font-size: 21px; font-weight: 800; text-decoration: none; }
@@ -41,7 +53,7 @@
 .section-heading h2 { font-size: 16px; font-weight: 650; }
 .shipment-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .shipment-ticket { display: block; padding: 21px 20px 0; border: 1px solid #dce1d3; border-radius: 8px; background: #fff; transition: border-color .2s, transform .2s, box-shadow .2s; min-width: 0; }
-.shipment-ticket:hover { border-color: #99ad71; transform: translateY(-3px); box-shadow: 0 9px 22px #29302909; }
+@media (hover: hover) and (pointer: fine) { .shipment-ticket:hover { border-color: #99ad71; transform: translateY(-2px); box-shadow: 0 9px 22px #29302909; } }
 .ticket-header { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 600; }
 .carrier-monogram { width: 29px; height: 29px; display: inline-grid; place-items: center; border-radius: 5px; font-size: 10px; font-weight: 800; flex-shrink: 0; }
 .carrier-monogram.red { background: #fae9e5; color: #b84130; }.carrier-monogram.yellow { background: #fbf0be; color: #7b6211; }
@@ -58,7 +70,37 @@
 .business-entry h2 { font-size: 16px; font-weight: 650; }.business-entry div > span { display: block; font-size: 12px; color: #737b68; margin-top: 5px; }
 .entry-arrow { margin-left: auto; display: grid; place-items: center; width: 46px; height: 46px; border: 1px solid #e5e5e5; border-radius: 50%; transition: background .2s; }.business-entry:hover .entry-arrow { background: #f4f4f4; }
 .tracking-footer { max-width: 1160px; margin: auto; padding: 30px 40px; display: flex; align-items: center; gap: 22px; font-size: 10px; color: #707963; }.tracking-footer > span:first-child { font-weight: 700; }.tracking-footer > a { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; min-height: 36px; }
-@media (prefers-reduced-motion: no-preference) { .search-workspace, .shipment-section { animation: enter .5s ease-out both; }.shipment-section { animation-delay: .08s; } @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } } }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion-input='keyboard']) :is(button, .search-submit, .new-shipment, .document-links a) {
+    transition: transform var(--motion-press) var(--ease-out), opacity var(--motion-press) ease;
+  }
+  :root:not([data-motion-input='keyboard']) :is(button, .search-submit, .new-shipment, .document-links a):active:not(:disabled) { transform: scale(.97); }
+  :root:not([data-motion-input='keyboard']) :is(.search-workspace, .shipment-section, .shipping-page fieldset:not([hidden]), .shipping-page .review, .shipping-page .seat, .shipping-page .result, .shipping-page .notice, .shipping-page .nearby, .business-content .empty, .form-error) {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity var(--motion-enter) var(--ease-out), transform var(--motion-enter) var(--ease-out);
+    @starting-style { opacity: 0; transform: translateY(6px); }
+  }
+  :root:not([data-motion-input='keyboard']) dialog.sheet {
+    opacity: 0;
+    transform: translateY(12px) scale(.97);
+    transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out), display 160ms allow-discrete, overlay 160ms allow-discrete;
+  }
+  :root:not([data-motion-input='keyboard']) dialog.sheet[open] {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition-duration: 250ms;
+    @starting-style { opacity: 0; transform: translateY(12px) scale(.97); }
+  }
+  :root:not([data-motion-input='keyboard']) dialog.sheet::backdrop {
+    opacity: 0;
+    transition: opacity 160ms var(--ease-out), display 160ms allow-discrete, overlay 160ms allow-discrete;
+  }
+  :root:not([data-motion-input='keyboard']) dialog.sheet[open]::backdrop {
+    opacity: 1;
+    @starting-style { opacity: 0; }
+  }
+}
 @media (max-width: 900px) { .shipment-grid { gap: 10px; }.shipment-ticket { padding-inline: 14px; }.ticket-route { gap: 7px; font-size: 16px; } }
 @media (max-width: 700px) {
   .tracking-header { padding: 14px 20px; min-height: 74px; gap: 12px; }.wordmark { font-size: 18px; }.wordmark-suffix { display: none; }.tracking-header nav { gap: 16px; }.tracking-header .header-search { display: none; }.business-link { border: 0; padding: 0; }
@@ -66,7 +108,7 @@
   .search-field { flex-wrap: wrap; gap: 10px; padding: 10px; }.search-field > svg { margin-left: 5px; width: 20px; }.search-field input { flex-basis: 140px; font-size: 16px; }.clear-search { width: 32px; }.search-submit { width: 100%; min-height: 48px; justify-content: space-between; padding-inline: 18px; }
   .carrier-strip { gap: 12px 19px; font-size: 11px; margin-top: 20px; }.planned-carrier { width: 100%; }.shipment-grid { grid-template-columns: 1fr; gap: 12px; }.shipment-ticket { padding: 18px 20px 0; }.ticket-route { margin: 18px 0 13px; font-size: 20px; gap: 14px; }.ticket-bottom { padding-block: 13px; }.ticket-number { font-size: 13px; }.journey-segments { margin-bottom: 15px; }.section-heading h2 { font-size: 14px; }.section-heading > div { gap: 11px; }.tracking-footer { padding: 24px 20px; gap: 12px; }.business-entry { gap: 13px; }.business-entry h2 { font-size: 14px; }
 }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } .shipment-ticket:hover { transform: none; } }
 
 @theme {
   --font-sans: 'Manrope Variable', sans-serif;

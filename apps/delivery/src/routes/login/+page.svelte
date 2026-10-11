@@ -41,7 +41,10 @@
 	});
 </script>
 
-<svelte:head><title>Вхід | Rahunok Delivery</title></svelte:head>
+<svelte:head>
+	<title>Вхід | Rahunok Delivery</title>
+	<meta name="referrer" content="same-origin" />
+</svelte:head>
 <main>
 	<section aria-labelledby="login-title">
 		<a href={resolve('/(public)')} class="brand"><Package2 size={28} /> rahunok / delivery</a>

@@ -274,7 +274,7 @@ export async function track(
 			headers: { 'Content-Type': 'application/json', Accept: 'application/json', token: meestToken! }
 		}) : await transport(isNp ? 'https://api.novaposhta.ua/v2.0/json/' :
 			'https://www.ukrposhta.ua/status-tracking/0.0.1/statuses/with-not-found', {
-			method: 'POST', redirect: 'error', signal: controller.signal,
+			method: 'POST', redirect: 'manual', signal: controller.signal,
 			headers: { 'Content-Type': 'application/json', Accept: 'application/json',
 				...(!isNp ? { Authorization: `Bearer ${upToken}` } : {}) },
 			body: JSON.stringify(isNp ? {

@@ -42,9 +42,14 @@ try {
 		return route.fulfill({ json: { data: kind === 'cities' ? [city] : points, hasMore: false } });
 	});
 	await page.route('**/__gps_test', route => route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/src/app.css"></head><body><div id="app"></div><script type="module">
-		import { mount } from '/node_modules/.vite/deps/svelte.js';
+		import { mount, unmount, createRawSnippet } from '/node_modules/.vite/deps/svelte.js';
+		import Layout from '/src/routes/+layout.svelte';
 		import Wizard from '/src/routes/(business)/business/new/+page.svelte';
-		mount(Wizard, { target: document.getElementById('app'), props: { data: { userId: 'gps-test', defaultSenderRef: '${senderRef}', defaultContactRef: '${contactRef}', contacts: [{ ref: '${contactRef}', name: 'Sender Contact', phone: '+380671234567' }], defaultsWarning: '', senders: [{ ref: '${senderRef}', name: 'Test Sender' }], documents: [{ id: '${issuedId}', state: 'issued', trackingNumber: '20400000000001', createdAt: '2026-10-01T10:00:00Z' }, { id: 'unknown', state: 'outcome_unknown', trackingNumber: null, createdAt: '2026-10-01T11:00:00Z' }], accountError: '', documentsError: '', attemptId: '${attemptId}' }, form: null } });
+		const children = createRawSnippet(() => ({ render: () => '<div></div>', setup(target) {
+			const wizard = mount(Wizard, { target, props: { data: { userId: 'gps-test', defaultSenderRef: '${senderRef}', defaultContactRef: '${contactRef}', contacts: [{ ref: '${contactRef}', name: 'Sender Contact', phone: '+380671234567' }], defaultsWarning: '', senders: [{ ref: '${senderRef}', name: 'Test Sender' }], documents: [{ id: '${issuedId}', state: 'issued', trackingNumber: '20400000000001', createdAt: '2026-10-01T10:00:00Z' }, { id: 'unknown', state: 'outcome_unknown', trackingNumber: null, createdAt: '2026-10-01T11:00:00Z' }], accountError: '', documentsError: '', attemptId: '${attemptId}' }, form: null } });
+			return () => unmount(wizard);
+		} }));
+		mount(Layout, { target: document.getElementById('app'), props: { children } });
 	</script></body></html>` }));
 	await page.goto('http://localhost:5173/__gps_test');
 	await expect(page.locator('select[name="senderRef"]')).toHaveValue(senderRef);
@@ -70,6 +75,8 @@ try {
 	await expect(page.locator('select[name="contactRef"]')).toHaveValue(contactRef);
 	assert.equal(accountRequests, 1);
 	await page.locator('.wizard-actions .primary').click();
+	assert.equal(await page.evaluate(() => document.documentElement.dataset.motionInput), 'pointer');
+	assert.equal(await page.locator('fieldset[data-step="1"]').first().evaluate(element => getComputedStyle(element).transitionDuration), '0.2s, 0.2s');
 	await page.locator('#recipient-city-query').fill(city.name);
 	await page.locator('#recipient-city-query').press('Enter');
 	await page.locator('#recipient-city').selectOption(city.ref);
@@ -92,6 +99,56 @@ try {
 		assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 		await page.screenshot({ path: fileURLToPath(new URL(`../../../test-results/delivery-wizard-${width}.png`, import.meta.url)), fullPage: true });
 	}
+	if (process.argv.includes('--gps-only')) {
+		await page.locator('.steps button').first().focus();
+		await page.keyboard.press('Enter');
+		await expect(page.locator('#sender-city')).toBeVisible();
+		assert.equal(await page.evaluate(() => document.documentElement.dataset.motionInput), 'keyboard');
+		assert.equal(await page.locator('fieldset[data-step="0"]').first().evaluate(element => getComputedStyle(element).transitionDuration), '0s');
+		await page.emulateMedia({ reducedMotion: 'reduce' });
+		await page.locator('.wizard-actions .primary').click();
+		assert.equal(await page.locator('fieldset[data-step="1"]').first().evaluate(element => getComputedStyle(element).transitionDuration), '0s');
+		await expect(page.locator('fieldset[data-step="1"]').first()).toBeVisible();
+		assert.deepEqual(errors, []);
+	}
+	const dialogPage = await context.newPage();
+	dialogPage.on('pageerror', error => errors.push(error.message));
+	await dialogPage.route('**/__motion_dialog_test', route => route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="app"></div><script type="module">
+		import { mount, unmount, createRawSnippet } from '/node_modules/.vite/deps/svelte.js';
+		import Layout from '/src/routes/+layout.svelte';
+		import Shipments from '/src/routes/(business)/business/+page.svelte';
+		const children = createRawSnippet(() => ({ render: () => '<div></div>', setup(target) {
+			const shipments = mount(Shipments, { target, props: { data: { shipments: [] }, form: null } });
+			return () => unmount(shipments);
+		} }));
+		mount(Layout, { target: document.getElementById('app'), props: { children } });
+	</script></body></html>` }));
+	await dialogPage.goto('http://localhost:5173/__motion_dialog_test');
+	const openDialog = dialogPage.locator('.header-actions button');
+	const dialog = dialogPage.locator('dialog').first();
+	for (const width of [1440, 390]) {
+		await dialogPage.setViewportSize({ width, height: 900 });
+		await openDialog.click();
+		await expect(dialog).toBeVisible();
+		assert.match(await dialog.evaluate(element => getComputedStyle(element).transitionDuration), /^0\.25s/);
+		await expect(dialog).toHaveCSS('opacity', '1');
+		assert.equal(await dialogPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+		await dialog.locator('header button').click();
+		await expect(dialog).toBeHidden();
+	}
+	await openDialog.focus();
+	await dialogPage.keyboard.press('Enter');
+	await expect(dialog).toBeVisible();
+	await expect(dialog).toHaveCSS('transition-duration', '0s');
+	await dialogPage.keyboard.press('Escape');
+	await expect(dialog).toBeHidden();
+	await dialogPage.emulateMedia({ reducedMotion: 'reduce' });
+	await openDialog.click();
+	await expect(dialog).toBeVisible();
+	await expect(dialog).toHaveCSS('transition-duration', '0s');
+	await expect(dialog).toHaveCSS('opacity', '1');
+	assert.deepEqual(errors, []);
+	await dialogPage.close();
 	if (!process.argv.includes('--gps-only')) {
 	let submissions = 0;
 	let release;

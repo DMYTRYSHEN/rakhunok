@@ -59,9 +59,9 @@
 		<section class="search-workspace" aria-labelledby="tracking-title">
 			<div class="section-overline"><span class="signal-dot"></span> ВІДСТЕЖЕННЯ ВІДПРАВЛЕНЬ</div>
 			<h1 id="tracking-title">Ваша посилка.<br /><span>Усе під контролем.</span></h1>
-			<form class="tracking-form" onsubmit={handleSubmit}>
+			<form class="tracking-form" onsubmit={handleSubmit} aria-busy={submitting}>
 				<label for="tracking-number">Номер накладної</label>
-				<div class="search-field"><Search size={23} strokeWidth={1.7} />
+				<div class="search-field tracking-query" class:query-pending={submitting}><Search size={23} strokeWidth={1.7} />
 					<input id="tracking-number" name="tracking" bind:value={trackingNumber} placeholder="Номер відправлення" maxlength={64} pattern={'[A-Za-z0-9]{1,64}'} required autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="tracking-disclosure" />
 					{#if trackingNumber}<button type="button" class="icon-button clear-search" title="Очистити номер" aria-label="Очистити номер" onclick={() => trackingNumber = ''}><X size={18} /></button>{/if}
 					<button type="submit" class="search-submit" disabled={!trackingNumber.trim() || submitting}><span>{submitting ? 'Відкриваємо' : 'Відстежити'}</span><ArrowRight size={19} /></button>

@@ -348,6 +348,26 @@
 			"isBackground": true,
 			"problemMatcher": [],
 			"group": "build"
+		},
+		{
+			"label": "Delivery local 5173",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"D:/svetle/corex/apps/delivery",
+				"run",
+				"dev",
+				"--",
+				"--host",
+				"localhost",
+				"--port",
+				"5173",
+				"--strictPort"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
 		}
 	]
 }
